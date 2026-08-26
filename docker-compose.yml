@@ -1,0 +1,22 @@
+name: oinur-dev
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: oinur-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-oinur}
+      MYSQL_USER: ${MYSQL_USER:-oinur}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-oinur}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+    ports: ['3306:3306']
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_0900_ai_ci]
+    volumes: [dbdata:/var/lib/mysql]
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+volumes:
+  dbdata:
