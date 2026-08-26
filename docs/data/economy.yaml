@@ -1,0 +1,218 @@
+# ======================================================================
+# OInurturning 全局经济常数  docs/data/economy.yaml
+# 版本 v0.1（2026-08-26）
+# 权威依据：GAME-DESIGN.md §16（经济闭环）；剧情奖励框架见 §13、PVP 见 §14
+#
+# 【校准目标】中期玩家画像：5 名学员、综合能力≈NOIP 水平（40–60）、声誉≈200。
+#   周收支 ≈ 持平略正：收入/支出比目标区间 [0.9, 1.15]（ROADMAP T5.1 验收线），
+#   大件消费（紫级书 / 精能核心 / 心流引擎等）靠攒 2–6 周。
+# 【纪律】代码不得硬编码本文件任何数值；平衡调整只改这里，PR 附收支模拟对比（ROADMAP 横切约定）。
+# 【交叉一致性】lecture.thresholds 与 systems/gameplay.md 必须一致；
+#   剧情出战体力/通关线与 systems/progression.md 一一对应。
+# ======================================================================
+
+meta:
+  version: "0.1"
+  updated: "2026-08-26"
+  calibration_profile:
+    students: 5
+    ability_level: noip          # 综合能力约 45–55
+    reputation: 200
+    target_income_expense_ratio: [0.90, 1.15]
+
+# ----------------------------------------------------------------------
+# 训练支出（GAME-DESIGN §9）
+# 费用公式：cost = round(money_base × (1 + student_coeff × (在册学员数 − 1)))
+# 收益递减曲线 Δ = base × (1 − cur/cap)^k 的曲线常数由 systems/gameplay.md 定义，
+# 本文件只管钱与体力。
+# ----------------------------------------------------------------------
+training:
+  cost_formula: "round(money_base * (1 + student_coeff * (owned_students - 1)))"
+  student_coeff: 0.08            # 学员数线性系数
+  basic:                         # 基础训练：随机提升六维之一
+    money_base: 60
+    stamina_cost: 1
+  directed:                      # 定向训练：指定维度，消耗对应书籍 1 册
+    money_base: 150
+    stamina_cost: 1
+    book_consumed: 1             # 书籍单价见 items.yaml book-* 系列
+  specialized:                   # 专项训练：消耗自制预制题，效率高于定向（效率倍率见 gameplay.md）
+    money_base: 100
+    stamina_cost: 1
+    premade_problem_consumed: 1
+  # 示例表（basic / directed / specialized，单位金币）：
+  #   n=1: 60 / 150 / 100      n=2: 65 / 162 / 108     n=3: 70 / 174 / 116
+  #   n=4: 74 / 186 / 124      n=5: 79 / 198 / 132     n=6: 84 / 210 / 140
+  #   n=8: 94 / 234 / 156      n=10: 103 / 258 / 172
+
+# ----------------------------------------------------------------------
+# 招募支出（GAME-DESIGN §12）
+# ----------------------------------------------------------------------
+recruitment:
+  recruit_cost_formula: "round(recruit_base * recruit_growth ^ owned_students) * quality_mult"   # owned_students = 招募前的在册数
+  recruit_base: 300              # 第一名普通人 300 金
+  recruit_growth: 1.35           # 递增曲线
+  quality_mult: { common: 1.0, good: 1.5, elite: 2.5, genius: 5.0 }   # 品质定价系数（gameplay.md §4.1 / student.md §3.6 同步）
+  quality_note: 品质档权重与声誉属性加成数值由 systems/gameplay.md / systems/student.md 定义
+  manual_refresh:
+    price_formula: "round(refresh_base * refresh_growth ^ refreshes_done_today)" # 当日第 k 次（k 从 0 计）
+    refresh_base: 100
+    refresh_growth: 1.5
+    daily_price_cap: 800         # 当日刷到第 6 次起封顶 800
+    free_interval_hours: 24      # 免费刷新间隔（机制归 gameplay.md，此处仅记录默认值）
+  # 示例表（招募费，招募前学员数 n → 价格）：
+  #   0→300  1→405  2→547  3→738  4→996  5→1345  6→1816
+  #   7→2452  8→3310  9→4468  10→6032  11→8143
+  # 刷新价序列：100 → 150 → 225 → 338 → 506 → 759 → 800(封顶)
+
+# ----------------------------------------------------------------------
+# 讲课收入（GAME-DESIGN §12，主收入来源）
+# 报酬公式：pay = round(base_money × rep_mult × overflow_mult)
+# ----------------------------------------------------------------------
+lecture:
+  audience_tiers:
+    - id: beginner               # 入门组
+      threshold: 15              # 综合能力门槛 —— 与 systems/gameplay.md 保持一致
+      base_money: 60             # 基础金钱报酬
+      base_reputation: 1         # 基础声誉报酬
+    - id: junior                 # 普及组
+      threshold: 30              # —— 与 systems/gameplay.md 保持一致
+      base_money: 150
+      base_reputation: 2
+    - id: senior                 # 提高组
+      threshold: 45              # —— 与 systems/gameplay.md 保持一致
+      base_money: 300
+      base_reputation: 4
+    - id: provincial             # 省选组
+      threshold: 62              # —— 与 systems/gameplay.md 保持一致
+      base_money: 800
+      base_reputation: 8
+    - id: national               # 国家队集训队
+      threshold: 80              # —— 与 systems/gameplay.md 保持一致
+      base_money: 2000
+      base_reputation: 15
+  reputation_pay_curve:          # 声誉影响报酬总额的曲线
+    formula: "rep_mult = clamp(1 + reputation / rep_divisor, min_mult, max_mult)"
+    rep_divisor: 500             # 声誉 200 → ×1.40；500 → ×2.00；≥1000 → 封顶
+    min_mult: 1.0
+    max_mult: 3.0
+    # 提高组示例：rep 0→300 / 100→360 / 200→420 / 500→600 / 1000+(cap)→900
+  overflow_bonus:                # 能力溢出门槛的额外加成
+    rule: 每高出门槛 overflow_step 点，报酬 +overflow_pct（按完整步数叠加），上限 overflow_cap_pct
+    overflow_step: 5
+    overflow_pct: 0.20
+    overflow_cap_pct: 1.00       # 最高 +100%
+  forced_taking_penalty_note: 能力不足强行接单扣声誉，具体数值由 systems/gameplay.md 定义
+  stamina_assumption: 每次讲课扣 2 点体力 —— 以 systems/gameplay.md 最终定义为准，本文件收支测算按此假设
+  frequency_cap_note: 讲课次数限制机制由 systems/gameplay.md 定义（ROADMAP T3.5）
+
+# ----------------------------------------------------------------------
+# 赛事与剧情奖金（GAME-DESIGN §13.3；细则见 systems/progression.md §1.9）
+# ----------------------------------------------------------------------
+contest:
+  rank_prize_formula: "prize = round(M[chapter] * rank_coeff * (1 + 0.5 * ng_layer))"
+  rank_coeffs:
+    champion: 0.30               # 冠军
+    runner_up: 0.20              # 亚军
+    third_to_eighth: 0.10        # 第三至八名
+  ngplus_money_multiplier:
+    formula: "mult(k) = 1 + 0.5 * k"
+    applies_to: 首通金钱奖励与重复通关名次奖金
+    excluded: 进阶石等里程碑道具一律不乘算（GAME-DESIGN §13.3 红线）
+  m_table_ref: M/S/U 表以 GAME-DESIGN §13.2 为准，逐关数值落在 docs/data/stages.yaml
+
+# ----------------------------------------------------------------------
+# 剧情模式进程常数（定义处：systems/progression.md §1）
+# ----------------------------------------------------------------------
+story:
+  stamina_cost:                  # 每关每次出战的体力扣减（出战学员）
+    chapters_1_to_4: 1           # CSP-J / CSP-S / NOIP / 省选
+    chapters_5_to_8: 2           # NOI / CTT / CTS / IOI
+  clear_rank_line_formula: "max(4, floor(npc_pool_size / 2))"   # 默认池 16 人 → 前 8 通关；池规模由 stages.yaml 给出
+  retry_rule: 失败无惩罚可重打，每次重打重新扣体力（progression.md §1.5）
+  fullclear_bonus_gold: 500000   # 一周目全通大额结算金（progression.md §1.7）
+  legend_box_gold: 200000        # 传说礼盒开启所得结算金（与 items.yaml legend-box.contents 一致）
+  ngplus_layer_fullclear_stones: 5   # NG+ 每层全通固定发放的进阶石（不乘算）
+  daily_rank_prize_cap_per_stage: 3  # 同一关卡每日名次奖金结算上限，超出无奖金仍可打
+
+# ----------------------------------------------------------------------
+# PVP 经济相关（细则见 systems/progression.md §2）
+# ----------------------------------------------------------------------
+pvp:
+  sizes: [8, 16, 32]
+  min_players_to_start: 4        # 低于此数赛事取消并全员退票
+  entry_ticket_per_registration: 1   # 报名消耗报名券数量（items.yaml entry-ticket）
+  refund_first_round_winners: 1  # 首轮获胜者返票数量
+  submitted_problems_max: 2      # 报名时可提交入赛场题池的自制预制题上限
+  problem_reputation_per_unsolved: 2 # 对手未解出你的携带题时的声誉收益
+  problem_rep_cap_per_match: 1   # 同一道题同一场对决最多计费次数（防刷）
+  problem_rep_cap_per_tournament: 12 # 单道题单届锦标赛声誉收益上限
+  champion_exhibition_reputation: 5  # 冠亚军表演加场胜方额外声誉
+  round_interval_hours_min: 24   # 轮次最小间隔（战报查阅期）
+
+# ----------------------------------------------------------------------
+# 历练奇遇类直接给钱事件的金额区间表（GAME-DESIGN §10；事件定义见 docs/data/events.yaml）
+# 适用于奇遇/试炼/人情类直接发钱事件（G1/G7/Y1 等）；对决类奖励另见 events.yaml
+# ----------------------------------------------------------------------
+adventure:
+  money_ranges_by_rarity:
+    gray:     {min: 20, max: 60}
+    yellow:   {min: 50, max: 150}
+    green:    {min: 120, max: 320}
+    blue:     {min: 300, max: 800}
+    purple:   {min: 800, max: 2000}
+    colorful: {min: 2000, max: 5000}
+  note: 区间内均匀取整；中期玩家主要摸到 gray/green 档（均值约 60/220），收支测算按混合均值 ~120/次计。
+
+# ----------------------------------------------------------------------
+# 被动收入（历练长线契约）
+# ----------------------------------------------------------------------
+passive:
+  sponsor_contract_p4:           # 商业赞助谈判（events.yaml P4，签契约时消耗声誉）
+    daily_income_min: 80
+    daily_income_max: 300
+    contract_days: 14            # 到期自动终止，需重新触发事件续签
+    max_active_contracts: 2
+  substitute_coach_y6:           # 代课教练（events.yaml Y6 结识，声誉达标后雇佣）
+    player_share_ratio: 0.60     # 玩家抽成比例（教练拿其余 40%）
+    passive_lectures_per_week: 3 # 教练每周代课次数
+    tier_cap: junior             # 代课只接普及组及以下课程（base_money 150）
+    # 单教练周收入期望 ≈ 150 × 0.6 × 3 ≈ 270 金，定位为锦上添花而非主力收入
+    reputation_gate_note: 雇佣门槛由 Y6 事件定义（events.yaml）
+
+# ----------------------------------------------------------------------
+# 支出端清单与典型一周估算（校准画像：5 学员 / 综合≈50 / 声誉 200）
+# 体力预算假设：按 GAME-DESIGN §4「每日上线安排一轮行动」节奏，每学员每周有效行动约 5 次
+# （体力上限 5、离线持续恢复），全队周行动 ≈ 25 次，分配为：
+#   讲课 ×5（每次 2 体力，假设值，最终以 systems/gameplay.md 为准）
+#   ＋ 训练 ×10（每次 1 体力）＋ 历练 ×5 ＋ 剧情重复通关 ×5
+# ----------------------------------------------------------------------
+sinks_summary:
+  expense_items:                 # 支出端清单（GAME-DESIGN §16）
+    - {item: 基础训练, weekly_estimate: 395, calc: "79×5 次"}
+    - {item: 定向训练, weekly_estimate: 792, calc: "198×4 次"}
+    - {item: 定向书籍消耗, weekly_estimate: 1280, calc: "绿级均价 320×4 册"}
+    - {item: 专项训练, weekly_estimate: 264, calc: "132×2 次（自产预制题）"}
+    - {item: 学员池手动刷新, weekly_estimate: 150, calc: "均价 150×1 次"}
+    - {item: 招募摊销, weekly_estimate: 673, calc: "每两周招 1 名 @n=5 价 1345"}
+    - {item: 应急杂项（奶茶/药水/事件修理）, weekly_estimate: 250, calc: "经验值"}
+  expense_total_weekly: 3804
+  income_items:                  # 收入端清单（GAME-DESIGN §16）
+    - {item: 讲课（提高组×5）, weekly_estimate: 2520, calc: "300×rep1.40×溢出1.20≈504/次"}
+    - {item: 历练掉钱（×5）, weekly_estimate: 600, calc: "混合均值 120/次"}
+    - {item: 剧情名次奖金（NOIP 章重复×2 场）, weekly_estimate: 600, calc: "300~900/场"}
+    - {item: 被动收入（赞助或代课，部分周生效）, weekly_estimate: 200, calc: "期望摊销"}
+  income_total_weekly: 3920
+  canonical_week:
+    ratio: 1.03                  # 3920 / 3804，落于目标区间 [0.90, 1.15]
+    net_weekly: 116              # ≈ 持平略正
+    big_ticket_cadence: 紫级书 2600 / 精能核心 3200 / 心流引擎 4800 ≈ 攒 2–6 周（视名次奖金运气）
+  sensitivity_notes:
+    - 弹性最大的收入项是剧情名次奖金（受每日 3 次限额与体力竞争约束，活跃玩家可显著上浮）。
+    - 最大支出杠杆是定向书籍消耗与招募节奏；新手期（2–3 学员）各项成本同步缩小，天然保护。
+    - 后期（CTS/IOI 章、NG+ 高层）名次奖金绝对值大增属预期设计，M5 模拟需单独覆盖「后期周」画像。
+  tuning_knobs_priority:         # M5 校准时的调整优先序（动谁最省事）
+    - lecture.audience_tiers.base_money
+    - training.directed.book_consumed 与 items.yaml 书价联动
+    - adventure.money_ranges_by_rarity
+    - recruitment.recruit_growth

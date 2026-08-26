@@ -1,0 +1,1046 @@
+# =============================================================================
+# OInurturning 历练事件表（docs/GAME-DESIGN.md §10 底稿的全量字段化）
+# version: 0.1.0
+#
+# 【数量说明 / 与总纲的已知差异】
+#   GAME-DESIGN.md 正文两处写「41 条」，但其 §10 底稿表格实际收录 40 条
+#   （灰8 + 黄8 + 绿8 + 蓝8 + 紫6 + 彩2 = 40）。本表严格照抄底稿，不增不删不改名，
+#   收录 40 条；差异已上报 team-lead 待裁定。
+#
+# 【排序】一级序 = 稀有度 gray→yellow→green→blue→purple→colorful；
+#         二级序 = 体力消耗 1→3；同组内按底稿编号顺序。
+#         因此编号顺序为：G1–G8、Y1 Y2 Y3 Y7 Y8、Y4 Y5 Y6、
+#         R1–R5 R7 R8、R6、L1 L2 L3 L6 L7 L8、L4 L5、P3、P1 P2 P4 P5 P6、C1 C2。
+#
+# 【枚举】
+#   category: duel=对决 | windfall=奇遇 | trial=试炼 | chance=机缘 | trouble=麻烦 | social=人情
+#   rarity:   gray < yellow < green < blue < purple < colorful
+#   tiebreak（对决平局分流，算法归 systems/contest.md）:
+#     friendly     友谊收场——不计胜负，双方各得安慰奖励
+#     by_energy    比较双方剩余精力，多者胜
+#     by_quality   比较本场出题质量分，高者胜
+#     sudden_death 进入加赛突然死亡局，先失分者负
+#   outcome.type:
+#     duel   出题对决（duel 块只含参数，内部算法归 contest.md；
+#            quality_rule=true 表示启用【考察出题质量】：答题方未解出 → 出题方 +2）
+#     check  属性检定（p_success = sigmoid((S−DC)/12)，S 含天赋修正；
+#            grades 按 margin/solved/passed 分档取首个满足项，rewards_fail 为保底档）
+#     fixed  无判定直接结算
+#
+# 【字段字典】
+#   repeatable        false 的事件受 once_per_student / server_weekly_limit 约束
+#   cooldown_days     账号级单事件冷却（现实时间，懒结算）；0 = 无冷却
+#   weight            组内权重：同稀有度同体力层内相对占比（各组内部和为 100）。
+#                     最终概率 = 层权重[投入档][rarity] × weight ÷ Σ组内权重
+#                     （层权重见 gameplay.md §3.2：−1{gray70,yellow30}
+#                       −2{yellow42,green34,blue20,purple4} −3{green25,blue35,purple31,colorful9}）
+#   requirements      抽取前置过滤：min_stat.{six_max}（最高单维六维）、min_reputation 等，
+#                     不满足则该事件根本不进池
+#   choices[].requires_item / consume   选择分支的道具门槛与自动消耗
+#   choices[].cost_money              选择即支付的钱（不足则无法选择）
+#   rewards* 字段：
+#     money/reputation  int 或 {min,max}，负数为支出
+#     items             [{id, qty, prob}]，prob 缺省 1.0；id: dim-book 表示
+#                       「随机维度的六维书」（rarity 指定书的稀有度，真实 id 由 items.yaml 落地）
+#     stat_gain         {<attr>: int|{min,max}}；特殊键 all_six（六维各+）、chosen_skill
+#                       （玩家在 code/thinking/单一六维中自选）；配 target_student:
+#                       participant(默认)|random_own|chosen
+#     buffs             [{target, stat?, bonus?|effect?, duration}]（duration 单位为次数）
+#     energy_cost       额外精力消耗
+#     bank_add          预制题入库 {count:{min,max}} 或 {quality_mult}，quality 为质量分区间
+#     recruit           特殊招募结算 {quality_tier, success_prob, on_success, on_fail}
+#                       （签约金由 choices[].cost_money 支付，on_fail.money 为退款）
+# =============================================================================
+
+version: 0.1.0
+
+events:
+  # ============================== 灰·常见 ==============================
+  - id: evt-g1-signin-warmup
+    code: G1
+    name: 签到题热身
+    category: trial
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 13
+    requirements: null
+    description: "社区 OJ 挂出今日签到题，AC 就有奶茶钱拿。"
+    choices:
+      - text: 花几分钟水过去
+        outcomes:
+          - weight: 100
+            type: check
+            check: { skill: code, dc: 15 }
+            rewards_success: { money: { min: 15, max: 30 }, stat_gain: { mindset: 1 } }
+            rewards_fail: { money: 5, stat_gain: { mindset: -1 } }
+
+  - id: evt-g2-duel-passerby
+    code: G2
+    name: 路人学员切磋
+    category: duel
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 13
+    requirements: null
+    description: "机房里一位路人学员发起友谊切磋，输赢都只是练手。"
+    choices:
+      - text: 接受切磋
+        outcomes:
+          - weight: 100
+            type: duel
+            duel: { opponent: random_common, rounds: 4, quality_rule: false, tiebreak: friendly }
+            rewards_win: { money: { min: 20, max: 35 }, reputation: 1, stat_gain: { mindset: 1 } }
+            rewards_lose: { money: { min: 8, max: 15 } }
+            rewards_draw: { money: 12, stat_gain: { mindset: 1 } }
+
+  - id: evt-g3-scrap-paper
+    code: G3
+    name: 草稿纸堆淘金
+    category: windfall
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 14
+    requirements: null
+    description: "机房角落堆着小山般的废草稿纸，据说偶尔能翻到好东西。"
+    choices:
+      - text: 蹲下来翻一翻
+        outcomes:
+          - weight: 45
+            type: fixed
+            rewards: { money: { min: 10, max: 25 } }
+          - weight: 25
+            type: fixed
+            rewards: { items: [{ id: old-note-page, qty: 1 }] }
+          - weight: 15
+            type: fixed
+            rewards: { items: [{ id: old-note-page, qty: 2 }] }
+          - weight: 10
+            type: fixed
+            rewards: {}
+          - weight: 5
+            type: fixed
+            rewards: { money: { min: 40, max: 60 } }
+
+  - id: evt-g4-net-down
+    code: G4
+    name: 断网事故
+    category: trouble
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 1
+    weight: 12
+    requirements: null
+    description: "训练机房的网线突然罢工，提交列表一片红。"
+    choices:
+      - text: 掏出备用网线顶上
+        requires_item: spare-cable
+        consume: { item: spare-cable, qty: 1 }
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: 1 } }
+      - text: 花钱请人抢修
+        cost_money: 40
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: {}
+      - text: 干等网络恢复
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: -2 } }
+
+  - id: evt-g5-canteen-chat
+    code: G5
+    name: 食堂闲聊
+    category: social
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 13
+    requirements: null
+    description: "邻桌坐着一位陌生学员，聊得投机便互留了联系方式，记入档案（影响日后招募池）。"
+    choices:
+      - text: 打个招呼拼个桌
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              items: [{ id: recruit-clue, qty: 1, prob: 0.6 }]
+              stat_gain: { mindset: 1 }
+
+  - id: evt-g6-group-chat
+    code: G6
+    name: 群里灌水
+    category: social
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 13
+    requirements: null
+    description: "营区交流群今天格外热闹，混个脸熟也有微薄人气。"
+    choices:
+      - text: 冒个泡水一帖
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              reputation: { min: 1, max: 2 }
+              items: [{ id: intel-slip, qty: 1, prob: 0.12 }]
+      - text: 潜水围观
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { reputation: 1 }
+
+  - id: evt-g7-typing-race
+    code: G7
+    name: 打字速度赛
+    category: trial
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 12
+    requirements: null
+    description: "有人组织限时代码录入比赛，比的是手速与熟练度。"
+    choices:
+      - text: 报名参赛
+        outcomes:
+          - weight: 100
+            type: check
+            check: { skill: code, dc: 30 }
+            grades:
+              - { margin_min: 20, rewards: { money: 45, stat_gain: { mindset: 1 } } }
+              - { margin_min: 0, rewards: { money: 25 } }
+            rewards_fail: { money: 8 }
+
+  - id: evt-g8-caught-slacking
+    code: G8
+    name: 摸鱼被抓
+    category: trouble
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 1
+    weight: 10
+    requirements: null
+    description: "上课摸鱼刷题解被教练逮了个正着，气氛一度十分尴尬。"
+    choices:
+      - text: 递上一杯奶茶赔罪
+        requires_item: milk-tea
+        consume: { item: milk-tea, qty: 1 }
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: 1 } }
+      - text: 老实认错
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: -1 } }
+
+  # ============================== 黄 ==============================
+  - id: evt-y1-school-mock
+    code: Y1
+    name: 校内模拟赛
+    category: trial
+    rarity: yellow
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 1
+    weight: 21
+    requirements: null
+    description: "校内办了场两题小型模拟赛，按得分发奖。"
+    choices:
+      - text: 代表训练营出战
+        outcomes:
+          - weight: 100
+            type: check
+            check: { kind: mock_contest, problems: 2, skills: [thinking, code], dc: 28 }
+            grades:
+              - { solved_min: 2, rewards: { money: 60, reputation: 1, stat_gain: { mindset: 1 } } }
+              - { solved_min: 1, rewards: { money: 35 } }
+            rewards_fail: { money: 10, stat_gain: { mindset: -1 } }
+
+  - id: evt-y2-old-bookstore
+    code: Y2
+    name: 旧书店淘宝
+    category: windfall
+    rarity: yellow
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 1
+    weight: 21
+    requirements: null
+    description: "巷口旧书店新到一批竞赛书，老板心情好时还肯让价。"
+    choices:
+      - text: 花 60 钱淘一本
+        cost_money: 60
+        outcomes:
+          - weight: 60
+            type: fixed
+            rewards: { items: [{ id: dim-book, rarity: yellow, qty: 1 }] }
+          - weight: 30
+            type: fixed
+            rewards:
+              items: [{ id: dim-book, rarity: yellow, qty: 1 }]
+              money: 30
+          - weight: 10
+            type: fixed
+            rewards:
+              items:
+                - { id: dim-book, rarity: yellow, qty: 1 }
+                - { id: coffee, qty: 1 }
+      - text: 只逛不买
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: 1 } }
+
+  - id: evt-y3-senior-notes
+    code: Y3
+    name: 学长的笔记
+    category: windfall
+    rarity: yellow
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 1
+    weight: 20
+    requirements: null
+    description: "毕业学长留下一册写满批注的训练笔记，读罢思路清晰。"
+    choices:
+      - text: 借来研读一晚
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              buffs: [{ target: next_training, stat: any, bonus: 0.2, duration: 1 }]
+              stat_gain: { mindset: 1 }
+
+  - id: evt-y7-code-deleted
+    code: Y7
+    name: 代码误删
+    category: trouble
+    rarity: yellow
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 1
+    weight: 20
+    requirements: null
+    description: "一个 rm 手滑，写了半天的标程没了。重写还是弃了？"
+    choices:
+      - text: 通宵重写（耗 1 精力换回奖励）
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              energy_cost: 1
+              money: 50
+              stat_gain: { code: 1, mindset: -1 }
+      - text: 弃了，重新选题材
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: -2 } }
+
+  - id: evt-y8-package-arrival
+    code: Y8
+    name: 快递到了
+    category: windfall
+    rarity: yellow
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 1
+    weight: 18
+    requirements: null
+    description: "之前在商城订购的书到货了，去门卫处签收。"
+    choices:
+      - text: 签收快递
+        outcomes:
+          - weight: 80
+            type: fixed
+            rewards: { items: [{ id: dim-book, rarity: yellow, qty: 1 }] }
+          - weight: 20
+            type: fixed
+            rewards: { items: [{ id: dim-book, rarity: green, qty: 1 }] }
+
+  - id: evt-y4-keyboard-dead
+    code: Y4
+    name: 键盘报废
+    category: trouble
+    rarity: yellow
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 2
+    weight: 34
+    requirements: null
+    description: "主战键盘键帽连根崩飞，修还是凑合，是个问题。"
+    choices:
+      - text: 送修（花 150 钱）
+        cost_money: 150
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: {}
+      - text: 凑合接个旧键盘
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              stat_gain: { mindset: -3 }
+              buffs: [{ target: next_duel_answer, bonus: -0.15, duration: 1 }]
+
+  - id: evt-y5-blind-typing
+    code: Y5
+    name: 盲打极限挑战
+    category: trial
+    rarity: yellow
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 2
+    weight: 33
+    requirements: null
+    description: "蒙眼限时编码的整活挑战赛，成功者赢得功能道具。"
+    choices:
+      - text: 蒙上眼上机
+        outcomes:
+          - weight: 100
+            type: check
+            check: { skill: code, dc: 45 }
+            rewards_success:
+              items: [{ id: vigor-drink, qty: 1 }]
+              money: 40
+              stat_gain: { mindset: 1 }
+            rewards_fail: { stat_gain: { mindset: -2 } }
+
+  - id: evt-y6-pacing-coach
+    code: Y6
+    name: 陪跑教练
+    category: social
+    rarity: yellow
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 2
+    weight: 33
+    requirements: null
+    description: "一位赋闲的教练在操场陪跑，聊下来发现颇有货。声誉达标后可在高级学院雇其代课（被动收入）。"
+    choices:
+      - text: 陪他边跑边聊
+        outcomes:
+          - weight: 70
+            type: fixed
+            rewards:
+              items: [{ id: coach-contact, qty: 1 }]
+              stat_gain: { mindset: 1 }
+          - weight: 30
+            type: fixed
+            rewards: { money: 30 }
+
+  # ============================== 绿（先 −2 后 −3） ==============================
+  - id: evt-r1-regional-warmup
+    code: R1
+    name: 区域赛热身对抗
+    category: duel
+    rarity: green
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 1
+    weight: 14
+    requirements: null
+    description: "区域赛前的公开对抗赛，对手不好对付。平局时比拼双方剩余精力定胜负。"
+    choices:
+      - text: 应战
+        outcomes:
+          - weight: 100
+            type: duel
+            duel: { opponent: random_skilled, rounds: 4, quality_rule: false, tiebreak: by_energy }
+            rewards_win: { money: { min: 150, max: 220 }, reputation: 3, stat_gain: { mindset: 1 } }
+            rewards_lose: { money: 40, stat_gain: { mindset: -1 } }
+
+  - id: evt-r2-rare-book-flash
+    code: R2
+    name: 绝版书闪现
+    category: windfall
+    rarity: green
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 2
+    weight: 13
+    requirements: null
+    description: "书商手里闪现一批绝版好书，价格不菲，但确实值。"
+    choices:
+      - text: 咬牙买下中阶书（花 400 钱）
+        cost_money: 400
+        outcomes:
+          - weight: 60
+            type: fixed
+            rewards: { items: [{ id: dim-book, rarity: green, qty: 1 }] }
+          - weight: 40
+            type: fixed
+            rewards: { items: [{ id: dim-book, rarity: blue, qty: 1 }] }
+      - text: 改捎洗练券碎片（花 200 钱）
+        cost_money: 200
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { items: [{ id: reroll-shard, qty: 2 }] }
+      - text: 绝版太贵，看看就走
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: -1 } }
+
+  - id: evt-r3-lecture-volunteer
+    code: R3
+    name: 讲座志愿者
+    category: social
+    rarity: green
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 1
+    weight: 14
+    requirements: { min_stat: { six_max: 25 } }
+    description: "名师讲座招志愿者，要求有真材实料才能上台协助演示。"
+    choices:
+      - text: 报名当志愿者
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { money: 180, reputation: 4, stat_gain: { mindset: 1 } }
+
+  - id: evt-r4-oj-commission
+    code: R4
+    name: OJ 出题委托
+    category: duel
+    rarity: green
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 2
+    weight: 14
+    requirements: null
+    description: "OJ 平台公开征题，你的题由平台评审现场试做。【考察出题质量】启用：评审未解出则你 +2 计分；胜出后成品直接入你的预制题库。"
+    choices:
+      - text: 提交自己的原创题
+        outcomes:
+          - weight: 100
+            type: duel
+            duel: { opponent: platform_reviewer, rounds: 4, quality_rule: true, tiebreak: by_quality }
+            rewards_win:
+              money: { min: 150, max: 250 }
+              reputation: 3
+              bank_add: { quality_mult: 1.1 }
+            rewards_lose: { reputation: -1, stat_gain: { mindset: -1 } }
+
+  - id: evt-r5-power-outage
+    code: R5
+    name: 机房停电惊魂
+    category: trouble
+    rarity: green
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 1
+    weight: 13
+    requirements: null
+    description: "写到一半忽然断电，UPS 只够撑几分钟——稳住心态才能止损。"
+    choices:
+      - text: 摸黑稳住继续写完关键段
+        outcomes:
+          - weight: 100
+            type: check
+            check: { skill: mindset, dc: 30 }
+            rewards_success: { money: 30, stat_gain: { mindset: 2 } }
+            rewards_fail: { stat_gain: { mindset: -3 } }
+      - text: 及时保存收工走人
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: -1 } }
+
+  - id: evt-r7-master-guidance
+    code: R7
+    name: 强者指点
+    category: windfall
+    rarity: green
+    stamina_cost: 2
+    repeatable: false
+    once_per_student: true
+    cooldown_days: 0
+    weight: 17
+    requirements: null
+    description: "一位路过的强者随手点拨了几句，被点到的学员豁然开朗（每名学员限一次）。"
+    choices:
+      - text: 洗耳恭听
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              target_student: random_own
+              stat_gain: { all_six: 1, code: 1, thinking: 1, mindset: 2 }
+
+  - id: evt-r8-substitute-teaching
+    code: R8
+    name: 代课请求
+    category: social
+    rarity: green
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 1
+    weight: 15
+    requirements: null
+    description: "同行临时有事，请你代讲一堂课。报酬按正常讲课结算，且不占用每日讲课次数。"
+    choices:
+      - text: 答应代一节课
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              lecture: { audience: random_tier_1_to_3, uses_daily_quota: false }
+
+  - id: evt-r6-talent-omen
+    code: R6
+    name: 天赋异动征兆
+    category: chance
+    rarity: green
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 5
+    weight: 100
+    requirements: null
+    description: "学员的天赋出现罕见的躁动征兆，若有道具引导，可锁定下次洗练或升阶的方向。"
+    choices:
+      - text: 以天命罗盘锁定异动方向
+        requires_item: direction-charm
+        consume: { item: direction-charm, qty: 1 }
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              buffs: [{ target: next_advance_or_reroll, effect: direction_lock, duration: 1 }]
+      - text: 静观其变
+        outcomes:
+          - weight: 40
+            type: fixed
+            rewards: { stat_gain: { mindset: 2 } }
+          - weight: 60
+            type: fixed
+            rewards: {}
+
+  # ============================== 蓝（先 −2 后 −3） ==============================
+  - id: evt-l1-provincial-mock
+    code: L1
+    name: 省选模拟对抗
+    category: duel
+    rarity: blue
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 2
+    weight: 17
+    requirements: null
+    description: "省选级别的强手发出对抗邀请。平局将进入加赛一局决胜负，胜者捧走紫级书。"
+    choices:
+      - text: 登台应战
+        outcomes:
+          - weight: 100
+            type: duel
+            duel: { opponent: random_elite, rounds: 4, quality_rule: false, tiebreak: sudden_death }
+            rewards_win:
+              items: [{ id: dim-book, rarity: purple, qty: 1 }]
+              money: 300
+              reputation: 5
+            rewards_lose: { money: 60, stat_gain: { mindset: -2 } }
+
+  - id: evt-l2-acmer-meetup
+    code: L2
+    name: ACMer 聚会
+    category: social
+    rarity: blue
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 3
+    weight: 17
+    requirements: { min_reputation: 150 }
+    description: "退役 ACMer 的线下聚会，没有点名气连门票都拿不到。"
+    choices:
+      - text: 亮出训练营名片入场
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              reputation: 25
+              items:
+                - { id: recruit-clue, qty: 2 }
+                - { id: intel-slip, qty: 1, prob: 0.08 }
+
+  - id: evt-l3-lost-problemset
+    code: L3
+    name: 遗失的题册
+    category: windfall
+    rarity: blue
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 3
+    weight: 16
+    requirements: null
+    description: "旧书摊深处翻出一册无名题册，里面的题质量惊人，可直接整理入你的预制题库。"
+    choices:
+      - text: 收下题册
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              bank_add: { count: { min: 2, max: 3 }, quality: { min: 65, max: 85 } }
+              stat_gain: { mindset: 1 }
+
+  - id: evt-l6-private-tutoring
+    code: L6
+    name: 名师开小灶
+    category: chance
+    rarity: blue
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 3
+    weight: 17
+    requirements: null
+    description: "一位隐居名师愿意开高价一对一，指定一名学员获得大幅成长。"
+    choices:
+      - text: 砸重金报名（花 800 钱，指定学员与成长项）
+        cost_money: 800
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              target_student: chosen
+              stat_gain: { chosen_skill: { min: 4, max: 6 } }
+      - text: 太贵了，婉拒
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: {}
+
+  - id: evt-l7-cheating-scandal
+    code: L7
+    name: 作弊风波
+    category: trouble
+    rarity: blue
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 2
+    weight: 17
+    requirements: null
+    description: "有人举报你的学员对局作弊，舆论哗然。要么当场用实力自证，要么花钱摆平。"
+    choices:
+      - text: 当场出题对决自证清白
+        outcomes:
+          - weight: 100
+            type: duel
+            duel: { opponent: random_skilled, rounds: 4, quality_rule: false, tiebreak: by_quality }
+            rewards_win: { reputation: 8, stat_gain: { mindset: 1 } }
+            rewards_lose: { reputation: -6, stat_gain: { mindset: -2 } }
+      - text: 破财消灾（花 250 钱）
+        cost_money: 250
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: -1 } }
+      - text: 认下指控（声誉 -5）
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { reputation: -5 }
+
+  - id: evt-l8-live-interview
+    code: L8
+    name: 直播间采访
+    category: social
+    rarity: blue
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 3
+    weight: 16
+    requirements: null
+    description: "直播频道邀你上节目谈培养心得——要拿出声望做曝光，换来的是招募口碑的短期飙升。"
+    choices:
+      - text: 接受专访（声誉 -20，获曝光 buff）
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              reputation: -20
+              items: [{ id: spotlight-pass, qty: 1 }]
+              money: 100
+      - text: 婉拒采访
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: {}
+
+  - id: evt-l4-oj-hacked
+    code: L4
+    name: OJ 遭黑客攻击
+    category: trouble
+    rarity: blue
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 3
+    weight: 52
+    requirements: null
+    description: "合作 OJ 平台遭黑客入侵，数据面临泄露。持防火墙道具可反击成功，坐视不管则声誉扫地。"
+    choices:
+      - text: 掏出防火墙反杀
+        requires_item: firewall
+        consume: { item: firewall, qty: 1 }
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              items: [{ id: crypto-core, qty: 1 }]
+              reputation: 10
+              money: 200
+      - text: 组织学员连夜防御
+        outcomes:
+          - weight: 100
+            type: check
+            check: { skill: thinking, dc: 60 }
+            rewards_success: { money: 300, reputation: 5 }
+            rewards_fail: { money: -500, reputation: -15, stat_gain: { mindset: -2 } }
+      - text: 明哲保身不掺和
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { money: -300, reputation: -10 }
+
+  - id: evt-l5-debug-trial
+    code: L5
+    name: 极限调试试炼
+    category: trial
+    rarity: blue
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 2
+    weight: 48
+    requirements: null
+    description: "传说中的地狱调试间：限时在一坨祖传屎山中找出隐藏 bug，找得越多赏金越厚。"
+    choices:
+      - text: 进入调试间
+        outcomes:
+          - weight: 100
+            type: check
+            check: { skill: thinking, dc: 55 }
+            grades:
+              - { margin_min: 20, rewards: { money: 550, items: [{ id: coffee, qty: 2 }], stat_gain: { mindset: 1 } } }
+              - { margin_min: 0, rewards: { money: 320 } }
+            rewards_fail: { money: 80, stat_gain: { mindset: -1 } }
+
+  # ============================== 紫（先 −2 后 −3） ==============================
+  - id: evt-p3-reroll-master
+    code: P3
+    name: 洗练大师
+    category: chance
+    rarity: purple
+    stamina_cost: 2
+    repeatable: true
+    cooldown_days: 3
+    weight: 100
+    requirements: null
+    description: "云游四方的洗练大师开张营业，今日惠顾一律半价。"
+    choices:
+      - text: 求大师出手（下次洗练半价券）
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              buffs: [{ target: next_reroll, effect: discount_half, duration: 1 }]
+
+  - id: evt-p1-winter-camp-invite
+    code: P1
+    name: 冬令营邀约
+    category: duel
+    rarity: purple
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 4
+    weight: 21
+    requirements: { min_reputation: 350 }
+    description: "国家队冬令营发来表演赛邀约，对手是预备役级别的狠角色。平局加赛突死。"
+    choices:
+      - text: 接下邀约
+        outcomes:
+          - weight: 100
+            type: duel
+            duel:
+              opponent: random_elite
+              opponent_params: { power_mult: 1.15 }
+              rounds: 4
+              quality_rule: false
+              tiebreak: sudden_death
+            rewards_win:
+              money: { min: 800, max: 1200 }
+              reputation: 40
+              items: [{ id: purple-book-voucher, qty: 1 }]
+            rewards_lose: { reputation: -5, stat_gain: { mindset: -2 } }
+
+  - id: evt-p2-legend-problem-scroll
+    code: P2
+    name: 传奇题卷
+    category: trial
+    rarity: purple
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 4
+    weight: 20
+    requirements: null
+    description: "一卷传说级难题现世：既要亲手解题，又要鉴赏点评其构造。全对方得天赋升阶材料。【考察出题质量】以反向考核形式生效：鉴赏环节权重加倍。"
+    choices:
+      - text: 接受双重考验
+        outcomes:
+          - weight: 100
+            type: check
+            check:
+              kind: dual_check
+              quality_rule: true
+              checks:
+                - { skill: six_max, dc: 70 }
+                - { skill: setting, dc: 70 }
+            grades:
+              - { passed_min: 2, rewards: { items: [{ id: advance-stone, qty: 1 }], reputation: 10 } }
+              - { passed_min: 1, rewards: { items: [{ id: reroll-shard, qty: 2 }], money: 300 } }
+            rewards_fail: { stat_gain: { mindset: -2 } }
+
+  - id: evt-p4-sponsor-negotiation
+    code: P4
+    name: 商业赞助谈判
+    category: social
+    rarity: purple
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 4
+    weight: 19
+    requirements: { min_reputation: 300 }
+    description: "赞助商带着合同登门：以声誉背书换取长期资金。同时最多维持 2 份生效契约。"
+    choices:
+      - text: 签下赞助契约（声誉 -30，此后每日 +300 钱 × 30 天）
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              reputation: -30
+              items: [{ id: sponsor-contract, qty: 1 }]
+      - text: 保持纯粹，拒绝资本
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { stat_gain: { mindset: 1 } }
+
+  - id: evt-p5-midnight-mystery-contest
+    code: P5
+    name: 深夜神秘赛
+    category: duel
+    rarity: purple
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 4
+    weight: 21
+    requirements: null
+    description: "午夜时分收到匿名对战函，蒙面强手连番挑战。平局加赛突死；当日连胜可叠加额外奖励。"
+    choices:
+      - text: 深夜应战
+        outcomes:
+          - weight: 100
+            type: duel
+            duel: { opponent: random_elite, rounds: 4, quality_rule: false, tiebreak: sudden_death }
+            rewards_win:
+              money: 600
+              reputation: 10
+              win_streak_bonus: { per_win_extra_money: 250, cap: 1250, window: same_day }
+            rewards_lose: { stat_gain: { mindset: -2 } }
+
+  - id: evt-p6-genius-youth
+    code: P6
+    name: 天才少年
+    category: chance
+    rarity: purple
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 4
+    weight: 19
+    requirements: null
+    description: "旅途中偶遇一位天才少年，其天赋肉眼可见——但签约金同样惊人。"
+    choices:
+      - text: 支付签约金抢人（花 8000 钱）
+        cost_money: 8000
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards:
+              recruit:
+                quality_tier: genius
+                success_prob: 0.7
+                on_success: { reputation: 5 }
+                on_fail: { money: 4000, stat_gain: { mindset: -1 } }
+      - text: 只留个联系方式
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: { items: [{ id: recruit-clue, qty: 1 }] }
+      - text: 目送天才离开
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: {}
+
+  # ============================== 彩·传说 ==============================
+  - id: evt-c1-gold-ghost-duel
+    code: C1
+    name: 金牌幽灵的对局
+    category: duel
+    rarity: colorful
+    stamina_cost: 3
+    repeatable: true
+    cooldown_days: 7
+    weight: 55
+    requirements: { min_reputation: 800 }
+    description: "隐退多年的金牌选手如幽灵般现身，指名要与你的学员过招。【考察出题质量】生效；平局比拼出题质量分。胜者得传说中的 tag 获取卡。"
+    choices:
+      - text: 迎战金牌幽灵
+        outcomes:
+          - weight: 100
+            type: duel
+            duel: { opponent: legendary_ghost, rounds: 4, quality_rule: true, tiebreak: by_quality }
+            rewards_win: { items: [{ id: tag-card, qty: 1 }], reputation: 100 }
+            rewards_lose: { reputation: 5, stat_gain: { mindset: -3 } }
+
+  - id: evt-c2-turing-relic
+    code: C2
+    name: 图灵之遗
+    category: chance
+    rarity: colorful
+    stamina_cost: 3
+    repeatable: false
+    server_weekly_limit: 3
+    cooldown_days: 7
+    weight: 45
+    requirements: null
+    description: "传闻中的图灵之遗在本周短暂显世，全服每周仅 3 人可得机缘：彩色天赋碎片，乃至完整的进阶材料。"
+    choices:
+      - text: 触碰遗物
+        outcomes:
+          - weight: 45
+            type: fixed
+            rewards: { items: [{ id: color-shard, qty: 2 }] }
+          - weight: 35
+            type: fixed
+            rewards: { items: [{ id: advance-stone, qty: 1 }] }
+          - weight: 20
+            type: fixed
+            rewards: { items: [{ id: color-shard, qty: 1 }] }

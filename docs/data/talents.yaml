@@ -1,0 +1,703 @@
+# =====================================================================
+# OInurturning 天赋家族树数据表
+# 权威规格：docs/GAME-DESIGN.md §5/§7；机制细则：docs/systems/student.md
+# 本文件同时是策划文档与运行时数据源（API 启动时校验并导入 MySQL）。
+# =====================================================================
+#
+# 【全局规则】
+# - 稀有度六档（全局统一序列）：gray 灰 < yellow 黄 < green 绿 < blue 蓝 < purple 紫 < colorful 彩。
+#   严禁红/橙。gray 档全部为负面天赋（kind: negative）；yellow 及以上全部非负面。
+# - 无天赋是合法且常见的；一名学员拥有多个天赋也合法。（此规则作用于招募/洗练池设计，见 student.md §3.4）
+# - 彩色（colorful）天赋效果明显超标，全服稀缺，为传说级。
+# - id 规则：{slug}-{rarity}，kebab-case 英文；slug 在全表内唯一。
+# - 升阶链唯一：每个天赋至多一个 upgrade_to（直接上级），链条不得分叉或合并；
+#   升阶前提是 talents 表登记了上级形态（GAME-DESIGN §7.3），必成功，彩为顶点。
+# - 负面家族的链顶（yellow）一律为中性/微正面天赋，即「净化」路径。
+# - 家族 family 为 null 的天赋不可升阶（upgrade_to 必为 null）。
+#
+# 【效果字段】effects 列表：stat + mode(percent|flat) + value。
+# stat 允许三类键：
+#  (1) 六维：ds 数据结构 / dp 动态规划 / math 数学 / graph 图论 / greedy 贪心 / string 字符串
+#      —— percent 修饰比赛与对决中该维的有效值；
+#  (2) 全局能力：code 代码能力 / thinking 思维能力 / setting 出题能力
+#      —— percent 修饰其有效值；
+#  (3) 辅助属性：
+#      mindset  心态     —— flat 为「心态日回归基准线偏移」（正=长期乐观/负=长期悲观，详见 student.md §5.1）；
+#                           本表不用 percent 形式的 mindset。
+#      focus_cap    专注力上限   —— flat 为永久上限增减（属性分值）。
+#      energy_max   精力上限     —— flat 为永久上限增减（属性分值）。
+#      stamina_regen 体力恢复效率 —— percent 修饰由该属性导出的体力恢复速率（不改属性分值本身）。
+# 负面天赋允许负的 percent 值；正面天赋不得含负效果。
+#
+# 【本文件自定义声明的 meta 键】（effects 中出现的非属性键均在此定义，一句话语义）
+# - training_all:        基础/定向/专项训练的主属性收益加成（%）。
+# - training_ds / training_dp / training_math / training_graph / training_greedy / training_string:
+#                        定向或专项训练命中对应六维时的收益加成（%），与 training_all 乘算叠加。
+# - training_code:       训练结算中「代码能力+1」附带触发概率的乘算提升（%）。
+# - training_thinking:   训练结算中「思维能力+1」附带触发概率的乘算提升（%）。
+# - book_effect:         即时使用类书籍（思维书/代码书/出题书）收益的加成（%）。
+# - duel_posing:         出题对决中己方学员所出题目的需求参数上调幅度（%，仅对决内生效）。
+# - duel_solve:          出题对决中己方答题三缺口缩小的幅度（%，仅对决内生效）。
+# - lecture_income:      讲课报酬加成（%）。
+# - focus_gain:          比赛中专注积累速率加成（%，与心态系数 g(m) 乘算）。
+# - energy_cost_reduce:  比赛中精力消耗降低（%）。
+# - energy_regen:        赛后精力恢复速率加成（%）。
+# - wa_penalty_reduce:   WA 罚时时长缩短（%，可为负表示更长）。
+# - mindset_loss_reduce: 负向心态变化量的减免（%）。
+# - event_luck:          历练事件抽取时高稀有度权重提升（%）。
+# - setting_quality:     出题行动所得题目质量评分的加成（%）。
+#
+version: 1
+
+talents:
+  # ============ 家族 memo 记忆化（dp 系，最长净化外正向链，可冲彩） ============
+  - id: memo-green
+    name: 记忆化
+    rarity: green
+    kind: positive
+    family: memo
+    effects:
+      - {stat: dp, mode: percent, value: 8}
+      - {stat: training_dp, mode: percent, value: 15}
+    description: "DP 训练效率+15%，DP 类题目有效维度+8%。把算过的答案记在草稿纸角落，是天才的第一步。"
+    upgrade_to: memo-blue
+  - id: memo-blue
+    name: 记忆化·进阶
+    rarity: blue
+    kind: positive
+    family: memo
+    effects:
+      - {stat: dp, mode: percent, value: 12}
+      - {stat: training_dp, mode: percent, value: 25}
+    description: "DP 训练效率+25%，DP 类题目有效维度+12%。滚动数组与状态压缩信手拈来，草稿纸再也写不下他的转移方程。"
+    upgrade_to: memo-purple
+  - id: memo-purple
+    name: 记忆化·宗师
+    rarity: purple
+    kind: positive
+    family: memo
+    effects:
+      - {stat: dp, mode: percent, value: 16}
+      - {stat: training_dp, mode: percent, value: 40}
+    description: "DP 训练效率+40%，DP 类题目有效维度+16%。状态空间在他眼中是一张早已铺好的地图。"
+    upgrade_to: memo-colorful
+  - id: memo-colorful
+    name: 记忆化·时空之门
+    rarity: colorful
+    kind: positive
+    family: memo
+    effects:
+      - {stat: dp, mode: percent, value: 25}
+      - {stat: training_dp, mode: percent, value: 60}
+      - {stat: training_all, mode: percent, value: 15}
+    description: "传说级：所有状态转移早已发生完毕，他只是去取回答案。DP 训练效率+60%，训练总收益+15%，DP 类题目有效维度+25%。"
+    upgrade_to: null
+
+  # ============ 家族 tabu 打表怪（找规律系） ============
+  - id: tabu-yellow
+    name: 打表怪
+    rarity: yellow
+    kind: positive
+    family: tabu
+    effects:
+      - {stat: training_all, mode: percent, value: 8}
+      - {stat: math, mode: percent, value: 3}
+    description: "训练总收益+8%，数学类题目有效维度+3%。先暴力出前八项，规律它自己会开口。"
+    upgrade_to: tabu-green
+  - id: tabu-green
+    name: 打表怪·预计算
+    rarity: green
+    kind: positive
+    family: tabu
+    effects:
+      - {stat: training_all, mode: percent, value: 12}
+      - {stat: math, mode: percent, value: 5}
+      - {stat: thinking, mode: percent, value: 2}
+    description: "训练总收益+12%，数学类题目有效维度+5%，思维有效值+2%。打出的表整整齐齐，规律近在眼前。"
+    upgrade_to: tabu-blue
+  - id: tabu-blue
+    name: 打表怪·OEIS附体
+    rarity: blue
+    kind: positive
+    family: tabu
+    effects:
+      - {stat: training_all, mode: percent, value: 16}
+      - {stat: math, mode: percent, value: 8}
+      - {stat: thinking, mode: percent, value: 4}
+    description: "训练总收益+16%，数学类题目有效维度+8%，思维有效值+4%。他打出的任何数列都能在 OEIS 上查到通项。"
+    upgrade_to: null
+
+  # ============ 家族 sense 数感（数学直觉） ============
+  - id: sense-green
+    name: 数感
+    rarity: green
+    kind: positive
+    family: sense
+    effects:
+      - {stat: math, mode: percent, value: 8}
+      - {stat: duel_solve, mode: percent, value: 5}
+    description: "数学类题目有效维度+8%，对决解题缺口缩小5%。看到 1e9 就想到根号分治是一种本能。"
+    upgrade_to: sense-blue
+  - id: sense-blue
+    name: 数感·第六感
+    rarity: blue
+    kind: positive
+    family: sense
+    effects:
+      - {stat: math, mode: percent, value: 12}
+      - {stat: duel_solve, mode: percent, value: 8}
+      - {stat: focus_gain, mode: percent, value: 10}
+    description: "数学类题目有效维度+12%，对决解题缺口缩小8%，专注积累速率+10%。数据范围本身就是提示。"
+    upgrade_to: null
+
+  # ============ 家族 construct 构造直觉 ============
+  - id: construct-green
+    name: 构造直觉
+    rarity: green
+    kind: positive
+    family: construct
+    effects:
+      - {stat: thinking, mode: percent, value: 4}
+      - {stat: duel_posing, mode: percent, value: 6}
+    description: "思维有效值+4%，己方所出题目需求参数上调6%。构造题在他手里总是先有方案再有问题。"
+    upgrade_to: construct-blue
+  - id: construct-blue
+    name: 构造直觉·巧夺天工
+    rarity: blue
+    kind: positive
+    family: construct
+    effects:
+      - {stat: thinking, mode: percent, value: 7}
+      - {stat: duel_posing, mode: percent, value: 10}
+    description: "思维有效值+7%，己方所出题目需求参数上调10%。别人眼中的毒瘤题是他信手搭的积木。"
+    upgrade_to: construct-purple
+  - id: construct-purple
+    name: 构造直觉·鬼斧神工
+    rarity: purple
+    kind: positive
+    family: construct
+    effects:
+      - {stat: thinking, mode: percent, value: 10}
+      - {stat: duel_posing, mode: percent, value: 16}
+      - {stat: setting_quality, mode: percent, value: 10}
+    description: "思维有效值+10%，己方所出题目需求参数上调16%，出题质量评分+10%。他构造的数据能让标算作者当场怀疑人生。"
+    upgrade_to: null
+
+  # ============ 家族 hack 对拍之手 ============
+  - id: hack-green
+    name: 对拍之手
+    rarity: green
+    kind: positive
+    family: hack
+    effects:
+      - {stat: duel_solve, mode: percent, value: 8}
+      - {stat: training_code, mode: percent, value: 10}
+    description: "对决解题缺口缩小8%，训练中代码能力附带成长概率+10%。暴力+对拍，赛场上最朴素的信仰。"
+    upgrade_to: hack-blue
+  - id: hack-blue
+    name: 对拍之手·暴力美学
+    rarity: blue
+    kind: positive
+    family: hack
+    effects:
+      - {stat: duel_solve, mode: percent, value: 12}
+      - {stat: training_code, mode: percent, value: 20}
+      - {stat: wa_penalty_reduce, mode: percent, value: 10}
+    description: "对决解题缺口缩小12%，训练中代码能力附带成长概率+20%，WA 罚时缩短10%。他的随机数据生成器比考官更懂你的代码。"
+    upgrade_to: null
+
+  # ============ 家族 guess 猜结论大师（第二条冲彩链） ============
+  - id: guess-green
+    name: 猜结论大师
+    rarity: green
+    kind: positive
+    family: guess
+    effects:
+      - {stat: thinking, mode: percent, value: 5}
+      - {stat: duel_solve, mode: percent, value: 6}
+    description: "思维有效值+5%，对决解题缺口缩小6%。猜一个结论，对了就是 AC，错了就再猜一个。"
+    upgrade_to: guess-blue
+  - id: guess-blue
+    name: 猜结论大师·大胆假设
+    rarity: blue
+    kind: positive
+    family: guess
+    effects:
+      - {stat: thinking, mode: percent, value: 8}
+      - {stat: duel_solve, mode: percent, value: 10}
+    description: "思维有效值+8%，对决解题缺口缩小10%。样例过了就是过了，证明可以赛后补。"
+    upgrade_to: guess-purple
+  - id: guess-purple
+    name: 猜结论大师·小心求证
+    rarity: purple
+    kind: positive
+    family: guess
+    effects:
+      - {stat: thinking, mode: percent, value: 11}
+      - {stat: duel_solve, mode: percent, value: 14}
+      - {stat: math, mode: percent, value: 5}
+    description: "思维有效值+11%，对决解题缺口缩小14%，数学类题目有效维度+5%。大胆假设之后，他真的会求证——这是他与赌徒的区别。"
+    upgrade_to: guess-colorful
+  - id: guess-colorful
+    name: 猜结论大师·先知
+    rarity: colorful
+    kind: positive
+    family: guess
+    effects:
+      - {stat: thinking, mode: percent, value: 20}
+      - {stat: duel_solve, mode: percent, value: 22}
+      - {stat: math, mode: percent, value: 12}
+      - {stat: focus_gain, mode: percent, value: 20}
+    description: "传说级：结论在他眼前自动展开证明，他只是负责抄下来。思维有效值+20%，对决解题缺口缩小22%，数学类题目有效维度+12%，专注积累速率+20%。"
+    upgrade_to: null
+
+  # ============ 家族 const 卡常大师 ============
+  - id: const-green
+    name: 卡常大师
+    rarity: green
+    kind: positive
+    family: const
+    effects:
+      - {stat: code, mode: percent, value: 5}
+      - {stat: energy_cost_reduce, mode: percent, value: 8}
+    description: "代码有效值+5%，比赛精力消耗降低8%。循环展开、寄存器变量、读入优化，三件套保平安。"
+    upgrade_to: const-blue
+  - id: const-blue
+    name: 卡常大师·极限压榨
+    rarity: blue
+    kind: positive
+    family: const
+    effects:
+      - {stat: code, mode: percent, value: 8}
+      - {stat: energy_cost_reduce, mode: percent, value: 12}
+    description: "代码有效值+8%，比赛精力消耗降低12%。1e9 次运算在他手里能跑进 900ms——评测机都得给他面子。"
+    upgrade_to: null
+
+  # ============ 家族 heur 玄学复杂度 ============
+  - id: heur-yellow
+    name: 玄学复杂度
+    rarity: yellow
+    kind: positive
+    family: heur
+    effects:
+      - {stat: duel_solve, mode: percent, value: 5}
+      - {stat: energy_cost_reduce, mode: percent, value: 5}
+    description: "对决解题缺口缩小5%，比赛精力消耗降低5%。均摊复杂度？反正它能过，别问怎么证的。"
+    upgrade_to: heur-green
+  - id: heur-green
+    name: 玄学复杂度·均摊之神
+    rarity: green
+    kind: positive
+    family: heur
+    effects:
+      - {stat: duel_solve, mode: percent, value: 9}
+      - {stat: energy_cost_reduce, mode: percent, value: 10}
+      - {stat: thinking, mode: percent, value: 2}
+    description: "对决解题缺口缩小9%，比赛精力消耗降低10%，思维有效值+2%。势能分析不会，但均摊两个字他会写。"
+    upgrade_to: null
+
+  # ============ 家族 type 键盘侠 ============
+  - id: type-yellow
+    name: 键盘侠
+    rarity: yellow
+    kind: positive
+    family: type
+    effects:
+      - {stat: code, mode: percent, value: 4}
+      - {stat: training_code, mode: percent, value: 10}
+    description: "代码有效值+4%，训练中代码能力附带成长概率+10%。码字如飞，模板秒敲，考场上的手速担当。"
+    upgrade_to: type-green
+  - id: type-green
+    name: 键盘侠·盲打之神
+    rarity: green
+    kind: positive
+    family: type
+    effects:
+      - {stat: code, mode: percent, value: 7}
+      - {stat: training_code, mode: percent, value: 18}
+      - {stat: focus_gain, mode: percent, value: 8}
+    description: "代码有效值+7%，训练中代码能力附带成长概率+18%，专注积累速率+8%。眼睛看题，手指已经写完了整段线段树。"
+    upgrade_to: null
+
+  # ============ 家族 tmpl 模板大师 ============
+  - id: tmpl-green
+    name: 模板大师
+    rarity: green
+    kind: positive
+    family: tmpl
+    effects:
+      - {stat: training_all, mode: percent, value: 10}
+      - {stat: ds, mode: percent, value: 5}
+    description: "训练总收益+10%，数据结构类题目有效维度+5%。他的代码库是一座随时待命的军火库。"
+    upgrade_to: tmpl-blue
+  - id: tmpl-blue
+    name: 模板大师·移动题库
+    rarity: blue
+    kind: positive
+    family: tmpl
+    effects:
+      - {stat: training_all, mode: percent, value: 15}
+      - {stat: ds, mode: percent, value: 8}
+      - {stat: setting_quality, mode: percent, value: 5}
+    description: "训练总收益+15%，数据结构类题目有效维度+8%，出题质量评分+5。见到原题变式，他只是微微一笑掏出模板。"
+    upgrade_to: null
+
+  # ============ 家族 lect 讲台之星（讲课流派） ============
+  - id: lect-green
+    name: 讲台之星
+    rarity: green
+    kind: positive
+    family: lect
+    effects:
+      - {stat: lecture_income, mode: percent, value: 10}
+      - {stat: setting, mode: percent, value: 3}
+    description: "讲课报酬+10%，出题有效值+3%。能把单调栈讲出相声效果的学员，家长抢着报名。"
+    upgrade_to: lect-blue
+  - id: lect-blue
+    name: 讲台之星·金牌讲师
+    rarity: blue
+    kind: positive
+    family: lect
+    effects:
+      - {stat: lecture_income, mode: percent, value: 18}
+      - {stat: setting, mode: percent, value: 6}
+      - {stat: setting_quality, mode: percent, value: 8}
+    description: "讲课报酬+18%，出题有效值+6%，出题质量评分+8%。他的公开课录像在 OI 圈内广为流传。"
+    upgrade_to: null
+
+  # ============ 家族 grind 刷题狂魔 ============
+  - id: grind-yellow
+    name: 刷题狂魔
+    rarity: yellow
+    kind: positive
+    family: grind
+    effects:
+      - {stat: training_all, mode: percent, value: 6}
+      - {stat: energy_cost_reduce, mode: percent, value: 4}
+    description: "训练总收益+6%，比赛精力消耗降低4%。题量即正义，刷完这本还有下一本。"
+    upgrade_to: grind-green
+  - id: grind-green
+    name: 刷题狂魔·题海无涯
+    rarity: green
+    kind: positive
+    family: grind
+    effects:
+      - {stat: training_all, mode: percent, value: 10}
+      - {stat: training_thinking, mode: percent, value: 15}
+    description: "训练总收益+10%，训练中思维能力附带成长概率+15%。回头不是岸，回头还有题。"
+    upgrade_to: null
+
+  # ============ 六维亲和单点家族（各锚定一维） ============
+  - id: seg-green
+    name: 线段树园丁
+    rarity: green
+    kind: positive
+    family: seg
+    effects:
+      - {stat: ds, mode: percent, value: 8}
+      - {stat: training_ds, mode: percent, value: 18}
+    description: "DS 训练效率+18%，数据结构类题目有效维度+8%。pushdown 写错？不存在的，他给每棵线段树都浇过水。"
+    upgrade_to: null
+  - id: numth-green
+    name: 数论爱好者
+    rarity: green
+    kind: positive
+    family: numth
+    effects:
+      - {stat: math, mode: percent, value: 8}
+      - {stat: training_math, mode: percent, value: 18}
+    description: "数学训练效率+18%，数学类题目有效维度+8%。床边贴着卢卡斯定理，睡前默背一遍逆元。"
+    upgrade_to: null
+  - id: dij-green
+    name: 最短路行者
+    rarity: green
+    kind: positive
+    family: dij
+    effects:
+      - {stat: graph, mode: percent, value: 8}
+      - {stat: training_graph, mode: percent, value: 18}
+    description: "图论训练效率+18%，图论类题目有效维度+8%。他的人生规划用堆优化过，永远走当前最优的一步。"
+    upgrade_to: null
+  - id: greed-green
+    name: 贪心信奉者
+    rarity: green
+    kind: positive
+    family: greed
+    effects:
+      - {stat: greedy, mode: percent, value: 8}
+      - {stat: training_greedy, mode: percent, value: 18}
+    description: "贪心训练效率+18%，贪心类题目有效维度+8%。排序之后从大到小拿，人生亦如是。反例？那是排序方式不对。"
+    upgrade_to: null
+  - id: kmp-green
+    name: KMP信徒
+    rarity: green
+    kind: positive
+    family: kmp
+    effects:
+      - {stat: string, mode: percent, value: 8}
+      - {stat: training_string, mode: percent, value: 18}
+    description: "字符串训练效率+18%，字符串类题目有效维度+8%。失配的时候不要灰心，nxt 数组会告诉你退到哪里。"
+    upgrade_to: null
+
+  # ============ 负面家族（灰→黄净化链，链顶中性/微正面） ============
+  - id: zeron-gray
+    name: 爆零战神
+    rarity: gray
+    kind: negative
+    family: zeron
+    effects:
+      - {stat: mindset, mode: flat, value: -2}
+      - {stat: focus_gain, mode: percent, value: -15}
+    description: "首题崩盘全场懵，爆零也要爆得气势如虹。心态日回归基准−2，专注积累速率−15%。"
+    upgrade_to: zeron-yellow
+  - id: zeron-yellow
+    name: 复盘之神
+    rarity: yellow
+    kind: positive
+    family: zeron
+    effects:
+      - {stat: mindset, mode: flat, value: 1}
+      - {stat: focus_gain, mode: percent, value: 8}
+    description: "每一场惨败都被他酿成复盘笔记。心态日回归基准+1，专注积累速率+8%。净化完成：爆零不可怕，可怕的是白爆。"
+    upgrade_to: null
+  - id: oob-gray
+    name: 数组越界体质
+    rarity: gray
+    kind: negative
+    family: oob
+    effects:
+      - {stat: code, mode: percent, value: -5}
+      - {stat: wa_penalty_reduce, mode: percent, value: -20}
+    description: "RE 与 WA 的常客，数组开小是肌肉记忆。代码有效值−5%，WA 罚时延长20%。"
+    upgrade_to: oob-yellow
+  - id: oob-yellow
+    name: 边界检查者
+    rarity: yellow
+    kind: positive
+    family: oob
+    effects:
+      - {stat: code, mode: percent, value: 3}
+      - {stat: wa_penalty_reduce, mode: percent, value: 10}
+    description: "每一次惨痛的越界都化作边界测试的直觉。代码有效值+3%，WA 罚时缩短10%。净化完成。"
+    upgrade_to: null
+  - id: proc-gray
+    name: 拖延症
+    rarity: gray
+    kind: negative
+    family: proc
+    effects:
+      - {stat: training_all, mode: percent, value: -8}
+      - {stat: focus_gain, mode: percent, value: -10}
+    description: "明天再练吧，反正 deadline 还没到。训练总收益−8%，专注积累速率−10%。"
+    upgrade_to: proc-yellow
+  - id: proc-yellow
+    name: 时间管理者
+    rarity: yellow
+    kind: positive
+    family: proc
+    effects:
+      - {stat: training_all, mode: percent, value: 5}
+      - {stat: focus_gain, mode: percent, value: 8}
+    description: "deadline 是第一生产力，如今他学会了把 deadline 提前。训练总收益+5%，专注积累速率+8%。净化完成。"
+    upgrade_to: null
+  - id: clum-gray
+    name: 手残
+    rarity: gray
+    kind: negative
+    family: clum
+    effects:
+      - {stat: code, mode: percent, value: -6}
+      - {stat: energy_cost_reduce, mode: percent, value: -8}
+    description: "思路都在天上飞，手指在地上一行行挪还老打错。代码有效值−6%，比赛精力消耗增加8%。"
+    upgrade_to: clum-yellow
+  - id: clum-yellow
+    name: 稳如磐石
+    rarity: yellow
+    kind: positive
+    family: clum
+    effects:
+      - {stat: code, mode: percent, value: 3}
+      - {stat: energy_cost_reduce, mode: percent, value: 8}
+    description: "千锤百炼后，每一击都落在正确的键位上。代码有效值+3%，比赛精力消耗降低8%。净化完成。"
+    upgrade_to: null
+  - id: insom-gray
+    name: 考场失眠
+    rarity: gray
+    kind: negative
+    family: insom
+    effects:
+      - {stat: focus_cap, mode: flat, value: -10}
+      - {stat: focus_gain, mode: percent, value: -12}
+    description: "赛前一夜数羊到天亮，进场时脑子还是浆糊。专注力上限−10，专注积累速率−12%。"
+    upgrade_to: insom-yellow
+  - id: insom-yellow
+    name: 赛前入定
+    rarity: yellow
+    kind: positive
+    family: insom
+    effects:
+      - {stat: focus_cap, mode: flat, value: 5}
+      - {stat: focus_gain, mode: percent, value: 10}
+    description: "吃过失眠的苦，如今学会了赛前冥想放空。专注力上限+5，专注积累速率+10%。净化完成。"
+    upgrade_to: null
+  - id: wrong-gray
+    name: 假算法惯犯
+    rarity: gray
+    kind: negative
+    family: wrong
+    effects:
+      - {stat: thinking, mode: percent, value: -5}
+      - {stat: duel_solve, mode: percent, value: -8}
+    description: "复杂度都是骗自己的，O(n) 只是愿望。思维有效值−5%，对决解题缺口增大8%。"
+    upgrade_to: wrong-yellow
+  - id: wrong-yellow
+    name: 反证大师
+    rarity: yellow
+    kind: positive
+    family: wrong
+    effects:
+      - {stat: thinking, mode: percent, value: 4}
+      - {stat: duel_solve, mode: percent, value: 6}
+    description: "被假算法坑过千百遍，如今一眼就能看出反例。思维有效值+4%，对决解题缺口缩小6%。净化完成。"
+    upgrade_to: null
+
+  # ============ 无家族独立天赋（family: null，不可升阶） ============
+  - id: optimist-yellow
+    name: 天生乐天派
+    rarity: yellow
+    kind: positive
+    family: null
+    effects:
+      - {stat: mindset, mode: flat, value: 1}
+    description: "WA 了？就当交了个朋友。心态日回归基准+1，天生不容易陷入低谷。"
+    upgrade_to: null
+  - id: steel-blue
+    name: 抗压之王
+    rarity: blue
+    kind: positive
+    family: null
+    effects:
+      - {stat: mindset_loss_reduce, mode: percent, value: 30}
+      - {stat: mindset, mode: flat, value: 1}
+    description: "罚时、卡常、毒瘤题都压不垮他的心态：负向心态变化减免30%，心态日回归基准+1。"
+    upgrade_to: null
+  - id: owl-yellow
+    name: 夜猫子
+    rarity: yellow
+    kind: positive
+    family: null
+    effects:
+      - {stat: energy_regen, mode: percent, value: 15}
+    description: "白天困成狗，晚上文思泉涌。精力恢复速率+15%。"
+    upgrade_to: null
+  - id: photo-green
+    name: 过目不忘
+    rarity: green
+    kind: positive
+    family: null
+    effects:
+      - {stat: training_thinking, mode: percent, value: 12}
+      - {stat: training_code, mode: percent, value: 8}
+    description: "训练中思维能力附带成长概率+12%，代码能力附带成长概率+8%。题解看过一遍，考场上自动回放。"
+    upgrade_to: null
+  - id: euclid-green
+    name: 欧皇体质
+    rarity: green
+    kind: positive
+    family: null
+    effects:
+      - {stat: event_luck, mode: percent, value: 20}
+    description: "历练时高稀有度事件权重+20%。出门捡到绝版书的传闻，一半发生在他身上。"
+    upgrade_to: null
+  - id: mentor-green
+    name: 教学相长
+    rarity: green
+    kind: positive
+    family: null
+    effects:
+      - {stat: lecture_income, mode: percent, value: 12}
+      - {stat: setting, mode: percent, value: 3}
+    description: "讲课报酬+12%，出题有效值+3%。给别人讲一遍，自己理解深三层。"
+    upgrade_to: null
+  - id: setter-blue
+    name: 出题鬼才
+    rarity: blue
+    kind: positive
+    family: null
+    effects:
+      - {stat: setting_quality, mode: percent, value: 20}
+      - {stat: duel_posing, mode: percent, value: 12}
+    description: "出题质量评分+20%，己方所出题目需求参数上调12%。他出的题让选手又爱又恨，评审却挑不出毛病。"
+    upgrade_to: null
+  - id: acfun-purple
+    name: AC自动机
+    rarity: purple
+    kind: positive
+    family: null
+    effects:
+      - {stat: wa_penalty_reduce, mode: percent, value: 25}
+      - {stat: duel_solve, mode: percent, value: 10}
+      - {stat: code, mode: percent, value: 5}
+    description: "失配指针指向胜利：WA 罚时缩短25%，对决解题缺口缩小10%，代码有效值+5%。传说他的代码编译通过即 AC。"
+    upgrade_to: null
+  - id: goldsoul-purple
+    name: 金牌之魂
+    rarity: purple
+    kind: positive
+    family: null
+    effects:
+      - {stat: duel_solve, mode: percent, value: 12}
+      - {stat: mindset, mode: flat, value: 2}
+      - {stat: focus_gain, mode: percent, value: 12}
+    description: "站上决赛席的那一刻起，眼睛里只剩金牌。对决解题缺口缩小12%，心态日回归基准+2，专注积累速率+12%。"
+    upgrade_to: null
+  - id: turing-colorful
+    name: 图灵转世
+    rarity: colorful
+    kind: positive
+    family: null
+    effects:
+      - {stat: training_all, mode: percent, value: 40}
+      - {stat: thinking, mode: percent, value: 15}
+      - {stat: code, mode: percent, value: 10}
+      - {stat: focus_cap, mode: flat, value: 20}
+    description: "传说级：据说图灵停机问题挡不住他，因为他从不写不停机的程序。训练总收益+40%，思维有效值+15%，代码有效值+10%，专注力上限+20。"
+    upgrade_to: null
+  - id: ironwill-yellow
+    name: 意志如铁
+    rarity: yellow
+    kind: positive
+    family: null
+    effects:
+      - {stat: mindset_loss_reduce, mode: percent, value: 20}
+    description: "负向心态变化减免20%。TLE 四发不皱眉，第五发照样微笑提交。"
+    upgrade_to: null
+  - id: scholar-green
+    name: 博览群书
+    rarity: green
+    kind: positive
+    family: null
+    effects:
+      - {stat: book_effect, mode: percent, value: 25}
+    description: "即时使用类书籍（思维书/代码书/出题书）效果+25%。图书馆的每一个角落都有他的指纹。"
+    upgrade_to: null
+  - id: marathon-blue
+    name: 铁人体质
+    rarity: blue
+    kind: positive
+    family: null
+    effects:
+      - {stat: energy_max, mode: flat, value: 10}
+      - {stat: stamina_regen, mode: percent, value: 20}
+    description: "精力上限+10，体力恢复速率+20%。五小时连赛眼都不眨，机房通宵第二天照常早训。"
+    upgrade_to: null
+  - id: prodigy-blue
+    name: 少年天才
+    rarity: blue
+    kind: positive
+    family: null
+    effects:
+      - {stat: training_all, mode: percent, value: 12}
+      - {stat: thinking, mode: percent, value: 3}
+    description: "训练总收益+12%，思维有效值+3%。小学跳两级，初中打省选，成长速度快得让教练心虚。"
+    upgrade_to: null

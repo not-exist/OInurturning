@@ -1,0 +1,1318 @@
+# ======================================================================
+# OInurturning 全道具表  docs/data/items.yaml
+# 版本 v0.1（2026-08-26）
+# 权威依据：GAME-DESIGN.md §5（稀有度）、§6（属性）、§7（天赋）、§13（剧情奖励）、§15（背包分类）
+# 稀有度全局统一序列：gray < yellow < green < blue < purple < colorful（严禁红橙）
+#
+# 字段说明：
+#   id          全局唯一英文标识符，运行时主键
+#   name        中文显示名
+#   category    nurture | book | functional | contest | quest | material
+#   rarity      gray | yellow | green | blue | purple | colorful
+#   effect.desc 一句话效果说明
+#   effect.*    结构化字段：kind 为使用语义枚举，其余按道具类型携带参数
+#   price       商城售价（金币）；null 表示不可购买（仅通过途径获取）
+#   sources     获取途径数组（事件编号引用 docs/data/events.yaml）
+#   stack       单格堆叠上限
+#   description 背包内展示的风味文本
+#
+# effect.kind 枚举：
+#   rename / talent_advance / talent_reroll / mentality_add / energy_restore /
+#   energy_cap_add / stamina_restore / focus_cap_add / attr_boost /
+#   event_defuse / contest_buff / adventure_buff / adventure_insurance /
+#   info_preview / recruit_guarantee / account_aura / unlock_tag /
+#   pvp_entry / grant_box / choose_grant / compose_input / display
+#
+# 合成配方（compose_input 类道具的汇总；合成界面读取此处）：
+#   old-note-page ×5   → book-{subject}-yellow ×1（九科中随机一科）
+#   circuit-board ×3   → firewall ×1
+#   reroll-shard  ×10  → reroll-ticket ×1
+#   color-shard   ×10  → 随机彩色天赋 ×1
+#   reroll-shard  ×10   → reroll-ticket ×1（与 student.md 洗练支付口径一致）
+#
+# 书籍二分规则（权威 student.md §4.4，集成裁定）：
+#   六维书 book-{ds|dp|math|graph|greedy|string}-* —— 仅作定向训练耗材（提供 BookMult），不可直接使用；
+#   直用书 book-{thinking|coding|setting}-* —— 背包即用、固定增益（不走训练递减曲线，呼应 GAME-DESIGN §6.2「突破依赖道具」），
+#     增益即上表梯度值，受「同学员同属性每周 ≤10 点」约束。
+#
+# dim-book 虚拟 id（仅 events.yaml 引用）：发放时按所附 rarity 展开为随机科目的对应稀有度六维书。
+# 集成新增 effect.kind 枚举：talent_reroll_lock / unlock_passive / passive_income_source / recruit_quality_buff / vendor_sell
+#
+# 注意：
+#   * badge-ngplus-{k}（NG+ 各层全通徽章）为服务端按层生成的陈列勋章，
+#     不在本表枚举，见 systems/progression.md §1.8。
+#   * advance-stone 与 tag-card 的获取渠道为设计红线，price 必须保持 null。
+# ======================================================================
+
+meta:
+  version: "0.1"
+  updated: "2026-08-26"
+  authority: "docs/GAME-DESIGN.md §5 §6 §7 §13 §15"
+  rarity_order: [gray, yellow, green, blue, purple, colorful]
+  categories: [nurture, book, functional, contest, quest, material]
+  book_subjects:
+    ds: 数据结构
+    dp: 动态规划
+    math: 数学
+    graph: 图论
+    greedy: 贪心
+    string: 字符串
+    thinking: 思维
+    coding: 代码实现
+    setting: 出题
+  book_tier_suffix:
+    gray: 基础手册
+    yellow: 进阶讲义
+    green: 精要
+    blue: 典藏版
+    purple: 传世真经
+
+items:
+  # --------------------------------------------------------------------
+  # 养成类 nurture
+  # --------------------------------------------------------------------
+  - id: direction-charm
+    name: 方向锁定符
+    category: nurture
+    rarity: blue
+    effect:
+      desc: 下一次洗练时锁定结果家族（在该家族内按常规稀有度权重抽取）；不改变保底计数；可与洗练券/碎片叠用。
+      kind: talent_reroll_lock
+      usage_timing: 洗练确认前激活，一次性
+    price: null
+    sources:
+      - R6 天赋异动征兆（消耗品载体，见 events.yaml）
+    stack: 10
+    description: 替学员卜一卦方向。玄学，但这次是定向的玄学。
+  - id: rename-card
+    name: 改名卡
+    category: nurture
+    rarity: green
+    effect:
+      desc: 使用后可为一名学员更改姓名。
+      kind: rename
+      target: single_student
+      constraints: 每次改名消耗一张，不限改名次数
+    price: 600
+    sources:
+      - 商城
+      - 剧情正赛里程碑（CSP-J）
+      - 开除学员时概率回收
+    stack: 99
+    description: 一张烫金卡片。名字是教练给的第一个礼物，也可能是第二个。
+
+  - id: advance-stone
+    name: 天赋进阶石
+    category: nurture
+    rarity: purple
+    effect:
+      desc: 使一名学员的指定天赋升阶至下一稀有度，必成功。
+      kind: talent_advance
+      cost_by_target_rarity: {yellow: 1, green: 2, blue: 3, purple: 5, colorful: 8}
+      success_rate: 1.0
+      constraints: 目标天赋须在 talents.yaml 登记上级形态；彩为顶点不可再进阶
+    price: null
+    sources:
+      - 剧情正赛里程碑（省选×1、NOI×2、CTT×3、IOI 礼盒内含×4，一周目共 10 颗）
+      - NG+ 每层全通固定 +5 颗
+      - 历练机缘类事件（P2 传奇题卷等）
+      - PVP 锦标赛奖励（管理员配置，建议冠军 2 颗）
+    stack: 99
+    description: 商城不直售的全服稀缺资源。一颗石头，一次命运的抬手。
+
+  - id: reroll-ticket
+    name: 洗练券
+    category: nurture
+    rarity: blue
+    effect:
+      desc: 将一名学员的一个天赋重新随机为同稀有度的另一天赋。
+      kind: talent_reroll
+      target: single_talent
+      constraints: 彩色天赋不可洗练；洗练结果从同稀有度天赋池抽取，具体池定义见 talents.yaml
+    price: 1100
+    sources:
+      - 商城
+      - 剧情正赛里程碑（CSP-S）
+      - P3 洗练大师（半价洗练机会）
+      - 合成：reroll-shard ×20
+    stack: 99
+    description: 擦掉重写。天赋这东西，有时候只是还没抽对姿势。
+
+  - id: calm-pill
+    name: 定心丸
+    category: nurture
+    rarity: green
+    effect:
+      desc: 使用后使一名学员心态 +5。
+      kind: mentality_add
+      amount: 5
+      target: single_student
+      usage_timing: 非比赛时段任意时刻
+    price: 150
+    sources:
+      - 商城
+      - 剧情正赛里程碑（NOIP ×2）
+      - 历练事件掉落
+    stack: 99
+    description: 甜的，含着含着就不慌了。
+
+  - id: vigor-drink
+    name: 精力药剂
+    category: nurture
+    rarity: green
+    effect:
+      desc: 使用后使一名学员立即恢复 20 点精力。
+      kind: energy_restore
+      amount: 20
+      target: single_student
+      usage_timing: 任意时刻；每名学员每场比赛限用 1 支
+    price: 180
+    sources:
+      - 商城
+      - 历练奇遇类事件掉落
+    stack: 99
+    description: 电解质、牛磺酸与玄学。比赛拖到后期，喝它就是续命。
+
+  - id: vitality-core
+    name: 精能核心
+    category: nurture
+    rarity: purple
+    effect:
+      desc: 永久提升一名学员精力上限 +10。
+      kind: energy_cap_add
+      amount: 10
+      target: single_student
+      usage_timing: 非比赛时段；每名学员限用 3 次
+    price: 3200
+    sources:
+      - 商城
+      - P1 冬令营邀约获胜奖励
+    stack: 10
+    description: 凝缩的训练舱能量。装上之后，续航肉眼可见地变长了。
+
+  # --------------------------------------------------------------------
+  # 功能类 functional
+  # --------------------------------------------------------------------
+  - id: milk-tea
+    name: 奶茶
+    category: functional
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员心态 +2；持有时可自动化解历练事件「摸鱼被抓(G8)」。
+      kind: mentality_add
+      amount: 2
+      target: single_student
+      event_defuse: G8
+      usage_timing: 非比赛时段任意时刻
+    price: 20
+    sources:
+      - 商城
+      - 历练人情类事件掉落
+    stack: 99
+    description: 三分糖去冰。没有什么是一杯奶茶解决不了的。
+
+  - id: spare-cable
+    name: 备用网线
+    category: functional
+    rarity: gray
+    effect:
+      desc: 持有即生效——历练事件「断网事故(G4)」结算时自动消耗一根，将负面影响完全化解。
+      kind: event_defuse
+      event_ref: G4
+      auto_trigger: true
+    price: 50
+    sources:
+      - 商城
+      - Y5 盲打极限挑战奖励
+    stack: 10
+    description: 机房老传统：网线总会断，区别是你有没有备用的。
+
+  - id: firewall
+    name: 防火墙
+    category: functional
+    rarity: blue
+    effect:
+      desc: 持有即生效——历练事件「OJ 遭黑客攻击(L4)」时自动消耗一面，反击成功并获得稀有材料电路板×2。
+      kind: event_defuse
+      event_ref: L4
+      auto_trigger: true
+      on_success_grant: {circuit-board: 2}
+    price: 420
+    sources:
+      - 商城
+      - Y5 盲打极限挑战奖励
+      - 合成：circuit-board ×3
+    stack: 10
+    description: 硬件防火墙，物理意义上的那种。黑客来了先撞墙。
+
+  - id: spotlight-pass
+    name: 曝光通行证
+    category: functional
+    rarity: green
+    effect:
+      desc: 使用后 48 小时内，招募池刷新时精英/天才品质权重加倍后重新归一化（可与声誉加成叠加）。
+      kind: recruit_quality_buff
+      duration_hours: 48
+      usage_timing: 任意时刻激活，账号级生效
+    price: null
+    sources:
+      - L8 直播间采访
+    stack: 5
+    description: 流量就是生产力。
+  - id: stamina-potion
+    name: 体力药水
+    category: functional
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员立即恢复 3 点体力（不超过上限 5）。
+      kind: stamina_restore
+      amount: 3
+      target: single_student
+      usage_timing: 非比赛时段；每名学员每日限用 1 瓶
+    price: 320
+    sources:
+      - 商城
+      - L5 极限调试试炼奖励
+    stack: 99
+    description: 浓缩葡萄糖加一点薄荷味。今天必须再战一场的时候，就靠它。
+
+  - id: coffee
+    name: 浓咖啡
+    category: functional
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员立即恢复 1 点体力，但心态 -1（咖啡因副作用）。
+      kind: stamina_restore
+      amount: 1
+      mentality_change: -1
+      target: single_student
+      usage_timing: 非比赛时段；每名学员每日限用 2 杯
+    price: 80
+    sources:
+      - 商城
+    stack: 99
+    description: 手是暖的，心是慌的，题是多做了一道的。
+
+  - id: focus-engine
+    name: 心流引擎
+    category: functional
+    rarity: purple
+    effect:
+      desc: 永久提升一名学员专注力上限 +10。
+      kind: focus_cap_add
+      amount: 10
+      target: single_student
+      usage_timing: 非比赛时段；每名学员限用 1 台
+    price: 4800
+    sources:
+      - 商城
+      - 剧情正赛里程碑（NOI）
+    stack: 10
+    description: 戴上之后世界只剩键盘声。NOI 赛场边流传的黑科技。
+
+  - id: double-card
+    name: 双倍训练卡
+    category: functional
+    rarity: green
+    effect:
+      desc: 使用后绑定一名学员，其下一次训练（基础/定向/专项均可）的属性收益翻倍。
+      kind: training_buff
+      multiplier: 2
+      scope: next_training_session
+      usage_timing: 训练前激活；每名学员每周限用 1 张
+    price: 450
+    sources:
+      - 商城
+      - Y5 盲打极限挑战奖励
+    stack: 99
+    description: 教练，我今天想加练。——好，那就练出两份的效果。
+
+  - id: protection-card
+    name: 保护卡
+    category: functional
+    rarity: green
+    effect:
+      desc: 历练遇到麻烦类事件的负面结果时，可手动打出此卡将其完全抵消（体力照常消耗）。
+      kind: adventure_insurance
+      scope: trouble_events_only
+      usage_timing: 事件结果揭示后的确认弹窗中选择；每次历练最多生效 1 张
+    price: 380
+    sources:
+      - 商城
+      - Y5 盲打极限挑战奖励
+    stack: 99
+    description: 不是所有意外都得硬吃。花小钱，免大灾。
+
+  - id: energy-bar
+    name: 能量棒
+    category: functional
+    rarity: green
+    effect:
+      desc: 使用后该学员在下一场比赛中精力上限临时 +20，仅当场有效。
+      kind: contest_buff
+      buff: {energy_cap_temp: 20}
+      usage_timing: 报名或进入比赛前使用，单场生效；剧情赛与 PVP 均可用
+    price: 220
+    sources:
+      - 商城
+      - Y1 校内模拟赛奖励
+    stack: 99
+    description: 压得死紧的一块燕麦砖。嚼完它，再难的题也啃得动。
+
+  - id: lucky-coin
+    name: 幸运币
+    category: functional
+    rarity: blue
+    effect:
+      desc: 使用后下一次历练的高稀有度事件权重整体上调一档（体力投入档不变），用后自动消耗。
+      kind: adventure_buff
+      buff: {rarity_weight_shift: +1_tier}
+      usage_timing: 历练出发前激活；每账号每日限用 1 枚
+    price: 650
+    sources:
+      - 商城
+      - 历练机缘类事件掉落
+    stack: 99
+    description: 不知道是谁抛过的硬币。正面朝上的时候，好事就近了一点。
+
+  # --------------------------------------------------------------------
+  # 书籍类 book —— 九科 × 五稀有度共 45 册
+  # 属性增益梯度：gray +2 / yellow +4 / green +7 / blue +12 / purple +20
+  # 统一约束：同一学员同一属性每周经书籍获得的增益合计不超过 10 点；受属性上限 100 约束；
+  #           书籍增益不走训练收益递减曲线（这是书籍相对训练的价值所在，见 GAME-DESIGN §6.2「突破依赖道具」）
+  # --------------------------------------------------------------------
+  - id: book-ds-gray
+    name: 《数据结构·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员数据结构 +2。
+      kind: attr_boost
+      attribute: ds
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 数据结构方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-dp-gray
+    name: 《动态规划·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员动态规划 +2。
+      kind: attr_boost
+      attribute: dp
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 动态规划方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-math-gray
+    name: 《数学·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员数学 +2。
+      kind: attr_boost
+      attribute: math
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 数学方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-graph-gray
+    name: 《图论·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员图论 +2。
+      kind: attr_boost
+      attribute: graph
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 图论方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-greedy-gray
+    name: 《贪心·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员贪心 +2。
+      kind: attr_boost
+      attribute: greedy
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 贪心方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-string-gray
+    name: 《字符串·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员字符串 +2。
+      kind: attr_boost
+      attribute: string
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 字符串方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-thinking-gray
+    name: 《思维·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员思维能力 +2。
+      kind: attr_boost
+      attribute: thinking
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 思维方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-coding-gray
+    name: 《代码实现·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员代码能力 +2。
+      kind: attr_boost
+      attribute: coding
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 代码实现方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-setting-gray
+    name: 《出题·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员出题能力 +2。
+      kind: attr_boost
+      attribute: setting
+      amount: 2
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 30
+    sources: [商城, G3 草稿纸堆淘金, Y2 旧书店淘宝]
+    stack: 99
+    description: 出题方向的基础读物，薄薄一册，胜在便宜。
+
+  - id: book-ds-yellow
+    name: 《数据结构·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员数据结构 +4。
+      kind: attr_boost
+      attribute: ds
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 数据结构方向的系统讲义，训练营书架上的常客。
+
+  - id: book-dp-yellow
+    name: 《动态规划·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员动态规划 +4。
+      kind: attr_boost
+      attribute: dp
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 动态规划方向的系统讲义，训练营书架上的常客。
+
+  - id: book-math-yellow
+    name: 《数学·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员数学 +4。
+      kind: attr_boost
+      attribute: math
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 数学方向的系统讲义，训练营书架上的常客。
+
+  - id: book-graph-yellow
+    name: 《图论·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员图论 +4。
+      kind: attr_boost
+      attribute: graph
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 图论方向的系统讲义，训练营书架上的常客。
+
+  - id: book-greedy-yellow
+    name: 《贪心·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员贪心 +4。
+      kind: attr_boost
+      attribute: greedy
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 贪心方向的系统讲义，训练营书架上的常客。
+
+  - id: book-string-yellow
+    name: 《字符串·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员字符串 +4。
+      kind: attr_boost
+      attribute: string
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 字符串方向的系统讲义，训练营书架上的常客。
+
+  - id: book-thinking-yellow
+    name: 《思维·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员思维能力 +4。
+      kind: attr_boost
+      attribute: thinking
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 思维方向的系统讲义，训练营书架上的常客。
+
+  - id: book-coding-yellow
+    name: 《代码实现·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员代码能力 +4。
+      kind: attr_boost
+      attribute: coding
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 代码实现方向的系统讲义，训练营书架上的常客。
+
+  - id: book-setting-yellow
+    name: 《出题·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员出题能力 +4。
+      kind: attr_boost
+      attribute: setting
+      amount: 4
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 100
+    sources: [商城, Y2 旧书店淘宝, 合成：old-note-page ×5 随机黄级书]
+    stack: 99
+    description: 出题方向的系统讲义，训练营书架上的常客。
+
+  - id: book-ds-green
+    name: 《数据结构·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员数据结构 +7。
+      kind: attr_boost
+      attribute: ds
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 数据结构方向的精要整理，读透能补上明显的短板。
+
+  - id: book-dp-green
+    name: 《动态规划·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员动态规划 +7。
+      kind: attr_boost
+      attribute: dp
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 动态规划方向的精要整理，读透能补上明显的短板。
+
+  - id: book-math-green
+    name: 《数学·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员数学 +7。
+      kind: attr_boost
+      attribute: math
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 数学方向的精要整理，读透能补上明显的短板。
+
+  - id: book-graph-green
+    name: 《图论·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员图论 +7。
+      kind: attr_boost
+      attribute: graph
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 图论方向的精要整理，读透能补上明显的短板。
+
+  - id: book-greedy-green
+    name: 《贪心·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员贪心 +7。
+      kind: attr_boost
+      attribute: greedy
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 贪心方向的精要整理，读透能补上明显的短板。
+
+  - id: book-string-green
+    name: 《字符串·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员字符串 +7。
+      kind: attr_boost
+      attribute: string
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 字符串方向的精要整理，读透能补上明显的短板。
+
+  - id: book-thinking-green
+    name: 《思维·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员思维能力 +7。
+      kind: attr_boost
+      attribute: thinking
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 思维方向的精要整理，读透能补上明显的短板。
+
+  - id: book-coding-green
+    name: 《代码实现·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员代码能力 +7。
+      kind: attr_boost
+      attribute: coding
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 代码实现方向的精要整理，读透能补上明显的短板。
+
+  - id: book-setting-green
+    name: 《出题·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员出题能力 +7。
+      kind: attr_boost
+      attribute: setting
+      amount: 7
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 320
+    sources: [商城, R2 绝版书闪现, L1 省选模拟对抗获胜, 剧情道具池（NOIP/省选）]
+    stack: 99
+    description: 出题方向的精要整理，读透能补上明显的短板。
+
+  - id: book-ds-blue
+    name: 《数据结构·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员数据结构 +12。
+      kind: attr_boost
+      attribute: ds
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 数据结构方向的典藏版，纸质很好，内容更好。
+
+  - id: book-dp-blue
+    name: 《动态规划·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员动态规划 +12。
+      kind: attr_boost
+      attribute: dp
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 动态规划方向的典藏版，纸质很好，内容更好。
+
+  - id: book-math-blue
+    name: 《数学·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员数学 +12。
+      kind: attr_boost
+      attribute: math
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 数学方向的典藏版，纸质很好，内容更好。
+
+  - id: book-graph-blue
+    name: 《图论·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员图论 +12。
+      kind: attr_boost
+      attribute: graph
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 图论方向的典藏版，纸质很好，内容更好。
+
+  - id: book-greedy-blue
+    name: 《贪心·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员贪心 +12。
+      kind: attr_boost
+      attribute: greedy
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 贪心方向的典藏版，纸质很好，内容更好。
+
+  - id: book-string-blue
+    name: 《字符串·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员字符串 +12。
+      kind: attr_boost
+      attribute: string
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 字符串方向的典藏版，纸质很好，内容更好。
+
+  - id: book-thinking-blue
+    name: 《思维·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员思维能力 +12。
+      kind: attr_boost
+      attribute: thinking
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 思维方向的典藏版，纸质很好，内容更好。
+
+  - id: book-coding-blue
+    name: 《代码实现·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员代码能力 +12。
+      kind: attr_boost
+      attribute: coding
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 代码实现方向的典藏版，纸质很好，内容更好。
+
+  - id: book-setting-blue
+    name: 《出题·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员出题能力 +12。
+      kind: attr_boost
+      attribute: setting
+      amount: 12
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 880
+    sources: [商城, 剧情道具池（NOI）, 历练蓝级事件掉落]
+    stack: 99
+    description: 出题方向的典藏版，纸质很好，内容更好。
+
+  - id: book-ds-purple
+    name: 《数据结构·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员数据结构 +20。
+      kind: attr_boost
+      attribute: ds
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 数据结构方向的传世真经，据说作者拿过不止一块金牌。
+
+  - id: book-dp-purple
+    name: 《动态规划·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员动态规划 +20。
+      kind: attr_boost
+      attribute: dp
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 动态规划方向的传世真经，据说作者拿过不止一块金牌。
+
+  - id: book-math-purple
+    name: 《数学·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员数学 +20。
+      kind: attr_boost
+      attribute: math
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 数学方向的传世真经，据说作者拿过不止一块金牌。
+
+  - id: book-graph-purple
+    name: 《图论·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员图论 +20。
+      kind: attr_boost
+      attribute: graph
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 图论方向的传世真经，据说作者拿过不止一块金牌。
+
+  - id: book-greedy-purple
+    name: 《贪心·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员贪心 +20。
+      kind: attr_boost
+      attribute: greedy
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 贪心方向的传世真经，据说作者拿过不止一块金牌。
+
+  - id: book-string-purple
+    name: 《字符串·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员字符串 +20。
+      kind: attr_boost
+      attribute: string
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 字符串方向的传世真经，据说作者拿过不止一块金牌。
+
+  - id: book-thinking-purple
+    name: 《思维·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员思维能力 +20。
+      kind: attr_boost
+      attribute: thinking
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 思维方向的传世真经，据说作者拿过不止一块金牌。
+
+  - id: book-coding-purple
+    name: 《代码实现·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员代码能力 +20。
+      kind: attr_boost
+      attribute: coding
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 代码实现方向的传世真经，据说作者拿过不止一块金牌。
+
+  - id: book-setting-purple
+    name: 《出题·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员出题能力 +20。
+      kind: attr_boost
+      attribute: setting
+      amount: 20
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: 2600
+    sources: [商城, L1 省选模拟对抗获胜, 剧情道具池（CTT/CTS/IOI）, NG+（k≥2）道具池]
+    stack: 99
+    description: 出题方向的传世真经，据说作者拿过不止一块金牌。
+
+  # --------------------------------------------------------------------
+  # 赛事类 contest
+  # --------------------------------------------------------------------
+  - id: tag-card
+    name: tag获取卡
+    category: contest
+    rarity: colorful
+    effect:
+      desc: 兑换一枚自定义称号 tag，展示于排行榜与个人主页；每张卡兑换一枚。
+      kind: unlock_tag
+      grant: custom_tag_slot_1
+    price: null
+    sources:
+      - PVP 锦标赛冠军（独占，唯一产出渠道）
+    stack: 99
+    description: 全服只有冠军能拿到的东西。挂出来，让所有人知道这一届属于你。
+
+  - id: entry-ticket
+    name: 报名券
+    category: contest
+    rarity: green
+    effect:
+      desc: 报名一场 PVP 锦标赛的入场凭证，报名时消耗一张。
+      kind: pvp_entry
+      cost_per_registration: 1
+    price: 250
+    sources:
+      - 商城
+      - 历练人情类事件概率掉落
+      - PVP 首轮获胜返票
+    stack: 99
+    description: 想上桌打牌，先买张门票。
+
+  - id: legend-box
+    name: 传说礼盒
+    category: contest
+    rarity: purple
+    effect:
+      desc: 打开后获得进阶石×4 与结算金 200,000。
+      kind: grant_box
+      contents: {advance-stone: 4, gold: 200000}
+    price: null
+    sources:
+      - 剧情正赛里程碑（IOI，一周目唯一）
+    stack: 99
+    description: 登顶之路尽头放着的盒子。丝带上绣着四个字母：IOI。
+
+  - id: purple-book-voucher
+    name: 紫级书自选券
+    category: contest
+    rarity: purple
+    effect:
+      desc: 使用后从全部九科的紫级书中任选一册兑换。
+      kind: choose_grant
+      options_pattern: book-{subject}-purple
+    price: null
+    sources:
+      - 剧情正赛里程碑（CTS）
+    stack: 99
+    description: 书店老板会亲自把你要的那本送到训练营来。
+
+  - id: trophy-champion
+    name: 冠军奖杯
+    category: contest
+    rarity: purple
+    effect:
+      desc: PVP 锦标赛夺冠纪念，纯荣誉陈列品，无数值效果，展示于训练营大厅。
+      kind: display
+    price: null
+    sources:
+      - PVP 锦标赛冠军（每届一座）
+    stack: 99
+    description: 底座刻着届数与你的ID。擦亮一点，它会反光。
+
+  - id: trophy-gold
+    name: 金牌陈列座
+    category: contest
+    rarity: blue
+    effect:
+      desc: 剧情模式 IOI 正赛首通纪念，纯荣誉陈列品，无数值效果，展示于训练营大厅。
+      kind: display
+    price: null
+    sources:
+      - IOI 正赛首通（随全通奖励并发）
+    stack: 99
+    description: 金色的，沉甸甸的。挂在墙上正好。
+
+  # --------------------------------------------------------------------
+  # 任务类 quest
+  # --------------------------------------------------------------------
+  - id: intel-slip
+    name: 情报
+    category: quest
+    rarity: gray
+    effect:
+      desc: 使用后可预览下一次历练的事件与选项，再决定是否投体力出发；每次历练限用一张。
+      kind: info_preview
+      scope: next_adventure
+    price: 30
+    sources:
+      - 商城
+      - G6 群里灌水概率获得
+    stack: 99
+    description: 小道消息打印在皱巴巴的纸条上。信不信由你。
+
+  - id: coach-contact
+    name: 陪跑教练联络卡
+    category: quest
+    rarity: yellow
+    effect:
+      desc: 结识一位陪跑教练，解锁「代课委托」被动渠道（分成与次数限制见 economy.passive / gameplay.md 讲课章节）。
+      kind: unlock_passive
+      passive: substitute_lecture
+      usage_timing: 获得即自动激活（账号级一次性）
+    price: null
+    sources:
+      - Y6 陪跑教练
+    stack: 1
+    description: 名片背面手写着一串 OJ 账号。
+  - id: sponsor-contract
+    name: 商业赞助契约
+    category: quest
+    rarity: purple
+    effect:
+      desc: 持有即启用一份赞助契约：每日被动入账 80–300 钱，持续 14 天；同时最多 2 份生效（参数见 economy.passive）。
+      kind: passive_income_source
+      daily_min: 80
+      daily_max: 300
+      duration_days: 14
+      max_active: 2
+      usage_timing: 获得即自动生效，到期自动失效
+    price: null
+    sources:
+      - P4 商业赞助谈判
+    stack: 2
+    description: 印着键盘logo的合同，甲乙方都很满意。
+  - id: recruit-clue
+    name: 招募线索
+    category: quest
+    rarity: purple
+    effect:
+      desc: 使用后下一次手动刷新招募池时，保底出现至少一名精英品质学员；仅对紧接的一次刷新生效，不可叠加。
+      kind: recruit_guarantee
+      guarantee_quality: elite_min
+      usage_timing: 刷新前激活，一次性
+    price: 1800
+    sources:
+      - 商城
+      - L2 ACMer 聚会
+    stack: 99
+    description: 一张写满成绩和联系方式的便签。「这孩子，值得。」
+
+  - id: badge-legend
+    name: 传奇教练勋章
+    category: quest
+    rarity: purple
+    effect:
+      desc: 账号永久被动——所有声誉获取 +10%；全局唯一。
+      kind: account_aura
+      reputation_gain_bonus_pct: 10
+      unique: true
+    price: null
+    sources:
+      - 剧情模式一周目全通（唯一发放，见 systems/progression.md §1.7）
+    stack: 1
+    description: 协会只发给把八座山都爬完的人。别问下一个在哪，往 NG+ 看。
+
+  # --------------------------------------------------------------------
+  # 材料类 material
+  # --------------------------------------------------------------------
+  - id: crypto-core
+    name: 加密核心
+    category: material
+    rarity: blue
+    effect:
+      desc: 从黑客手里夺回的神秘硬件。可出售给回收商换取 500 钱；后续版本将接入合成配方。
+      kind: vendor_sell
+      sell_value: 500
+    price: null
+    sources:
+      - L4 OJ 遭黑客攻击（反击成功）
+    stack: 99
+    description: 温热的外壳里仿佛还有算力在流动。
+  - id: color-shard
+    name: 彩色天赋碎片
+    category: material
+    rarity: colorful
+    effect:
+      desc: 集满 10 枚可在天赋界面合成一枚随机彩色天赋。
+      kind: compose_input
+      recipe: {count: 10, output: random_colorful_talent}
+    price: null
+    sources:
+      - C2 图灵之遗（全服周限量）
+      - 限定活动
+    stack: 99
+    description: 折射七种颜色的碎屑。拼起来的那一刻，传说诞生。
+
+  - id: reroll-shard
+    name: 洗练券碎片
+    category: material
+    rarity: green
+    effect:
+      desc: 集满 20 枚自动可合成为一张洗练券。
+      kind: compose_input
+      recipe: {count: 20, output: reroll-ticket}
+    price: null
+    sources:
+      - R2 绝版书闪现
+      - P2 传奇题卷
+      - P3 洗练大师
+    stack: 99
+    description: 缺角的票根。攒够了，命运愿意给你重开一次的机会。
+
+  - id: old-note-page
+    name: 笔记残页
+    category: material
+    rarity: gray
+    effect:
+      desc: 集满 5 页可合成一本随机科目的黄级书。
+      kind: compose_input
+      recipe: {count: 5, output: "book-{subject}-yellow_random"}
+    price: null
+    sources:
+      - G3 草稿纸堆淘金
+      - Y2 旧书店淘宝
+    stack: 99
+    description: 学长留下的草稿，字迹潦草但思路是对的。
+
+  - id: circuit-board
+    name: 机房电路板
+    category: material
+    rarity: blue
+    effect:
+      desc: 稀有材料；集满 3 块可合成一面防火墙。
+      kind: compose_input
+      recipe: {count: 3, output: firewall}
+    price: null
+    sources:
+      - L4 OJ 遭黑客攻击（持防火墙反击成功所得）
+      - 限定活动任务
+    stack: 99
+    description: 从报废服务器上拆下来的好东西。懂行的人见了眼睛发亮。
+
+  - id: lecture-handout
+    name: 名师讲义
+    category: material
+    rarity: green
+    effect:
+      desc: 使用时自选一科，视为该科绿级书使用（对应属性 +7）。
+      kind: attr_boost
+      amount: 7
+      attribute: player_choice_any_subject
+      constraints: 单学员单属性每周书籍增益合计 ≤10 点；受属性上限 100 约束
+    price: null
+    sources:
+      - L6 名师开小灶
+      - L3 遗失的题册
+    stack: 99
+    description: 名师亲手整理的手稿。教谁，谁赚。
