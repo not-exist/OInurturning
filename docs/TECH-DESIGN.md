@@ -635,23 +635,19 @@ model UserItem {
 }
 
 model ProblemLibraryEntry {
+  // 【M1-R8 修订】M1 落地为最小版（专项训练耗材），M3 出题玩法上线时
+  // 以迁移追加 demand/thought/codeVolume/traitId/status/timesUsed 等列。
   id              Int         @id @default(autoincrement())
-  ownerId         Int                                        // 归属玩家（题库是账号资产）
+  userId          Int                                        // 归属玩家（题库是账号资产）
   authorStudentId Int?                                       // 出题学员；开除后置空保留题目
-  dimension       String      @db.VarChar(16)                // DimensionKey
-  demand          Int                                        // 六维需求
-  thought         Int                                        // 思维量
-  codeVolume      Int                                        // 代码量
-  quality         Int                                        // 质量评级（公式见 systems/problem-making.md）
-  traitId         String?     @db.VarChar(64)                // 附带特性（problems.yaml 特性表）
-  status          EntryStatus @default(AVAILABLE)
-  timesUsed       Int         @default(0)                    // 被专项训练消耗次数
-  createdAt       DateTime    @default(now())
+  name            String      @db.VarChar(64)
+  dominantDim     String      @db.VarChar(8)                 // DimensionKey（锚定六维）
+  rarity          String      @db.VarChar(8)                 // 六档稀有度（→专项训练 QualityMult）
+  quality         Int                                        // 质量评级 Q（0–100）
+  consumedAt      DateTime?                                  // 被专项训练消耗时间（耗材语义）
+  createdAt       DateTime   @default(now())
 
-  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  authorStudent Student? @relation("ProblemAuthor", fields: [authorStudentId], references: [id], onDelete: SetNull)
-
-  @@index([ownerId, status, createdAt])
+  @@index([userId, consumedAt])
 }
 
 // ───────────────────────── 对局域 ─────────────────────────
