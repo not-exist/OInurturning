@@ -10,7 +10,8 @@ import type { User } from '@prisma/client';
 const REFRESH_COOKIE = 'oinur_rt';
 
 // 计时侧信道防护：用户不存在时也对其执行一次等耗时的 bcrypt.compare，消除可测量的耗时差
-const DUMMY_HASH = bcrypt.hashSync('oinur-timing-dummy', 10);
+// cost 必须与真实哈希档位一致（env.BCRYPT_COST），否则 dummy 路径仍快约 4 倍
+const DUMMY_HASH = bcrypt.hashSync('oinur-timing-dummy', env.BCRYPT_COST);
 
 function hash(pw: string): Promise<string> {
   return bcrypt.hash(pw, env.BCRYPT_COST);
