@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
@@ -45,8 +46,15 @@ export function clearRefreshCookie(): string {
 export async function register(input: { username: string; password: string }) {
   const exists = await prisma.user.findUnique({ where: { username: input.username }, select: { id: true } });
   if (exists) throw new ApiError('ALREADY_EXISTS', { field: 'username' });
-  const user = await prisma.user.create({ data: { username: input.username, passwordHash: await hash(input.password) } });
-  return sessionFor(user);
+  try {
+    const user = await prisma.user.create({ data: { username: input.username, passwordHash: await hash(input.password) } });
+    return sessionFor(user);
+  } catch (e) {
+    // 并发注册 TOCTOU：唯一索引兜底
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')
+      throw new ApiError('ALREADY_EXISTS', { field: 'username' });
+    throw e;
+  }
 }
 
 export async function login(input: { username: string; password: string }) {

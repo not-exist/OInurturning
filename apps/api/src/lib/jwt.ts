@@ -8,7 +8,7 @@ export interface AccessClaims {
 }
 
 export function signAccess(u: AccessClaims): string {
-  return jwt.sign(u, env.JWT_SECRET, { expiresIn: '15m' });
+  return jwt.sign({ ...u, typ: 'access' }, env.JWT_SECRET, { expiresIn: '15m' });
 }
 
 export function signRefresh(u: AccessClaims): string {
@@ -16,8 +16,9 @@ export function signRefresh(u: AccessClaims): string {
 }
 
 export function verifyAccess(token: string): AccessClaims {
-  const claims = jwt.verify(token, env.JWT_SECRET) as AccessClaims;
-  if (typeof claims.uid !== 'number') throw new jwt.JsonWebTokenError('malformed claims');
+  const claims = jwt.verify(token, env.JWT_SECRET) as AccessClaims & { typ?: string };
+  if (typeof claims.uid !== 'number' || claims.typ !== 'access')
+    throw new jwt.JsonWebTokenError('malformed claims');
   return claims;
 }
 
