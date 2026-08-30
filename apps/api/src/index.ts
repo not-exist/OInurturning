@@ -4,11 +4,17 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { requestId } from './middlewares/requestId.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { ApiError } from './lib/errors.js';
 import { authRouter } from './modules/auth/router.js';
 import { usersRouter } from './modules/users/router.js';
 import type { ApiEnvelope } from '@oinur/shared';
 
-export function createApp(): express.Express {
+export interface AppOptions {
+  /** 默认在 NODE_ENV=test 时跳过限流；429 专项测试可显式传 false 开启 */
+  skipRateLimit?: boolean;
+}
+
+export function createApp(opts: AppOptions = {}): express.Express {
   const app = express();
   app.disable('x-powered-by');
   app.use(helmet());
@@ -24,12 +30,15 @@ export function createApp(): express.Express {
   });
 
   // 测试环境跳过限流：单进程串行跑完整套件会超过 authLimiter 的 10 次窗口
-  const skipInTest = (): boolean => process.env.NODE_ENV === 'test';
+  const skipRateLimit = opts.skipRateLimit ?? process.env.NODE_ENV === 'test';
+  const skip = (): boolean => skipRateLimit;
+  // 命中限流时走统一错误信封（RATE_LIMITED），而非框架默认纯文本
+  const limitedHandler: express.RequestHandler = (_req, _res, next) => next(new ApiError('RATE_LIMITED'));
   const authLimiter = rateLimit({
-    windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, skip: skipInTest,
+    windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, skip, handler: limitedHandler,
   });
   const globalLimiter = rateLimit({
-    windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false, skip: skipInTest,
+    windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false, skip, handler: limitedHandler,
   });
 
   app.use(globalLimiter);

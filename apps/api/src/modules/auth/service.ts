@@ -9,6 +9,9 @@ import type { User } from '@prisma/client';
 
 const REFRESH_COOKIE = 'oinur_rt';
 
+// 计时侧信道防护：用户不存在时也对其执行一次等耗时的 bcrypt.compare，消除可测量的耗时差
+const DUMMY_HASH = bcrypt.hashSync('oinur-timing-dummy', 10);
+
 function hash(pw: string): Promise<string> {
   return bcrypt.hash(pw, env.BCRYPT_COST);
 }
@@ -59,8 +62,8 @@ export async function register(input: { username: string; password: string }) {
 
 export async function login(input: { username: string; password: string }) {
   const user = await prisma.user.findUnique({ where: { username: input.username } });
-  const ok = user?.passwordHash ? await bcrypt.compare(input.password, user.passwordHash) : false;
-  if (!user || !ok) throw new ApiError('INVALID_CREDENTIALS');
+  const ok = await bcrypt.compare(input.password, user?.passwordHash ?? DUMMY_HASH);
+  if (!user || !user.passwordHash || !ok) throw new ApiError('INVALID_CREDENTIALS');
   const updated = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   return sessionFor(updated);
 }

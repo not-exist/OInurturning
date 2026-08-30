@@ -46,6 +46,17 @@ describe('POST /api/auth/refresh', () => {
     expect(unwrapErr(abuse).code).toBe('UNAUTHENTICATED');
   });
 
+  it('畸形 Cookie（非法 percent-encoding）→ UNAUTHENTICATED，不得 500', async () => {
+    const malformed = await request(app).post('/api/auth/refresh').set('Cookie', 'oinur_rt=%');
+    expect(malformed.status).toBe(401);
+    expect(unwrapErr(malformed).code).toBe('UNAUTHENTICATED');
+    const malformed2 = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', 'oinur_rt=%E0%A4%A');
+    expect(malformed2.status).toBe(401);
+    expect(unwrapErr(malformed2).code).toBe('UNAUTHENTICATED');
+  });
+
   it('无 Cookie → UNAUTHENTICATED；篡改 Cookie → UNAUTHENTICATED', async () => {
     const none = await request(app).post('/api/auth/refresh');
     expect(none.status).toBe(401);

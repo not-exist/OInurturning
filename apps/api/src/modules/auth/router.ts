@@ -76,7 +76,8 @@ authRouter.post('/refresh', async (req, res, next) => {
     res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken));
     res.json({ ok: true, data: { accessToken: s.accessToken, me: s.me } });
   } catch (e) {
-    // TokenExpiredError 继承自 JsonWebTokenError，无需单列
-    next(e instanceof jwt.JsonWebTokenError ? new ApiError('UNAUTHENTICATED') : e);
+    // TokenExpiredError 继承自 JsonWebTokenError，无需单列；
+    // URIError 来自畸形 percent-encoding 的 Cookie（decodeURIComponent 抛出），同按未认证处理
+    next(e instanceof jwt.JsonWebTokenError || e instanceof URIError ? new ApiError('UNAUTHENTICATED') : e);
   }
 });
