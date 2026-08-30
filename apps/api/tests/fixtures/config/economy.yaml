@@ -1,0 +1,25 @@
+# 测试 fixtures：最小合法 economy 配置（M1 必需字段齐全，多余分区 passthrough）
+meta:
+  version: "0.1-test"
+
+training:
+  cost_formula: "round(money_base * (1 + student_coeff * (owned_students - 1)))"
+  student_coeff: 0.08
+  basic: {money_base: 60, stamina_cost: 1}
+  directed: {money_base: 150, stamina_cost: 1, book_consumed: 1}
+  specialized: {money_base: 100, stamina_cost: 1, premade_problem_consumed: 1}
+
+recruitment:
+  recruit_cost_formula: "round(recruit_base * recruit_growth ^ owned_students) * quality_mult"
+  recruit_base: 300
+  recruit_growth: 1.35
+  quality_mult: {common: 1.0, good: 1.5, elite: 2.5, genius: 5.0}
+  manual_refresh:
+    price_formula: "round(refresh_base * refresh_growth ^ refreshes_done_today)"
+    refresh_base: 100
+    refresh_growth: 1.5
+    daily_price_cap: 800
+    free_interval_hours: 24
+
+lecture:
+  note: 多余分区应被 passthrough 放行

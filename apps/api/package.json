@@ -23,6 +23,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "pino": "^9.7.0",
+    "yaml": "^2.9.0",
     "zod": "^3.25.67"
   },
   "devDependencies": {

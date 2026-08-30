@@ -29,3 +29,67 @@ model User {
 
   @@map("users")
 }
+
+// ───────────────────────── 配置域（yaml 导入目标，TECH-DESIGN §3） ─────────────────────────
+// 公共字段约定：id=语义化稳定 id；sourceHash=导入批次指纹；payload=zod 校验后的完整定义；
+// deprecated=本批 yaml 中消失的历史条目（软弃用，绝不物理删除——玩法数据外键仍需有效）。
+// 后续里程碑的 StudentTalent/UserItem 等表将以外键指向 ConfigTalent/ConfigItem。
+
+model ConfigTalent {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigItem {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigProblem {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigEvent {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigStage {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigEconomy {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigImport {
+  id         Int      @id @default(autoincrement())
+  sourceHash String   @db.VarChar(64)
+  manifest   Json
+  ok         Boolean
+  errorCount Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}

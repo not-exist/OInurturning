@@ -1,0 +1,42 @@
+# 测试 fixtures：最小合法 items 配置（结构对齐 docs/data/items.yaml，含顶层 meta）
+meta:
+  version: "0.1-test"
+  rarity_order: [gray, yellow, green, blue, purple, colorful]
+
+items:
+  - id: rename-card
+    name: 改名卡
+    category: nurture
+    rarity: green
+    effect:
+      desc: 使用后可为一名学员更改姓名。
+      kind: rename
+      target: single_student
+    price: 600
+    sources: [商城]
+    stack: 99
+    description: 测试用道具·可购买。
+  - id: advance-stone
+    name: 天赋进阶石
+    category: nurture
+    rarity: purple
+    effect:
+      desc: 使一名学员的指定天赋升阶至下一稀有度，必成功。
+      kind: talent_advance
+    price: null
+    sources: [测试发放]
+    stack: 99
+    description: 测试用道具·不可购买。
+  - id: book-ds-green
+    name: 数据结构精要
+    category: book
+    rarity: green
+    effect:
+      desc: 定向训练数据结构时的收益倍率书。
+      kind: attr_boost
+      attribute: ds
+      amount: 3
+    price: 320
+    sources: [商城]
+    stack: 10
+    description: 测试用六维书。
