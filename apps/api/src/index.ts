@@ -7,6 +7,7 @@ import { requestId } from './middlewares/requestId.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { ApiError } from './lib/errors.js';
 import { getConfig, importConfigs } from './config/loader.js';
+import { academyRouter } from './modules/academy/router.js';
 import { authRouter } from './modules/auth/router.js';
 import { usersRouter } from './modules/users/router.js';
 import type { ApiEnvelope } from '@oinur/shared';
@@ -50,6 +51,7 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use(globalLimiter);
   app.use('/api/auth', authLimiter, authRouter);
   app.use('/api/users', usersRouter);
+  app.use('/api/academy', academyRouter);
 
   app.use(errorHandler);
   return app;

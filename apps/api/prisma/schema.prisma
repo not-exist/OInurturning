@@ -31,6 +31,7 @@ model User {
   items           UserItem[]
   problemEntries  ProblemLibraryEntry[]
   reputationLogs  ReputationLog[]
+  recruitPool     RecruitPool?
 
   @@map("users")
 }
@@ -180,6 +181,18 @@ model StudentTalent {
 
   @@unique([studentId, talentId]) // 同一天赋不可重复持有（家族升阶=替换行）
   @@index([talentId])
+}
+
+// ───────────────────────── 招募域（M1-R1/R2/R3：5 人候选池，24h 懒刷新，04:00 日界） ─────────────────────────
+
+model RecruitPool {
+  userId         Int      @id
+  candidates     Json // 5 个 CandidatePayload（生成规则：student.md §3.2–3.6）
+  generatedAt    DateTime
+  refreshesToday Int      @default(0) // 当日手动刷新次数（k 从 0 计）
+  refreshDayKey  String   @db.VarChar(10) // clock.dayKey，04:00 界，跨日重置计数
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ───────────────────────── 物品域 ─────────────────────────
