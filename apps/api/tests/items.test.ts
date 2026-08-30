@@ -58,6 +58,11 @@ async function studentRow(id: number) {
   return prisma.student.findUniqueOrThrow({ where: { id } });
 }
 
+async function focusEngineUsed(id: number): Promise<number> {
+  const s = await studentRow(id);
+  return (s.counters as { focusEngineUsed?: number }).focusEngineUsed ?? 0;
+}
+
 function use(token: string, body: Record<string, unknown>) {
   return request(app).post('/api/items/use').set(auth(token)).send(body);
 }
@@ -185,7 +190,21 @@ describe('POST /api/items/use 正例', () => {
     const r2 = await use(u.token, { itemId: 'focus-engine', studentId: id });
     expect(r2.status).toBe(400);
     expect(unwrapErr(r2).code).toBe('VALIDATION_FAILED');
+    expect(await focusEngineUsed(id)).toBe(1); // 首次使用已计数
     expect(await itemQuantity(u.userId, 'focus-engine')).toBe(1); // 仅扣 1 台
+  });
+
+  it('focus-engine：上限已满 100 → VALIDATION_FAILED，不扣道具、不计数', async () => {
+    const u = await createAuthedUser();
+    const id = await createStudent(u.userId, { focusCap: 100 });
+    await giveItem(u.userId, 'focus-engine', 1);
+
+    const res = await use(u.token, { itemId: 'focus-engine', studentId: id });
+    expect(res.status).toBe(400);
+    expect(unwrapErr(res).code).toBe('VALIDATION_FAILED');
+    expect(await itemQuantity(u.userId, 'focus-engine')).toBe(1); // 不扣
+    expect(await focusEngineUsed(id)).toBe(0); // 不计数
+    expect((await studentRow(id)).focusCap).toBe(100);
   });
 
   it('直用书 book-thinking-green：增益 = 7 × (1+book_effect/100)，周限 10 点内', async () => {
@@ -234,6 +253,43 @@ describe('POST /api/items/use 正例', () => {
     expect(v1.code).toBeCloseTo(29, 6); // 22+7
     const v2 = unwrapOk<StudentView>(await use(u.token, { itemId: 'book-setting-green', studentId: id }));
     expect(v2.setting).toBeCloseTo(12, 6); // 5+7
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 结算完整性回归：use 推进 lastSettledAt 且未命中字段的已结算值不丢失
+// ---------------------------------------------------------------------------
+
+describe('POST /api/items/use 结算完整性回归', () => {
+  beforeEach(resetUsers);
+
+  it('calm-pill：elapsed>0 时，未被效果命中的 energy/stamina 已结算值随 lastSettledAt 落库', async () => {
+    const u = await createAuthedUser();
+    // 2 小时前结算：energy 10+20=30；stamina 0+(4/3*2)=2.667（staminaRegen=50）
+    const past = new Date(Date.now() - 2 * 3_600_000);
+    const id = await createStudent(u.userId, {
+      energy: 10,
+      energyMax: 60,
+      stamina: 0,
+      staminaRegen: 50,
+      mindset: 0,
+      lastSettledAt: past,
+    });
+    const before = await studentRow(id);
+    expect(before.energy).toBe(10); // 基线：未结算前
+
+    await giveItem(u.userId, 'calm-pill', 1);
+    const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'calm-pill', studentId: id }));
+
+    // 效果只命中 mindset；energy/stamina 未命中，但已结算值必须随写回落库
+    expect(view.energy).toBeGreaterThan(20); // 10 → 30（收回复的结算值，非陈旧 10）
+    expect(view.stamina).toBeGreaterThan(2); // 0 → ~2.667
+
+    // lastSettledAt 已推进到 now（旧锚点不再保留，恢复不丢失）
+    const row = await studentRow(id);
+    expect(row.lastSettledAt.getTime()).toBeGreaterThan(past.getTime());
+    expect(row.energy).toBeGreaterThan(20);
+    expect(row.stamina).toBeGreaterThan(2);
   });
 });
 

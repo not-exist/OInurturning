@@ -264,6 +264,12 @@ function focusEngine(amount: number, s: Student): EffectApplyResult {
       reason: `心流引擎每人限 ${FOCUS_ENGINE_MAX_USES} 台，已用 ${used} 台`,
     });
   }
+  if (s.focusCap >= FOCUS_CAP_MAX) {
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: 'focus-engine',
+      reason: `专注力上限已达 ${FOCUS_CAP_MAX}，无需再使用心流引擎`,
+    });
+  }
   const focusCap = Math.min(FOCUS_CAP_MAX, s.focusCap + amount);
   return {
     patch: { focusCap },

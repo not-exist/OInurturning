@@ -136,10 +136,16 @@ export async function useItem(userId: number, input: UseItemInput, now: Date = n
     });
 
     // 5. 写回学员（乐观并发：仅当行未被并发改写）
+    //    合并完整结算值：效果命中的字段优先用 patch；未命中字段用 settle 算出的结算值补齐，
+    //    确保本次效果未覆盖的已结算字段（如 energy、stamina-potion 的 energy/mindset）仍随 lastSettledAt
+    //    推进而落库，否则该段时间的自然恢复会被永久丢弃。
     const updated = await tx.student.updateMany({
       where: { id, updatedAt: student.updatedAt },
       data: {
         ...patch,
+        stamina: patch.stamina ?? settled.stamina,
+        energy: patch.energy ?? settled.energy,
+        mindset: patch.mindset ?? settled.mindset,
         counters: counters as unknown as object,
         lastSettledAt: now,
       },
