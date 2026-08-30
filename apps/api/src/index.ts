@@ -11,6 +11,7 @@ import { academyRouter } from './modules/academy/router.js';
 import { authRouter } from './modules/auth/router.js';
 import { itemsRouter } from './modules/items/router.js';
 import { studentsRouter } from './modules/students/router.js';
+import { trainingRouter } from './modules/training/router.js';
 import { usersRouter } from './modules/users/router.js';
 import type { ApiEnvelope } from '@oinur/shared';
 
@@ -56,6 +57,7 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use('/api/academy', academyRouter);
   app.use('/api/students', studentsRouter);
   app.use('/api/items', itemsRouter);
+  app.use('/api/training', trainingRouter);
 
   app.use(errorHandler);
   return app;
