@@ -21,13 +21,18 @@
 
 | 任务 | 内容 | 验收标准 |
 |---|---|---|
-| T0.1 | pnpm workspace 初始化：apps/web、apps/api、packages/shared；TS/ESLint/Prettier 统一配置 | `pnpm i && pnpm -r build` 通过 |
-| T0.2 | packages/shared 建立，迁移 GAME-DESIGN 核心类型（Student/ContestReport 等 stub） | api 与 web 均能 import |
-| T0.3 | Prisma 接入 MySQL，User 表迁移（id/username/passwordHash/role/createdAt/lastLoginAt/reputation/money） | migrate 成功，可 CRUD |
-| T0.4 | Auth API：注册、登录（bcrypt+JWT）、改密、注销（软删）、GET /me（含 lastLoginAt 维护） | supertest 集成测试通过 |
-| T0.5 | 前端骨架：Vite+React+Router+Tailwind；登录/注册页；主布局壳（左侧标签导航） | 浏览器走通登录 |
-| T0.6 | 用户设置页：ID/注册时间/last login 展示、改密、注销确认流 | 手动验收 |
-| T0.7 | deploy/docker-compose.yml：mysql(healthcheck)+api+nginx(静态+/api 反代)；环境变量表落地 | `docker compose up` 一键起全栈 |
+| [x] T0.1 | pnpm workspace 初始化：apps/web、apps/api、packages/shared；TS/ESLint/Prettier 统一配置 | `pnpm i && pnpm -r build` 通过 |
+| [x] T0.2 | packages/shared 建立，迁移 GAME-DESIGN 核心类型（Student/ContestReport 等 stub） | api 与 web 均能 import |
+| [x] T0.3 | Prisma 接入 MySQL，User 表迁移（id/username/passwordHash/role/createdAt/lastLoginAt/reputation/money） | migrate 成功，可 CRUD |
+| [x] T0.4 | Auth API：注册、登录（bcrypt+JWT）、改密、注销（软删）、GET /me（含 lastLoginAt 维护） | supertest 集成测试通过 |
+| [x] T0.5 | 前端骨架：Vite+React+Router+Tailwind；登录/注册页；主布局壳（左侧标签导航） | 浏览器走通登录 |
+| [x] T0.6 | 用户设置页：ID/注册时间/last login 展示、改密、注销确认流 | 手动验收 |
+| [x] T0.7 | deploy/docker-compose.yml：mysql(healthcheck)+api+nginx(静态+/api 反代)；环境变量表落地 | `docker compose up` 一键起全栈 |
+
+> **M0 实测记录（2026-08-30）**：`pnpm install && pnpm typecheck && pnpm lint && pnpm test` 全绿；
+> 注册→登录→改密→注销全链路 20 项集成测试通过。实测环境为**本地 MariaDB（127.0.0.1:3306）+ 进程直跑（vitest/tsx）**，
+> 非 docker 容器环境；docker 编排文件已落地（T0.7），容器内一键起栈留待部署窗口验收。
+> 收尾审查另修复三项：/refresh 畸形 Cookie 归一 401、登录计时侧信道均衡、限流 429 统一信封（详见 git log `fix(api)`）。
 
 ## M1 学员·背包·训练
 

@@ -1,0 +1,22 @@
+{
+  "name": "oinurturning",
+  "private": true,
+  "packageManager": "pnpm@10.14.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter './apps/*' dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write .",
+    "db:up": "docker compose up -d && until docker compose exec mysql mysqladmin ping -h 127.0.0.1 -uoinur -poinur --silent >/dev/null 2>&1; do sleep 1; done && echo mysql-ready",
+    "db:migrate": "pnpm -C apps/api migrate"
+  },
+  "devDependencies": {
+    "eslint": "^9.30.0",
+    "prettier": "^3.6.0",
+    "typescript-eslint": "^8.35.0",
+    "typescript": "^5.8.0"
+  }
+}
