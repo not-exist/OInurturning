@@ -83,7 +83,7 @@ describe('GET /api/items', () => {
     expect(calm.rarity).toBe('green');
     expect(calm.category).toBe('nurture');
     expect(calm.description).toBeTruthy();
-    expect(calm.effectDesc).toContain('+3');
+    expect(calm.effectDesc).toContain('+5');
   });
 
   it('未认证 → 401', async () => {
@@ -99,7 +99,7 @@ describe('GET /api/items', () => {
 describe('POST /api/items/use 正例', () => {
   beforeEach(resetUsers);
 
-  it('calm-pill：心态 +3，clamp +10', async () => {
+  it('calm-pill：心态 +5，clamp +10', async () => {
     const u = await createAuthedUser();
     const id = await createStudent(u.userId, { mindset: 8 });
     await giveItem(u.userId, 'calm-pill', 1);
@@ -107,19 +107,19 @@ describe('POST /api/items/use 正例', () => {
     const res = await use(u.token, { itemId: 'calm-pill', studentId: id });
     expect(res.status).toBe(200);
     const view = unwrapOk<StudentView>(res);
-    expect(view.mindset).toBe(10); // 8+3=11 → clamp 10
+    expect(view.mindset).toBe(10); // 8+5=13 → clamp 10
     expect(await itemQuantity(u.userId, 'calm-pill')).toBe(0);
   });
 
-  it('milk-tea：心态 +1（首个无日限），日限 2 杯', async () => {
+  it('milk-tea：心态 +2（首个无日限），日限 2 杯', async () => {
     const u = await createAuthedUser();
     const id = await createStudent(u.userId, { mindset: 2 });
     await giveItem(u.userId, 'milk-tea', 3);
 
     const r1 = unwrapOk<StudentView>(await use(u.token, { itemId: 'milk-tea', studentId: id }));
-    expect(r1.mindset).toBe(3);
+    expect(r1.mindset).toBe(4);
     const r2 = unwrapOk<StudentView>(await use(u.token, { itemId: 'milk-tea', studentId: id }));
-    expect(r2.mindset).toBe(4);
+    expect(r2.mindset).toBe(6);
 
     // 第 3 杯 → VALIDATION_FAILED
     const r3 = await use(u.token, { itemId: 'milk-tea', studentId: id });
@@ -128,57 +128,64 @@ describe('POST /api/items/use 正例', () => {
     expect(await itemQuantity(u.userId, 'milk-tea')).toBe(1); // 仅扣 2 杯
   });
 
-  it('stamina-potion：体力 +3，clamp 5', async () => {
+  it('stamina-potion：体力 +3，clamp 5，每日限 1 瓶', async () => {
     const u = await createAuthedUser();
     const id = await createStudent(u.userId, { stamina: 1 });
-    await giveItem(u.userId, 'stamina-potion', 1);
+    await giveItem(u.userId, 'stamina-potion', 2);
 
     const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'stamina-potion', studentId: id }));
     expect(view.stamina).toBeCloseTo(4, 3); // 1+3=4
+
+    // 第 2 瓶 → 每日限 1 → VALIDATION_FAILED（且不扣第 2 瓶）
+    const r2 = await use(u.token, { itemId: 'stamina-potion', studentId: id });
+    expect(r2.status).toBe(400);
+    expect(unwrapErr(r2).code).toBe('VALIDATION_FAILED');
+    expect(await itemQuantity(u.userId, 'stamina-potion')).toBe(1);
   });
 
-  it('coffee：精力 +15，clamp energyMax', async () => {
+  it('coffee：体力 +1，心态 −1，clamp，每日限 2 杯', async () => {
     const u = await createAuthedUser();
-    const id = await createStudent(u.userId, { energy: 50, energyMax: 60 });
-    await giveItem(u.userId, 'coffee', 1);
+    const id = await createStudent(u.userId, { stamina: 3, mindset: 5 });
+    await giveItem(u.userId, 'coffee', 3);
 
-    const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'coffee', studentId: id }));
-    expect(view.energy).toBeCloseTo(60, 3); // 50+15=65 → clamp 60
+    const v1 = unwrapOk<StudentView>(await use(u.token, { itemId: 'coffee', studentId: id }));
+    expect(v1.stamina).toBeCloseTo(4, 3); // 3+1
+    expect(v1.mindset).toBe(4); // 5-1
+    const v2 = unwrapOk<StudentView>(await use(u.token, { itemId: 'coffee', studentId: id }));
+    expect(v2.stamina).toBeCloseTo(5, 3); // 4+1 → clamp 5
+    expect(v2.mindset).toBe(3); // 4-1
 
-    // 再次使用（精力已满）：clamp 不注入，但仍扣道具
-    const id2 = await createStudent(u.userId, { energy: 60, energyMax: 60 });
-    await giveItem(u.userId, 'coffee', 1);
-    const view2 = unwrapOk<StudentView>(await use(u.token, { itemId: 'coffee', studentId: id2 }));
-    expect(view2.energy).toBeCloseTo(60, 3);
-  });
-
-  it('vigor-drink：energyMax +3，每人限 3 次', async () => {
-    const u = await createAuthedUser();
-    const id = await createStudent(u.userId, { energyMax: 60 });
-    await giveItem(u.userId, 'vigor-drink', 4);
-
-    for (let i = 0; i < 3; i++) {
-      const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'vigor-drink', studentId: id }));
-      expect(view.energyMax).toBe(60 + 3 * (i + 1));
-    }
-    // 第 4 次 → VALIDATION_FAILED
-    const r4 = await use(u.token, { itemId: 'vigor-drink', studentId: id });
-    expect(r4.status).toBe(400);
-    expect(unwrapErr(r4).code).toBe('VALIDATION_FAILED');
-  });
-
-  it('focus-engine：focusCap +8，clamp 100，每人限 2 次', async () => {
-    const u = await createAuthedUser();
-    const id = await createStudent(u.userId, { focusCap: 92 });
-    await giveItem(u.userId, 'focus-engine', 3);
-
-    const r1 = unwrapOk<StudentView>(await use(u.token, { itemId: 'focus-engine', studentId: id }));
-    expect(r1.focusCap).toBe(100); // 92+8=100
-    const r2 = unwrapOk<StudentView>(await use(u.token, { itemId: 'focus-engine', studentId: id }));
-    expect(r2.focusCap).toBe(100); // 仍 clamp 100，但计一次使用
-    const r3 = await use(u.token, { itemId: 'focus-engine', studentId: id });
+    // 第 3 杯 → 每日限 2 → VALIDATION_FAILED
+    const r3 = await use(u.token, { itemId: 'coffee', studentId: id });
     expect(r3.status).toBe(400);
     expect(unwrapErr(r3).code).toBe('VALIDATION_FAILED');
+    expect(await itemQuantity(u.userId, 'coffee')).toBe(1); // 仅扣 2 杯
+  });
+
+  it('vigor-drink：M1 不可用（energy_restore 需比赛场景）→ VALIDATION_FAILED，不扣', async () => {
+    const u = await createAuthedUser();
+    const id = await createStudent(u.userId, { energyMax: 60 });
+    await giveItem(u.userId, 'vigor-drink', 1);
+
+    const res = await use(u.token, { itemId: 'vigor-drink', studentId: id });
+    expect(res.status).toBe(400);
+    expect(unwrapErr(res).code).toBe('VALIDATION_FAILED');
+    expect((unwrapErr(res).details as { reason?: string } | undefined)?.reason).toBe('该道具暂不可用');
+    expect(await itemQuantity(u.userId, 'vigor-drink')).toBe(1); // 不扣
+  });
+
+  it('focus-engine：focusCap +10，clamp 100，每人限 1 台', async () => {
+    const u = await createAuthedUser();
+    const id = await createStudent(u.userId, { focusCap: 92 });
+    await giveItem(u.userId, 'focus-engine', 2);
+
+    const r1 = unwrapOk<StudentView>(await use(u.token, { itemId: 'focus-engine', studentId: id }));
+    expect(r1.focusCap).toBe(100); // 92+10 → clamp 100
+    // 第 2 台 → 每人限 1 → VALIDATION_FAILED
+    const r2 = await use(u.token, { itemId: 'focus-engine', studentId: id });
+    expect(r2.status).toBe(400);
+    expect(unwrapErr(r2).code).toBe('VALIDATION_FAILED');
+    expect(await itemQuantity(u.userId, 'focus-engine')).toBe(1); // 仅扣 1 台
   });
 
   it('直用书 book-thinking-green：增益 = 7 × (1+book_effect/100)，周限 10 点内', async () => {
@@ -243,7 +250,7 @@ describe('POST /api/items/use 限制类反例', () => {
     await giveItem(u.userId, 'calm-pill', 1);
 
     const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'calm-pill', studentId: id }));
-    expect(view.mindset).toBe(5); // 2+3
+    expect(view.mindset).toBe(7); // 2+5
     expect(
       await prisma.userItem.findUnique({ where: { userId_itemId: { userId: u.userId, itemId: 'calm-pill' } } }),
     ).toBeNull(); // 扣到 0 删行
@@ -262,7 +269,7 @@ describe('POST /api/items/use 限制类反例', () => {
 
     // 陈旧 milkTeaKey 已跨日界 → 视为当日 0 杯，可正常使用
     const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'milk-tea', studentId: id }));
-    expect(view.mindset).toBe(1);
+    expect(view.mindset).toBe(2);
     expect(view.counters.milkTea).toBe(1);
   });
 
@@ -304,7 +311,7 @@ describe('POST /api/items/use 不可用与校验', () => {
     const id = await createStudent(u.userId);
     const unavailable = [
       'advance-stone', 'reroll-ticket', 'reroll-shard', 'direction-charm',
-      'legend-box', 'tag-card', 'badge-legend',
+      'legend-box', 'tag-card', 'badge-legend', 'vigor-drink',
     ];
     for (const itemId of unavailable) await giveItem(u.userId, itemId, 1);
 

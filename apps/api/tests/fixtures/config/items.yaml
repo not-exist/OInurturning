@@ -98,10 +98,11 @@ items:
     category: nurture
     rarity: green
     effect:
-      desc: 心态 +3（不超过 +10）。
+      desc: 心态 +5（不超过 +10）。
       kind: mentality_add
-      amount: 3
+      amount: 5
       target: single_student
+      usage_timing: 非比赛时段任意时刻
     price: 150
     sources: [商城]
     stack: 99
@@ -111,11 +112,12 @@ items:
     category: functional
     rarity: gray
     effect:
-      desc: 心态 +1（不超过 +10）；每日限 2 杯。
+      desc: 心态 +2（不超过 +10）；每日限 2 杯。
       kind: mentality_add
-      amount: 1
+      amount: 2
       target: single_student
       event_defuse: G8
+      usage_timing: 非比赛时段任意时刻
     price: 20
     sources: [商城]
     stack: 99
@@ -125,10 +127,11 @@ items:
     category: functional
     rarity: blue
     effect:
-      desc: 立即恢复 3 点体力（不超过 5）。
+      desc: 立即恢复 3 点体力（不超过 5）；每名学员每日限用 1 瓶。
       kind: stamina_restore
       amount: 3
       target: single_student
+      usage_timing: 非比赛时段；每名学员每日限用 1 瓶
     price: 320
     sources: [商城]
     stack: 99
@@ -138,10 +141,12 @@ items:
     category: functional
     rarity: yellow
     effect:
-      desc: 立即恢复 15 点精力（不超上限）。
-      kind: energy_restore
-      amount: 15
+      desc: 立即恢复 1 点体力，心态 -1（咖啡因副作用）；每名学员每日限用 2 杯。
+      kind: stamina_restore
+      amount: 1
+      mentality_change: -1
       target: single_student
+      usage_timing: 非比赛时段；每名学员每日限用 2 杯
     price: 80
     sources: [商城]
     stack: 99
@@ -151,10 +156,11 @@ items:
     category: nurture
     rarity: green
     effect:
-      desc: 精力上限永久 +3，每人最多 3 次。
-      kind: energy_cap_add
-      amount: 3
+      desc: 立即恢复 20 点精力；M1 无比赛场景暂不可用。
+      kind: energy_restore
+      amount: 20
       target: single_student
+      usage_timing: 任意时刻；每名学员每场比赛限用 1 支
     price: null
     sources: [测试发放]
     stack: 99
@@ -164,10 +170,11 @@ items:
     category: functional
     rarity: purple
     effect:
-      desc: 专注力上限永久 +8，每人最多 2 次。
+      desc: 专注力上限永久 +10，每人最多 1 台。
       kind: focus_cap_add
-      amount: 8
+      amount: 10
       target: single_student
+      usage_timing: 非比赛时段；每名学员限用 1 台
     price: null
     sources: [测试发放]
     stack: 10

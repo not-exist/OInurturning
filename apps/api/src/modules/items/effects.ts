@@ -7,14 +7,16 @@ import { MINDSET_MIN, MINDSET_MAX, STAMINA_CAP } from '../students/settle.js';
 import type { MetaAggregate } from '../students/meta.js';
 
 /**
- * 道具效果分派（M1 Task 5，效果权威：docs/systems/student.md §8 / .superpowers M1 Task 5 简报）。
+ * 道具效果分派（M1 Task 5 修订，效果权威：docs/systems/student.md §8 / docs/data/items.yaml，
+ * 集成裁定 M1-R9 已按 items.yaml 对齐）。
  *
  * F-4 义务：items.yaml 的 effect 为异构 passthrough，本模块消费其子键（amount/attribute 等）
  * 时一律用 zod 严格收口——好数据通过、坏数据（字段写错/类型错）抛 VALIDATION_FAILED，绝不产生 NaN。
  *
- * M1 可用道具：calm-pill / milk-tea / stamina-potion / coffee / vigor-drink / focus-engine /
+ * M1 可用道具：calm-pill / milk-tea / stamina-potion / coffee / focus-engine /
  *         直用书 book-thinking|book-coding|book-setting × 五档。
- * 其余类别（升阶/洗练/礼盒/徽章/六维书等）→ VALIDATION_FAILED「该道具暂不可用」或归属对应端点。
+ * M1 不可用（VALIDATION_FAILED「该道具暂不可用」）：vigor-drink（energy_restore 20 需比赛场景，M1 无比赛）、
+ *         升阶/洗练/礼盒/徽章/六维书/tag 类/advance-stone 等。
  */
 
 // ---------------------------------------------------------------------------
@@ -23,6 +25,10 @@ import type { MetaAggregate } from '../students/meta.js';
 
 /** amount 必须为有限数值（NaN/Infinity 拒绝）；异构子键 passthrough 放行（F-4 收口要点） */
 const amountField = z.object({ amount: z.number().finite() });
+/** 咖啡类：amount 有限数值 + mentality_change 必须为有限数值（心态副作用）；其余子键 passthrough 放行（F-4） */
+const staminaMindsetField = z
+  .object({ amount: z.number().finite(), mentality_change: z.number().finite() })
+  .passthrough();
 /** 直用书：attribute 必须为合法科目键、amount 为有限数值 */
 const bookField = z.object({ attribute: z.string().min(1), amount: z.number().finite() });
 
@@ -36,6 +42,16 @@ function numericField(eff: unknown, field: string, itemId: string): number {
   throw new ApiError('VALIDATION_FAILED', { resource: itemId, field, reason: `${field} 缺失或非数值` });
 }
 
+/** 从 effect 抽取 amount + mentality_change（咖啡）；缺失/类型错 → VALIDATION_FAILED（F-4） */
+function coffeeField(eff: unknown, itemId: string): { amount: number; mentalityChange: number } {
+  if (typeof eff !== 'object' || eff === null) {
+    throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: 'amount/mentality_change 缺失或非数值' });
+  }
+  const r = staminaMindsetField.safeParse(eff);
+  if (r.success) return { amount: r.data.amount, mentalityChange: r.data.mentality_change };
+  throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: 'amount/mentality_change 缺失或非数值' });
+}
+
 /** 从 effect（部分）抽取直用书字段（attribute + amount）；缺失/类型错 → VALIDATION_FAILED（F-4） */
 function bookFields(eff: unknown, itemId: string): { attribute: string; amount: number } {
   if (typeof eff !== 'object' || eff === null) {
@@ -47,15 +63,16 @@ function bookFields(eff: unknown, itemId: string): { attribute: string; amount: 
 }
 
 // ---------------------------------------------------------------------------
-// M1 道具数值规则（简报权威；数值由 items.yaml 的 effect 子键承载，此处不硬编码）
+// M1 道具限制（items.yaml 未提供机器可读的独立限额字段，此处为兜底常量；
+// 数值权威：docs/systems/student.md §8 / items.yaml effect.usage_timing 描述）
 // ---------------------------------------------------------------------------
 
 export const MILK_TEA_DAILY_LIMIT = 2;
-export const VIGOR_MAX_USES = 3;
-export const FOCUS_ENGINE_MAX_USES = 2;
+export const COFFEE_DAILY_LIMIT = 2;
+export const STAMINA_POTION_DAILY_LIMIT = 1;
+export const FOCUS_ENGINE_MAX_USES = 1;
 export const BOOK_WEEK_CAP = 10;
 export const FOCUS_CAP_MAX = 100;
-export const ENERGY_MAX_CAP = 100;
 
 /** 直用书科目键 → Student 列名（items.yaml 的 coding→code 列，string 维记作 str） */
 const BOOK_ATTR_COLUMNS: Record<string, keyof Student> = {
@@ -74,9 +91,12 @@ const DIRECT_BOOK_ATTRS = new Set(Object.keys(BOOK_ATTR_COLUMNS));
 interface Counters {
   milkTea?: number;
   milkTeaKey?: string;
+  coffeeDaily?: number;
+  coffeeDailyKey?: string;
+  staminaPotionDaily?: number;
+  staminaPotionDailyKey?: string;
   bookWeek?: Record<string, number>;
   bookWeekKey?: string;
-  vigorUsed?: number;
   focusEngineUsed?: number;
   [k: string]: unknown;
 }
@@ -121,20 +141,21 @@ export function applyItemEffect(input: EffectApplyInput): EffectApplyResult {
 
   switch (itemId) {
     case 'calm-pill':
-      return mentalityAdd(calmPillAmount(def.effect, itemId), student);
+      return mentalityAdd(numericField(def.effect, 'amount', itemId), student);
     case 'milk-tea':
-      return milkTea(milkTeaAmount(def.effect, itemId), student, now);
+      return milkTea(numericField(def.effect, 'amount', itemId), student, now);
     case 'stamina-potion':
-      return staminaRestore(restoreAmount(def.effect, itemId), student);
+      return staminaPotion(numericField(def.effect, 'amount', itemId), student, now);
     case 'coffee':
-      return energyRestore(restoreAmount(def.effect, itemId), student);
-    case 'vigor-drink':
-      return vigorDrink(capAmount(def.effect, itemId), student);
+      return coffee(coffeeField(def.effect, itemId), student, now);
     case 'focus-engine':
-      return focusEngine(capAmount(def.effect, itemId), student);
+      return focusEngine(numericField(def.effect, 'amount', itemId), student);
+    case 'vigor-drink':
+      // M1 不可用：energy_restore 20 为比赛场景道具，M1 无比赛（集成裁定 M1-R9）
+      throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '该道具暂不可用' });
   }
 
-  // 直用书（book-thinking/书 coding/setting）× 五档
+  // 直用书（book-thinking/coding/setting）× 五档
   if (itemId.startsWith('book-') && isDirectBook(itemId)) {
     return directBook(itemId, def.effect, student, meta, now);
   }
@@ -158,19 +179,9 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
-// --- 子键抽取（zod 收口） ---
-
-function calmPillAmount(eff: unknown, itemId: string): number {
-  return numericField(eff, 'amount', itemId);
-}
-function milkTeaAmount(eff: unknown, itemId: string): number {
-  return numericField(eff, 'amount', itemId);
-}
-function restoreAmount(eff: unknown, itemId: string): number {
-  return numericField(eff, 'amount', itemId);
-}
-function capAmount(eff: unknown, itemId: string): number {
-  return numericField(eff, 'amount', itemId);
+/** 通用「每日限额」判定：跨 04:00 日界即归零（items.yaml 未给机器可读限额时兜底） */
+function dailyUsed(c: Counters, countKey: string, dayKeyField: string, key: string): number {
+  return c[dayKeyField] === key ? num(c, countKey) : 0;
 }
 
 // --- 各效果 ---
@@ -184,11 +195,11 @@ function mentalityAdd(amount: number, s: Student): EffectApplyResult {
   };
 }
 
-/** 奶茶：心态 +1，每日限 2 杯（04:00 日界重置，counters.milkTea/milkTeaKey） */
+/** 奶茶：心态 +2，每日限 2 杯（04:00 日界重置，counters.milkTea/milkTeaKey） */
 function milkTea(amount: number, s: Student, now: Date): EffectApplyResult {
   const c = countersOf(s);
   const key = dayKey(now);
-  const used = c.milkTeaKey === key ? num(c, 'milkTea') : 0;
+  const used = dailyUsed(c, 'milkTea', 'milkTeaKey', key);
   if (used >= MILK_TEA_DAILY_LIMIT) {
     throw new ApiError('VALIDATION_FAILED', {
       resource: 'milk-tea',
@@ -202,43 +213,55 @@ function milkTea(amount: number, s: Student, now: Date): EffectApplyResult {
   };
 }
 
-/** 体力恢复：clamp [0, 5] */
-function staminaRestore(amount: number, s: Student): EffectApplyResult {
-  const stamina = clamp(s.stamina + amount, 0, STAMINA_CAP);
-  return { patch: { stamina }, counters: countersOf(s) };
-}
-
-/** 精力恢复：clamp [0, energyMax] */
-function energyRestore(amount: number, s: Student): EffectApplyResult {
-  const energy = clamp(s.energy + amount, 0, s.energyMax);
-  return { patch: { energy }, counters: countersOf(s) };
-}
-
-/** 精力药剂：energyMax +3（clamp 100），每人最多 3 次（counters.vigorUsed） */
-function vigorDrink(amount: number, s: Student): EffectApplyResult {
+/** 体力药水：体力恢复 clamp [0, 5]，每日限 1 瓶（counters.staminaPotionDaily/staminaPotionDailyKey） */
+function staminaPotion(amount: number, s: Student, now: Date): EffectApplyResult {
   const c = countersOf(s);
-  const used = num(c, 'vigorUsed');
-  if (used >= VIGOR_MAX_USES) {
+  const key = dayKey(now);
+  const used = dailyUsed(c, 'staminaPotionDaily', 'staminaPotionDailyKey', key);
+  if (used >= STAMINA_POTION_DAILY_LIMIT) {
     throw new ApiError('VALIDATION_FAILED', {
-      resource: 'vigor-drink',
-      reason: `精力药剂每人限 ${VIGOR_MAX_USES} 次，已用 ${used} 次`,
+      resource: 'stamina-potion',
+      reason: `每日限 ${STAMINA_POTION_DAILY_LIMIT} 瓶，今日已用 ${used} 瓶`,
     });
   }
-  const energyMax = Math.min(ENERGY_MAX_CAP, s.energyMax + amount);
+  const stamina = clamp(s.stamina + amount, 0, STAMINA_CAP);
   return {
-    patch: { energyMax },
-    counters: { ...c, vigorUsed: used + 1 },
+    patch: { stamina },
+    counters: { ...c, staminaPotionDaily: used + 1, staminaPotionDailyKey: key },
   };
 }
 
-/** 心流引擎：focusCap +8（clamp 100），每人最多 2 次（counters.focusEngineUsed） */
+/** 浓咖啡：体力恢复 clamp [0, 5] + 心态副作用 mentalityChange clamp [−10, +10]；每日限 2 杯（coffeeDaily 键） */
+function coffee(
+  eff: { amount: number; mentalityChange: number },
+  s: Student,
+  now: Date,
+): EffectApplyResult {
+  const c = countersOf(s);
+  const key = dayKey(now);
+  const used = dailyUsed(c, 'coffeeDaily', 'coffeeDailyKey', key);
+  if (used >= COFFEE_DAILY_LIMIT) {
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: 'coffee',
+      reason: `每日限 ${COFFEE_DAILY_LIMIT} 杯，今日已用 ${used} 杯`,
+    });
+  }
+  const stamina = clamp(s.stamina + eff.amount, 0, STAMINA_CAP);
+  const mindset = clamp(s.mindset + eff.mentalityChange, MINDSET_MIN, MINDSET_MAX);
+  return {
+    patch: { stamina, mindset },
+    counters: { ...c, coffeeDaily: used + 1, coffeeDailyKey: key },
+  };
+}
+
+/** 心流引擎：focus_cap 永久 +amount（clamp 100），每人限 1 台（counters.focusEngineUsed） */
 function focusEngine(amount: number, s: Student): EffectApplyResult {
   const c = countersOf(s);
   const used = num(c, 'focusEngineUsed');
   if (used >= FOCUS_ENGINE_MAX_USES) {
     throw new ApiError('VALIDATION_FAILED', {
       resource: 'focus-engine',
-      reason: `心流引擎每人限 ${FOCUS_ENGINE_MAX_USES} 次，已用 ${used} 次`,
+      reason: `心流引擎每人限 ${FOCUS_ENGINE_MAX_USES} 台，已用 ${used} 台`,
     });
   }
   const focusCap = Math.min(FOCUS_CAP_MAX, s.focusCap + amount);
