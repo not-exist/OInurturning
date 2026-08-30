@@ -16,12 +16,16 @@ RUN pnpm -C apps/api generate && pnpm -C apps/api build
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production CONFIG_DIR=/app/config
+# 镜像 pnpm workspace 布局：tsup 默认外置 dependencies，运行时需要
+# apps/api/node_modules（相对符号链接 → 根 node_modules/.pnpm）解析链完整
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages
-COPY --from=build /app/apps/api/dist ./dist
-COPY --from=build /app/apps/api/prisma ./prisma
+COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 COPY --from=build /app/docs/data ./config
 COPY deploy/entrypoint.sh ./entrypoint.sh
-RUN chmod +x entrypoint.sh && npx -y prisma@6.10.0 --version >/dev/null 2>&1 || true
+RUN chmod +x entrypoint.sh
 EXPOSE 3000
 CMD ["./entrypoint.sh"]

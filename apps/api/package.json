@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsup src/index.ts --format esm --target node22 --sourcemap --clean",
+    "build": "tsup",
     "start": "node dist/index.js",
     "migrate": "prisma migrate deploy",
     "generate": "prisma generate",
