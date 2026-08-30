@@ -57,7 +57,7 @@ describe('GET /api/problems', () => {
     const [first] = list;
     expect(first.id).toBeTypeOf('number');
     expect(first.name).toBe('题A');
-    expect(first.dim).toBe('DP');
+    expect(first.dominantDim).toBe('DP');
     expect(first.rarity).toBe('RAINBOW'); // colorful → RAINBOW
     expect(first.quality).toBe(80);
     expect(first.consumedAt).toBeNull();
@@ -99,7 +99,7 @@ describe('GET /api/talents', () => {
     expect(yellow.rarity).toBe('YELLOW');
     expect(yellow.kind).toBe('positive');
     expect(yellow.family).toBe('focus');
-    expect(yellow.desc).toContain('黄');
+    expect(yellow.description).toContain('黄');
     expect(yellow.effects.length).toBeGreaterThan(0);
 
     const gray = list.find((t) => t.id === 'slump-gray')!;

@@ -24,7 +24,7 @@ export interface TalentView {
   name: string;
   rarity: Rarity;
   kind: TalentDef['kind'];
-  desc: string;
+  description: string;
   family: string | null;
   effects: TalentDef['effects'];
 }
@@ -36,7 +36,7 @@ export async function listTalents(): Promise<TalentView[]> {
     name: t.name,
     rarity: toRarity(t.rarity as ConfigRarity),
     kind: t.kind,
-    desc: t.description,
+    description: t.description,
     family: t.family,
     effects: t.effects,
   }));

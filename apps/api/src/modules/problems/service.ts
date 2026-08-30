@@ -17,7 +17,7 @@ function toRarity(r: string): Rarity {
 export interface ProblemView {
   id: number;
   name: string;
-  dim: DimensionKey;
+  dominantDim: DimensionKey;
   rarity: Rarity;
   quality: number;
   consumedAt: string | null;
@@ -31,7 +31,7 @@ export async function listProblems(userId: number): Promise<ProblemView[]> {
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
-    dim: r.dominantDim as DimensionKey,
+    dominantDim: r.dominantDim as DimensionKey,
     rarity: toRarity(r.rarity as ConfigRarity),
     quality: r.quality,
     consumedAt: r.consumedAt ? r.consumedAt.toISOString() : null,
