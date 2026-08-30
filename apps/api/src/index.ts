@@ -1,8 +1,11 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { requestId } from './middlewares/requestId.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { authRouter } from './modules/auth/router.js';
+import { usersRouter } from './modules/users/router.js';
 import type { ApiEnvelope } from '@oinur/shared';
 
 export function createApp(): express.Express {
@@ -19,6 +22,19 @@ export function createApp(): express.Express {
     };
     res.json(body);
   });
+
+  // 测试环境跳过限流：单进程串行跑完整套件会超过 authLimiter 的 10 次窗口
+  const skipInTest = (): boolean => process.env.NODE_ENV === 'test';
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, skip: skipInTest,
+  });
+  const globalLimiter = rateLimit({
+    windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false, skip: skipInTest,
+  });
+
+  app.use(globalLimiter);
+  app.use('/api/auth', authLimiter, authRouter);
+  app.use('/api/users', usersRouter);
 
   app.use(errorHandler);
   return app;
