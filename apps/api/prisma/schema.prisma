@@ -27,5 +27,214 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  students        Student[]
+  items           UserItem[]
+  problemEntries  ProblemLibraryEntry[]
+  reputationLogs  ReputationLog[]
+  recruitPool     RecruitPool?
+
   @@map("users")
+}
+
+// ───────────────────────── 配置域（yaml 导入目标，TECH-DESIGN §3） ─────────────────────────
+// 公共字段约定：id=语义化稳定 id；sourceHash=导入批次指纹；payload=zod 校验后的完整定义；
+// deprecated=本批 yaml 中消失的历史条目（软弃用，绝不物理删除——玩法数据外键仍需有效）。
+// 后续里程碑的 StudentTalent/UserItem 等表将以外键指向 ConfigTalent/ConfigItem。
+
+model ConfigTalent {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+
+  studentTalents StudentTalent[]
+}
+
+model ConfigItem {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+
+  holdings UserItem[]
+}
+
+model ConfigProblem {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigEvent {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigStage {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigEconomy {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigImport {
+  id         Int      @id @default(autoincrement())
+  sourceHash String   @db.VarChar(64)
+  manifest   Json
+  ok         Boolean
+  errorCount Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ───────────────────────── 学员域（M1-R4：字段对齐领域键，student.md 权威） ─────────────────────────
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum QualityTier {
+  COMMON
+  GOOD
+  ELITE
+  GENIUS
+}
+
+enum StudentStatus {
+  ACTIVE
+  DISMISSED
+}
+
+enum AcquiredVia {
+  RECRUIT
+  EVENT
+  UPGRADE // 进阶石升阶
+  REROLL  // 洗练券洗出
+  ADMIN
+}
+
+model Student {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  name        String        @db.VarChar(24)
+  sex         Sex
+  qualityTier QualityTier
+  status      StudentStatus @default(ACTIVE)
+  // 九维能力（1–100，浮点累积、展示 floor）
+  ds          Float
+  dp          Float
+  math        Float
+  graph       Float
+  greedy      Float
+  str         Float
+  code        Float
+  thinking    Float
+  setting     Float
+  // 辅助属性与资源
+  mindset     Float         @default(2) // −10…+10
+  focusCap    Int
+  energyMax   Int
+  energy      Float
+  stamina     Float         @default(5) // 上限恒定 5（economy）
+  staminaRegen Int // 1–100 刻度
+  counters    Json          @default("{}") // 稀疏计数器：reroll/vigorUsed/focusEngineUsed/milkTea/bookWeek
+  lastSettledAt DateTime    @default(now())
+  recruitedAt DateTime      @default(now())
+  dismissedAt DateTime?
+  updatedAt   DateTime      @updatedAt
+
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  talents          StudentTalent[]
+  authoredProblems ProblemLibraryEntry[]  @relation("ProblemAuthor")
+
+  @@index([userId, status])
+}
+
+model StudentTalent {
+  id           Int          @id @default(autoincrement())
+  studentId    Int
+  talentId     String       @db.VarChar(64) // → ConfigTalent.id
+  acquiredVia  AcquiredVia
+  fromTalentId String?      @db.VarChar(64) // 升阶/洗练前的天赋 id，溯源用
+  createdAt    DateTime     @default(now())
+
+  student Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  talent  ConfigTalent @relation(fields: [talentId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, talentId]) // 同一天赋不可重复持有（家族升阶=替换行）
+  @@index([talentId])
+}
+
+// ───────────────────────── 招募域（M1-R1/R2/R3：5 人候选池，24h 懒刷新，04:00 日界） ─────────────────────────
+
+model RecruitPool {
+  userId         Int      @id
+  candidates     Json // 5 个 CandidatePayload（生成规则：student.md §3.2–3.6）
+  generatedAt    DateTime
+  refreshesToday Int      @default(0) // 当日手动刷新次数（k 从 0 计）
+  refreshDayKey  String   @db.VarChar(10) // clock.dayKey，04:00 界，跨日重置计数
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────── 物品域 ─────────────────────────
+
+model UserItem {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  itemId   String @db.VarChar(64) // → ConfigItem.id
+  quantity Int // >0 才保留行；扣到 0 即删除行
+
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item ConfigItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, itemId])
+  @@index([itemId])
+}
+
+model ProblemLibraryEntry {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  authorStudentId Int? // 开除作者后置空（student.md §9）
+  name            String    @db.VarChar(64)
+  dominantDim     String    @db.VarChar(8) // DS/DP/MATH/GRAPH/GREEDY/STRING
+  rarity          String    @db.VarChar(8) // 六档
+  quality         Int // Q 分 0–100
+  consumedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authorStudent Student? @relation("ProblemAuthor", fields: [authorStudentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, consumedAt])
+}
+
+model ReputationLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  delta     Int // 正负皆可
+  reason    String   @db.VarChar(64) // LECTURE / CONTEST_RANK / DISMISS / EVENT:<id> / PVP_PRIZE …
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

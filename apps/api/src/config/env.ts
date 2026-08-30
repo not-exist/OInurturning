@@ -8,6 +8,8 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET 至少 32 字节随机'),
   BCRYPT_COST: z.coerce.number().int().min(10).max(14).default(12),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug']).default('info'),
+  /** 配置即数据管线的 yaml 源目录；相对路径先按 cwd 解析，再按仓库根回退 */
+  CONFIG_DIR: z.string().default('docs/data'),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

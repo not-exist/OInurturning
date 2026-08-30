@@ -5,9 +5,10 @@ import { useAuthStore } from '../lib/auth-store';
 
 const TABS = [
   { to: '/', label: '总览' },
-  { to: '/students', label: '学员管理', soon: true },
-  { to: '/backpack', label: '背包', soon: true },
-  { to: '/academy', label: '高级学院', soon: true },
+  { to: '/students', label: '学员管理' },
+  { to: '/training', label: '训练中心' },
+  { to: '/backpack', label: '背包' },
+  { to: '/academy', label: '高级学院' },
   { to: '/adventure', label: '历练', soon: true },
   { to: '/story', label: '剧情模式', soon: true },
   { to: '/pvp', label: 'PVP', soon: true },
