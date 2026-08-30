@@ -1,0 +1,67 @@
+import { useState, type FormEvent, type JSX } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { apiFetch, setAccessToken, ApiCallError } from '../../lib/api';
+import { useAuthStore } from '../../lib/auth-store';
+import type { MeView } from '@oinur/shared';
+
+export function RegisterPage(): JSX.Element {
+  const nav = useNavigate();
+  const setMe = useAuthStore((s) => s.setMe);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent): Promise<void> {
+    e.preventDefault();
+    setErr(null);
+    try {
+      const d = await apiFetch<{ accessToken: string; me: MeView }>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+      setAccessToken(d.accessToken);
+      setMe(d.me);
+      nav('/');
+    } catch (e2) {
+      setErr(
+        e2 instanceof ApiCallError && e2.code === 'ALREADY_EXISTS'
+          ? '用户名已被占用'
+          : '注册失败，请稍后再试',
+      );
+    }
+  }
+
+  return (
+    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
+      <h1 className="text-center text-2xl font-bold">OInurturning</h1>
+      <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-3">
+        <input
+          className="rounded border px-3 py-2"
+          placeholder="用户名"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <input
+          className="rounded border px-3 py-2"
+          type="password"
+          placeholder="密码（至少 8 位）"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        {err && <p className="text-sm text-red-600">{err}</p>}
+        <button
+          className="rounded bg-neutral-900 py-2 font-medium text-white hover:bg-neutral-700"
+          type="submit"
+        >
+          注册
+        </button>
+        <p className="text-center text-sm text-neutral-500">
+          已有账号？
+          <Link className="text-blue-600 underline" to="/login">
+            登录
+          </Link>
+        </p>
+      </form>
+    </div>
+  );
+}
