@@ -117,6 +117,17 @@ function toJsonPayload(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
+/** 递归冻结：CONFIG 为多模块共享的只读缓存，嵌套结构同样不可改写（F-3） */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object') {
+    for (const key of Object.keys(value)) {
+      deepFreeze((value as Record<string, unknown>)[key]);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}
+
 async function loadBundleFromDb(sourceHash: string): Promise<ConfigBundle> {
   const [talents, items, economy] = await Promise.all([
     prisma.configTalent.findMany({ where: { deprecated: false } }),
@@ -130,6 +141,45 @@ async function loadBundleFromDb(sourceHash: string): Promise<ConfigBundle> {
     sourceHash,
   };
   return bundle;
+}
+
+/**
+ * 将 DB 调和到与本批 yaml 完全一致：本批条目逐条 upsert（恢复 payload、置 deprecated:false，
+ * 即回滚场景下被弃用条目复活、被改写 payload 回滚），本批缺失的活跃条目软弃用。
+ * 完整导入与幂等跳过两条路径共用（F-1/F-2）。
+ */
+async function reconcileTables(
+  tx: Prisma.TransactionClient,
+  batch: { talents: TalentDef[]; items: ItemDef[]; economy: EconomyConfig; sourceHash: string },
+): Promise<void> {
+  const { talents, items, economy, sourceHash } = batch;
+  for (const t of talents) {
+    await tx.configTalent.upsert({
+      where: { id: t.id },
+      create: { id: t.id, sourceHash, payload: toJsonPayload(t) },
+      update: { sourceHash, payload: toJsonPayload(t), deprecated: false },
+    });
+  }
+  for (const it of items) {
+    await tx.configItem.upsert({
+      where: { id: it.id },
+      create: { id: it.id, sourceHash, payload: toJsonPayload(it) },
+      update: { sourceHash, payload: toJsonPayload(it), deprecated: false },
+    });
+  }
+  await tx.configEconomy.upsert({
+    where: { id: 'active' },
+    create: { id: 'active', sourceHash, payload: toJsonPayload(economy) },
+    update: { sourceHash, payload: toJsonPayload(economy), deprecated: false },
+  });
+  await tx.configTalent.updateMany({
+    where: { deprecated: false, id: { notIn: talents.map((t) => t.id) } },
+    data: { deprecated: true, sourceHash },
+  });
+  await tx.configItem.updateMany({
+    where: { deprecated: false, id: { notIn: items.map((i) => i.id) } },
+    data: { deprecated: true, sourceHash },
+  });
 }
 
 export interface ImportConfigsOptions {
@@ -179,8 +229,15 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
   const sourceHash = sha256(FILES.map((f) => byFile.get(f) ?? '').join('\n'));
   const done = await prisma.configImport.findFirst({ where: { sourceHash, ok: true } });
   if (done) {
-    CONFIG = Object.freeze(await loadBundleFromDb(sourceHash));
-    logger.info({ sourceHash, dir }, '[config] 同 hash 已导入，幂等跳过');
+    // 幂等跳过仍需先调和 DB（F-1/F-2）：回滚到旧 hash 时，被后续批次软弃用的条目复活、
+    // 被改写的 payload 回滚，保证任何进程启动后 CONFIG 必然等于其自身 CONFIG_DIR 的 yaml；
+    // 不新增 configImport 行，保留审计幂等语义。
+    await prisma.$transaction(
+      (tx) => reconcileTables(tx, { talents, items, economy: economy!, sourceHash }),
+      { timeout: 20_000 },
+    );
+    CONFIG = deepFreeze(await loadBundleFromDb(sourceHash));
+    logger.info({ sourceHash, dir }, '[config] 同 hash 已导入，调和 DB 后幂等跳过');
     return CONFIG;
   }
 
@@ -192,41 +249,13 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
   }));
   await prisma.$transaction(
     async (tx) => {
-      for (const t of talents) {
-        await tx.configTalent.upsert({
-          where: { id: t.id },
-          create: { id: t.id, sourceHash, payload: toJsonPayload(t) },
-          update: { sourceHash, payload: toJsonPayload(t), deprecated: false },
-        });
-      }
-      for (const it of items) {
-        await tx.configItem.upsert({
-          where: { id: it.id },
-          create: { id: it.id, sourceHash, payload: toJsonPayload(it) },
-          update: { sourceHash, payload: toJsonPayload(it), deprecated: false },
-        });
-      }
-      await tx.configEconomy.upsert({
-        where: { id: 'active' },
-        create: { id: 'active', sourceHash, payload: toJsonPayload(economy!) },
-        update: { sourceHash, payload: toJsonPayload(economy!), deprecated: false },
-      });
-      const talentIds = talents.map((t) => t.id);
-      const itemIds = items.map((i) => i.id);
-      await tx.configTalent.updateMany({
-        where: { deprecated: false, id: { notIn: talentIds } },
-        data: { deprecated: true, sourceHash },
-      });
-      await tx.configItem.updateMany({
-        where: { deprecated: false, id: { notIn: itemIds } },
-        data: { deprecated: true, sourceHash },
-      });
+      await reconcileTables(tx, { talents, items, economy: economy!, sourceHash });
       await tx.configImport.create({ data: { sourceHash, manifest, ok: true } });
     },
     { timeout: 20_000 },
   );
 
-  CONFIG = Object.freeze(await loadBundleFromDb(sourceHash));
+  CONFIG = deepFreeze(await loadBundleFromDb(sourceHash));
   logger.info(
     { sourceHash, talents: talents.length, items: items.length },
     '[config] 配置导入完成并冻结进内存缓存',

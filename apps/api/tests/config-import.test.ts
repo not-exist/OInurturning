@@ -275,6 +275,19 @@ lecture:
   note: 多余分区 passthrough
 `;
 
+const REDUCED_TALENTS = `version: 1
+talents:
+  - id: focus-yellow
+    name: 专注
+    rarity: yellow
+    kind: positive
+    family: focus
+    effects:
+      - {stat: focus_gain, mode: percent, value: 8}
+    description: 测试用天赋。
+    upgrade_to: null
+`;
+
 const tmpDirs: string[] = [];
 function writeConfigDir(files: { talents: string; items: string; economy: string }): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'oinur-config-'));
@@ -318,24 +331,12 @@ describe('importConfigs', () => {
     expect(rec).toBe(1);
   });
 
-  it('本批消失的条目被软弃用，复活条目取消弃用', async () => {
+  it('本批消失的条目被软弃用，内容有变的条目复活并取消弃用', async () => {
     const dir = writeConfigDir({ talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY });
     const first = await importConfigs({ configDir: dir });
 
     // 移除 focus-green，并将 focus-yellow 的 upgrade_to 置空 → 新 hash
-    const reduced = `version: 1
-talents:
-  - id: focus-yellow
-    name: 专注
-    rarity: yellow
-    kind: positive
-    family: focus
-    effects:
-      - {stat: focus_gain, mode: percent, value: 8}
-    description: 测试用天赋。
-    upgrade_to: null
-`;
-    writeFileSync(path.join(dir, 'talents.yaml'), reduced);
+    writeFileSync(path.join(dir, 'talents.yaml'), REDUCED_TALENTS);
     const second = await importConfigs({ configDir: dir });
     expect(second.sourceHash).not.toBe(first.sourceHash);
     expect(second.talents['focus-green']).toBeUndefined();
@@ -351,6 +352,107 @@ talents:
     expect(revived?.deprecated).toBe(false);
     expect(revived?.sourceHash).toBe(third.sourceHash);
     expect(third.talents['focus-green']).toBeDefined();
+  });
+
+  it('回滚到历史 ok hash：skip 路径调和 DB——弃用条目复活、被改写 payload 回滚、无新导入记录', async () => {
+    const dir = writeConfigDir({ talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY });
+    const first = await importConfigs({ configDir: dir });
+
+    // 批次 B：删除 focus-green（软弃用）并改写 focus-yellow 的 name → 新 hash
+    writeFileSync(path.join(dir, 'talents.yaml'), REDUCED_TALENTS.replace('name: 专注', 'name: 专注·改'));
+    const second = await importConfigs({ configDir: dir });
+    expect(second.sourceHash).not.toBe(first.sourceHash);
+    expect(second.talents['focus-yellow']?.name).toBe('专注·改');
+    expect(
+      (await prisma.configTalent.findUnique({ where: { id: 'focus-green' } }))?.deprecated,
+    ).toBe(true);
+
+    // 回滚到历史 hash A：命中 ok 记录走 skip 路径，但 DB 必须先调和到与 yaml 一致
+    writeFileSync(path.join(dir, 'talents.yaml'), BASE_TALENTS);
+    const third = await importConfigs({ configDir: dir });
+    expect(third.sourceHash).toBe(first.sourceHash);
+
+    // 审计幂等：不新增 configImport 行
+    const rec = await prisma.configImport.count({ where: { sourceHash: first.sourceHash, ok: true } });
+    expect(rec).toBe(1);
+
+    // 被弃用条目复活，且 payload 回滚到历史版本
+    const revived = await prisma.configTalent.findUnique({ where: { id: 'focus-green' } });
+    expect(revived?.deprecated).toBe(false);
+    expect((revived?.payload as { name: string }).name).toBe('专注·进阶');
+    // 被改写的 payload 回滚
+    const yellow = await prisma.configTalent.findUnique({ where: { id: 'focus-yellow' } });
+    expect((yellow?.payload as { name: string }).name).toBe('专注');
+    // CONFIG 与磁盘 yaml 一致
+    expect(third.talents['focus-yellow']?.name).toBe('专注');
+    expect(third.talents['focus-green']?.name).toBe('专注·进阶');
+  });
+
+  it('不同 CONFIG_DIR 交替导入后，CONFIG 必然等于本进程自身 CONFIG_DIR 的 yaml', async () => {
+    // 模拟多进程共享 DB：进程 A/B fixtures 不同，交替启动时 DB 被互相改写
+    const dirA = writeConfigDir({ talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY });
+    const dirB = writeConfigDir({
+      talents: `version: 1
+talents:
+  - id: solo-gray
+    name: 独行
+    rarity: gray
+    kind: positive
+    family: solo
+    effects:
+      - {stat: focus_gain, mode: percent, value: 3}
+    description: 另一进程的 fixtures。
+    upgrade_to: null
+`,
+      items: `items:
+  - id: other-item
+    name: 异世界道具
+    category: nurture
+    rarity: gray
+    effect:
+      desc: 另一进程的 fixtures。
+      kind: rename
+    price: null
+    sources: [商城]
+    stack: 1
+    description: 另一进程的 fixtures。
+`,
+      economy: BASE_ECONOMY,
+    });
+
+    await importConfigs({ configDir: dirA });
+    const fromB = await importConfigs({ configDir: dirB });
+    expect(fromB.talents['focus-green']).toBeUndefined();
+    expect(fromB.items['rename-card']).toBeUndefined();
+
+    // 进程 A 再次启动：hash A 已有 ok 记录 → skip 路径调和后，CONFIG 与 A 的 yaml 严格一致
+    const backA = await importConfigs({ configDir: dirA });
+    expect(Object.keys(backA.talents).sort()).toEqual(['focus-green', 'focus-yellow']);
+    expect(Object.keys(backA.items)).toEqual(['rename-card']);
+    expect(backA.talents['solo-gray']).toBeUndefined();
+    expect(backA.items['other-item']).toBeUndefined();
+
+    // 进程 B 再次启动同理
+    const backB = await importConfigs({ configDir: dirB });
+    expect(Object.keys(backB.talents)).toEqual(['solo-gray']);
+    expect(Object.keys(backB.items)).toEqual(['other-item']);
+  });
+
+  it('CONFIG 深冻结：运行时改写嵌套结构抛错且不影响缓存', async () => {
+    const dir = writeConfigDir({ talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY });
+    const bundle = await importConfigs({ configDir: dir });
+    expect(Object.isFrozen(bundle)).toBe(true);
+    expect(Object.isFrozen(bundle.talents['focus-yellow'])).toBe(true);
+    expect(Object.isFrozen(bundle.talents['focus-yellow']?.effects)).toBe(true);
+    expect(Object.isFrozen(bundle.economy.recruitment.quality_mult)).toBe(true);
+    expect(() => {
+      (bundle.talents['focus-yellow'] as { name: string }).name = '篡改';
+    }).toThrow(TypeError);
+    expect(() => {
+      (bundle.economy.recruitment.quality_mult as { genius: number }).genius = 99;
+    }).toThrow(TypeError);
+    expect(bundle.talents['focus-yellow']?.name).toBe('专注');
+    expect(bundle.economy.recruitment.quality_mult.genius).toBe(5.0);
   });
 
   it('坏 rarity 抛 FatalStartupError，报出文件与路径', async () => {
