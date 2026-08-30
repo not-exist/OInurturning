@@ -1,0 +1,374 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { DimensionKey, QualityTier, Rarity, StudentView } from '@oinur/shared';
+import { apiFetch } from './api';
+
+// ---------------------------------------------------------------------------
+// 领域视图类型（API 返回；shared 未导出的补于此）
+// ---------------------------------------------------------------------------
+
+export interface CandidateAttrs {
+  ds: number;
+  dp: number;
+  math: number;
+  graph: number;
+  greedy: number;
+  str: number;
+  code: number;
+  thinking: number;
+  setting: number;
+  focusCap: number;
+  energyMax: number;
+  staminaRegen: number;
+}
+
+export interface CandidatePayload {
+  tempId: string;
+  name: string;
+  sex: 'MALE' | 'FEMALE';
+  qualityTier: QualityTier;
+  hint: string;
+  attrs: CandidateAttrs;
+  talents: { talentId: string }[];
+  price: number;
+}
+
+export interface PoolView {
+  candidates: CandidatePayload[];
+  generatedAt: string;
+  refreshesToday: number;
+  refreshPrice: number;
+}
+
+export interface ItemView {
+  itemId: string;
+  quantity: number;
+  name: string;
+  rarity: Rarity;
+  category: string;
+  description: string;
+  price: number | null;
+  effectDesc: string | null;
+}
+
+export interface DismissResult {
+  id: number;
+  status: 'DISMISSED';
+  reputationPenalty: number;
+  reputationDelta: number;
+  reputation: number;
+  recycledRenameCard: boolean;
+}
+
+export interface RareGain {
+  stat: 'code' | 'thinking' | 'setting' | 'mindset' | 'focus_cap' | 'stamina_regen';
+  amount: number;
+}
+
+export interface TrainingResult {
+  dim: DimensionKey;
+  delta: number;
+  rareGains: RareGain[];
+  cost: number;
+  staminaAfter: number;
+}
+
+export interface TalentDefView {
+  id: string;
+  name: string;
+  rarity: Rarity;
+  kind: 'positive' | 'negative';
+  description: string;
+  effects: { stat: string; mode: string; value: number }[];
+}
+
+export interface ProblemView {
+  id: number;
+  name: string;
+  dominantDim: DimensionKey;
+  rarity: Rarity;
+  quality: number;
+  consumedAt: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// 展示辅助（全局唯一；稀有度/品质/类别/维度/性别中文映射）
+// ---------------------------------------------------------------------------
+
+export const DIMENSION_LABEL: Record<DimensionKey, string> = {
+  DS: '数据结构',
+  DP: '动态规划',
+  MATH: '数学',
+  GRAPH: '图论',
+  GREEDY: '贪心',
+  STRING: '字符串',
+};
+
+export const QUALITY_LABEL: Record<QualityTier, string> = {
+  COMMON: '普通',
+  GOOD: '良好',
+  ELITE: '精英',
+  GENIUS: '天才',
+};
+
+export const SEX_LABEL: Record<'MALE' | 'FEMALE', string> = {
+  MALE: '男',
+  FEMALE: '女',
+};
+
+export const CATEGORY_LABEL: Record<string, string> = {
+  nurture: '养成',
+  book: '书籍',
+  functional: '功能',
+  contest: '竞赛',
+  quest: '任务',
+  material: '材料',
+};
+
+export const RARITY_LABEL: Record<Rarity, string> = {
+  GRAY: '灰',
+  YELLOW: '黄',
+  GREEN: '绿',
+  BLUE: '蓝',
+  PURPLE: '紫',
+  RAINBOW: '彩',
+};
+
+/** 材质色（通用着色） */
+export const RARITY_TEXT: Record<Rarity, string> = {
+  GRAY: 'text-neutral-500',
+  YELLOW: 'text-yellow-600',
+  GREEN: 'text-green-600',
+  BLUE: 'text-blue-600',
+  PURPLE: 'text-purple-600',
+  RAINBOW: 'text-fuchsia-600',
+};
+
+/** 徽标/边框用背景色（浅底深字） */
+export const RARITY_BADGE: Record<Rarity, string> = {
+  GRAY: 'bg-neutral-200 text-neutral-700',
+  YELLOW: 'bg-yellow-100 text-yellow-700',
+  GREEN: 'bg-green-100 text-green-700',
+  BLUE: 'bg-blue-100 text-blue-700',
+  PURPLE: 'bg-purple-100 text-purple-700',
+  RAINBOW: 'bg-fuchsia-100 text-fuchsia-700',
+};
+
+/** 归一化稀有度：API 对 items/talents 返回配置小写（如 gray），共享类型为大写 Rarity；统一大写 */
+function normRarity(r: string): Rarity {
+  const up = r.toUpperCase();
+  return (up in RARITY_TEXT ? up : 'GRAY') as Rarity;
+}
+
+/** 稀有度中文文案 */
+export function rarityLabel(r: string): string {
+  return RARITY_LABEL[normRarity(r)];
+}
+
+/** 稀有度文字着色 */
+export function rarityText(r: string): string {
+  return RARITY_TEXT[normRarity(r)];
+}
+
+/** 稀有度徽标底色 */
+export function rarityBadge(r: string): string {
+  return RARITY_BADGE[normRarity(r)];
+}
+
+/** 展示层 floor：能力值为浮点累积值 */
+export function floor(v: number): number {
+  return Math.floor(v);
+}
+
+/** 心态：四舍五入到整数点展示 */
+export function round(v: number): number {
+  return Math.round(v);
+}
+
+// ---------------------------------------------------------------------------
+// 学员
+// ---------------------------------------------------------------------------
+
+export function useStudents() {
+  return useQuery({
+    queryKey: ['students'],
+    queryFn: () => apiFetch<StudentView[]>('/api/students'),
+  });
+}
+
+export function useStudent(id: number | undefined) {
+  return useQuery({
+    queryKey: ['student', id],
+    queryFn: () => apiFetch<StudentView>(`/api/students/${id}`),
+    enabled: id != null,
+  });
+}
+
+export function useRenameStudent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) =>
+      apiFetch<StudentView>(`/api/students/${id}/rename`, {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: (s) => {
+      qc.invalidateQueries({ queryKey: ['student', s.id] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+}
+
+export function useDismissStudent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<DismissResult>(`/api/students/${id}/dismiss`, { method: 'POST' }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['student', r.id] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+}
+
+export function useTalentDefs() {
+  // 后端暂无 GET /api/talents（见报告 CONCERNS）；预留契约，返回空即优雅降级
+  return useQuery({
+    queryKey: ['talents'],
+    queryFn: () => apiFetch<TalentDefView[]>('/api/talents'),
+    retry: false,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 招募
+// ---------------------------------------------------------------------------
+
+export function useAcademyPool() {
+  return useQuery({
+    queryKey: ['academy'],
+    queryFn: () => apiFetch<PoolView>('/api/academy/pool'),
+  });
+}
+
+export function useRefreshPool() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<PoolView>('/api/academy/refresh', { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['academy'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useRecruit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tempId: string) =>
+      apiFetch<StudentView>('/api/academy/recruit', {
+        method: 'POST',
+        body: JSON.stringify({ tempId }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['academy'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 背包
+// ---------------------------------------------------------------------------
+
+export function useInventory() {
+  return useQuery({
+    queryKey: ['items'],
+    queryFn: () => apiFetch<ItemView[]>('/api/items'),
+  });
+}
+
+export function useUseItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, studentId }: { itemId: string; studentId: number }) =>
+      apiFetch<StudentView>('/api/items/use', {
+        method: 'POST',
+        body: JSON.stringify({ itemId, studentId }),
+      }),
+    onSuccess: (s) => {
+      qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['student', s.id] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 训练
+// ---------------------------------------------------------------------------
+
+export interface DirectedTrainInput {
+  studentId: number;
+  dim: DimensionKey;
+  bookItemId?: string;
+}
+
+export function useProblems() {
+  // 后端暂无 GET /api/problems（见报告 CONCERNS）；预留契约，返回空即优雅降级
+  return useQuery({
+    queryKey: ['problems'],
+    queryFn: () => apiFetch<ProblemView[]>('/api/problems'),
+    retry: false,
+  });
+}
+
+export function useBasicTrain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: number) =>
+      apiFetch<TrainingResult>('/api/training/basic', {
+        method: 'POST',
+        body: JSON.stringify({ studentId }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useDirectedTrain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DirectedTrainInput) =>
+      apiFetch<TrainingResult>('/api/training/directed', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useSpecializedTrain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, problemId }: { studentId: number; problemId: number }) =>
+      apiFetch<TrainingResult>('/api/training/specialized', {
+        method: 'POST',
+        body: JSON.stringify({ studentId, problemId }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['problems'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
