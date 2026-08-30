@@ -26,7 +26,7 @@
 
 - 每名学员持久保存 `last_tick_at`；任何读取或行动结算时，先按
   `补足量 = floor((now − last_tick_at) / 单点恢复时长 × stamina_regen)` 补足并截断至上限，再执行本次操作。
-- **体力**：上限 5；恢复速率 = `(2/3) × (stamina_regen / 50)` 点/小时——新人 regen≈48–54 即约 46–52 分钟/点（student.md §7.1）。满体力约 4 小时，玩家每日上线 1–2 轮即可清完。
+- **体力**：上限 5；恢复速率 = `(4/3) × (stamina_regen / 50)` 点/小时——新人 regen≈48–54 即约 46–52 分钟/点（student.md §7.1）。满体力约 4 小时，玩家每日上线 1–2 轮即可清完。
 - **精力**：上限 `energy_max`；恢复速率 = `10 × (1 + energy_regen/100)` 点/小时（student.md §7.2），新人约 6–8 小时回满。
 - **专注（focus）**：仅赛场内临时存在，不入时钟，每场比赛开始时清零。
 - 离线时间照常累计（同一公式），不存在「错过在线奖励」概念。
@@ -247,7 +247,7 @@ Q = clamp( round(0.55×setting + 0.25×target_dim + 0.20×thinking + U(−8,+8))
 | 训练增益 base（基础/定向/专项） | 1.6 / 2.0×BookMult / 3.2×QualityMult，共用 `(1−cur/100)^2` 浮点衰减【student.md §4】 |
 | 稀有成长概率（mindset/setting/focus_cap/stamina_regen，均 +1） | 3% / 2% / 0.8% / 0.5%【student.md §4.5】 |
 | 历练层权重（−1/−2/−3） | {70,30} / {42,34,20,4} / {25,35,31,9} |
-| 体力/精力恢复 | (2/3)×(stamina_regen/50) 点/时 ／ 10×(1+energy_regen/100) 点/时【student.md §7】 |
+| 体力/精力恢复 | (4/3)×(stamina_regen/50) 点/时 ／ 10×(1+energy_regen/100) 点/时【student.md §7】 |
 | 招募池容量 / 免费刷新 / 手动刷新价格 | 5 / 24h / round(100×1.5^k) 封顶 800【economy.yaml】 |
 | 品质权重（普/良/精/天） | 55 / 30 / 12 / 3【student.md §3.2】 |
 | 招募费 | round(300×1.35^N) × 品质系数{1, 1.5, 2.5, 5} |
