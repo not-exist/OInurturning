@@ -27,6 +27,151 @@ items:
     sources: [测试发放]
     stack: 99
     description: 测试用道具·不可购买。
+  - id: reroll-ticket
+    name: 洗练券
+    category: nurture
+    rarity: blue
+    effect:
+      desc: 将一名学员的一个天赋重新随机。
+      kind: talent_reroll
+    price: null
+    sources: [测试发放]
+    stack: 99
+    description: 测试用洗练券。
+  - id: reroll-shard
+    name: 洗练券碎片
+    category: material
+    rarity: green
+    effect:
+      desc: 集满 20 枚可合成一张洗练券。
+      kind: compose_input
+    price: null
+    sources: [测试发放]
+    stack: 99
+    description: 测试用碎片。
+  - id: direction-charm
+    name: 方向锁定符
+    category: nurture
+    rarity: blue
+    effect:
+      desc: 锁定下一次洗练结果家族。
+      kind: talent_reroll_lock
+    price: null
+    sources: [测试发放]
+    stack: 10
+    description: 测试用锁定符。
+  - id: legend-box
+    name: 传说礼盒
+    category: contest
+    rarity: purple
+    effect:
+      desc: 打开获得进阶石与结算金。
+      kind: grant_box
+    price: null
+    sources: [测试发放]
+    stack: 99
+    description: 测试用礼盒。
+  - id: tag-card
+    name: tag获取卡
+    category: contest
+    rarity: colorful
+    effect:
+      desc: 兑换一枚自定义称号。
+      kind: unlock_tag
+    price: null
+    sources: [测试发放]
+    stack: 99
+    description: 测试用 tag 卡。
+  - id: badge-legend
+    name: 传奇教练勋章
+    category: quest
+    rarity: purple
+    effect:
+      desc: 账号永久被动，声誉获取 +10%。
+      kind: account_aura
+    price: null
+    sources: [测试发放]
+    stack: 1
+    description: 测试用勋章。
+  - id: calm-pill
+    name: 定心丸
+    category: nurture
+    rarity: green
+    effect:
+      desc: 心态 +3（不超过 +10）。
+      kind: mentality_add
+      amount: 3
+      target: single_student
+    price: 150
+    sources: [商城]
+    stack: 99
+    description: 测试用定心丸。
+  - id: milk-tea
+    name: 奶茶
+    category: functional
+    rarity: gray
+    effect:
+      desc: 心态 +1（不超过 +10）；每日限 2 杯。
+      kind: mentality_add
+      amount: 1
+      target: single_student
+      event_defuse: G8
+    price: 20
+    sources: [商城]
+    stack: 99
+    description: 测试用奶茶。
+  - id: stamina-potion
+    name: 体力药水
+    category: functional
+    rarity: blue
+    effect:
+      desc: 立即恢复 3 点体力（不超过 5）。
+      kind: stamina_restore
+      amount: 3
+      target: single_student
+    price: 320
+    sources: [商城]
+    stack: 99
+    description: 测试用体力药水。
+  - id: coffee
+    name: 浓咖啡
+    category: functional
+    rarity: yellow
+    effect:
+      desc: 立即恢复 15 点精力（不超上限）。
+      kind: energy_restore
+      amount: 15
+      target: single_student
+    price: 80
+    sources: [商城]
+    stack: 99
+    description: 测试用浓咖啡。
+  - id: vigor-drink
+    name: 精力药剂
+    category: nurture
+    rarity: green
+    effect:
+      desc: 精力上限永久 +3，每人最多 3 次。
+      kind: energy_cap_add
+      amount: 3
+      target: single_student
+    price: null
+    sources: [测试发放]
+    stack: 99
+    description: 测试用精力药剂。
+  - id: focus-engine
+    name: 心流引擎
+    category: functional
+    rarity: purple
+    effect:
+      desc: 专注力上限永久 +8，每人最多 2 次。
+      kind: focus_cap_add
+      amount: 8
+      target: single_student
+    price: null
+    sources: [测试发放]
+    stack: 10
+    description: 测试用心流引擎。
   - id: book-ds-green
     name: 数据结构精要
     category: book
@@ -35,8 +180,99 @@ items:
       desc: 定向训练数据结构时的收益倍率书。
       kind: attr_boost
       attribute: ds
-      amount: 3
+      amount: 7
     price: 320
     sources: [商城]
     stack: 10
     description: 测试用六维书。
+  - id: book-thinking-gray
+    name: 《思维·基础手册》
+    category: book
+    rarity: gray
+    effect:
+      desc: 使用后使一名学员思维能力 +2。
+      kind: attr_boost
+      attribute: thinking
+      amount: 2
+    price: 30
+    sources: [商城]
+    stack: 99
+    description: 测试用直用书·灰。
+  - id: book-thinking-yellow
+    name: 《思维·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员思维能力 +4。
+      kind: attr_boost
+      attribute: thinking
+      amount: 4
+    price: 100
+    sources: [商城]
+    stack: 99
+    description: 测试用直用书·黄。
+  - id: book-thinking-green
+    name: 《思维·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员思维能力 +7。
+      kind: attr_boost
+      attribute: thinking
+      amount: 7
+    price: 320
+    sources: [商城]
+    stack: 99
+    description: 测试用直用书·绿。
+  - id: book-thinking-blue
+    name: 《思维·典藏版》
+    category: book
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员思维能力 +12。
+      kind: attr_boost
+      attribute: thinking
+      amount: 12
+    price: 880
+    sources: [商城]
+    stack: 99
+    description: 测试用直用书·蓝。
+  - id: book-thinking-purple
+    name: 《思维·传世真经》
+    category: book
+    rarity: purple
+    effect:
+      desc: 使用后使一名学员思维能力 +20。
+      kind: attr_boost
+      attribute: thinking
+      amount: 20
+    price: 2600
+    sources: [商城]
+    stack: 99
+    description: 测试用直用书·紫。
+  - id: book-coding-green
+    name: 《代码实现·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员代码能力 +7。
+      kind: attr_boost
+      attribute: coding
+      amount: 7
+    price: 320
+    sources: [商城]
+    stack: 99
+    description: 测试用代码直用书。
+  - id: book-setting-green
+    name: 《出题·精要》
+    category: book
+    rarity: green
+    effect:
+      desc: 使用后使一名学员出题能力 +7。
+      kind: attr_boost
+      attribute: setting
+      amount: 7
+    price: 320
+    sources: [商城]
+    stack: 99
+    description: 测试用出题直用书。
