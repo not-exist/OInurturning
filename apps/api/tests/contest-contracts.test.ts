@@ -26,7 +26,10 @@ const duelHasNoRankingFields: false = false as 'rank' extends keyof DuelSummary 
 
 const rankingReport = {
   reportVersion: 1,
+  engineVersion: 'ranking-v1',
+  rngVersion: 'mulberry32-v1',
   seed: 42,
+  snapshotHash: '1234abcd',
   createdAt: '2026-08-31T00:00:00.000Z',
   stageRef: { chapter: 'chapter-1', stageIndex: 1, ngPlusLayer: 2 },
   rewards,
@@ -35,6 +38,7 @@ const rankingReport = {
   questions: [],
   participants: [],
   standings: [],
+  pass: true,
 } satisfies RankingReport;
 
 const progress = {

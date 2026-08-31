@@ -1,68 +1,40 @@
-import type {
-  ParticipantSnapshot,
-  QuestionSnapshot,
-  RankingInput,
-  RankingStanding,
+import {
+  rankingInputSchema,
+  rankingSeedSchema,
+  type FrozenSolveHooks,
+  type ParticipantAttempt,
+  type ParticipantSnapshot,
+  type ParticipantTimeline,
+  type QuestionSnapshot,
+  type RankingInput,
+  type RankingReport,
+  type RankingStanding,
 } from '@oinur/shared';
-import type { ConditionalSolveHooks, HookContext, QuestionAttempt } from './models.js';
-import { createRandomStream, deriveSeed, RNG_VERSION } from './rng.js';
+import type { AttemptRng, HookContext, QuestionAttempt } from './models.js';
+import { createRandomStream, deriveStreamSeed, RNG_VERSION } from './rng.js';
 import { energyCost, estimateSolveTime, solveQuestion } from './solve.js';
 import {
   ENGINE_VERSION,
   cloneQuestionSnapshot,
   isPassingRank,
   stableHash,
-  type DetailedParticipantAttempt,
-  type DetailedParticipantTimeline,
-  type DeterministicRankingReport,
   validateRankingReport,
 } from './report.js';
 
 interface ParticipantResult {
-  timeline: DetailedParticipantTimeline;
+  timeline: ParticipantTimeline;
   totalScore: number;
   rankingPenaltyMin: number;
 }
 
-interface RuntimeQuestion extends QuestionSnapshot {
-  partialScores?: boolean;
+function hooksFor(question: QuestionSnapshot): readonly FrozenSolveHooks[] {
+  return question.traits.flatMap((trait) => trait.hooks);
 }
 
-const TRAIT_HOOKS: Readonly<Record<string, readonly ConditionalSolveHooks[]>> = {
-  'wide-data': [{ partial_override: 'none', tle_prob_add: 0.05 }],
-  'mod-longlong-curse': [{ wa_penalty_add: 5, ac_prob_add: -0.03 }],
-  'strict-spj': [{ partial_override: 'none', noise_sigma_add: 0.05 }],
-  'off-by-one-boundary': [{ ac_prob_add: -0.04, wa_penalty_add: 2 }],
-  interactive: [{ submit_time_add: 10, energy_cost_add: 2 }],
-  'card-constant': [{ tle_prob_add: 0.2 }],
-  'greedy-counterexample': [{ ac_prob_add: -0.08 }],
-  'partial-trap': [{ partial_override: 'trap' }],
-  'construct-poison': [{ think_weight_mul: 1.5, ac_prob_add: -0.05 }],
-  'anti-ak-shield': [{ condition: 'anti_ak', ac_prob_add: -0.15, tle_prob_add: 0.1 }],
-  'force-online': [{ submit_time_add: 8, energy_per_submit_add: 1, partial_override: 'none' }],
-  'precision-hell': [{ ac_prob_add: -0.12, wa_penalty_add: 5, mindset_fail_add: -2 }],
-  'tight-clock': [{ tle_prob_add: 0.3, noise_sigma_mul: 1.3 }],
-  'miracle-easy': [{ condition: 'first_problem', time_k_mul: 0.75, ac_prob_add: 0.25 }],
-  'chaos-domain': [{ prob_amplify: 0.5, noise_sigma_add: 0.1 }],
-};
-
-function cloneParticipantSnapshot(participant: ParticipantSnapshot): ParticipantSnapshot {
-  return {
-    ...participant,
-    abilities: { ...participant.abilities },
-  };
-}
-
-function hooksFor(question: QuestionSnapshot): readonly ConditionalSolveHooks[] {
-  return question.trait === undefined ? [] : (TRAIT_HOOKS[question.trait.traitId] ?? []);
-}
-
-function toTimelineAttempt(resolution: QuestionAttempt): DetailedParticipantAttempt {
-  const verdict = resolution.verdict === 'UNFINISHED' ? 'TLE' : resolution.verdict;
-
+function toTimelineAttempt(resolution: QuestionAttempt): ParticipantAttempt {
   return {
     questionIndex: resolution.questionIndex,
-    verdict,
+    verdict: resolution.verdict,
     minutesUsed: resolution.timeSpentMin,
     penaltyMin: resolution.penaltyMin,
     focusGain: resolution.focusAfter - resolution.focusBefore,
@@ -79,10 +51,16 @@ function hookContext(attemptCount: number, acCount: number, questionCount: numbe
   };
 }
 
+function compareCodeUnits(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 function compareQuestionPriority(
   leftPosition: number,
   rightPosition: number,
-  questions: readonly RuntimeQuestion[],
+  questions: readonly QuestionSnapshot[],
   participant: ParticipantSnapshot,
   focus: number,
   context: HookContext,
@@ -100,28 +78,31 @@ function compareQuestionPriority(
   const priorityDifference = right.score / rightEstimate - left.score / leftEstimate;
 
   if (priorityDifference !== 0) return priorityDifference;
-  if (left.index !== right.index) return left.index - right.index;
-  return leftPosition - rightPosition;
+  const instanceDifference = compareCodeUnits(left.instanceId, right.instanceId);
+  return instanceDifference === 0 ? leftPosition - rightPosition : instanceDifference;
+}
+
+function participantRng(seed: number, participantIndex: number): AttemptRng {
+  const streamSeed = participantIndex === 0 ? seed : deriveStreamSeed(seed, `npc:${participantIndex - 1}`);
+  return {
+    noise: createRandomStream(streamSeed, 'noise'),
+    judge: createRandomStream(streamSeed, 'judge'),
+  };
 }
 
 function simulateParticipant(
-  participantInput: ParticipantSnapshot,
-  questions: readonly RuntimeQuestion[],
+  participant: ParticipantSnapshot,
+  questions: readonly QuestionSnapshot[],
   durationMin: number,
   seed: number,
   participantIndex: number,
 ): ParticipantResult {
-  const participant = cloneParticipantSnapshot(participantInput);
-  const participantSeed = deriveSeed(seed, 'participant', participantIndex);
-  const rng = {
-    noise: createRandomStream(participantSeed, 'noise'),
-    judge: createRandomStream(participantSeed, 'judge'),
-  };
+  const rng = participantRng(seed, participantIndex);
   const remaining = new Set(questions.map((_, position) => position));
   const accepted = new Set<number>();
-  const attempts: DetailedParticipantAttempt[] = [];
-  let remainingClockMin = Math.max(0, durationMin);
-  let energy = Math.max(0, participant.energyMax);
+  const attempts: ParticipantAttempt[] = [];
+  let remainingClockMin = durationMin;
+  let energy = participant.energyMax;
   let focus = 0;
   let mindset = participant.mindset;
   let totalScore = 0;
@@ -136,8 +117,8 @@ function simulateParticipant(
 
     if (available.length === 0) {
       const skipped = [...remaining].sort((left, right) => {
-        const indexDifference = questions[left]!.index - questions[right]!.index;
-        return indexDifference === 0 ? left - right : indexDifference;
+        const instanceDifference = compareCodeUnits(questions[left]!.instanceId, questions[right]!.instanceId);
+        return instanceDifference === 0 ? left - right : instanceDifference;
       });
 
       for (const position of skipped) {
@@ -230,23 +211,24 @@ function buildStandings(results: readonly ParticipantResult[]): RankingStanding[
     }));
 }
 
-export function simulateRanking(input: RankingInput, seed: number): DeterministicRankingReport {
-  const normalizedSeed = seed >>> 0;
-  const questions = input.problems.map((question) => cloneQuestionSnapshot(question) as RuntimeQuestion);
-  const participants = [input.student, ...(input.participants ?? [])];
+export function simulateRanking(input: RankingInput, seed: number): RankingReport {
+  const validatedSeed = rankingSeedSchema.parse(seed);
+  const validatedInput = rankingInputSchema.parse(input);
+  const questions = validatedInput.problems.map(cloneQuestionSnapshot);
+  const participants = [validatedInput.student, ...(validatedInput.participants ?? [])];
   const results = participants.map((participant, participantIndex) =>
-    simulateParticipant(participant, questions, input.durationMin, normalizedSeed, participantIndex),
+    simulateParticipant(participant, questions, validatedInput.durationMin, validatedSeed, participantIndex),
   );
   const standings = buildStandings(results);
   const playerRank = standings.find((standing) => standing.participantIndex === 0)?.rank ?? Number.POSITIVE_INFINITY;
-  const report: DeterministicRankingReport = {
+  const report: RankingReport = {
     reportVersion: 1,
     engineVersion: ENGINE_VERSION,
     rngVersion: RNG_VERSION,
-    seed: normalizedSeed,
-    snapshotHash: stableHash(input),
-    createdAt: new Date(normalizedSeed).toISOString(),
-    ...(input.stageRef === undefined ? {} : { stageRef: { ...input.stageRef } }),
+    seed: validatedSeed,
+    snapshotHash: stableHash(validatedInput),
+    createdAt: new Date(validatedSeed).toISOString(),
+    ...(validatedInput.stageRef === undefined ? {} : { stageRef: { ...validatedInput.stageRef } }),
     rewards: [],
     growth: [],
     format: 'RANKING',

@@ -32,6 +32,7 @@ const participant: ParticipantSnapshot = {
 };
 
 const question: QuestionSnapshot = {
+  instanceId: 'kernel#0',
   index: 0,
   dimension: 'DS',
   demand: 50,
@@ -39,6 +40,8 @@ const question: QuestionSnapshot = {
   codeVolume: 50,
   score: 100,
   timeLimitMin: 90,
+  partialScores: false,
+  traits: [],
   source: 'GENERATED',
 };
 

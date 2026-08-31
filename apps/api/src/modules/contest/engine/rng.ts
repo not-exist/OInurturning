@@ -19,8 +19,13 @@ export function deriveSeed(...parts: (string | number)[]): number {
   return hash >>> 0;
 }
 
+/** Derive the seed that backs one documented labeled substream. */
+export function deriveStreamSeed(baseSeed: number, label: string): number {
+  const hexadecimalSeed = (baseSeed >>> 0).toString(16);
+  return deriveSeed(hexadecimalSeed, label);
+}
+
 /** A fresh deterministic substream; consuming another label cannot advance it. */
 export function createRandomStream(baseSeed: number, label: string): RandomSource {
-  const hexadecimalSeed = (baseSeed >>> 0).toString(16);
-  return mulberry32(deriveSeed(hexadecimalSeed, label));
+  return mulberry32(deriveStreamSeed(baseSeed, label));
 }

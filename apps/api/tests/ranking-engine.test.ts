@@ -32,8 +32,26 @@ function participant(displayName: string, ability: number, energyMax = 100): Par
   };
 }
 
+function question(overrides: Partial<QuestionSnapshot> = {}): QuestionSnapshot {
+  return {
+    instanceId: 'stage:test#0',
+    index: 0,
+    dimension: 'DS',
+    demand: 45,
+    thought: 42,
+    codeVolume: 35,
+    score: 100,
+    timeLimitMin: 20,
+    partialScores: false,
+    traits: [],
+    source: 'GENERATED',
+    ...overrides,
+  };
+}
+
 const questions: QuestionSnapshot[] = [
-  {
+  question({
+    instanceId: 'stage:test#slow',
     index: 1,
     dimension: 'DP',
     demand: 55,
@@ -41,19 +59,13 @@ const questions: QuestionSnapshot[] = [
     codeVolume: 45,
     score: 40,
     timeLimitMin: 100,
-    source: 'GENERATED',
-  },
-  {
+  }),
+  question({
+    instanceId: 'stage:test#fast',
     index: 2,
-    dimension: 'DS',
-    demand: 45,
-    thought: 42,
-    codeVolume: 35,
-    score: 100,
-    timeLimitMin: 20,
     source: 'PREMADE',
     premadeEntryId: 7,
-  },
+  }),
 ];
 
 function rankingInput(overrides: Partial<RankingInput> = {}): RankingInput {
@@ -67,7 +79,7 @@ function rankingInput(overrides: Partial<RankingInput> = {}): RankingInput {
   };
 }
 
-describe('deterministic ranking simulator', () => {
+describe('ranking simulation and ordering', () => {
   it('preserves participant order, selects the highest score/time question, and records timeline totals', () => {
     const report = simulateRanking(rankingInput(), 17);
 
@@ -79,7 +91,7 @@ describe('deterministic ranking simulator', () => {
     for (const standing of report.standings) {
       const timeline = report.participants[standing.participantIndex];
       const reproducedScore = timeline?.attempts.reduce(
-        (total, attempt) => total + ('resolution' in attempt ? attempt.resolution.scoreAwarded : 0),
+        (total, attempt) => total + attempt.resolution.scoreAwarded,
         0,
       );
       expect(standing.totalScore).toBe(reproducedScore);
@@ -88,9 +100,8 @@ describe('deterministic ranking simulator', () => {
 
   it('uses score, AC time, and stable participant index as the complete standings key', () => {
     const tied = rankingInput({
-      student: { ...participant('First', 50), side: 'HOME' },
-      participants: [participant('Second', 50), participant('Third', 50)],
-      durationMin: 0,
+      student: { ...participant('First', 50, 0), side: 'HOME' },
+      participants: [participant('Second', 50, 0), participant('Third', 50, 0)],
     });
 
     expect(simulateRanking(tied, 5).standings).toEqual([
@@ -100,12 +111,28 @@ describe('deterministic ranking simulator', () => {
     ]);
   });
 
+  it('breaks equal priorities by instanceId code-unit order before source position', () => {
+    const report = simulateRanking(
+      rankingInput({
+        student: { ...participant('Player', 85), side: 'HOME' },
+        participants: [],
+        problems: [
+          question({ instanceId: 'a-instance', index: 2 }),
+          question({ instanceId: 'Z-instance', index: 1 }),
+        ],
+      }),
+      5,
+    );
+
+    expect(report.participants[0]?.attempts[0]?.questionIndex).toBe(1);
+  });
+
   it('uses the fixed rank-eight pass line', () => {
     expect(isPassingRank(1)).toBe(true);
     expect(isPassingRank(8)).toBe(true);
     expect(isPassingRank(9)).toBe(false);
 
-    const report = simulateRanking(rankingInput({ durationMin: 0 }), 9);
+    const report = simulateRanking(rankingInput(), 9);
     const playerRank = report.standings.find((standing) => standing.participantIndex === 0)?.rank;
     expect(report.pass).toBe(isPassingRank(playerRank ?? Number.POSITIVE_INFINITY));
   });
@@ -120,33 +147,86 @@ describe('deterministic ranking simulator', () => {
 
     expect(input).toEqual(before);
   });
+});
 
-  it('gives a strictly better bounded multi-seed mean rank to the stronger participant', () => {
-    const sampleQuestions: QuestionSnapshot[] = [0, 1, 2, 3].map((offset) => ({
-      index: offset,
-      dimension: offset % 2 === 0 ? 'DS' : 'DP',
-      demand: 55 + offset * 3,
-      thought: 52 + offset * 3,
-      codeVolume: 45 + offset * 4,
-      score: 100,
-      timeLimitMin: 45 + offset * 10,
-      source: 'GENERATED',
-    }));
+describe('ranking input validation', () => {
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('rejects invalid duration %s', (durationMin) => {
+    expect(() => simulateRanking(rankingInput({ durationMin }), 1)).toThrow();
+  });
+
+  it('rejects empty problem sets before simulation', () => {
+    expect(() => simulateRanking(rankingInput({ problems: [] }), 1)).toThrow();
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 0x1_0000_0000])('rejects invalid seed %s', (seed) => {
+    expect(() => simulateRanking(rankingInput(), seed)).toThrow();
+  });
+
+  it('rejects non-finite snapshots and malformed frozen hooks', () => {
+    const badParticipant = rankingInput({
+      student: {
+        ...rankingInput().student,
+        abilities: { ...rankingInput().student.abilities, DS: Number.NaN },
+      },
+    });
+    const badQuestion = rankingInput({
+      problems: [question({ score: Number.POSITIVE_INFINITY })],
+    });
+    const badHook = rankingInput({
+      problems: [
+        question({
+          traits: [
+            {
+              traitId: 'frozen-hook',
+              severity: 'red',
+              hooks: [{ ac_prob_add: Number.NaN }],
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(() => simulateRanking(badParticipant, 1)).toThrow();
+    expect(() => simulateRanking(badQuestion, 1)).toThrow();
+    expect(() => simulateRanking(badHook, 1)).toThrow();
+  });
+});
+
+describe('ranking strength monotonicity', () => {
+  it('keeps the stronger participant within explicit bounds across 64 seeds', () => {
+    const sampleQuestions: QuestionSnapshot[] = [0, 1, 2, 3].map((offset) =>
+      question({
+        instanceId: `sample#${offset}`,
+        index: offset,
+        dimension: offset % 2 === 0 ? 'DS' : 'DP',
+        demand: 55 + offset * 3,
+        thought: 52 + offset * 3,
+        codeVolume: 45 + offset * 4,
+        score: 100,
+        timeLimitMin: 45 + offset * 10,
+      }),
+    );
     const input = rankingInput({
-      student: { ...participant('Weak', 38), side: 'HOME' },
-      participants: [participant('Strong', 78)],
+      student: { ...participant('Weak', 20), side: 'HOME' },
+      participants: [participant('Strong', 95)],
       problems: sampleQuestions,
       durationMin: 240,
     });
     let weakRankTotal = 0;
     let strongRankTotal = 0;
+    let strongWins = 0;
 
     for (let seed = 0; seed < 64; seed += 1) {
       const standings = simulateRanking(input, seed).standings;
-      weakRankTotal += standings.find((standing) => standing.participantIndex === 0)?.rank ?? 0;
-      strongRankTotal += standings.find((standing) => standing.participantIndex === 1)?.rank ?? 0;
+      const weakRank = standings.find((standing) => standing.participantIndex === 0)?.rank ?? 0;
+      const strongRank = standings.find((standing) => standing.participantIndex === 1)?.rank ?? 0;
+      weakRankTotal += weakRank;
+      strongRankTotal += strongRank;
+      if (strongRank < weakRank) strongWins += 1;
     }
 
-    expect(strongRankTotal / 64).toBeLessThan(weakRankTotal / 64);
+    expect(strongWins).toBeGreaterThanOrEqual(56);
+    expect(strongRankTotal / 64).toBeLessThanOrEqual(1.125);
+    expect(weakRankTotal / 64).toBeGreaterThanOrEqual(1.875);
   });
 });

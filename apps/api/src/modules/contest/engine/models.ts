@@ -1,4 +1,10 @@
-import type { ParticipantSnapshot, QuestionSnapshot } from '@oinur/shared';
+import type {
+  AttemptResolutionSnapshot,
+  FrozenSolveHooks,
+  ParticipantSnapshot,
+  QuestionAttemptSnapshot,
+  QuestionSnapshot,
+} from '@oinur/shared';
 
 export type RandomSource = () => number;
 
@@ -10,23 +16,7 @@ export interface AttemptRng {
 export type HookCondition = 'first_problem' | 'anti_ak';
 export type PartialOverride = 'none' | 'trap' | 'keep';
 
-/** Snake-case names intentionally match the authoritative problem YAML hooks. */
-export interface ConditionalSolveHooks {
-  condition?: HookCondition;
-  time_k_mul?: number;
-  ac_prob_add?: number;
-  tle_prob_add?: number;
-  wa_penalty_add?: number;
-  submit_time_add?: number;
-  energy_cost_add?: number;
-  energy_per_submit_add?: number;
-  noise_sigma_add?: number;
-  noise_sigma_mul?: number;
-  mindset_fail_add?: number;
-  partial_override?: PartialOverride;
-  think_weight_mul?: number;
-  prob_amplify?: number;
-}
+export type ConditionalSolveHooks = FrozenSolveHooks;
 
 export interface HookContext {
   isFirstProblem?: boolean;
@@ -69,16 +59,7 @@ export interface ResolveAttemptInput {
 
 export type AttemptVerdict = 'AC' | 'WA' | 'TLE' | 'UNFINISHED';
 
-export interface AttemptResolution {
-  attemptNumber: number;
-  verdict: AttemptVerdict;
-  submissionTimeMin: number;
-  timeSpentMin: number;
-  penaltyMin: number;
-  mindsetDelta: number;
-  extraEnergyCost: number;
-  clockExhausted: boolean;
-}
+export type AttemptResolution = AttemptResolutionSnapshot;
 
 export interface SolveQuestionInput extends SolveEstimateInput {
   availableEnergy: number;
@@ -89,23 +70,4 @@ export interface SolveQuestionInput extends SolveEstimateInput {
 
 export type QuestionVerdict = 'AC' | 'SKIP' | 'UNFINISHED';
 
-export interface QuestionAttempt {
-  questionIndex: number;
-  verdict: QuestionVerdict;
-  submissions: AttemptResolution[];
-  submissionCount: number;
-  waCount: number;
-  tleJudgeCount: number;
-  estimatedTimeMin: number;
-  timeSpentMin: number;
-  penaltyMin: number;
-  energyRequired: number;
-  energyCost: number;
-  energyAfter: number;
-  scoreAwarded: number;
-  focusBefore: number;
-  focusAfter: number;
-  mindsetDelta: number;
-  mindsetAfter: number;
-  notes: string[];
-}
+export type QuestionAttempt = QuestionAttemptSnapshot;
