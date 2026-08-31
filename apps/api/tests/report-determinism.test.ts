@@ -84,6 +84,26 @@ describe('shared ranking contracts', () => {
     expect(attemptResolutionSchema.parse(firstSubmission)).toEqual(firstSubmission);
   });
 
+  it('rejects explicit undefined own properties at nested input and report boundaries', () => {
+    const malformedInput = input();
+    malformedInput.problems[0]!.traits = [
+      {
+        traitId: 'undefined-hook',
+        severity: 'red',
+        hooks: [{ condition: undefined } as unknown as Record<string, never>],
+      },
+    ];
+    const malformedReport = structuredClone(simulateRanking(input(), 45));
+    malformedReport.growth.push({
+      attr: 'ds',
+      delta: 1,
+      sourceProblem: undefined,
+    } as unknown as (typeof malformedReport.growth)[number]);
+
+    expect(rankingInputSchema.safeParse(malformedInput).success).toBe(false);
+    expect(rankingReportSchema.safeParse(malformedReport).success).toBe(false);
+  });
+
   it('rejects inconsistent indexes, ranks, totals, energy, final mindset, and pass state', () => {
     const report = simulateRanking(input(), 45);
     const duplicateIndex = structuredClone(report);
@@ -128,6 +148,18 @@ describe('ranking report determinism', () => {
     expect(firstBytes).toBe(secondBytes);
     expect(firstBytes).toBe(stableSerialize(first));
     expect(stableHash(first)).toBe(stableHash(second));
+  });
+
+  it('stores the complete validated replay input and hashes exactly that stored snapshot', () => {
+    const contestInput = input();
+    contestInput.npcPoolParam = { size: 1, meanLevel: 55, spread: 4 };
+    const expectedSnapshot = rankingInputSchema.parse(contestInput);
+    const report = simulateRanking(contestInput, 0x1234abcd);
+
+    expect(report.inputSnapshot).toEqual(expectedSnapshot);
+    expect(stableHash(report.inputSnapshot)).toBe(report.snapshotHash);
+    expect(report.inputSnapshot).not.toBe(contestInput);
+    expect(report.inputSnapshot.problems).not.toBe(contestInput.problems);
   });
 
   it('fills replay metadata from constants and the validated frozen input snapshot', () => {
@@ -179,9 +211,9 @@ describe('ranking report determinism', () => {
       true,
     );
     expect(report.participants[0]?.attempts[0]?.resolution.penaltyMin).toBeGreaterThan(0);
-    expect(stableHash(report)).toBe('3c6aee2c');
+    expect(stableHash(report)).toBe('6412e17e');
     expect(serialized).toBe(
-      '{"createdAt":"1970-01-01T00:00:00.123Z","engineVersion":"ranking-v1","format":"RANKING","growth":[],"participants":[{"attempts":[{"energyCost":14,"focusGain":6,"mindsetDelta":-12,"minutesUsed":100,"penaltyMin":55.31720358486209,"questionIndex":0,"resolution":{"energyAfter":76,"energyCost":14,"energyRequired":2,"estimatedTimeMin":19.55192508628933,"focusAfter":6,"focusBefore":0,"mindsetAfter":-10,"mindsetDelta":-12,"notes":["WA","WA","WA"],"penaltyMin":55.31720358486209,"questionIndex":0,"scoreAwarded":30,"submissionCount":3,"submissions":[{"attemptNumber":1,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":18.006145652292588,"timeSpentMin":43.00614565229259,"verdict":"WA"},{"attemptNumber":2,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":11.843373965624004,"timeSpentMin":36.843373965624004,"verdict":"WA"},{"attemptNumber":3,"clockExhausted":true,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":5.317203584862094,"submissionTimeMin":14.833276797221307,"timeSpentMin":20.1504803820834,"verdict":"WA"}],"timeSpentMin":100,"tleJudgeCount":0,"verdict":"UNFINISHED","waCount":3},"verdict":"UNFINISHED"}],"finalMindset":-10,"participant":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"userId":11},"totalEnergySpent":14}],"pass":true,"questions":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"reportVersion":1,"rewards":[],"rngVersion":"mulberry32-v1","seed":123,"snapshotHash":"0c93f3a7","standings":[{"participantIndex":0,"rank":1,"totalScore":30}]}',
+      '{"createdAt":"1970-01-01T00:00:00.123Z","engineVersion":"ranking-v1","format":"RANKING","growth":[],"inputSnapshot":{"durationMin":100,"kind":"custom","participants":[],"problems":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"student":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"userId":11}},"participants":[{"attempts":[{"energyCost":14,"focusGain":6,"mindsetDelta":-12,"minutesUsed":100,"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"resolution":{"energyAfter":76,"energyCost":14,"energyRequired":2,"estimatedTimeMin":19.55192508628933,"focusAfter":6,"focusBefore":0,"mindsetAfter":-10,"mindsetDelta":-12,"notes":["WA","WA","WA"],"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"scoreAwarded":30,"submissionCount":3,"submissions":[{"attemptNumber":1,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":18.006145652292588,"timeSpentMin":43.00614565229259,"verdict":"WA"},{"attemptNumber":2,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":11.843373965624004,"timeSpentMin":36.843373965624004,"verdict":"WA"},{"attemptNumber":3,"clockExhausted":true,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":5.317203584862094,"submissionTimeMin":14.833276797221307,"timeSpentMin":20.1504803820834,"verdict":"WA"}],"timeSpentMin":100,"tleJudgeCount":0,"verdict":"UNFINISHED","waCount":3},"verdict":"UNFINISHED"}],"finalMindset":-10,"participant":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"userId":11},"totalEnergySpent":14}],"pass":true,"questions":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"reportVersion":1,"rewards":[],"rngVersion":"mulberry32-v1","seed":123,"snapshotHash":"0c93f3a7","standings":[{"participantIndex":0,"rank":1,"totalScore":30}]}',
     );
   });
 
@@ -214,6 +246,16 @@ describe('ranking report determinism', () => {
 });
 
 describe('canonical serializer rejection', () => {
+  it('rejects named and symbol own properties on arrays', () => {
+    const named = [1];
+    Object.defineProperty(named, 'extra', { value: undefined, enumerable: true });
+    const symbolKeyed = [1];
+    Object.defineProperty(symbolKeyed, Symbol('extra'), { value: 2, enumerable: true });
+
+    expect(() => stableSerialize(named)).toThrow(/array own propert/i);
+    expect(() => stableSerialize(symbolKeyed)).toThrow(/symbol-keyed/i);
+  });
+
   it('rejects every unsupported root or member instead of colliding with valid JSON', () => {
     const sparse: unknown[] = [];
     sparse[1] = 1;

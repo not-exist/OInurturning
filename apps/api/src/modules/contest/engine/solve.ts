@@ -244,6 +244,7 @@ export function solveQuestion(input: SolveQuestionInput, rng: AttemptRng): Quest
 
   if (availableEnergy < energyRequired) {
     return {
+      problemInstanceId: input.question.instanceId,
       questionIndex: input.question.index,
       verdict: 'SKIP',
       submissions: [],
@@ -326,6 +327,7 @@ export function solveQuestion(input: SolveQuestionInput, rng: AttemptRng): Quest
   const scoreAwarded = verdict === 'AC' ? Math.max(0, input.question.score) : partialScore(input, timeSpent, estimatedTime);
 
   return {
+    problemInstanceId: input.question.instanceId,
     questionIndex: input.question.index,
     verdict,
     submissions: attempts,

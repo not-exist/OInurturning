@@ -11,6 +11,32 @@ export type TiebreakMode = 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';
 const finiteNumber = z.number().finite();
 const nonnegativeFinite = finiteNumber.nonnegative();
 
+function rejectExplicitUndefined(
+  value: unknown,
+  context: z.RefinementCtx,
+  path: (string | number)[] = [],
+): void {
+  if (value === null || typeof value !== 'object') return;
+
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => rejectExplicitUndefined(entry, context, [...path, index]));
+    return;
+  }
+
+  for (const key of Object.keys(value)) {
+    const entry = (value as Record<string, unknown>)[key];
+    if (entry === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [...path, key],
+        message: 'Explicit undefined properties are not JSON-safe',
+      });
+    } else {
+      rejectExplicitUndefined(entry, context, [...path, key]);
+    }
+  }
+}
+
 export const rankingSeedSchema = z.number().int().min(0).max(0xffffffff);
 
 export const contestStageRefSchema = z
@@ -76,8 +102,9 @@ export const questionSnapshotSchema = z
   .strict();
 export type QuestionSnapshot = z.infer<typeof questionSnapshotSchema>;
 
-const abilityValues = Object.fromEntries(ABILITY_KEYS.map((key) => [key, finiteNumber])) as {
-  [Key in (typeof ABILITY_KEYS)[number]]: typeof finiteNumber;
+const abilityNumber = finiteNumber.min(1).max(100);
+const abilityValues = Object.fromEntries(ABILITY_KEYS.map((key) => [key, abilityNumber])) as {
+  [Key in (typeof ABILITY_KEYS)[number]]: typeof abilityNumber;
 };
 
 /** Immutable participant values captured at contest entry. Talents remain archival and inactive. */
@@ -88,6 +115,7 @@ export const participantSnapshotSchema = z
     studentId: z.number().int().positive().nullable(),
     displayName: z.string().min(1),
     abilities: z.object(abilityValues).strict(),
+    traits: z.array(z.string().min(1)).optional(),
     mindset: finiteNumber.min(-10).max(10),
     focusCap: nonnegativeFinite,
     energyMax: nonnegativeFinite,
@@ -111,6 +139,7 @@ export type AttemptResolutionSnapshot = z.infer<typeof attemptResolutionSchema>;
 
 export const questionAttemptSchema = z
   .object({
+    problemInstanceId: z.string().min(1),
     questionIndex: z.number().int().nonnegative(),
     verdict: z.enum(['AC', 'SKIP', 'UNFINISHED']),
     submissions: z.array(attemptResolutionSchema),
@@ -135,6 +164,7 @@ export type QuestionAttemptSnapshot = z.infer<typeof questionAttemptSchema>;
 
 export const participantAttemptSchema = z
   .object({
+    problemInstanceId: z.string().min(1),
     questionIndex: z.number().int().nonnegative(),
     verdict: z.enum(['AC', 'SKIP', 'UNFINISHED']),
     minutesUsed: nonnegativeFinite,
@@ -147,6 +177,7 @@ export const participantAttemptSchema = z
   .strict()
   .superRefine((attempt, context) => {
     const expected = {
+      problemInstanceId: attempt.resolution.problemInstanceId,
       questionIndex: attempt.resolution.questionIndex,
       verdict: attempt.resolution.verdict,
       minutesUsed: attempt.resolution.timeSpentMin,
@@ -232,6 +263,35 @@ export const growthDeltaSchema = z
   .strict();
 export type GrowthDelta = z.infer<typeof growthDeltaSchema>;
 
+const npcPoolParamSchema = z
+  .object({
+    size: z.number().int().nonnegative(),
+    meanLevel: finiteNumber,
+    spread: nonnegativeFinite,
+  })
+  .strict();
+
+export const rankingInputSchema = z
+  .object({
+    kind: z.enum(['story', 'custom']).optional(),
+    stageRef: contestStageRefSchema.optional(),
+    student: participantSnapshotSchema,
+    participants: z.array(participantSnapshotSchema).optional(),
+    problems: z.array(questionSnapshotSchema).min(1),
+    durationMin: finiteNumber.positive(),
+    npcPoolParam: npcPoolParamSchema.optional(),
+    firstClearAvailable: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    rejectExplicitUndefined(input, context);
+    const instanceIds = new Set(input.problems.map((problem) => problem.instanceId));
+    if (instanceIds.size !== input.problems.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ['problems'], message: 'instanceId values must be unique' });
+    }
+  });
+export type RankingInput = z.infer<typeof rankingInputSchema>;
+
 export const reportHeaderSchema = z
   .object({
     reportVersion: z.literal(1),
@@ -249,6 +309,7 @@ export type ReportHeader = z.infer<typeof reportHeaderSchema>;
 
 const rankingReportShape = reportHeaderSchema.extend({
   format: z.literal('RANKING'),
+  inputSnapshot: rankingInputSchema,
   questions: z.array(questionSnapshotSchema).min(1),
   participants: z.array(participantTimelineSchema).min(1),
   standings: z.array(rankingStandingSchema).min(1),
@@ -256,7 +317,7 @@ const rankingReportShape = reportHeaderSchema.extend({
 });
 
 export const rankingReportSchema = rankingReportShape.superRefine((report, context) => {
-  const questionIndexes = new Set(report.questions.map((question) => question.index));
+  rejectExplicitUndefined(report, context);
   const instanceIds = new Set(report.questions.map((question) => question.instanceId));
   if (instanceIds.size !== report.questions.length) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['questions'], message: 'instanceId values must be unique' });
@@ -321,16 +382,16 @@ export const rankingReportSchema = rankingReportShape.superRefine((report, conte
           message: 'Must equal the participant replay score',
         });
       }
-      const seenQuestions = new Set<number>();
+      const seenProblems = new Set<string>();
       timeline.attempts.forEach((attempt, attemptPosition) => {
-        if (!questionIndexes.has(attempt.questionIndex) || seenQuestions.has(attempt.questionIndex)) {
+        if (!instanceIds.has(attempt.problemInstanceId) || seenProblems.has(attempt.problemInstanceId)) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ['participants', standing.participantIndex, 'attempts', attemptPosition, 'questionIndex'],
-            message: 'Attempt question indexes must be known and unique per participant',
+            path: ['participants', standing.participantIndex, 'attempts', attemptPosition, 'problemInstanceId'],
+            message: 'Attempt problem instance IDs must be known and unique per participant',
           });
         }
-        seenQuestions.add(attempt.questionIndex);
+        seenProblems.add(attempt.problemInstanceId);
       });
     }
   });
@@ -382,34 +443,6 @@ export interface DuelSummary {
 }
 
 export type ContestSummary = RankingSummary | DuelSummary;
-
-const npcPoolParamSchema = z
-  .object({
-    size: z.number().int().nonnegative(),
-    meanLevel: finiteNumber,
-    spread: nonnegativeFinite,
-  })
-  .strict();
-
-export const rankingInputSchema = z
-  .object({
-    kind: z.enum(['story', 'custom']).optional(),
-    stageRef: contestStageRefSchema.optional(),
-    student: participantSnapshotSchema,
-    participants: z.array(participantSnapshotSchema).optional(),
-    problems: z.array(questionSnapshotSchema).min(1),
-    durationMin: finiteNumber.positive(),
-    npcPoolParam: npcPoolParamSchema.optional(),
-    firstClearAvailable: z.boolean().optional(),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    const instanceIds = new Set(input.problems.map((problem) => problem.instanceId));
-    if (instanceIds.size !== input.problems.length) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['problems'], message: 'instanceId values must be unique' });
-    }
-  });
-export type RankingInput = z.infer<typeof rankingInputSchema>;
 
 export interface DuelInput {
   home: ParticipantSnapshot;

@@ -37,6 +37,16 @@ function encodeStable(value: unknown, active: WeakSet<object>): string {
 
   let result: string;
   if (Array.isArray(value)) {
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key === 'symbol') throw new TypeError('Cannot serialize symbol-keyed array properties');
+      if (key === 'length') continue;
+
+      const index = Number(key);
+      if (!Number.isInteger(index) || index < 0 || index >= value.length || String(index) !== key) {
+        throw new TypeError('Cannot serialize non-index array own properties');
+      }
+    }
+
     const entries: string[] = [];
     for (let index = 0; index < value.length; index += 1) {
       if (!(index in value)) throw new TypeError('Cannot serialize sparse arrays');

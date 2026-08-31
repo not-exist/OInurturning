@@ -33,6 +33,7 @@ function hooksFor(question: QuestionSnapshot): readonly FrozenSolveHooks[] {
 
 function toTimelineAttempt(resolution: QuestionAttempt): ParticipantAttempt {
   return {
+    problemInstanceId: resolution.problemInstanceId,
     questionIndex: resolution.questionIndex,
     verdict: resolution.verdict,
     minutesUsed: resolution.timeSpentMin,
@@ -232,6 +233,7 @@ export function simulateRanking(input: RankingInput, seed: number): RankingRepor
     rewards: [],
     growth: [],
     format: 'RANKING',
+    inputSnapshot: validatedInput,
     questions,
     participants: results.map((result) => result.timeline),
     standings,

@@ -127,6 +127,39 @@ describe('ranking simulation and ordering', () => {
     expect(report.participants[0]?.attempts[0]?.questionIndex).toBe(1);
   });
 
+  it('distinguishes duplicate legacy numeric indexes by authoritative instanceId', () => {
+    const duplicateIndexes = [
+      question({
+        instanceId: 'a-instance',
+        index: 0,
+        timeLimitMin: 5,
+        traits: [{ traitId: 'force-ac', severity: 'red', hooks: [{ ac_prob_add: 1 }] }],
+      }),
+      question({
+        instanceId: 'b-instance',
+        index: 0,
+        timeLimitMin: 5,
+        traits: [{ traitId: 'force-ac', severity: 'red', hooks: [{ ac_prob_add: 1 }] }],
+      }),
+    ];
+
+    const report = simulateRanking(
+      rankingInput({
+        student: { ...participant('Player', 85), side: 'HOME' },
+        participants: [],
+        problems: duplicateIndexes,
+        durationMin: 100,
+      }),
+      5,
+    );
+
+    expect(report.participants[0]?.attempts.map((attempt) => attempt.problemInstanceId)).toEqual([
+      'a-instance',
+      'b-instance',
+    ]);
+    expect(report.participants[0]?.attempts.map((attempt) => attempt.questionIndex)).toEqual([0, 0]);
+  });
+
   it('uses the fixed rank-eight pass line', () => {
     expect(isPassingRank(1)).toBe(true);
     expect(isPassingRank(8)).toBe(true);
@@ -135,6 +168,29 @@ describe('ranking simulation and ordering', () => {
     const report = simulateRanking(rankingInput(), 9);
     const playerRank = report.standings.find((standing) => standing.participantIndex === 0)?.rank;
     expect(report.pass).toBe(isPassingRank(playerRank ?? Number.POSITIVE_INFINITY));
+  });
+
+  it('preserves participant traits as archival data without activating solver hooks', () => {
+    const archivedTrait = 'participant-precision-hell';
+    const baseInput = rankingInput({ participants: [] });
+    const withTrait = simulateRanking(
+      {
+        ...baseInput,
+        student: { ...baseInput.student, traits: [archivedTrait] },
+      } as RankingInput,
+      29,
+    );
+    const withoutTrait = simulateRanking(
+      {
+        ...baseInput,
+        student: { ...baseInput.student, traits: [] },
+      } as RankingInput,
+      29,
+    );
+
+    expect(withTrait.inputSnapshot.student.traits).toEqual([archivedTrait]);
+    expect(withTrait.participants[0]?.participant.traits).toEqual([archivedTrait]);
+    expect(withTrait.participants[0]?.attempts).toEqual(withoutTrait.participants[0]?.attempts);
   });
 
   it('does not mutate input snapshots', () => {
@@ -160,6 +216,25 @@ describe('ranking input validation', () => {
 
   it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 0x1_0000_0000])('rejects invalid seed %s', (seed) => {
     expect(() => simulateRanking(rankingInput(), seed)).toThrow();
+  });
+
+  it('enforces ability values from 1 to 100 while mindset remains from -10 to 10', () => {
+    for (const ability of [1, 100]) {
+      expect(() =>
+        simulateRanking(rankingInput({ student: { ...participant('Player', ability), side: 'HOME' } }), 1),
+      ).not.toThrow();
+    }
+    for (const ability of [0, 101]) {
+      expect(() =>
+        simulateRanking(rankingInput({ student: { ...participant('Player', ability), side: 'HOME' } }), 1),
+      ).toThrow();
+    }
+    for (const mindset of [-10, 10]) {
+      expect(() => simulateRanking(rankingInput({ student: { ...rankingInput().student, mindset } }), 1)).not.toThrow();
+    }
+    for (const mindset of [-11, 11]) {
+      expect(() => simulateRanking(rankingInput({ student: { ...rankingInput().student, mindset } }), 1)).toThrow();
+    }
   });
 
   it('rejects non-finite snapshots and malformed frozen hooks', () => {

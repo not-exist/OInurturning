@@ -9,6 +9,26 @@ import type {
 
 const rewards: RewardLine[] = [{ type: 'first_clear_money', amount: 100 }];
 const growth: GrowthDelta[] = [{ attr: 'ds', delta: 1, sourceProblem: 'stage-1#0' }];
+const snapshotParticipant = {
+  side: 'HOME' as const,
+  userId: 1,
+  studentId: 1,
+  displayName: 'Player',
+  abilities: {
+    DS: 50,
+    DP: 50,
+    MATH: 50,
+    GRAPH: 50,
+    GREEDY: 50,
+    STRING: 50,
+    CODING: 50,
+    THINKING: 50,
+    PROBLEM: 50,
+  },
+  mindset: 0,
+  focusCap: 40,
+  energyMax: 100,
+};
 
 const rankingSummary = {
   format: 'RANKING',
@@ -35,6 +55,15 @@ const rankingReport = {
   rewards,
   growth,
   format: 'RANKING',
+  inputSnapshot: {
+    kind: 'story',
+    stageRef: { chapter: 'chapter-1', stageIndex: 1, ngPlusLayer: 2 },
+    student: snapshotParticipant,
+    participants: [],
+    problems: [],
+    durationMin: 1,
+    firstClearAvailable: true,
+  },
   questions: [],
   participants: [],
   standings: [],
