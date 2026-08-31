@@ -56,6 +56,26 @@ function controlledRng(judge: readonly number[]): AttemptRng {
   return { noise: zeroNoise(), judge: values(judge) };
 }
 
+function recordingRng(judge: readonly number[]): { rng: AttemptRng; draws: string[] } {
+  const draws: string[] = [];
+  const noise = zeroNoise();
+  const judgeValues = values(judge);
+
+  return {
+    rng: {
+      noise: () => {
+        draws.push('noise');
+        return noise();
+      },
+      judge: () => {
+        draws.push('judge');
+        return judgeValues();
+      },
+    },
+    draws,
+  };
+}
+
 function solveInput(overrides: Partial<SolveQuestionInput> = {}): SolveQuestionInput {
   return {
     participant,
@@ -164,28 +184,37 @@ describe('single submission resolution', () => {
   } as const;
 
   it('returns AC after a non-TLE accepted judge roll', () => {
-    expect(resolveAttempt(input, controlledRng([0.5, 0.2])).verdict).toBe('AC');
+    const { rng, draws } = recordingRng([0.5, 0.2]);
+
+    expect(resolveAttempt(input, rng).verdict).toBe('AC');
+    expect(draws).toEqual(['noise', 'noise', 'judge', 'judge']);
   });
 
   it('returns WA after a non-TLE rejected judge roll', () => {
-    const result = resolveAttempt(input, controlledRng([0.5, 0.9]));
+    const { rng, draws } = recordingRng([0.5, 0.9]);
+    const result = resolveAttempt(input, rng);
 
     expect(result.verdict).toBe('WA');
     expect(result.penaltyMin).toBe(20);
+    expect(draws).toEqual(['noise', 'noise', 'judge', 'judge']);
   });
 
   it('returns judge TLE from the first judge roll', () => {
-    const result = resolveAttempt(input, controlledRng([0]));
+    const { rng, draws } = recordingRng([0]);
+    const result = resolveAttempt(input, rng);
 
     expect(result.verdict).toBe('TLE');
     expect(result.penaltyMin).toBe(20);
+    expect(draws).toEqual(['noise', 'noise', 'judge']);
   });
 
   it('returns UNFINISHED without advancing beyond the remaining clock', () => {
-    const result = resolveAttempt({ ...input, remainingClockMin: 30 }, controlledRng([0.5, 0.2]));
+    const { rng, draws } = recordingRng([0.5, 0.2]);
+    const result = resolveAttempt({ ...input, remainingClockMin: 30 }, rng);
 
     expect(result.verdict).toBe('UNFINISHED');
     expect(result.timeSpentMin).toBe(30);
+    expect(draws).toEqual(['noise', 'noise']);
   });
 });
 
@@ -200,15 +229,28 @@ describe('question solving flow', () => {
   });
 
   it('records WA and TLE distinctly before a later AC', () => {
-    const afterWa = solveQuestion(solveInput({ remainingClockMin: 500 }), controlledRng([0.5, 0.99, 0.5, 0]));
-    const afterTle = solveQuestion(solveInput({ remainingClockMin: 500 }), controlledRng([0, 0.5, 0]));
+    const afterWaRng = recordingRng([0.5, 0.99, 0.5, 0]);
+    const afterTleRng = recordingRng([0, 0.5, 0]);
+    const afterWa = solveQuestion(solveInput({ remainingClockMin: 500 }), afterWaRng.rng);
+    const afterTle = solveQuestion(solveInput({ remainingClockMin: 500 }), afterTleRng.rng);
 
     expect(afterWa.verdict).toBe('AC');
     expect(afterWa.submissions.map((attempt) => attempt.verdict)).toEqual(['WA', 'AC']);
     expect(afterWa.energyCost).toBe(12);
+    expect(afterWaRng.draws).toEqual([
+      'noise',
+      'noise',
+      'judge',
+      'judge',
+      'noise',
+      'noise',
+      'judge',
+      'judge',
+    ]);
     expect(afterTle.verdict).toBe('AC');
     expect(afterTle.submissions.map((attempt) => attempt.verdict)).toEqual(['TLE', 'AC']);
     expect(afterTle.energyCost).toBe(10);
+    expect(afterTleRng.draws).toEqual(['noise', 'noise', 'judge', 'noise', 'noise', 'judge', 'judge']);
   });
 
   it('returns UNFINISHED at the duration boundary with partial score and nonnegative energy', () => {
