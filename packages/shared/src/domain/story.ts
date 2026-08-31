@@ -1,4 +1,4 @@
-import type { ContestSummary } from './contest.js';
+import type { ContestSummary, GrowthDelta, RewardLine } from './contest.js';
 
 export type StoryStageKey = string;
 
@@ -29,6 +29,8 @@ export interface StoryProgressView {
   firstClearAt: string | null;
   bestRank: number | null;
   clearCount: number;
+  rewards: RewardLine[];
+  growth: GrowthDelta[];
   lastReportId?: string;
   lastSummary?: ContestSummary;
 }

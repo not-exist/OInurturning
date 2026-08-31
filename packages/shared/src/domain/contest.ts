@@ -7,6 +7,12 @@ export type ContestVerdict = 'AC' | 'WA' | 'TLE' | 'SKIP';
 export type DuelWinnerSide = 'HOME' | 'AWAY' | 'DRAW';
 export type TiebreakMode = 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';
 
+export interface ContestStageRef {
+  chapter: string;
+  stageIndex: number;
+  ngPlusLayer: number;
+}
+
 export interface QuestionTraitSnapshot {
   traitId: string;
   severity: ProblemSeverity;
@@ -65,6 +71,9 @@ export interface ReportHeader {
   reportVersion: 1;
   seed: number;
   createdAt: string;
+  stageRef?: ContestStageRef;
+  rewards: RewardLine[];
+  growth: GrowthDelta[];
 }
 
 export interface RankingReport extends ReportHeader {
@@ -117,19 +126,29 @@ export interface GrowthDelta {
   sourceProblem?: string;
 }
 
-export interface ContestSummary {
-  format: ContestFormat;
-  rank?: number;
-  participantCount?: number;
-  totalScore?: number;
-  winnerSide?: DuelWinnerSide;
-  homeScore?: number;
-  awayScore?: number;
+export interface RankingSummary {
+  format: 'RANKING';
+  rank: number;
+  participantCount: number;
+  totalScore: number;
+  rewards: RewardLine[];
+  growth: GrowthDelta[];
 }
+
+export interface DuelSummary {
+  format: 'DUEL';
+  winnerSide: DuelWinnerSide;
+  homeScore: number;
+  awayScore: number;
+  rewards: RewardLine[];
+  growth: GrowthDelta[];
+}
+
+export type ContestSummary = RankingSummary | DuelSummary;
 
 export interface RankingInput {
   kind?: 'story' | 'custom';
-  stageRef?: { chapter: string; stageIndex: number; ngPlusLayer: number };
+  stageRef?: ContestStageRef;
   student: ParticipantSnapshot;
   participants?: ParticipantSnapshot[];
   problems: QuestionSnapshot[];
