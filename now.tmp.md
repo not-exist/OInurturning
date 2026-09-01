@@ -1,14 +1,15 @@
 # OInurturning M2 完成交接
 
-更新时间：2026-09-01
+更新时间：2026-09-02
 
 ## 工作区
 
 - worktree：`/home/qzez/OInurturning/.claude/worktrees/m2-contest-story-work`
 - branch：`worktree-m2-contest-story-work`
-- committed HEAD：`a4b2d30 fix(api): complete ranking replay snapshots`
-- Task 3 follow-up 与 Task 4–9 当前均为未提交工作区变更。
-- 未执行 commit、merge 或 push。
+- committed HEAD：`5c1e0f8 feat(m2): complete contest story mode`
+- M2 Task 3 follow-up 与 Task 4–9 已提交。
+- M3.1 事件配置导入与抽取器当前为未提交工作区变更。
+- 未执行 merge 或 push；仓库暂未配置远端。
 
 ## M2 状态
 
@@ -43,8 +44,17 @@
 - Deferred Minor：Task 1 snapshot arrays 仍是 mutable type；`ContestReportView` 仍为 alias。二者不阻塞 M2。
 - Docker 部署与浏览器视觉走查留到部署窗口；代码、HTTP 与 production build 均已验证。
 
+## M3.1 状态
+
+- `packages/shared/src/config/events.ts`：事件/选择/结果 schema。
+- `apps/api/src/config/loader.ts`：六文件导入、ConfigEvent 调和、CONFIG.events。
+- `apps/api/src/modules/adventure/extractor.ts`：纯函数抽取器。
+- `apps/api/tests/adventure-extractor.test.ts`：40 条真实事件与抽取边界。
+- focused：3 个测试文件、32 个测试通过；shared/API typecheck、API lint 通过。
+- T3.2 尚未开始：事件结算、情报预览、冷却历史持久化和 AdventureLog 待实现。
+
 ## 下一步
 
-1. 审阅当前大范围未提交 diff。
-2. 按任务边界拆分提交，或在确认后整体提交。
+1. 完成 M3.1 全量质量门并提交独立 commit。
+2. 设计 T3.2 的 AdventureLog/事件历史持久化和事务边界。
 3. 决定是否将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`。

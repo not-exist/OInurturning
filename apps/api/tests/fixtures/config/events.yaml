@@ -1,0 +1,19 @@
+version: 0.1.0
+events:
+  - id: evt-test-warmup
+    code: G1
+    name: 测试事件
+    category: trial
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 100
+    requirements: null
+    description: 测试用事件。
+    choices:
+      - text: 开始
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: {}

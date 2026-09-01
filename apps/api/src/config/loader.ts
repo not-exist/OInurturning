@@ -6,11 +6,14 @@ import { parseDocument } from 'yaml';
 import type { Prisma } from '@prisma/client';
 import {
   economyConfigSchema,
+  eventsConfigSchema,
   itemsFileSchema,
   problemConfigSchema,
   stagesConfigSchema,
   talentsFileSchema,
   type EconomyConfig,
+  type EventConfig,
+  type EventsConfig,
   type ItemDef,
   type ProblemConfig,
   type ProblemTemplate,
@@ -24,7 +27,7 @@ import { runSemanticChecks, type SemanticIssue } from './semantic.js';
 import { logger } from '../lib/logger.js';
 import { prisma } from '../lib/prisma.js';
 
-const FILES = ['talents', 'items', 'economy', 'problems', 'stages'] as const;
+const FILES = ['talents', 'items', 'economy', 'problems', 'stages', 'events'] as const;
 type ConfigFile = (typeof FILES)[number];
 
 export interface ConfigBundle {
@@ -34,6 +37,7 @@ export interface ConfigBundle {
   problemTraits: Record<string, ProblemTrait>;
   problemConventions: ProblemConfig['conventions'];
   stages: Record<string, StageConfig>;
+  events: Record<string, EventConfig>;
   stageDefaults: StagesConfig['defaults'];
   fullClear: StagesConfig['full_clear'];
   ngPlus: StagesConfig['ng_plus'];
@@ -54,6 +58,10 @@ export function getProblemTemplate(id: string): ProblemTemplate | undefined {
 
 export function getStageConfig(stageKey: string): StageConfig | undefined {
   return CONFIG?.stages[stageKey];
+}
+
+export function getEventConfig(eventId: string): EventConfig | undefined {
+  return CONFIG?.events[eventId];
 }
 
 /** 配置校验失败即致命：测试环境抛出供断言，其余环境在打印错误表后退出进程 */
@@ -154,11 +162,12 @@ async function loadBundleFromDb(
   problemsConfig: ProblemConfig,
   stagesConfig: StagesConfig,
 ): Promise<ConfigBundle> {
-  const [talents, items, problems, stages, economy] = await Promise.all([
+  const [talents, items, problems, stages, events, economy] = await Promise.all([
     prisma.configTalent.findMany({ where: { deprecated: false } }),
     prisma.configItem.findMany({ where: { deprecated: false } }),
     prisma.configProblem.findMany({ where: { deprecated: false } }),
     prisma.configStage.findMany({ where: { deprecated: false } }),
+    prisma.configEvent.findMany({ where: { deprecated: false } }),
     prisma.configEconomy.findUniqueOrThrow({ where: { id: 'active' } }),
   ]);
   const bundle: ConfigBundle = {
@@ -170,6 +179,7 @@ async function loadBundleFromDb(
     problemTraits: Object.fromEntries(problemsConfig.traits.map((trait) => [trait.id, trait])),
     problemConventions: problemsConfig.conventions,
     stages: Object.fromEntries(stages.map((r) => [r.id, r.payload as unknown as StageConfig])),
+    events: Object.fromEntries(events.map((r) => [r.id, r.payload as unknown as EventConfig])),
     stageDefaults: stagesConfig.defaults,
     fullClear: stagesConfig.full_clear,
     ngPlus: stagesConfig.ng_plus,
@@ -191,11 +201,12 @@ async function reconcileTables(
     items: ItemDef[];
     problems: ProblemConfig;
     stages: StagesConfig;
+    events: EventsConfig;
     economy: EconomyConfig;
     sourceHash: string;
   },
 ): Promise<void> {
-  const { talents, items, problems, stages, economy, sourceHash } = batch;
+  const { talents, items, problems, stages, events, economy, sourceHash } = batch;
   for (const t of talents) {
     await tx.configTalent.upsert({
       where: { id: t.id },
@@ -225,6 +236,13 @@ async function reconcileTables(
       update: { sourceHash, payload: toJsonPayload(stage), deprecated: false },
     });
   }
+  for (const event of events.events) {
+    await tx.configEvent.upsert({
+      where: { id: event.id },
+      create: { id: event.id, sourceHash, payload: toJsonPayload(event) },
+      update: { sourceHash, payload: toJsonPayload(event), deprecated: false },
+    });
+  }
   await tx.configEconomy.upsert({
     where: { id: 'active' },
     create: { id: 'active', sourceHash, payload: toJsonPayload(economy) },
@@ -249,6 +267,13 @@ async function reconcileTables(
     },
     data: { deprecated: true, sourceHash },
   });
+  await tx.configEvent.updateMany({
+    where: {
+      deprecated: false,
+      id: { notIn: events.events.map((event) => event.id) },
+    },
+    data: { deprecated: true, sourceHash },
+  });
 }
 
 export interface ImportConfigsOptions {
@@ -257,7 +282,7 @@ export interface ImportConfigsOptions {
 }
 
 /**
- * 配置即数据管线（TECH-DESIGN §4.2 的 M1 三文件版）：
+ * 配置即数据管线（TECH-DESIGN §4.2）：
  * 读 yaml → zod 校验 → 语义检查 → sourceHash 幂等判断 → 单事务 upsert + 软弃用 → 冻结内存缓存。
  */
 export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<ConfigBundle> {
@@ -272,6 +297,7 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
   let economy: EconomyConfig | undefined;
   let problems: ProblemConfig | undefined;
   let stages: StagesConfig | undefined;
+  let events: EventsConfig | undefined;
   for (const raw of raws) {
     if (raw.file === 'talents') {
       const r = talentsFileSchema.safeParse(raw.data);
@@ -317,9 +343,20 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
             message: i.message,
           })),
         );
-    } else {
+    } else if (raw.file === 'stages') {
       const r = stagesConfigSchema.safeParse(raw.data);
       if (r.success) stages = r.data;
+      else
+        errors.push(
+          ...r.error.issues.map((i) => ({
+            file: raw.file,
+            path: i.path.join('.'),
+            message: i.message,
+          })),
+        );
+    } else {
+      const r = eventsConfigSchema.safeParse(raw.data);
+      if (r.success) events = r.data;
       else
         errors.push(
           ...r.error.issues.map((i) => ({
@@ -339,12 +376,13 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
     economy: economy!,
     problems: problems!,
     stages: stages!,
+    events: events!,
   });
   if (semanticIssues.length > 0) {
     failFast(semanticIssues.map((i) => ({ file: i.file, path: i.path, message: i.message })));
   }
 
-  // 4. 版本指纹与幂等判断：sha256(五文件原文拼接)
+  // 4. 版本指纹与幂等判断：sha256(六文件原文拼接)
   const byFile = new Map(raws.map((r) => [r.file, r.text]));
   const sourceHash = sha256(FILES.map((f) => byFile.get(f) ?? '').join('\n'));
   const done = await prisma.configImport.findFirst({ where: { sourceHash, ok: true } });
@@ -359,6 +397,7 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
           items,
           problems: problems!,
           stages: stages!,
+          events: events!,
           economy: economy!,
           sourceHash,
         }),
@@ -382,6 +421,8 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
             ? problems!.templates.length
             : f === 'stages'
               ? stages!.stages.length
+              : f === 'events'
+                ? events!.events.length
               : 1,
   }));
   await prisma.$transaction(
@@ -391,6 +432,7 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
         items,
         problems: problems!,
         stages: stages!,
+        events: events!,
         economy: economy!,
         sourceHash,
       });
@@ -407,6 +449,7 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
       items: items.length,
       problems: problems!.templates.length,
       stages: stages!.stages.length,
+      events: events!.events.length,
     },
     '[config] 配置导入完成并冻结进内存缓存',
   );

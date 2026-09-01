@@ -3,3 +3,4 @@ export * from './items.js';
 export * from './economy.js';
 export * from './problems.js';
 export * from './stages.js';
+export * from './events.js';

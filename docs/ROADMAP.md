@@ -70,11 +70,13 @@
 > **M2 实测记录（2026-09-01，本地 MariaDB + 进程直跑）**：`pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build` 全绿；API 共 27 个测试文件、244 个测试通过。consolidated golden 固定 ranking hash `ec43a98d`、duel hash `909f2bf8`，真实配置 34 个题目模板/33 个关卡通过导入，8 个章末正赛进度可连续解锁 NG+1/NG+2。
 > HTTP smoke：`coach` 登录 → `GET /api/story/overview` → 精英学员进入 `cspj:1`（rank 2）→ `GET /api/records/:id` → 同 `Idempotency-Key` 重放；两次返回同一 record，数据库实测 money `5000→5500`、stamina `5→4`、ContestRecord 1 条、StoryProgress 1 条，首通奖励未重复。另测失败场 rank 17：只扣一次体力并保留一条 record，不写 progress/reward。Web `/story` 已由 Vite dev server 提供，production build 通过；Docker 与浏览器视觉走查留待部署窗口。
 
+> **M3.1 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：shared 事件 schema、六文件配置导入、ConfigEvent 调和/软弃用/深冻结与纯函数抽取器已落地；真实 `events.yaml` 40 条事件全部通过校验。抽取器按投入体力档先抽稀有度再抽组内事件，空组重归一化，并覆盖声誉/属性门槛、单事件冷却、`once_per_student`、`server_weekly_limit`、可用体力与确定性排序；focused 回归 3 个测试文件、32 个测试通过。
+
 ## M3 历练·学院·题库
 
 | 任务 | 内容 | 验收标准 |
 |---|---|---|
-| T3.1 | events 导入 + 抽取器：三层体力档权重、once 移除、冷却、情报道具预览 | 权重分布统计符合 events.yaml |
+| [x] T3.1 | events 导入 + 抽取器：三层体力档权重、once 移除、冷却、情报道具预览 | 权重分布统计符合 events.yaml |
 | T3.2 | 历练 API+页面：投体力→事件卡→选项分支→结果结算（含 buff 存储 next_training 等） | 多段选项事件（Y7/L7/R5）全分支可走 |
 | T3.3 | 历练对决事件接入 T2.3 内核（G2/R1/R4/L1/L7/P1/P5/C1/C2 相关路径） | DuelReport 正确入 AdventureLog |
 | T3.4 | 高级学院：招募池 API/页面（含付费刷新）、招募费曲线、声誉加成 | 与 gameplay.md 参数一致 |

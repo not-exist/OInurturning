@@ -365,6 +365,27 @@ ng_plus:
   layer_cap: null
 `;
 
+const MINIMAL_EVENTS = `version: 0.1.0
+events:
+  - id: evt-test-warmup
+    code: G1
+    name: 测试事件
+    category: trial
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 100
+    requirements: null
+    description: 测试用事件。
+    choices:
+      - text: 开始
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: {}
+`;
+
 const tmpDirs: string[] = [];
 function writeConfigDir(files: { talents: string; items: string; economy: string }): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'oinur-config-'));
@@ -375,6 +396,7 @@ function writeConfigDir(files: { talents: string; items: string; economy: string
   writeFileSync(path.join(dir, 'problems.yaml'), MINIMAL_PROBLEMS);
   const itemId = /^\s*- id: ([a-z0-9-]+)/m.exec(files.items)?.[1] ?? 'rename-card';
   writeFileSync(path.join(dir, 'stages.yaml'), MINIMAL_STAGES.replaceAll('rename-card', itemId));
+  writeFileSync(path.join(dir, 'events.yaml'), MINIMAL_EVENTS);
   return dir;
 }
 
