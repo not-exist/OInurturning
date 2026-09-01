@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DimensionKey, QualityTier, Rarity, StudentView } from '@oinur/shared';
+import type {
+  ContestRecordView,
+  DimensionKey,
+  QualityTier,
+  Rarity,
+  StudentView,
+} from '@oinur/shared';
 import { apiFetch } from './api';
 
 // ---------------------------------------------------------------------------
@@ -370,5 +376,95 @@ export function useSpecializedTrain() {
       qc.invalidateQueries({ queryKey: ['problems'] });
       qc.invalidateQueries({ queryKey: ['me'] });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 剧情与战报
+// ---------------------------------------------------------------------------
+
+export interface StoryStageProgress {
+  stageKey: string;
+  ngLevel: number;
+  name?: string;
+  recommendedLevel?: number;
+  durationMin?: number;
+  staminaCost?: number;
+  unlocked: boolean;
+  cleared: boolean;
+  clearCount: number;
+  bestRank: number | null;
+  firstClearAt: string | null;
+}
+
+export interface StoryChapterView {
+  chapter: string;
+  stages: StoryStageProgress[];
+}
+
+export interface StoryOverview {
+  ngLevel: number;
+  chapters: StoryChapterView[];
+  ngPlusUnlocked: boolean;
+  maxUnlockedNgLevel: number;
+}
+
+export interface StoryEntryResult {
+  record: ContestRecordView;
+  replayed: boolean;
+  firstClear: boolean;
+}
+
+export function useStoryOverview(ngLevel = 0) {
+  return useQuery({
+    queryKey: ['story-overview', ngLevel],
+    queryFn: () => apiFetch<StoryOverview>(`/api/story/overview?ngLevel=${ngLevel}`),
+  });
+}
+
+export function useStoryProgress(ngLevel?: number) {
+  const query = ngLevel === undefined ? '' : `?ngLevel=${ngLevel}`;
+  return useQuery({
+    queryKey: ['story-progress', ngLevel ?? 'all'],
+    queryFn: () =>
+      apiFetch<import('@oinur/shared').StoryProgressView[]>(`/api/story/progress${query}`),
+  });
+}
+
+export function useEnterStoryStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      stageKey,
+      roster,
+      ngLevel,
+      idempotencyKey,
+    }: {
+      stageKey: string;
+      roster: number[];
+      ngLevel: number;
+      idempotencyKey: string;
+    }) =>
+      apiFetch<StoryEntryResult>(`/api/story/stages/${encodeURIComponent(stageKey)}/enter`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ roster, ngLevel }),
+      }),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['story-overview'] });
+      qc.invalidateQueries({ queryKey: ['story-progress'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      return result;
+    },
+  });
+}
+
+export function useContestRecord(recordId: string | undefined) {
+  return useQuery({
+    queryKey: ['contest-record', recordId],
+    queryFn: () => apiFetch<ContestRecordView>(`/api/records/${recordId}`),
+    enabled: recordId !== undefined,
   });
 }

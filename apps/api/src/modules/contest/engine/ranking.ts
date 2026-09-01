@@ -103,7 +103,7 @@ function simulateParticipant(
   const accepted = new Set<number>();
   const attempts: ParticipantAttempt[] = [];
   let remainingClockMin = durationMin;
-  let energy = participant.energyMax;
+   let energy = participant.energy ?? participant.energyMax;
   let focus = 0;
   let mindset = participant.mindset;
   let totalScore = 0;

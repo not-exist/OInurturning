@@ -23,9 +23,19 @@ import { RNG_VERSION } from '../src/modules/contest/engine/rng.js';
 
 function participant(displayName = 'Replay Player', ability = 70): ParticipantSnapshot {
   const abilities = Object.fromEntries(
-    (['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING', 'CODING', 'THINKING', 'PROBLEM'] as AbilityKey[]).map(
-      (key) => [key, ability],
-    ),
+    (
+      [
+        'DS',
+        'DP',
+        'MATH',
+        'GRAPH',
+        'GREEDY',
+        'STRING',
+        'CODING',
+        'THINKING',
+        'PROBLEM',
+      ] as AbilityKey[]
+    ).map((key) => [key, ability]),
   ) as Record<AbilityKey, number>;
 
   return {
@@ -34,6 +44,7 @@ function participant(displayName = 'Replay Player', ability = 70): ParticipantSn
     studentId: displayName === 'Replay Player' ? 22 : null,
     displayName,
     abilities,
+    traits: [],
     mindset: 2,
     focusCap: 35,
     energyMax: 90,
@@ -104,6 +115,22 @@ describe('shared ranking contracts', () => {
     expect(rankingReportSchema.safeParse(malformedReport).success).toBe(false);
   });
 
+  it('rejects unsafe raw members before Zod can strip them', () => {
+    const namedProblems = [replayQuestion()] as QuestionSnapshot[] & { extra?: unknown };
+    Object.defineProperty(namedProblems, 'extra', { value: undefined });
+    const namedInput = { ...input(), problems: namedProblems };
+
+    const cyclicInput = input() as RankingInput & { cycle?: unknown };
+    cyclicInput.cycle = cyclicInput;
+
+    const symbolInput = input() as RankingInput & { [key: symbol]: unknown };
+    symbolInput[Symbol('unsupported')] = 1;
+
+    expect(rankingInputSchema.safeParse(namedInput).success).toBe(false);
+    expect(rankingInputSchema.safeParse(cyclicInput).success).toBe(false);
+    expect(rankingInputSchema.safeParse(symbolInput).success).toBe(false);
+  });
+
   it('rejects inconsistent indexes, ranks, totals, energy, final mindset, and pass state', () => {
     const report = simulateRanking(input(), 45);
     const duplicateIndex = structuredClone(report);
@@ -120,7 +147,14 @@ describe('shared ranking contracts', () => {
     wrongMindset.participants[0]!.finalMindset += 1;
     wrongPass.pass = !wrongPass.pass;
 
-    for (const invalid of [duplicateIndex, wrongRank, wrongTotal, wrongEnergy, wrongMindset, wrongPass]) {
+    for (const invalid of [
+      duplicateIndex,
+      wrongRank,
+      wrongTotal,
+      wrongEnergy,
+      wrongMindset,
+      wrongPass,
+    ]) {
       expect(rankingReportSchema.safeParse(invalid).success).toBe(false);
     }
   });
@@ -207,13 +241,15 @@ describe('ranking report determinism', () => {
     const report = simulateRanking(goldenInput, 123);
     const serialized = serializeRankingReport(report);
 
-    expect(report.participants[0]?.attempts[0]?.resolution.submissions.some((entry) => entry.verdict !== 'AC')).toBe(
-      true,
-    );
+    expect(
+      report.participants[0]?.attempts[0]?.resolution.submissions.some(
+        (entry) => entry.verdict !== 'AC',
+      ),
+    ).toBe(true);
     expect(report.participants[0]?.attempts[0]?.resolution.penaltyMin).toBeGreaterThan(0);
-    expect(stableHash(report)).toBe('6412e17e');
+    expect(stableHash(report)).toBe('5df070c2');
     expect(serialized).toBe(
-      '{"createdAt":"1970-01-01T00:00:00.123Z","engineVersion":"ranking-v1","format":"RANKING","growth":[],"inputSnapshot":{"durationMin":100,"kind":"custom","participants":[],"problems":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"student":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"userId":11}},"participants":[{"attempts":[{"energyCost":14,"focusGain":6,"mindsetDelta":-12,"minutesUsed":100,"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"resolution":{"energyAfter":76,"energyCost":14,"energyRequired":2,"estimatedTimeMin":19.55192508628933,"focusAfter":6,"focusBefore":0,"mindsetAfter":-10,"mindsetDelta":-12,"notes":["WA","WA","WA"],"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"scoreAwarded":30,"submissionCount":3,"submissions":[{"attemptNumber":1,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":18.006145652292588,"timeSpentMin":43.00614565229259,"verdict":"WA"},{"attemptNumber":2,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":11.843373965624004,"timeSpentMin":36.843373965624004,"verdict":"WA"},{"attemptNumber":3,"clockExhausted":true,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":5.317203584862094,"submissionTimeMin":14.833276797221307,"timeSpentMin":20.1504803820834,"verdict":"WA"}],"timeSpentMin":100,"tleJudgeCount":0,"verdict":"UNFINISHED","waCount":3},"verdict":"UNFINISHED"}],"finalMindset":-10,"participant":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"userId":11},"totalEnergySpent":14}],"pass":true,"questions":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"reportVersion":1,"rewards":[],"rngVersion":"mulberry32-v1","seed":123,"snapshotHash":"0c93f3a7","standings":[{"participantIndex":0,"rank":1,"totalScore":30}]}',
+      '{"createdAt":"1970-01-01T00:00:00.123Z","engineVersion":"ranking-v1","format":"RANKING","growth":[],"inputSnapshot":{"durationMin":100,"kind":"custom","participants":[],"problems":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"student":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"traits":[],"userId":11}},"participants":[{"attempts":[{"energyCost":14,"focusGain":6,"mindsetDelta":-12,"minutesUsed":100,"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"resolution":{"energyAfter":76,"energyCost":14,"energyRequired":2,"estimatedTimeMin":19.55192508628933,"focusAfter":6,"focusBefore":0,"mindsetAfter":-10,"mindsetDelta":-12,"notes":["WA","WA","WA"],"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"scoreAwarded":30,"submissionCount":3,"submissions":[{"attemptNumber":1,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":18.006145652292588,"timeSpentMin":43.00614565229259,"verdict":"WA"},{"attemptNumber":2,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":11.843373965624004,"timeSpentMin":36.843373965624004,"verdict":"WA"},{"attemptNumber":3,"clockExhausted":true,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":5.317203584862094,"submissionTimeMin":14.833276797221307,"timeSpentMin":20.1504803820834,"verdict":"WA"}],"timeSpentMin":100,"tleJudgeCount":0,"verdict":"UNFINISHED","waCount":3},"verdict":"UNFINISHED"}],"finalMindset":-10,"participant":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"traits":[],"userId":11},"totalEnergySpent":14}],"pass":true,"questions":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"reportVersion":1,"rewards":[],"rngVersion":"mulberry32-v1","seed":123,"snapshotHash":"c7007ad4","standings":[{"participantIndex":0,"rank":1,"totalScore":30}]}',
     );
   });
 
@@ -221,7 +257,9 @@ describe('ranking report determinism', () => {
     const original = input();
     const changed = { ...input(), durationMin: input().durationMin + 1 };
 
-    expect(simulateRanking(original, 44).snapshotHash).not.toBe(simulateRanking(changed, 44).snapshotHash);
+    expect(simulateRanking(original, 44).snapshotHash).not.toBe(
+      simulateRanking(changed, 44).snapshotHash,
+    );
   });
 
   it('builds the discriminated compact summary and preserves settlement lines', () => {
@@ -234,7 +272,8 @@ describe('ranking report determinism', () => {
       format: 'RANKING',
       rank: report.standings.find((standing) => standing.participantIndex === 0)?.rank ?? 0,
       participantCount: 2,
-      totalScore: report.standings.find((standing) => standing.participantIndex === 0)?.totalScore ?? 0,
+      totalScore:
+        report.standings.find((standing) => standing.participantIndex === 0)?.totalScore ?? 0,
       rewards: report.rewards,
       growth: report.growth,
     };
@@ -248,12 +287,16 @@ describe('ranking report determinism', () => {
 describe('canonical serializer rejection', () => {
   it('rejects named and symbol own properties on arrays', () => {
     const named = [1];
-    Object.defineProperty(named, 'extra', { value: undefined, enumerable: true });
+    Object.defineProperty(named, 'extra', { value: undefined });
     const symbolKeyed = [1];
     Object.defineProperty(symbolKeyed, Symbol('extra'), { value: 2, enumerable: true });
 
     expect(() => stableSerialize(named)).toThrow(/array own propert/i);
     expect(() => stableSerialize(symbolKeyed)).toThrow(/symbol-keyed/i);
+
+    const nonEnumerable: Record<string, unknown> = {};
+    Object.defineProperty(nonEnumerable, 'extra', { value: undefined });
+    expect(() => stableSerialize(nonEnumerable)).toThrow(/non-enumerable/i);
   });
 
   it('rejects every unsupported root or member instead of colliding with valid JSON', () => {

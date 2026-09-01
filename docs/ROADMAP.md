@@ -58,14 +58,17 @@
 
 | 任务 | 内容 | 验收标准 |
 |---|---|---|
-| T2.1 | **共享求解内核**（纯函数）：RNG（可复现种子）、三缺口耗时 sigmoid、代码差→精力消耗、专注积累与提速曲线、WA/TLE/弃题判定 | 单元测试覆盖边界（0差/满差/0精力/满专注） |
-| T2.2 | 排名制模拟器（多题串接、特性扰动、NPC 实力模型）+ ContestReport 结构 | 同 seed 结果逐字节一致（确定性） |
-| T2.3 | **出题对决模拟器**：4 局轮流坐庄、计分、【考察出题质量】+2、tiebreak 枚举（sudden_death/by_energy/by_quality/friendly）、预制题替换 | 单测覆盖平局各分支 |
-| T2.4 | problems/stages 配置导入 + NPC 选手池生成器 | 33 关配置全部通过校验 |
-| T2.5 | Story API：章节/关卡列表、开赛（体力扣减+快照）、战报存取、首通判定与奖励发放（钱/道具/里程碑）、进度表 | 首通奖励与 stages.yaml 数字一致（自动化断言） |
-| T2.6 | 战报渲染组件：逐题时间线、判定色标、得分名次、奖励摘要 | 移动端可读 |
-| T2.7 | NG+：层级开启、需求乘数、奖励乘算（石头除外）、独立首通状态；重复通关名次奖金 | NG+k=1..3 断言通过 |
-| T2.8 | 一周目全通检测 → 传奇教练勋章 + 解锁 NG+ | 集成测试 |
+| [x] T2.1 | **共享求解内核**（纯函数）：RNG（可复现种子）、三缺口耗时 sigmoid、代码差→精力消耗、专注积累与提速曲线、WA/TLE/弃题判定 | 单元测试覆盖边界（0差/满差/0精力/满专注） |
+| [x] T2.2 | 排名制模拟器（多题串接、特性扰动、NPC 实力模型）+ ContestReport 结构 | 同 seed 结果逐字节一致（确定性） |
+| [x] T2.3 | **出题对决模拟器**：4 局轮流坐庄、计分、【考察出题质量】+2、tiebreak 枚举（sudden_death/by_energy/by_quality/friendly）、预制题替换 | 单测覆盖平局各分支 |
+| [x] T2.4 | problems/stages 配置导入 + NPC 选手池生成器 | 33 关配置全部通过校验 |
+| [x] T2.5 | Story API：章节/关卡列表、开赛（体力扣减+快照）、战报存取、首通判定与奖励发放（钱/道具/里程碑）、进度表 | 首通奖励与 stages.yaml 数字一致（自动化断言） |
+| [x] T2.6 | 战报渲染组件：逐题时间线、判定色标、得分名次、奖励摘要 | 移动端可读 |
+| [x] T2.7 | NG+：层级开启、需求乘数、奖励乘算（石头除外）、独立首通状态；重复通关名次奖金 | NG+k=1..3 断言通过 |
+| [x] T2.8 | 一周目全通检测 → 传奇教练勋章 + 解锁 NG+ | 集成测试 |
+
+> **M2 实测记录（2026-09-01，本地 MariaDB + 进程直跑）**：`pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build` 全绿；API 共 27 个测试文件、244 个测试通过。consolidated golden 固定 ranking hash `ec43a98d`、duel hash `909f2bf8`，真实配置 34 个题目模板/33 个关卡通过导入，8 个章末正赛进度可连续解锁 NG+1/NG+2。
+> HTTP smoke：`coach` 登录 → `GET /api/story/overview` → 精英学员进入 `cspj:1`（rank 2）→ `GET /api/records/:id` → 同 `Idempotency-Key` 重放；两次返回同一 record，数据库实测 money `5000→5500`、stamina `5→4`、ContestRecord 1 条、StoryProgress 1 条，首通奖励未重复。另测失败场 rank 17：只扣一次体力并保留一条 record，不写 progress/reward。Web `/story` 已由 Vite dev server 提供，production build 通过；Docker 与浏览器视觉走查留待部署窗口。
 
 ## M3 历练·学院·题库
 

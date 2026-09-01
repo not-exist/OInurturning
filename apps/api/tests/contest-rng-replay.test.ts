@@ -1,17 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import type { AbilityKey, ParticipantSnapshot, QuestionSnapshot, RankingInput } from '@oinur/shared';
+import type {
+  AbilityKey,
+  ParticipantSnapshot,
+  QuestionSnapshot,
+  RankingInput,
+} from '@oinur/shared';
 import { simulateRanking } from '../src/modules/contest/engine/ranking.js';
 import { createRandomStream, deriveStreamSeed } from '../src/modules/contest/engine/rng.js';
 import { solveQuestion } from '../src/modules/contest/engine/solve.js';
 
 function participant(displayName: string, side: ParticipantSnapshot['side']): ParticipantSnapshot {
-  const keys: AbilityKey[] = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING', 'CODING', 'THINKING', 'PROBLEM'];
+  const keys: AbilityKey[] = [
+    'DS',
+    'DP',
+    'MATH',
+    'GRAPH',
+    'GREEDY',
+    'STRING',
+    'CODING',
+    'THINKING',
+    'PROBLEM',
+  ];
   return {
     side,
     userId: side === 'HOME' ? 1 : null,
     studentId: side === 'HOME' ? 2 : null,
     displayName,
     abilities: Object.fromEntries(keys.map((key) => [key, 60])) as Record<AbilityKey, number>,
+    traits: [],
     mindset: 0,
     focusCap: 30,
     energyMax: 100,

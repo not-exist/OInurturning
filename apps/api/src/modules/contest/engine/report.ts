@@ -38,18 +38,24 @@ function encodeStable(value: unknown, active: WeakSet<object>): string {
   let result: string;
   if (Array.isArray(value)) {
     for (const key of Reflect.ownKeys(value)) {
-      if (typeof key === 'symbol') throw new TypeError('Cannot serialize symbol-keyed array properties');
+      if (typeof key === 'symbol')
+        throw new TypeError('Cannot serialize symbol-keyed array properties');
       if (key === 'length') continue;
 
       const index = Number(key);
       if (!Number.isInteger(index) || index < 0 || index >= value.length || String(index) !== key) {
         throw new TypeError('Cannot serialize non-index array own properties');
       }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor?.get !== undefined || descriptor?.set !== undefined) {
+        throw new TypeError('Cannot serialize accessor properties');
+      }
     }
 
     const entries: string[] = [];
     for (let index = 0; index < value.length; index += 1) {
-      if (!(index in value)) throw new TypeError('Cannot serialize sparse arrays');
+      if (!Object.prototype.hasOwnProperty.call(value, index))
+        throw new TypeError('Cannot serialize sparse arrays');
       entries.push(encodeStable(value[index], active));
     }
     result = `[${entries.join(',')}]`;
@@ -58,8 +64,14 @@ function encodeStable(value: unknown, active: WeakSet<object>): string {
     if (prototype !== Object.prototype && prototype !== null) {
       throw new TypeError('Cannot serialize non-plain objects');
     }
-    if (Object.getOwnPropertySymbols(value).length > 0) {
-      throw new TypeError('Cannot serialize symbol-keyed properties');
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key === 'symbol') throw new TypeError('Cannot serialize symbol-keyed properties');
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor?.enumerable !== true)
+        throw new TypeError('Cannot serialize non-enumerable properties');
+      if (descriptor?.get !== undefined || descriptor?.set !== undefined) {
+        throw new TypeError('Cannot serialize accessor properties');
+      }
     }
 
     const record = value as Record<string, unknown>;
@@ -103,7 +115,8 @@ export function isPassingRank(rank: number): boolean {
 
 export function buildContestSummary(report: RankingReport): ContestSummary {
   const playerStanding = report.standings.find((standing) => standing.participantIndex === 0);
-  if (playerStanding === undefined) throw new Error('Ranking report is missing the player standing');
+  if (playerStanding === undefined)
+    throw new Error('Ranking report is missing the player standing');
 
   return {
     format: 'RANKING',

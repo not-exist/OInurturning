@@ -25,6 +25,7 @@ const snapshotParticipant = {
     THINKING: 50,
     PROBLEM: 50,
   },
+  traits: [],
   mindset: 0,
   focusCap: 40,
   energyMax: 100,
@@ -41,7 +42,9 @@ const rankingSummary = {
 
 type RankingSummary = Extract<ContestSummary, { format: 'RANKING' }>;
 type DuelSummary = Extract<ContestSummary, { format: 'DUEL' }>;
-const rankingHasNoDuelFields: false = false as 'winnerSide' extends keyof RankingSummary ? true : false;
+const rankingHasNoDuelFields: false = false as 'winnerSide' extends keyof RankingSummary
+  ? true
+  : false;
 const duelHasNoRankingFields: false = false as 'rank' extends keyof DuelSummary ? true : false;
 
 const rankingReport = {

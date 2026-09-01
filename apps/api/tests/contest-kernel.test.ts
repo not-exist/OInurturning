@@ -9,13 +9,24 @@ import {
 import { simulateRanking } from '../src/modules/contest/engine/ranking.js';
 
 function participant(): ParticipantSnapshot {
-  const keys: AbilityKey[] = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING', 'CODING', 'THINKING', 'PROBLEM'];
+  const keys: AbilityKey[] = [
+    'DS',
+    'DP',
+    'MATH',
+    'GRAPH',
+    'GREEDY',
+    'STRING',
+    'CODING',
+    'THINKING',
+    'PROBLEM',
+  ];
   return {
     side: 'HOME',
     userId: 1,
     studentId: 2,
     displayName: 'Hook Player',
     abilities: Object.fromEntries(keys.map((key) => [key, 50])) as Record<AbilityKey, number>,
+    traits: [],
     mindset: 0,
     focusCap: 40,
     energyMax: 100,
@@ -82,7 +93,8 @@ describe('frozen ranking question behavior', () => {
 
     const missingClockFlag = structuredClone(attempt);
     const unknownSubmissionField = structuredClone(attempt);
-    delete (missingClockFlag.resolution.submissions[0] as Partial<{ clockExhausted: boolean }>).clockExhausted;
+    delete (missingClockFlag.resolution.submissions[0] as Partial<{ clockExhausted: boolean }>)
+      .clockExhausted;
     Object.assign(unknownSubmissionField.resolution.submissions[0]!, { invented: true });
 
     expect(participantAttemptSchema.safeParse(missingClockFlag).success).toBe(false);

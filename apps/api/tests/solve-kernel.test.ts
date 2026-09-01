@@ -8,7 +8,11 @@ import {
   resolveAttempt,
   solveQuestion,
 } from '../src/modules/contest/engine/solve.js';
-import type { AttemptRng, ConditionalSolveHooks, SolveQuestionInput } from '../src/modules/contest/engine/models.js';
+import type {
+  AttemptRng,
+  ConditionalSolveHooks,
+  SolveQuestionInput,
+} from '../src/modules/contest/engine/models.js';
 
 const participant: ParticipantSnapshot = {
   side: 'HOME',
@@ -26,6 +30,7 @@ const participant: ParticipantSnapshot = {
     THINKING: 50,
     PROBLEM: 50,
   },
+  traits: [],
   mindset: 0,
   focusCap: 50,
   energyMax: 100,
@@ -108,10 +113,9 @@ describe('solve-time estimate', () => {
       codeVolume: 50,
     };
 
-    expect(estimateSolveTime({ participant: anchorParticipant, question: anchorQuestion, focus: 0 })).toBeCloseTo(
-      88.8499645126,
-      8,
-    );
+    expect(
+      estimateSolveTime({ participant: anchorParticipant, question: anchorQuestion, focus: 0 }),
+    ).toBeCloseTo(88.8499645126, 8);
   });
 
   it('clamps maximum and minimum three-gap estimates to the documented bounds', () => {
@@ -127,11 +131,17 @@ describe('solve-time estimate', () => {
     const minimum = { ...question, demand: 0, thought: 0, codeVolume: 0 };
 
     expect(estimateSolveTime({ participant: weakest, question: maximum, focus: 0 })).toBe(225);
-    expect(estimateSolveTime({ participant: strongest, question: minimum, focus: 0 })).toBeCloseTo(31.5, 12);
+    expect(estimateSolveTime({ participant: strongest, question: minimum, focus: 0 })).toBeCloseTo(
+      31.5,
+      12,
+    );
   });
 
   it('uses full focus for the documented 40 percent speed-up', () => {
-    expect(estimateSolveTime({ participant, question, focus: participant.focusCap })).toBeCloseTo(90 / 1.4, 10);
+    expect(estimateSolveTime({ participant, question, focus: participant.focusCap })).toBeCloseTo(
+      90 / 1.4,
+      10,
+    );
   });
 
   it('applies only hook modifiers whose conditions are active', () => {
@@ -154,9 +164,7 @@ describe('solve-time estimate', () => {
 
 describe('focus and energy accounting', () => {
   it('clamps focus at its cap for the maximum legal mindset', () => {
-    expect(
-      focusAfterAttempt({ focus: 49, focusCap: 50, investedMin: 100, mindset: 10 }),
-    ).toBe(50);
+    expect(focusAfterAttempt({ focus: 49, focusCap: 50, investedMin: 100, mindset: 10 })).toBe(50);
   });
 
   it('clamps focus at zero when anxiety backlash exceeds accumulated focus', () => {
@@ -179,6 +187,21 @@ describe('focus and energy accounting', () => {
 });
 
 describe('single submission resolution', () => {
+  it('normalizes a direct non-finite time estimate instead of leaking NaN', () => {
+    const result = resolveAttempt(
+      {
+        attemptNumber: 1,
+        estimatedTimeMin: Number.NaN,
+        remainingClockMin: 10,
+        acProbability: 1,
+      },
+      controlledRng([1, 0]),
+    );
+
+    expect(result.submissionTimeMin).toBe(0);
+    expect(Number.isFinite(result.timeSpentMin)).toBe(true);
+  });
+
   const input = {
     attemptNumber: 1,
     estimatedTimeMin: 90,
@@ -253,7 +276,15 @@ describe('question solving flow', () => {
     expect(afterTle.verdict).toBe('AC');
     expect(afterTle.submissions.map((attempt) => attempt.verdict)).toEqual(['TLE', 'AC']);
     expect(afterTle.energyCost).toBe(10);
-    expect(afterTleRng.draws).toEqual(['noise', 'noise', 'judge', 'noise', 'noise', 'judge', 'judge']);
+    expect(afterTleRng.draws).toEqual([
+      'noise',
+      'noise',
+      'judge',
+      'noise',
+      'noise',
+      'judge',
+      'judge',
+    ]);
   });
 
   it('returns UNFINISHED at the duration boundary with partial score and nonnegative energy', () => {

@@ -4,11 +4,13 @@ import {
   type ConfigRarity,
   type EconomyConfig,
   type ItemDef,
+  type ProblemConfig,
+  type StagesConfig,
   type TalentDef,
 } from '@oinur/shared';
 
 export interface SemanticIssue {
-  file: 'talents' | 'items' | 'economy';
+  file: 'talents' | 'items' | 'economy' | 'problems' | 'stages';
   path: string;
   message: string;
 }
@@ -23,12 +25,84 @@ export function runSemanticChecks(input: {
   talents: TalentDef[];
   items: ItemDef[];
   economy: EconomyConfig;
+  problems?: ProblemConfig;
+  stages?: StagesConfig;
 }): SemanticIssue[] {
   const issues: SemanticIssue[] = [];
   checkTalents(input.talents, issues);
   checkItems(input.items, issues);
   checkEconomy(input.economy, issues);
+  if (input.problems !== undefined) checkProblems(input.problems, issues);
+  if (input.stages !== undefined) checkStages(input.stages, input.problems, input.items, issues);
   return issues;
+}
+
+function checkProblems(problems: ProblemConfig, issues: SemanticIssue[]): void {
+  const seenTemplates = new Set<string>();
+  for (const template of problems.templates) {
+    if (seenTemplates.has(template.id)) {
+      issues.push({
+        file: 'problems',
+        path: `templates.${template.id}`,
+        message: `题目模板 id 重复：${template.id}`,
+      });
+    }
+    seenTemplates.add(template.id);
+  }
+}
+
+function checkStages(
+  stages: StagesConfig,
+  problems: ProblemConfig | undefined,
+  items: ItemDef[],
+  issues: SemanticIssue[],
+): void {
+  const itemIds = new Set(items.map((item) => item.id));
+  const templateTiers = new Set(problems?.templates.map((template) => template.tier));
+  const stageKeys = new Set<string>();
+
+  stages.stages.forEach((stage, stageIndex) => {
+    const stageKey = `${stage.chapter}:${stage.stage_index}`;
+    if (stageKeys.has(stageKey)) {
+      issues.push({
+        file: 'stages',
+        path: `stages.${stageIndex}`,
+        message: `关卡 key 重复：${stageKey}`,
+      });
+    }
+    stageKeys.add(stageKey);
+
+    stage.problem_slots.forEach((slot, slotIndex) => {
+      if (problems !== undefined && !templateTiers.has(slot.tier)) {
+        issues.push({
+          file: 'stages',
+          path: `stages.${stageIndex}.problem_slots.${slotIndex}.tier`,
+          message: `题目 tier 无可用模板：${slot.tier}`,
+        });
+      }
+    });
+
+    const milestoneItems = stage.first_clear.milestone?.items ?? [];
+    milestoneItems.forEach((reward, rewardIndex) => {
+      if (!itemIds.has(reward.item)) {
+        issues.push({
+          file: 'stages',
+          path: `stages.${stageIndex}.first_clear.milestone.items.${rewardIndex}.item`,
+          message: `奖励道具引用不存在：${reward.item}`,
+        });
+      }
+    });
+  });
+
+  stages.full_clear.items.forEach((reward, rewardIndex) => {
+    if (!itemIds.has(reward.item)) {
+      issues.push({
+        file: 'stages',
+        path: `full_clear.items.${rewardIndex}.item`,
+        message: `全通奖励道具引用不存在：${reward.item}`,
+      });
+    }
+  });
 }
 
 function checkTalents(talents: TalentDef[], issues: SemanticIssue[]): void {

@@ -1,0 +1,37 @@
+version: 1
+updated: '2026-08-31'
+defaults:
+  engine_ref: docs/systems/contest.md
+  stamina_cost_by_chapter: {cspj: 1, csps: 1, noip: 1, province: 1, noi: 2, ctt: 2, cts: 2, ioi: 2}
+  pass_rank_max: 8
+stages:
+  - chapter: cspj
+    stage_index: 1
+    name: 测试关
+    recommended_level: 1
+    duration_min: 10
+    problem_slots: [{tier: cspj, count: 1}]
+    npc_pool: {size: 1, mean_level: 1, spread: 0}
+    first_clear:
+      money: 1
+      items: {count: 1, chance: 1, pool: [{rarity: gray, weight: 1}]}
+      milestone: {items: [{item: rename-card, count: 1}]}
+full_clear:
+  condition: test
+  money: 1
+  items: [{item: rename-card, count: 1}]
+  unlocks: ng_plus
+ng_plus:
+  layer_param: k
+  demand_multiplier: '1 + 0.15k'
+  trait_chance_bonus: '1 + 0.10k'
+  trait_pool_shift:
+    weight_scale: '1 + 0.10k'
+    high_severity_extra: {min_severity: blue, scale: '1 + 0.05k', cap: colorful}
+  first_clear_money_multiplier: '1 + 0.5k'
+  item_rarity_shift: {from_layer: 2, shift: 1, cap: colorful}
+  milestone_rule: fixed
+  advance_stone_per_layer_clear: 5
+  layer_badge: {item_id_template: 'badge-ng{k}', count: 1}
+  repeat_clear_rank_bonus: {champion: 0.3, runner_up: 0.2, third_to_eighth: 0.1, others: 0}
+  layer_cap: null

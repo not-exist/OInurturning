@@ -158,7 +158,7 @@ export function resolveAttempt(input: ResolveAttemptInput, rng: AttemptRng): Att
   const noiseSigma = Math.max(0, (0.15 + hooks.noiseSigmaAdd) * hooks.noiseSigmaMul);
   const submissionTime = Math.max(
     0,
-    rewriteMultiplier * Math.max(0, input.estimatedTimeMin) * Math.exp(noiseSigma * normalSample(rng.noise)) +
+    rewriteMultiplier * Math.max(0, finite(input.estimatedTimeMin, 0)) * Math.exp(noiseSigma * normalSample(rng.noise)) +
       hooks.submitTimeAdd,
   );
 

@@ -12,6 +12,17 @@ enum Role {
   ADMIN
 }
 
+enum ContestType {
+  STORY
+  PVP
+  ADVENTURE
+}
+
+enum ContestFormat {
+  RANKING
+  DUEL
+}
+
 model User {
   id            Int       @id @default(autoincrement())
   username      String    @unique @db.VarChar(32)
@@ -32,8 +43,51 @@ model User {
   problemEntries  ProblemLibraryEntry[]
   reputationLogs  ReputationLog[]
   recruitPool     RecruitPool?
+  contestRecords ContestRecord[]
+  storyProgress  StoryProgress[]
 
   @@map("users")
+}
+
+model ContestRecord {
+  id             String        @id @default(cuid()) @db.VarChar(64)
+  userId         Int
+  type           ContestType
+  format         ContestFormat
+  stageKey       String?       @db.VarChar(64)
+  ngLevel        Int?
+  idempotencyKey String        @db.VarChar(128)
+  inputSnapshot  Json
+  report         Json
+  summary        Json
+  rewards        Json
+  snapshotHash   String        @db.VarChar(64)
+  createdAt      DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, type, createdAt])
+}
+
+model StoryProgress {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  ngLevel      Int
+  stageKey     String    @db.VarChar(64)
+  firstClearAt DateTime?
+  bestRank     Int?
+  clearCount   Int       @default(0)
+  rewards      Json      @default("[]")
+  growth       Json      @default("[]")
+  lastRecordId String?   @db.VarChar(64)
+  lastSummary  Json?
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ngLevel, stageKey])
+  @@index([userId, ngLevel])
 }
 
 // ───────────────────────── 配置域（yaml 导入目标，TECH-DESIGN §3） ─────────────────────────

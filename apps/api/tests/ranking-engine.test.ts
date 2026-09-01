@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { AbilityKey, ParticipantSnapshot, QuestionSnapshot, RankingInput } from '@oinur/shared';
+import type {
+  AbilityKey,
+  ParticipantSnapshot,
+  QuestionSnapshot,
+  RankingInput,
+} from '@oinur/shared';
 import { simulateRanking } from '../src/modules/contest/engine/ranking.js';
 import { isPassingRank } from '../src/modules/contest/engine/report.js';
 
@@ -26,6 +31,7 @@ function participant(displayName: string, ability: number, energyMax = 100): Par
     studentId: null,
     displayName,
     abilities: abilities(ability),
+    traits: [],
     mindset: 0,
     focusCap: 40,
     energyMax,
@@ -83,10 +89,18 @@ describe('ranking simulation and ordering', () => {
   it('preserves participant order, selects the highest score/time question, and records timeline totals', () => {
     const report = simulateRanking(rankingInput(), 17);
 
-    expect(report.participants.map(({ participant: entry }) => entry.displayName)).toEqual(['Player', 'No energy']);
+    expect(report.participants.map(({ participant: entry }) => entry.displayName)).toEqual([
+      'Player',
+      'No energy',
+    ]);
     expect(report.participants[0]?.attempts[0]?.questionIndex).toBe(2);
-    expect(report.participants[1]?.attempts.map((attempt) => attempt.verdict)).toEqual(['SKIP', 'SKIP']);
-    expect(report.standings.find((standing) => standing.participantIndex === 1)?.totalScore).toBe(0);
+    expect(report.participants[1]?.attempts.map((attempt) => attempt.verdict)).toEqual([
+      'SKIP',
+      'SKIP',
+    ]);
+    expect(report.standings.find((standing) => standing.participantIndex === 1)?.totalScore).toBe(
+      0,
+    );
 
     for (const standing of report.standings) {
       const timeline = report.participants[standing.participantIndex];
@@ -157,7 +171,9 @@ describe('ranking simulation and ordering', () => {
       'a-instance',
       'b-instance',
     ]);
-    expect(report.participants[0]?.attempts.map((attempt) => attempt.questionIndex)).toEqual([0, 0]);
+    expect(report.participants[0]?.attempts.map((attempt) => attempt.questionIndex)).toEqual([
+      0, 0,
+    ]);
   });
 
   it('uses the fixed rank-eight pass line', () => {
@@ -171,20 +187,20 @@ describe('ranking simulation and ordering', () => {
   });
 
   it('preserves participant traits as archival data without activating solver hooks', () => {
-    const archivedTrait = 'participant-precision-hell';
+    const archivedTrait = { traitId: 'participant-precision-hell' };
     const baseInput = rankingInput({ participants: [] });
     const withTrait = simulateRanking(
       {
         ...baseInput,
         student: { ...baseInput.student, traits: [archivedTrait] },
-      } as RankingInput,
+      },
       29,
     );
     const withoutTrait = simulateRanking(
       {
         ...baseInput,
         student: { ...baseInput.student, traits: [] },
-      } as RankingInput,
+      },
       29,
     );
 
@@ -206,34 +222,50 @@ describe('ranking simulation and ordering', () => {
 });
 
 describe('ranking input validation', () => {
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('rejects invalid duration %s', (durationMin) => {
-    expect(() => simulateRanking(rankingInput({ durationMin }), 1)).toThrow();
-  });
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid duration %s',
+    (durationMin) => {
+      expect(() => simulateRanking(rankingInput({ durationMin }), 1)).toThrow();
+    },
+  );
 
   it('rejects empty problem sets before simulation', () => {
     expect(() => simulateRanking(rankingInput({ problems: [] }), 1)).toThrow();
   });
 
-  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 0x1_0000_0000])('rejects invalid seed %s', (seed) => {
-    expect(() => simulateRanking(rankingInput(), seed)).toThrow();
-  });
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 0x1_0000_0000])(
+    'rejects invalid seed %s',
+    (seed) => {
+      expect(() => simulateRanking(rankingInput(), seed)).toThrow();
+    },
+  );
 
   it('enforces ability values from 1 to 100 while mindset remains from -10 to 10', () => {
     for (const ability of [1, 100]) {
       expect(() =>
-        simulateRanking(rankingInput({ student: { ...participant('Player', ability), side: 'HOME' } }), 1),
+        simulateRanking(
+          rankingInput({ student: { ...participant('Player', ability), side: 'HOME' } }),
+          1,
+        ),
       ).not.toThrow();
     }
     for (const ability of [0, 101]) {
       expect(() =>
-        simulateRanking(rankingInput({ student: { ...participant('Player', ability), side: 'HOME' } }), 1),
+        simulateRanking(
+          rankingInput({ student: { ...participant('Player', ability), side: 'HOME' } }),
+          1,
+        ),
       ).toThrow();
     }
     for (const mindset of [-10, 10]) {
-      expect(() => simulateRanking(rankingInput({ student: { ...rankingInput().student, mindset } }), 1)).not.toThrow();
+      expect(() =>
+        simulateRanking(rankingInput({ student: { ...rankingInput().student, mindset } }), 1),
+      ).not.toThrow();
     }
     for (const mindset of [-11, 11]) {
-      expect(() => simulateRanking(rankingInput({ student: { ...rankingInput().student, mindset } }), 1)).toThrow();
+      expect(() =>
+        simulateRanking(rankingInput({ student: { ...rankingInput().student, mindset } }), 1),
+      ).toThrow();
     }
   });
 
