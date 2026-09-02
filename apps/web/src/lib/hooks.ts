@@ -78,6 +78,43 @@ export interface TrainingResult {
   staminaAfter: number;
 }
 
+export interface AdventureChoiceView {
+  index: number;
+  text: string;
+  available: boolean;
+  requiresItem?: string;
+  costMoney?: number;
+}
+
+export interface AdventureEventView {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  rarity: string;
+  staminaCost: 1 | 2 | 3;
+  description: string;
+  choices: AdventureChoiceView[] | null;
+}
+
+export interface AdventureLogView {
+  id: number;
+  studentId: number | null;
+  tier: 1 | 2 | 3;
+  status: 'PENDING' | 'RESOLVED';
+  preview: boolean;
+  event: AdventureEventView;
+  choices: number[];
+  results: unknown[];
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface AdventureChoiceResult {
+  adventure: AdventureLogView;
+  completed: boolean;
+}
+
 export interface TalentDefView {
   id: string;
   name: string;
@@ -300,15 +337,64 @@ export function useInventory() {
 export function useUseItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, studentId }: { itemId: string; studentId: number }) =>
-      apiFetch<StudentView>('/api/items/use', {
+    mutationFn: ({ itemId, studentId }: { itemId: string; studentId?: number }) =>
+      apiFetch<StudentView | { itemId: string; activated: true }>('/api/items/use', {
         method: 'POST',
         body: JSON.stringify({ itemId, studentId }),
       }),
-    onSuccess: (s) => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['items'] });
       qc.invalidateQueries({ queryKey: ['students'] });
-      qc.invalidateQueries({ queryKey: ['student', s.id] });
+      if ('id' in result) qc.invalidateQueries({ queryKey: ['student', result.id] });
+    },
+  });
+}
+
+export function useAdventureLogs() {
+  return useQuery({
+    queryKey: ['adventure-logs'],
+    queryFn: () => apiFetch<AdventureLogView[]>('/api/adventures/logs'),
+  });
+}
+
+export function useDrawAdventure() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, tier }: { studentId: number; tier: 1 | 2 | 3 }) =>
+      apiFetch<AdventureLogView>('/api/adventures/draw', {
+        method: 'POST',
+        body: JSON.stringify({ studentId, tier }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['adventure-logs'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+}
+
+export function useChooseAdventure() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      action,
+      optionIndex,
+      skill,
+    }: {
+      id: number;
+      action?: 'accept' | 'avoid';
+      optionIndex?: number;
+      skill?: string;
+    }) =>
+      apiFetch<AdventureChoiceResult>(`/api/adventures/${id}/choice`, {
+        method: 'POST',
+        body: JSON.stringify({ action, optionIndex, skill }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['adventure-logs'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
     },
   });
 }

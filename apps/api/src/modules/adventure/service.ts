@@ -1,0 +1,681 @@
+import { randomInt } from 'node:crypto';
+import { Prisma, type AdventureLog, type Student } from '@prisma/client';
+import type { ConfigRarity, EventChoice, EventConfig, EventOutcome } from '@oinur/shared';
+import { getConfig } from '../../config/loader.js';
+import { weekKey } from '../../lib/clock.js';
+import { ApiError } from '../../lib/errors.js';
+import { prisma } from '../../lib/prisma.js';
+import { createRandomStream } from '../contest/engine/rng.js';
+import { aggregateMeta } from '../students/meta.js';
+import { settle } from '../students/settle.js';
+import {
+  drawAdventureEvent,
+  type AdventureEventDrawContext,
+  type AdventureStaminaCost,
+} from './extractor.js';
+
+type JsonRecord = Record<string, unknown>;
+
+export interface AdventureChoiceInput {
+  action?: 'accept' | 'avoid';
+  optionIndex?: number;
+  skill?: string;
+}
+
+export interface AdventureChoiceView {
+  index: number;
+  text: string;
+  available: boolean;
+  requiresItem?: string;
+  costMoney?: number;
+}
+
+export interface AdventureEventView {
+  id: string;
+  code: string;
+  name: string;
+  category: EventConfig['category'];
+  rarity: ConfigRarity;
+  staminaCost: AdventureStaminaCost;
+  description: string;
+  choices: AdventureChoiceView[] | null;
+}
+
+export interface AdventureLogView {
+  id: number;
+  studentId: number | null;
+  tier: AdventureStaminaCost;
+  status: 'PENDING' | 'RESOLVED';
+  preview: boolean;
+  event: AdventureEventView;
+  choices: number[];
+  results: unknown[];
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface AdventureChoiceResult {
+  adventure: AdventureLogView;
+  completed: boolean;
+}
+
+const STAT_FIELDS = {
+  ds: 'ds',
+  dp: 'dp',
+  math: 'math',
+  graph: 'graph',
+  greedy: 'greedy',
+  string: 'str',
+  code: 'code',
+  thinking: 'thinking',
+  setting: 'setting',
+} as const;
+
+const SIX_FIELDS = ['ds', 'dp', 'math', 'graph', 'greedy', 'str'] as const;
+type StatField = (typeof STAT_FIELDS)[keyof typeof STAT_FIELDS];
+
+function requireConfig() {
+  const config = getConfig();
+  if (config === undefined) throw new Error('[adventure] CONFIG 未加载');
+  return config;
+}
+
+function record(value: unknown): JsonRecord {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : {};
+}
+
+function array(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function numberValue(value: unknown, random: () => number, field: string): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const range = record(value);
+  if (
+    typeof range.min === 'number' &&
+    Number.isFinite(range.min) &&
+    typeof range.max === 'number' &&
+    Number.isFinite(range.max) &&
+    range.max >= range.min
+  ) {
+    return range.min + Math.floor(random() * (range.max - range.min + 1));
+  }
+  throw new ApiError('STATE_CONFLICT', { resource: 'adventure', field, reason: 'invalid reward value' });
+}
+
+function weightedPick<T>(entries: readonly { value: T; weight: number }[], random: () => number): T {
+  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  if (total <= 0) throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'empty outcome pool' });
+  let roll = random() * total;
+  for (const entry of entries) {
+    roll -= entry.weight;
+    if (roll < 0) return entry.value;
+  }
+  return entries[entries.length - 1]!.value;
+}
+
+function outcomeSupported(outcome: EventOutcome): boolean {
+  if (outcome.type === 'duel') return false;
+  const raw = outcome as unknown as JsonRecord;
+  if (outcome.type === 'check') {
+    const check = record(raw.check);
+    if (check.kind !== undefined && check.kind !== 'single') return false;
+    if (typeof check.skill !== 'string' || typeof check.dc !== 'number') return false;
+  }
+  const unsupportedRewards = (rewards: unknown) => {
+    const value = record(rewards);
+    if (['lecture', 'recruit', 'bank_add', 'win_streak_bonus'].some((key) => key in value)) return true;
+    if (value.target_student !== undefined && value.target_student !== 'participant') return true;
+    return 'chosen_skill' in record(value.stat_gain);
+  };
+  if (unsupportedRewards(raw.rewards) || unsupportedRewards(raw.rewards_success) || unsupportedRewards(raw.rewards_fail)) {
+    return false;
+  }
+  return true;
+}
+
+function choiceSupported(choice: EventChoice): boolean {
+  return choice.outcomes.every(outcomeSupported);
+}
+
+function choiceView(choice: EventChoice, index: number): AdventureChoiceView {
+  return {
+    index,
+    text: choice.text,
+    available: choiceSupported(choice),
+    ...(choice.requires_item === undefined ? {} : { requiresItem: choice.requires_item }),
+    ...(choice.cost_money === undefined ? {} : { costMoney: choice.cost_money }),
+  };
+}
+
+function eventView(event: EventConfig, revealChoices: boolean): AdventureEventView {
+  return {
+    id: event.id,
+    code: event.code,
+    name: event.name,
+    category: event.category,
+    rarity: event.rarity,
+    staminaCost: event.stamina_cost,
+    description: event.description,
+    choices: revealChoices ? event.choices.map(choiceView) : null,
+  };
+}
+
+function resultPhase(log: AdventureLog): string | undefined {
+  const last = array(log.results).at(-1);
+  const phase = record(last).phase;
+  return typeof phase === 'string' ? phase : undefined;
+}
+
+function isAvoided(log: { status: string; results: Prisma.JsonValue }): boolean {
+  return log.status === 'RESOLVED' && record(array(log.results).at(-1)).status === 'AVOIDED';
+}
+
+function toLogView(log: AdventureLog, event: EventConfig, revealChoices: boolean): AdventureLogView {
+  const tier = log.tier as AdventureStaminaCost;
+  return {
+    id: log.id,
+    studentId: log.studentId,
+    tier,
+    status: log.status,
+    preview: resultPhase(log) === 'PREVIEW',
+    event: eventView(event, revealChoices),
+    choices: array(log.choices).filter((value): value is number => typeof value === 'number'),
+    results: array(log.results),
+    createdAt: log.createdAt.toISOString(),
+    resolvedAt: log.resolvedAt?.toISOString() ?? null,
+  };
+}
+
+async function lockStudent(
+  tx: Prisma.TransactionClient,
+  userId: number,
+  studentId: number,
+  now: Date,
+): Promise<{ current: Student & { talents: { talentId: string }[] }; settled: Student }> {
+  await tx.$queryRaw`SELECT id FROM Student WHERE id = ${studentId} FOR UPDATE`;
+  const current = await tx.student.findUnique({ where: { id: studentId }, include: { talents: true } });
+  if (current === null || current.status !== 'ACTIVE') {
+    throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
+  }
+  if (current.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
+  const settled = settle(current, aggregateMeta(current.talents.map((talent) => talent.talentId)), now);
+  return { current, settled };
+}
+
+async function persistStudentSettlement(
+  tx: Prisma.TransactionClient,
+  current: Student,
+  settled: Student,
+  stamina?: number,
+  energy?: number,
+  mindset?: number,
+  extra?: Prisma.StudentUpdateManyMutationInput,
+): Promise<void> {
+  const updated = await tx.student.updateMany({
+    where: { id: current.id, updatedAt: current.updatedAt },
+    data: {
+      stamina: stamina ?? settled.stamina,
+      energy: energy ?? settled.energy,
+      mindset: mindset ?? settled.mindset,
+      lastSettledAt: settled.lastSettledAt,
+      ...extra,
+    },
+  });
+  if (updated.count !== 1) throw new ApiError('STATE_CONFLICT', { studentId: current.id });
+}
+
+async function claimWeeklyLimit(
+  tx: Prisma.TransactionClient,
+  event: EventConfig,
+  now: Date,
+): Promise<void> {
+  if (event.server_weekly_limit === undefined) return;
+  const currentWeek = weekKey(now);
+  await tx.adventureWeeklyUsage.upsert({
+    where: { eventId_weekKey: { eventId: event.id, weekKey: currentWeek } },
+    create: { eventId: event.id, weekKey: currentWeek },
+    update: {},
+  });
+  const claimed = await tx.adventureWeeklyUsage.updateMany({
+    where: { eventId: event.id, weekKey: currentWeek, count: { lt: event.server_weekly_limit } },
+    data: { count: { increment: 1 } },
+  });
+  if (claimed.count !== 1) {
+    throw new ApiError('STATE_CONFLICT', { resource: event.id, reason: 'weekly event limit reached' });
+  }
+}
+
+async function drawContext(
+  tx: Prisma.TransactionClient,
+  userId: number,
+  student: Student & { talents: { talentId: string }[] },
+  investment: AdventureStaminaCost,
+  now: Date,
+): Promise<AdventureEventDrawContext> {
+  const [user, logs, weekly] = await Promise.all([
+    tx.user.findUniqueOrThrow({ where: { id: userId }, select: { reputation: true } }),
+    tx.adventureLog.findMany({
+      where: { userId },
+      select: { eventId: true, studentId: true, status: true, results: true, createdAt: true },
+    }),
+    tx.adventureWeeklyUsage.findMany({ where: { weekKey: weekKey(now) } }),
+  ]);
+  const lastTriggeredAtByEvent = new Map<string, Date>();
+  const oncePerStudentEventIds = new Set<string>();
+  for (const log of logs) {
+    if (isAvoided(log)) continue;
+    const previous = lastTriggeredAtByEvent.get(log.eventId);
+    if (previous === undefined || previous < log.createdAt) lastTriggeredAtByEvent.set(log.eventId, log.createdAt);
+    if (log.studentId === student.id) oncePerStudentEventIds.add(log.eventId);
+  }
+  return {
+    availableStamina: student.stamina,
+    investment,
+    reputation: user.reputation,
+    sixMax: Math.max(student.ds, student.dp, student.math, student.graph, student.greedy, student.str),
+    now,
+    lastTriggeredAtByEvent,
+    oncePerStudentEventIds,
+    weeklyUsageByEvent: new Map(weekly.map((row) => [row.eventId, row.count])),
+    rng: createRandomStream(randomInt(0, 2_147_483_647), 'draw'),
+  };
+}
+
+export async function drawAdventure(
+  userId: number,
+  studentId: number,
+  investment: AdventureStaminaCost,
+  now: Date = new Date(),
+): Promise<AdventureLogView> {
+  if (![1, 2, 3].includes(investment)) {
+    throw new ApiError('VALIDATION_FAILED', { field: 'tier', reason: 'must be 1, 2, or 3' });
+  }
+  const config = requireConfig();
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    const pending = await tx.adventureLog.findFirst({ where: { userId, status: 'PENDING' } });
+    if (pending !== null) {
+      throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'pending adventure exists' });
+    }
+    const { current, settled } = await lockStudent(tx, userId, studentId, now);
+    if (settled.stamina < investment) {
+      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', need: investment });
+    }
+    const context = await drawContext(tx, userId, { ...current, stamina: settled.stamina }, investment, now);
+    const event = drawAdventureEvent(
+      Object.values(config.events).filter((candidate) => candidate.choices.some(choiceSupported)),
+      context,
+    );
+    if (event === null) {
+      throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'no eligible event' });
+    }
+    const seed = randomInt(0, 2_147_483_647);
+    const preview = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { adventureIntelReady: true },
+    });
+    if (!preview.adventureIntelReady) {
+      await claimWeeklyLimit(tx, event, now);
+      await persistStudentSettlement(tx, current, settled, settled.stamina - investment);
+    }
+    const log = await tx.adventureLog.create({
+      data: {
+        userId,
+        studentId,
+        eventId: event.id,
+        tier: investment,
+        seed,
+        choices: [],
+        results: preview.adventureIntelReady ? [{ phase: 'PREVIEW' }] : [],
+      },
+    });
+    return toLogView(log, event, !preview.adventureIntelReady);
+  });
+}
+
+function skillScore(student: Student, skill: string, meta: Record<string, number>): number {
+  let base: number;
+  if (skill === 'six_max') {
+    base = Math.max(student.ds, student.dp, student.math, student.graph, student.greedy, student.str);
+  } else if (skill === 'mindset') {
+    base = student.mindset;
+  } else {
+    const field = STAT_FIELDS[skill as keyof typeof STAT_FIELDS];
+    if (field === undefined) {
+      throw new ApiError('STATE_CONFLICT', { resource: 'check', skill, reason: 'unknown skill' });
+    }
+    base = student[field];
+  }
+  const flat = meta[`${skill}_flat`] ?? 0;
+  const percent = meta[`${skill}_percent`] ?? 0;
+  return base + flat + (base * percent) / 100;
+}
+
+function rewardObject(outcome: JsonRecord): JsonRecord {
+  const unsupported = ['lecture', 'recruit', 'bank_add', 'win_streak_bonus'];
+  const rewards = record(outcome.rewards);
+  const found = [...unsupported, 'duel'].find((key) => key in rewards);
+  if (found !== undefined) {
+    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: `reward ${found} is not implemented` });
+  }
+  if (rewards.target_student !== undefined && rewards.target_student !== 'participant') {
+    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'non-actor target is not implemented' });
+  }
+  return rewards;
+}
+
+function resolveCheck(
+  outcome: JsonRecord,
+  student: Student,
+  meta: Record<string, number>,
+  random: () => number,
+): { rewards: JsonRecord; check: JsonRecord } {
+  const check = record(outcome.check);
+  if (check.kind !== undefined && check.kind !== 'single') {
+    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'compound check is not implemented' });
+  }
+  const skill = typeof check.skill === 'string' ? check.skill : undefined;
+  const dc = typeof check.dc === 'number' ? check.dc : undefined;
+  if (skill === undefined || dc === undefined) {
+    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'invalid check definition' });
+  }
+  const score = skillScore(student, skill, meta);
+  const margin = score - dc;
+  const probability = 1 / (1 + Math.exp(-margin / 12));
+  const success = random() < probability;
+  let rewards = success ? record(outcome.rewards_success) : record(outcome.rewards_fail);
+  if (success && Array.isArray(outcome.grades)) {
+    const grade = outcome.grades.find((entry) => {
+      const candidate = record(entry);
+      return typeof candidate.margin_min === 'number' && margin >= candidate.margin_min;
+    });
+    if (grade !== undefined) rewards = record(record(grade).rewards);
+  }
+  return {
+    rewards,
+    check: { skill, dc, score, margin, probability, success },
+  };
+}
+
+function rewardItemId(
+  rawId: string,
+  rarity: ConfigRarity | undefined,
+  random: () => number,
+): string {
+  const config = requireConfig();
+  if (rawId !== 'dim-book') {
+    if (!config.items[rawId]) throw new ApiError('STATE_CONFLICT', { resource: 'item', itemId: rawId });
+    return rawId;
+  }
+  const candidates = Object.values(config.items).filter(
+    (item) =>
+      item.id.startsWith('book-') &&
+      ['ds', 'dp', 'math', 'graph', 'greedy', 'string'].some((dimension) => item.id.startsWith(`book-${dimension}-`)) &&
+      (rarity === undefined || item.rarity === rarity),
+  );
+  const item = candidates[Math.floor(random() * candidates.length)];
+  if (item === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'item', itemId: rawId });
+  return item.id;
+}
+
+function applyStatGain(
+  rewards: JsonRecord,
+  student: Student,
+  random: () => number,
+  chosenSkill?: string,
+): { values: Partial<Record<StatField, number>>; mindset: number } {
+  const raw = record(rewards.stat_gain);
+  const values: Partial<Record<StatField, number>> = {};
+  let mindset = student.mindset;
+  for (const [key, rawValue] of Object.entries(raw)) {
+    const value = numberValue(rawValue, random, `stat_gain.${key}`);
+    if (key === 'mindset') {
+      mindset = Math.min(10, Math.max(-10, mindset + value));
+      continue;
+    }
+    if (key === 'all_six') {
+      for (const field of SIX_FIELDS) values[field] = Math.min(100, Math.max(1, (student[field] as number) + value));
+      continue;
+    }
+    if (key === 'chosen_skill') {
+      if (chosenSkill === undefined || !(chosenSkill in STAT_FIELDS)) {
+        throw new ApiError('VALIDATION_FAILED', { field: 'skill', reason: 'choose a valid student skill' });
+      }
+      const field = STAT_FIELDS[chosenSkill as keyof typeof STAT_FIELDS];
+      values[field] = Math.min(100, Math.max(1, (student[field] as number) + value));
+      continue;
+    }
+    const field = STAT_FIELDS[key as keyof typeof STAT_FIELDS];
+    if (field === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'stat', stat: key });
+    values[field] = Math.min(100, Math.max(1, (student[field] as number) + value));
+  }
+  return { values, mindset };
+}
+
+async function resolveRewards(
+  tx: Prisma.TransactionClient,
+  userId: number,
+  student: Student,
+  settled: Student,
+  event: EventConfig,
+  choice: EventChoice,
+  outcome: EventOutcome,
+  now: Date,
+  random: () => number,
+  chosenSkill?: string,
+): Promise<{ rewardLines: Prisma.InputJsonValue[]; studentData: Prisma.StudentUpdateManyMutationInput }> {
+  const outcomeRecord = outcome as unknown as JsonRecord;
+  const rewardObjectValue = rewardObject(outcomeRecord);
+  const rewardLines: Prisma.InputJsonValue[] = [];
+  const stat = applyStatGain(rewardObjectValue, settled, random, chosenSkill);
+  const studentData: Prisma.StudentUpdateManyMutationInput = {
+    ...stat.values,
+    mindset: stat.mindset,
+  };
+  const energyCost = rewardObjectValue.energy_cost;
+  const energyAfter =
+    energyCost === undefined
+      ? settled.energy
+      : settled.energy - numberValue(energyCost, random, 'energy_cost');
+  if (energyAfter < 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'energy', need: settled.energy - energyAfter });
+  studentData.energy = energyAfter;
+
+  const money = rewardObjectValue.money === undefined ? 0 : numberValue(rewardObjectValue.money, random, 'money');
+  const reputation =
+    rewardObjectValue.reputation === undefined
+      ? 0
+      : numberValue(rewardObjectValue.reputation, random, 'reputation');
+  const netMoney = -(choice.cost_money ?? 0) + money;
+  if (netMoney !== 0) {
+    const changed = await tx.user.updateMany({
+      where: { id: userId, ...(netMoney < 0 ? { money: { gte: -netMoney } } : {}) },
+      data: netMoney > 0 ? { money: { increment: netMoney } } : { money: { decrement: -netMoney } },
+    });
+    if (changed.count !== 1) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: -netMoney });
+    rewardLines.push({ type: 'money', amount: netMoney });
+  }
+  if (reputation !== 0) {
+    const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { reputation: true } });
+    const next = Math.max(0, user.reputation + reputation);
+    await tx.user.update({ where: { id: userId }, data: { reputation: next } });
+    await tx.reputationLog.create({ data: { userId, delta: next - user.reputation, reason: `EVENT:${event.id}` } });
+    rewardLines.push({ type: 'reputation', amount: next - user.reputation });
+  }
+
+  const consume = choice.consume;
+  if (consume !== undefined) {
+    const quantity = consume.qty;
+    const consumed = await tx.userItem.updateMany({
+      where: { userId, itemId: consume.item, quantity: { gte: quantity } },
+      data: { quantity: { decrement: quantity } },
+    });
+    if (consumed.count !== 1) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: consume.item, need: quantity });
+    await tx.userItem.deleteMany({ where: { userId, itemId: consume.item, quantity: { lte: 0 } } });
+    rewardLines.push({ type: 'consume_item', itemId: consume.item, count: quantity });
+  }
+
+  if (Array.isArray(rewardObjectValue.items)) {
+    for (const entry of rewardObjectValue.items) {
+      const item = record(entry);
+      const probability = item.prob === undefined ? 1 : numberValue(item.prob, random, 'items.prob');
+      if (random() >= probability) continue;
+      const itemId = rewardItemId(
+        typeof item.id === 'string' ? item.id : '',
+        typeof item.rarity === 'string' ? (item.rarity as ConfigRarity) : undefined,
+        random,
+      );
+      const count = numberValue(item.qty ?? 1, random, 'items.qty');
+      await tx.userItem.upsert({
+        where: { userId_itemId: { userId, itemId } },
+        create: { userId, itemId, quantity: count },
+        update: { quantity: { increment: count } },
+      });
+      rewardLines.push({ type: 'item', itemId, count });
+    }
+  }
+  if (Object.keys(record(rewardObjectValue.buffs)).length > 0 || Array.isArray(rewardObjectValue.buffs)) {
+    const buffs = Array.isArray(rewardObjectValue.buffs) ? rewardObjectValue.buffs : [rewardObjectValue.buffs];
+    const existing = array(record(student.counters).adventureBuffs);
+    studentData.counters = {
+      ...record(student.counters),
+      adventureBuffs: [...existing, ...buffs.map((buff) => ({ ...record(buff), appliedAt: now.toISOString() }))],
+    } as Prisma.InputJsonValue;
+    rewardLines.push(...buffs.map((buff) => ({ type: 'buff', ...record(buff) })) as Prisma.InputJsonValue[]);
+  }
+  return { rewardLines, studentData };
+}
+
+export async function chooseAdventure(
+  userId: number,
+  adventureId: number,
+  input: AdventureChoiceInput,
+  now: Date = new Date(),
+): Promise<AdventureChoiceResult> {
+  const config = requireConfig();
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM AdventureLog WHERE id = ${adventureId} FOR UPDATE`;
+    const log = await tx.adventureLog.findUnique({ where: { id: adventureId } });
+    if (log === null || log.userId !== userId) throw new ApiError('NOT_FOUND', { resource: 'adventure', id: adventureId });
+    const event = config.events[log.eventId];
+    if (event === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'event', eventId: log.eventId });
+    if (log.status === 'RESOLVED') {
+      return { adventure: toLogView(log, event, true), completed: true };
+    }
+
+    const preview = resultPhase(log) === 'PREVIEW';
+    if (preview && input.action === 'avoid') {
+      await tx.user.update({ where: { id: userId }, data: { adventureIntelReady: false } });
+      const resolved = await tx.adventureLog.update({
+        where: { id: adventureId },
+        data: { status: 'RESOLVED', results: [{ status: 'AVOIDED' }], resolvedAt: now },
+      });
+      return { adventure: toLogView(resolved, event, true), completed: true };
+    }
+    if (preview && input.action === 'accept') {
+      if (log.studentId === null) throw new ApiError('STATE_CONFLICT', { resource: 'student', reason: 'actor dismissed' });
+      const { current, settled } = await lockStudent(tx, userId, log.studentId, now);
+      if (settled.stamina < log.tier) {
+        throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', need: log.tier });
+      }
+      await claimWeeklyLimit(tx, event, now);
+      await persistStudentSettlement(tx, current, settled, settled.stamina - log.tier);
+      await tx.user.update({ where: { id: userId }, data: { adventureIntelReady: false } });
+      const accepted = await tx.adventureLog.update({
+        where: { id: adventureId },
+        data: { results: [{ phase: 'ACCEPTED' }] },
+      });
+      return { adventure: toLogView(accepted, event, true), completed: false };
+    }
+    if (input.optionIndex === undefined || !Number.isInteger(input.optionIndex)) {
+      throw new ApiError('VALIDATION_FAILED', { field: 'optionIndex' });
+    }
+    if (preview) throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'accept preview first' });
+    const choice = event.choices[input.optionIndex];
+    if (choice === undefined) throw new ApiError('VALIDATION_FAILED', { field: 'optionIndex' });
+    if (choice.requires_item !== undefined) {
+      const held = await tx.userItem.findUnique({ where: { userId_itemId: { userId, itemId: choice.requires_item } } });
+      if (!held || held.quantity < 1) {
+        throw new ApiError('INSUFFICIENT_RESOURCE', { resource: choice.requires_item, need: 1 });
+      }
+    }
+    if (choice.cost_money !== undefined) {
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { money: true } });
+      if (user.money < choice.cost_money) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: choice.cost_money });
+    }
+    if (log.studentId === null) throw new ApiError('STATE_CONFLICT', { resource: 'student', reason: 'actor dismissed' });
+    const { current, settled } = await lockStudent(tx, userId, log.studentId, now);
+    const meta = aggregateMeta(current.talents.map((talent) => talent.talentId));
+    const random = createRandomStream(log.seed, `choice:${input.optionIndex}`);
+    const selected = weightedPick(
+      choice.outcomes.map((outcome) => ({ value: outcome, weight: outcome.weight })),
+      random,
+    );
+    if (selected.type === 'duel') {
+      throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'duel outcome is scheduled for T3.3' });
+    }
+    const outcomeRecord = { ...(selected as unknown as JsonRecord) };
+    let checkSummary: JsonRecord | undefined;
+    if (selected.type === 'check') {
+      const checked = resolveCheck(outcomeRecord, settled, meta, random);
+      outcomeRecord.rewards = checked.rewards;
+      checkSummary = checked.check;
+    }
+    const applied = await resolveRewards(
+      tx,
+      userId,
+      current,
+      settled,
+      event,
+      choice,
+      outcomeRecord as EventOutcome,
+      now,
+      random,
+      input.skill,
+    );
+    await persistStudentSettlement(
+      tx,
+      current,
+      settled,
+      settled.stamina,
+      typeof applied.studentData.energy === 'number' ? applied.studentData.energy : settled.energy,
+      typeof applied.studentData.mindset === 'number' ? applied.studentData.mindset : settled.mindset,
+      {
+        ...applied.studentData,
+      },
+    );
+    const result = {
+      status: 'RESOLVED',
+      choiceIndex: input.optionIndex,
+      outcomeType: selected.type,
+      ...(checkSummary === undefined ? {} : { check: checkSummary }),
+      rewards: applied.rewardLines,
+    };
+    const resolved = await tx.adventureLog.update({
+      where: { id: adventureId },
+      data: {
+        status: 'RESOLVED',
+        choices: [input.optionIndex],
+        results: [result] as unknown as Prisma.InputJsonValue,
+        resolvedAt: now,
+      },
+    });
+    return { adventure: toLogView(resolved, event, true), completed: true };
+  });
+}
+
+export async function listAdventureLogs(userId: number, limit = 20): Promise<AdventureLogView[]> {
+  const config = requireConfig();
+  const rows = await prisma.adventureLog.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(Math.max(limit, 1), 100),
+  });
+  return rows.flatMap((row) => {
+    const event = config.events[row.eventId];
+    return event === undefined ? [] : [toLogView(row, event, row.status === 'RESOLVED' || resultPhase(row) === 'ACCEPTED')];
+  });
+}

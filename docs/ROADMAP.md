@@ -72,6 +72,8 @@
 
 > **M3.1 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：shared 事件 schema、六文件配置导入、ConfigEvent 调和/软弃用/深冻结与纯函数抽取器已落地；真实 `events.yaml` 40 条事件全部通过校验。抽取器按投入体力档先抽稀有度再抽组内事件，空组重归一化，并覆盖声誉/属性门槛、单事件冷却、`once_per_student`、`server_weekly_limit`、可用体力与确定性排序；focused 回归 3 个测试文件、32 个测试通过。
 
+> **M3.2 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：AdventureLog/AdventureWeeklyUsage 持久化、账号级 `intel-slip` 激活、PENDING/RESOLVED 状态机、事件抽取与固定/单属性检定结算已落地。`POST /api/adventures/draw`、`POST /api/adventures/:id/choice`、`GET /api/adventures/logs` 已接入；情报支持 accept/avoid，avoid 不扣体力且事件回池。奖励、道具消耗、声誉审计、学员能力/心态/精力与 `next_training` buff 在同一事务内结算；duel、复合检定、讲课、招募、题库入库仍待后续 slice，相关选项会标为不可用。全量回归 29 个测试文件、254 个测试通过，开发库迁移 `20260902100000_adventure_logs` 已应用；T3.2 的 duel 全分支验收留待 T3.3。
+
 ## M3 历练·学院·题库
 
 | 任务 | 内容 | 验收标准 |

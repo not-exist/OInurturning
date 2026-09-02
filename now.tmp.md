@@ -6,9 +6,9 @@
 
 - worktree：`/home/qzez/OInurturning/.claude/worktrees/m2-contest-story-work`
 - branch：`worktree-m2-contest-story-work`
-- committed HEAD：`5c1e0f8 feat(m2): complete contest story mode`
-- M2 Task 3 follow-up 与 Task 4–9 已提交。
-- M3.1 事件配置导入与抽取器当前为未提交工作区变更。
+- committed HEAD：`79d8ede feat(m3): add adventure event extraction`
+- M2 与 M3.1 已提交。
+- M3.2 历练 API、页面、状态机与固定/check 结算当前为未提交工作区变更。
 - 未执行 merge 或 push；仓库暂未配置远端。
 
 ## M2 状态
@@ -44,17 +44,21 @@
 - Deferred Minor：Task 1 snapshot arrays 仍是 mutable type；`ContestReportView` 仍为 alias。二者不阻塞 M2。
 - Docker 部署与浏览器视觉走查留到部署窗口；代码、HTTP 与 production build 均已验证。
 
-## M3.1 状态
+## M3 状态
 
 - `packages/shared/src/config/events.ts`：事件/选择/结果 schema。
 - `apps/api/src/config/loader.ts`：六文件导入、ConfigEvent 调和、CONFIG.events。
 - `apps/api/src/modules/adventure/extractor.ts`：纯函数抽取器。
 - `apps/api/tests/adventure-extractor.test.ts`：40 条真实事件与抽取边界。
-- focused：3 个测试文件、32 个测试通过；shared/API typecheck、API lint 通过。
-- T3.2 尚未开始：事件结算、情报预览、冷却历史持久化和 AdventureLog 待实现。
+- M3.1 focused：3 个测试文件、32 个测试通过；shared/API typecheck、API lint 通过。
+- `apps/api/src/modules/adventure/service.ts`：AdventureLog 状态机、资源/奖励事务、fixed/check 结算。
+- `apps/api/src/modules/adventure/router.ts`：draw/choice/logs API。
+- `apps/web/src/features/adventure/AdventurePage.tsx`：历练操作与记录页面。
+- M3.2 focused 与全量质量门已通过；开发库迁移 `20260902100000_adventure_logs` 已应用。基础 fixed/check slice 可用。
+- duel、复合检定、讲课、招募、题库入库仍待 T3.3–T3.6。
 
 ## 下一步
 
-1. 完成 M3.1 全量质量门并提交独立 commit。
-2. 设计 T3.2 的 AdventureLog/事件历史持久化和事务边界。
+1. 审阅并提交 M3.2 独立 commit。
+2. 开始 T3.3：事件 duel outcome 接入 M2 对决内核并写入 ContestRecord。
 3. 决定是否将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`。

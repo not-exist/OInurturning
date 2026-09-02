@@ -23,6 +23,11 @@ enum ContestFormat {
   DUEL
 }
 
+enum AdventureStatus {
+  PENDING
+  RESOLVED
+}
+
 model User {
   id            Int       @id @default(autoincrement())
   username      String    @unique @db.VarChar(32)
@@ -35,6 +40,7 @@ model User {
   bannedAt      DateTime?
   lastLoginAt   DateTime?
   lastSettledAt DateTime  @default(now())
+  adventureIntelReady Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -45,6 +51,7 @@ model User {
   recruitPool     RecruitPool?
   contestRecords ContestRecord[]
   storyProgress  StoryProgress[]
+  adventureLogs   AdventureLog[]
 
   @@map("users")
 }
@@ -88,6 +95,35 @@ model StoryProgress {
 
   @@unique([userId, ngLevel, stageKey])
   @@index([userId, ngLevel])
+}
+
+model AdventureLog {
+  id         Int             @id @default(autoincrement())
+  userId     Int
+  studentId  Int?
+  eventId    String          @db.VarChar(64)
+  tier       Int
+  seed       Int
+  status     AdventureStatus @default(PENDING)
+  choices    Json            @default("[]")
+  results    Json            @default("[]")
+  createdAt  DateTime        @default(now())
+  resolvedAt DateTime?
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actorStudent Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([userId, eventId])
+}
+
+model AdventureWeeklyUsage {
+  eventId String @db.VarChar(64)
+  weekKey String @db.VarChar(10)
+  count   Int    @default(0)
+
+  @@id([eventId, weekKey])
 }
 
 // ───────────────────────── 配置域（yaml 导入目标，TECH-DESIGN §3） ─────────────────────────
@@ -217,7 +253,8 @@ model Student {
 
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   talents          StudentTalent[]
-  authoredProblems ProblemLibraryEntry[]  @relation("ProblemAuthor")
+  adventures       AdventureLog[]
+  authoredProblems ProblemLibraryEntry[] @relation("ProblemAuthor")
 
   @@index([userId, status])
 }

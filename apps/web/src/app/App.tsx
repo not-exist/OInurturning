@@ -9,7 +9,7 @@ const TABS = [
   { to: '/training', label: '训练中心' },
   { to: '/backpack', label: '背包' },
   { to: '/academy', label: '高级学院' },
-  { to: '/adventure', label: '历练', soon: true },
+  { to: '/adventure', label: '历练' },
   { to: '/story', label: '剧情模式' },
   { to: '/pvp', label: 'PVP', soon: true },
 ] as const;
