@@ -11,7 +11,7 @@ import {
   type QuestionSnapshot,
 } from '@oinur/shared';
 import { getConfig } from '../../config/loader.js';
-import { weekKey } from '../../lib/clock.js';
+import { dayKey, weekKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { createRandomStream } from '../contest/engine/rng.js';
@@ -155,7 +155,7 @@ function outcomeSupported(outcome: EventOutcome): boolean {
 
 function unsupportedRewards(rewards: unknown): boolean {
   const value = record(rewards);
-  if (['lecture', 'recruit', 'bank_add', 'win_streak_bonus'].some((key) => key in value)) return true;
+  if (['lecture', 'recruit'].some((key) => key in value)) return true;
   if (value.target_student !== undefined && value.target_student !== 'participant') return true;
   return 'chosen_skill' in record(value.stat_gain);
 }
@@ -380,7 +380,7 @@ function skillScore(student: Student, skill: string, meta: Record<string, number
 }
 
 function rewardObject(outcome: JsonRecord): JsonRecord {
-  const unsupported = ['lecture', 'recruit', 'bank_add', 'win_streak_bonus'];
+  const unsupported = ['lecture', 'recruit'];
   const rewards = record(outcome.rewards);
   const found = [...unsupported, 'duel'].find((key) => key in rewards);
   if (found !== undefined) {
@@ -563,6 +563,27 @@ function playerDuelState(report: DuelReport, settled: Student): { energy: number
   };
 }
 
+async function priorWinStreak(
+  tx: Prisma.TransactionClient,
+  userId: number,
+  eventId: string,
+  now: Date,
+): Promise<number> {
+  const rows = await tx.adventureLog.findMany({
+    where: { userId, eventId, status: 'RESOLVED', createdAt: { gte: new Date(now.getTime() - 8 * 86_400_000) } },
+    orderBy: { createdAt: 'desc' },
+    select: { results: true, createdAt: true },
+  });
+  let streak = 0;
+  for (const row of rows) {
+    if (dayKey(row.createdAt) !== dayKey(now)) continue;
+    const result = record(array(row.results).at(-1));
+    if (result.duelWinnerSide !== 'HOME') break;
+    streak += 1;
+  }
+  return streak;
+}
+
 function rewardItemId(
   rawId: string,
   rarity: ConfigRarity | undefined,
@@ -618,6 +639,61 @@ function applyStatGain(
   return { values, mindset };
 }
 
+const BANK_DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
+
+function problemRarity(quality: number): string {
+  if (quality < 30) return 'gray';
+  if (quality < 50) return 'yellow';
+  if (quality < 70) return 'green';
+  if (quality < 85) return 'blue';
+  if (quality < 95) return 'purple';
+  return 'colorful';
+}
+
+async function addBankProblems(
+  tx: Prisma.TransactionClient,
+  userId: number,
+  studentId: number,
+  event: EventConfig,
+  bank: JsonRecord,
+  sourceQuestion: QuestionSnapshot | undefined,
+  random: () => number,
+  now: Date,
+): Promise<Prisma.InputJsonValue[]> {
+  const sourceQuality = sourceQuestion?.quality ?? sourceQuestion?.score;
+  const qualityMultiplier = bank.quality_mult;
+  const count = bank.count === undefined ? 1 : numberValue(bank.count, random, 'bank_add.count');
+  if (!Number.isInteger(count) || count < 1) {
+    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', field: 'bank_add.count' });
+  }
+  const available = await tx.problemLibraryEntry.count({ where: { userId, consumedAt: null } });
+  if (available + count > 120) {
+    throw new ApiError('STATE_CONFLICT', { resource: 'problemLibrary', reason: 'capacity reached' });
+  }
+  const lines: Prisma.InputJsonValue[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const quality =
+      typeof qualityMultiplier === 'number'
+        ? Math.min(100, Math.max(0, Math.round((sourceQuality ?? 0) * qualityMultiplier)))
+        : Math.min(100, Math.max(0, Math.round(numberValue(bank.quality, random, 'bank_add.quality'))));
+    const dimension = sourceQuestion?.dimension ?? BANK_DIMENSIONS[Math.floor(random() * BANK_DIMENSIONS.length)]!;
+    const row = await tx.problemLibraryEntry.create({
+      data: {
+        userId,
+        authorStudentId: studentId,
+        name: `${event.code}·历练成品·${index + 1}`,
+        dominantDim: dimension,
+        rarity: problemRarity(quality),
+        quality,
+        traitId: sourceQuestion?.traits[0]?.traitId ?? null,
+        createdAt: now,
+      },
+    });
+    lines.push({ type: 'bank_problem', problemId: row.id, quality, dimension });
+  }
+  return lines;
+}
+
 async function resolveRewards(
   tx: Prisma.TransactionClient,
   userId: number,
@@ -629,6 +705,8 @@ async function resolveRewards(
   now: Date,
   random: () => number,
   chosenSkill?: string,
+  bankSourceQuestion?: QuestionSnapshot,
+  winStreak = 0,
 ): Promise<{ rewardLines: Prisma.InputJsonValue[]; studentData: Prisma.StudentUpdateManyMutationInput }> {
   const outcomeRecord = outcome as unknown as JsonRecord;
   const rewardObjectValue = rewardObject(outcomeRecord);
@@ -646,7 +724,13 @@ async function resolveRewards(
   if (energyAfter < 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'energy', need: settled.energy - energyAfter });
   studentData.energy = energyAfter;
 
-  const money = rewardObjectValue.money === undefined ? 0 : numberValue(rewardObjectValue.money, random, 'money');
+  const moneyBase = rewardObjectValue.money === undefined ? 0 : numberValue(rewardObjectValue.money, random, 'money');
+  const streak = record(rewardObjectValue.win_streak_bonus);
+  const streakExtra =
+    winStreak > 0 && typeof streak.per_win_extra_money === 'number' && typeof streak.cap === 'number'
+      ? Math.min(streak.cap, streak.per_win_extra_money * winStreak)
+      : 0;
+  const money = moneyBase + streakExtra;
   const reputation =
     rewardObjectValue.reputation === undefined
       ? 0
@@ -660,6 +744,7 @@ async function resolveRewards(
     if (changed.count !== 1) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: -netMoney });
     rewardLines.push({ type: 'money', amount: netMoney });
   }
+  if (streakExtra > 0) rewardLines.push({ type: 'win_streak_bonus', amount: streakExtra, streak: winStreak });
   if (reputation !== 0) {
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { reputation: true } });
     const next = Math.max(0, user.reputation + reputation);
@@ -698,6 +783,20 @@ async function resolveRewards(
       });
       rewardLines.push({ type: 'item', itemId, count });
     }
+  }
+  if (rewardObjectValue.bank_add !== undefined) {
+    rewardLines.push(
+      ...(await addBankProblems(
+        tx,
+        userId,
+        student.id,
+        event,
+        record(rewardObjectValue.bank_add),
+        bankSourceQuestion,
+        random,
+        now,
+      )),
+    );
   }
   if (Object.keys(record(rewardObjectValue.buffs)).length > 0 || Array.isArray(rewardObjectValue.buffs)) {
     const buffs = Array.isArray(rewardObjectValue.buffs) ? rewardObjectValue.buffs : [rewardObjectValue.buffs];
@@ -780,6 +879,8 @@ export async function chooseAdventure(
     const outcomeRecord = { ...(selected as unknown as JsonRecord) };
     let duelReport: DuelReport | undefined;
     let rewardStudent = settled;
+    let winStreak = 0;
+    let bankSourceQuestion: QuestionSnapshot | undefined;
     if (selected.type === 'duel') {
       const duel = record(outcomeRecord.duel);
       const inputSnapshot = duelInput(
@@ -797,6 +898,10 @@ export async function chooseAdventure(
       outcomeRecord.rewards = record(outcomeRecord[rewardKey]);
       const playerState = playerDuelState(duelReport, settled);
       rewardStudent = { ...settled, energy: playerState.energy, mindset: playerState.mindset };
+      bankSourceQuestion = duelReport.rounds.find((round) => round.setterSide === 'HOME')?.question;
+      if (record(outcomeRecord.rewards).win_streak_bonus !== undefined && duelReport.winnerSide === 'HOME') {
+        winStreak = (await priorWinStreak(tx, userId, log.eventId, now)) + 1;
+      }
     }
     let checkSummary: JsonRecord | undefined;
     if (selected.type === 'check') {
@@ -815,6 +920,8 @@ export async function chooseAdventure(
       now,
       random,
       input.skill,
+      bankSourceQuestion,
+      winStreak,
     );
     await persistStudentSettlement(
       tx,
@@ -858,6 +965,7 @@ export async function chooseAdventure(
       outcomeType: selected.type,
       ...(checkSummary === undefined ? {} : { check: checkSummary }),
       ...(contestRecord === null ? {} : { contestRecordId: contestRecord.id }),
+      ...(duelReport === undefined ? {} : { duelWinnerSide: duelReport.winnerSide }),
       rewards: applied.rewardLines,
     };
     const resolved = await tx.adventureLog.update({

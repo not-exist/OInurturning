@@ -8,7 +8,7 @@
 - branch：`worktree-m2-contest-story-work`
 - committed HEAD：`64185e4 feat(m3): add academy lectures`
 - M2 与 M3.1–M3.5 已提交。
-- M3.6 出题题库基础 slice 当前为未提交工作区变更。
+- M3.6 出题题库基础 slice 已提交；当前为 M3 收口修正的未提交工作区变更。
 - 未执行 merge 或 push；仓库暂未配置远端。
 
 ## M2 状态
@@ -56,13 +56,13 @@
 - `apps/web/src/features/adventure/AdventurePage.tsx`：历练操作与记录页面。
 - M3.2 focused 与全量质量门已通过；开发库迁移 `20260902100000_adventure_logs` 已应用。基础 fixed/check slice 可用。
 - `apps/api/src/modules/contest/npc.ts`：事件对手快照生成。
-- M3.3 基础 duel 接入与 ContestRecord 关联已完成；全量质量门 30 个测试文件、255 个测试通过。
-- R4/P5 的题库入库与连胜奖金仍待后续系统；复合检定已随 T3.3 约束为不可用。
+- M3.3 基础 duel 接入与 ContestRecord 关联、R4 bank_add、P5 同日连胜奖金已完成；全量质量门 32 个测试文件、268 个测试通过。
+- 复合检定、讲课 outcome、招募 outcome 仍待后续系统；当前 M3 主要验收项已关闭。
 - T3.4 高级学院招募池沿用 M1 已完成实现；T3.5 讲课 API、页面、LectureLog 和结算已完成，focused 6/6、全量 261/261 通过。
-- T3.6 出题 API、页面、ProblemLibraryEntry traitId 和质量评级已完成，focused 4/4、全量 265/265 通过；开发库迁移 `20260902170000_problem_traits` 已应用。
+- T3.6 出题 API、页面、ProblemLibraryEntry traitId 和质量评级已完成，focused 4/4、全量 268/268 通过；开发库迁移 `20260902170000_problem_traits` 已应用。
 
 ## 下一步
 
-1. 审阅并提交 M3.6 出题题库独立 commit。
-2. 补齐 R4/P5 事件依赖，或进入 M4 PVP 管理端。
+1. 审阅并提交 M3 收口修正独立 commit。
+2. 运行一次 M3 汇总质量门并决定是否进入 M4 PVP 管理端。
 3. 决定是否将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`。

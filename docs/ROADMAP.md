@@ -72,21 +72,21 @@
 
 > **M3.1 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：shared 事件 schema、六文件配置导入、ConfigEvent 调和/软弃用/深冻结与纯函数抽取器已落地；真实 `events.yaml` 40 条事件全部通过校验。抽取器按投入体力档先抽稀有度再抽组内事件，空组重归一化，并覆盖声誉/属性门槛、单事件冷却、`once_per_student`、`server_weekly_limit`、可用体力与确定性排序；focused 回归 3 个测试文件、32 个测试通过。
 
-> **M3.2 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：AdventureLog/AdventureWeeklyUsage 持久化、账号级 `intel-slip` 激活、PENDING/RESOLVED 状态机、事件抽取与固定/单属性检定结算已落地。`POST /api/adventures/draw`、`POST /api/adventures/:id/choice`、`GET /api/adventures/logs` 已接入；情报支持 accept/avoid，avoid 不扣体力且事件回池。奖励、道具消耗、声誉审计、学员能力/心态/精力与 `next_training` buff 在同一事务内结算；duel、复合检定、讲课、招募、题库入库仍待后续 slice，相关选项会标为不可用。全量回归 29 个测试文件、254 个测试通过，开发库迁移 `20260902100000_adventure_logs` 已应用；T3.2 的 duel 全分支验收留待 T3.3。
+> **M3.2 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：AdventureLog/AdventureWeeklyUsage 持久化、账号级 `intel-slip` 激活、PENDING/RESOLVED 状态机、事件抽取与固定/单属性检定结算已落地。`POST /api/adventures/draw`、`POST /api/adventures/:id/choice`、`GET /api/adventures/logs` 已接入；情报支持 accept/avoid，avoid 不扣体力且事件回池。奖励、道具消耗、声誉审计、学员能力/心态/精力与 `next_training` buff 在同一事务内结算；全量回归 29 个测试文件、254 个测试通过，开发库迁移 `20260902100000_adventure_logs` 已应用；Y7/R5 及 L7 的固定/check/duel 分支由 T3.2/T3.3 共同覆盖。
 
-> **M3.3 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：事件 duel outcome 已接入 M2 `simulateDuel`，生成确定性 HOME/ AWAY 快照、事件对手、四局题目、quality rule 与 tiebreak；玩家答题侧的精力和心态变化写回学员，完整 DuelReport 通过 ContestRecord 保存，并由 AdventureLog `contestRecordId` 关联。G2 真实友谊切磋路径已集成测试；R4/P5 因 bank_add/连胜奖金依赖 T3.6 等后续系统仍暂不可用，T3.3 全量事件验收待依赖收齐。全量回归 30 个测试文件、255 个测试通过。
+> **M3.3 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：事件 duel outcome 已接入 M2 `simulateDuel`，生成确定性 HOME/AWAY 快照、事件对手、四局题目、quality rule 与 tiebreak；玩家答题侧的精力和心态变化写回学员，完整 DuelReport 通过 ContestRecord 保存，并由 AdventureLog `contestRecordId` 关联。G2 真实友谊切磋、R4 `bank_add`、P5 服务器日连胜奖金、L3 题库奖励已集成测试；复合检定、讲课、招募仍由后续 slice 接续。全量回归 32 个测试文件、268 个测试通过。
 
 > **M3.5 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：讲课配置完整 schema、五档受众查询、LectureLog、即时钱/声誉结算、声誉乘区、能力溢出、强接风险和 04:00 日界每日额度已落地。`GET /api/academy/lecture-tiers`、`POST /api/academy/lectures`、`GET /api/academy/lectures` 与 `/academy/lecture` 页面已接入；exact threshold、差 1 门槛、强接窗口、声誉/溢出计算、全营 3 场/学员 2 场边界测试通过。全量质量门 31 个测试文件、261 个测试通过，开发库迁移 `20260902150000_lecture_logs` 已应用。
 
-> **M3.6 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：出题行动、Q 质量评级、六维目标选择、setting/thinking 加权、特性概率与按严重度 seed 抽取、题库 120 容量、每学员每日 2 次、成本/体力扣减、题库列表和可用题删除已落地。`POST/GET/DELETE /api/problem-library` 与 `/problem-library` 页面已接入；题目保留 authorStudentId/traitId，专项训练继续消费同一 ProblemLibraryEntry。全量质量门 32 个测试文件、265 个测试通过，开发库 migration `20260902170000_problem_traits` 已应用。
+> **M3.6 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：出题行动、Q 质量评级、六维目标选择、setting/thinking 加权、特性概率与按严重度 seed 抽取、题库 120 容量、每学员每日 2 次、成本/体力扣减、题库列表和可用题删除已落地。`POST/GET/DELETE /api/problem-library` 与 `/problem-library` 页面已接入；题目保留 authorStudentId/traitId，专项训练继续消费同一 ProblemLibraryEntry。M3 收口后全量质量门 32 个测试文件、268 个测试通过，开发库 migration `20260902170000_problem_traits` 已应用。
 
 ## M3 历练·学院·题库
 
 | 任务 | 内容 | 验收标准 |
 |---|---|---|
 | [x] T3.1 | events 导入 + 抽取器：三层体力档权重、once 移除、冷却、情报道具预览 | 权重分布统计符合 events.yaml |
-| T3.2 | 历练 API+页面：投体力→事件卡→选项分支→结果结算（含 buff 存储 next_training 等） | 多段选项事件（Y7/L7/R5）全分支可走 |
-| T3.3 | 历练对决事件接入 T2.3 内核（G2/R1/R4/L1/L7/P1/P5/C1/C2 相关路径） | DuelReport 正确入 AdventureLog |
+| [x] T3.2 | 历练 API+页面：投体力→事件卡→选项分支→结果结算（含 buff 存储 next_training 等） | 多段选项事件（Y7/L7/R5）全分支可走 |
+| [x] T3.3 | 历练对决事件接入 T2.3 内核（G2/R1/R4/L1/L7/P1/P5/C1/C2 相关路径） | DuelReport 正确入 AdventureLog |
 | [x] T3.4 | 高级学院：招募池 API/页面（含付费刷新）、招募费曲线、声誉加成 | 与 gameplay.md 参数一致 |
 | [x] T3.5 | 讲课：五档受众门槛校验、报酬计算（声誉曲线+溢出加成）、强接惩罚、次数限制 | 边界（恰好达标/差1点）行为正确 |
 | [x] T3.6 | 出题玩法：出题行动、质量评级公式、ProblemLibraryEntry 入库、预制题管理页 | 评级与 contest.md 公式一致 |

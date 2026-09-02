@@ -7,8 +7,8 @@
 ## Slice Order
 
 1. T3.1：事件 schema、六文件配置导入、引用/权重语义校验、确定性事件抽取器。
-2. T3.2：历练记录与事件状态持久化，体力扣减、情报预览/回避、choice/outcome 结算。基础 fixed/check slice 已完成，duel 分支留给 T3.3。
-3. T3.3：事件中的 duel outcome 接入 M2 对决内核并写入 `ContestRecord`。基础接入已完成，R4/P5 奖励依赖后续题库/连胜系统。
+2. T3.2：历练记录与事件状态持久化，体力扣减、情报预览/回避、choice/outcome 结算。已完成 Y7/L7/R5 验收路径。
+3. T3.3：事件中的 duel outcome 接入 M2 对决内核并写入 `ContestRecord`。已完成 G2/R1/R4/L1/L7/P1/P5/C1/C2 相关路径。
 4. T3.4–T3.5：高级学院候选池复用 M1 招募池，补讲课门槛、每日额度、报酬与强接风险。T3.4 由 M1 既有实现覆盖，T3.5 已完成。
 5. T3.6：出题行动、质量评级与 `ProblemLibraryEntry` 入库，复用专项训练和未来 PVP 的题库契约。基础题库 slice 已完成。
 
@@ -31,7 +31,7 @@
 - 事件对决复用 `simulateDuel`，不复制答题/精力/tiebreak 算法；玩家作为 HOME，事件对手作为 AWAY。
 - 事件对手和四局题目均由 AdventureLog seed 派生；玩家答题侧每局 energy/mindset 变化从 DuelReport rounds 汇总后落库。
 - DuelReport 作为 `ContestRecord(type=ADVENTURE, format=DUEL)` 的完整 report 保存，AdventureLog 通过 `contestRecordId` 关联。
-- 当前可用 reward 分支包括 G2/R1/L1/L7/P1/C1；R4 的 bank_add、P5 的 win_streak_bonus 及其余题库依赖由 T3.6 接续。
+- 当前可用 reward 分支包括 G2/R1/R4/L1/L7/P1/P5/C1/C2；复合检定、讲课、招募仍由 T3.4–T3.6 接续。
 
 ## T3.5 Boundary
 
