@@ -336,6 +336,7 @@ model ProblemLibraryEntry {
   dominantDim     String    @db.VarChar(8) // DS/DP/MATH/GRAPH/GREEDY/STRING
   rarity          String    @db.VarChar(8) // 六档
   quality         Int // Q 分 0–100
+  traitId         String?   @db.VarChar(64)
   consumedAt      DateTime?
   createdAt       DateTime  @default(now())
 

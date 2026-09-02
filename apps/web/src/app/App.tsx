@@ -10,6 +10,7 @@ const TABS = [
   { to: '/backpack', label: '背包' },
   { to: '/academy', label: '高级学院' },
   { to: '/academy/lecture', label: '讲课' },
+  { to: '/problem-library', label: '出题题库' },
   { to: '/adventure', label: '历练' },
   { to: '/story', label: '剧情模式' },
   { to: '/pvp', label: 'PVP', soon: true },

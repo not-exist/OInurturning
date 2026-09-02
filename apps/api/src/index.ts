@@ -11,6 +11,7 @@ import { academyRouter } from './modules/academy/router.js';
 import { authRouter } from './modules/auth/router.js';
 import { itemsRouter } from './modules/items/router.js';
 import { problemsRouter } from './modules/problems/router.js';
+import { problemLibraryRouter } from './modules/problems/library-router.js';
 import { studentsRouter } from './modules/students/router.js';
 import { talentsRouter } from './modules/talents/router.js';
 import { trainingRouter } from './modules/training/router.js';
@@ -74,6 +75,7 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use('/api/students', studentsRouter);
   app.use('/api/items', itemsRouter);
   app.use('/api/problems', problemsRouter);
+  app.use('/api/problem-library', problemLibraryRouter);
   app.use('/api/talents', talentsRouter);
   app.use('/api/training', trainingRouter);
   app.use('/api/story', storyRouter);

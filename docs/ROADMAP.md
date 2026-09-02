@@ -78,6 +78,8 @@
 
 > **M3.5 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：讲课配置完整 schema、五档受众查询、LectureLog、即时钱/声誉结算、声誉乘区、能力溢出、强接风险和 04:00 日界每日额度已落地。`GET /api/academy/lecture-tiers`、`POST /api/academy/lectures`、`GET /api/academy/lectures` 与 `/academy/lecture` 页面已接入；exact threshold、差 1 门槛、强接窗口、声誉/溢出计算、全营 3 场/学员 2 场边界测试通过。全量质量门 31 个测试文件、261 个测试通过，开发库迁移 `20260902150000_lecture_logs` 已应用。
 
+> **M3.6 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：出题行动、Q 质量评级、六维目标选择、setting/thinking 加权、特性概率与按严重度 seed 抽取、题库 120 容量、每学员每日 2 次、成本/体力扣减、题库列表和可用题删除已落地。`POST/GET/DELETE /api/problem-library` 与 `/problem-library` 页面已接入；题目保留 authorStudentId/traitId，专项训练继续消费同一 ProblemLibraryEntry。全量质量门 32 个测试文件、265 个测试通过，开发库 migration `20260902170000_problem_traits` 已应用。
+
 ## M3 历练·学院·题库
 
 | 任务 | 内容 | 验收标准 |
@@ -87,7 +89,7 @@
 | T3.3 | 历练对决事件接入 T2.3 内核（G2/R1/R4/L1/L7/P1/P5/C1/C2 相关路径） | DuelReport 正确入 AdventureLog |
 | [x] T3.4 | 高级学院：招募池 API/页面（含付费刷新）、招募费曲线、声誉加成 | 与 gameplay.md 参数一致 |
 | [x] T3.5 | 讲课：五档受众门槛校验、报酬计算（声誉曲线+溢出加成）、强接惩罚、次数限制 | 边界（恰好达标/差1点）行为正确 |
-| T3.6 | 出题玩法：出题行动、质量评级公式、ProblemLibraryEntry 入库、预制题管理页 | 评级与 contest.md 公式一致 |
+| [x] T3.6 | 出题玩法：出题行动、质量评级公式、ProblemLibraryEntry 入库、预制题管理页 | 评级与 contest.md 公式一致 |
 
 ## M4 PVP 与管理端
 

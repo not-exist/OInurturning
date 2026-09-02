@@ -6,9 +6,9 @@
 
 - worktree：`/home/qzez/OInurturning/.claude/worktrees/m2-contest-story-work`
 - branch：`worktree-m2-contest-story-work`
-- committed HEAD：`79d8ede feat(m3): add adventure event extraction`
-- M2 与 M3.1 已提交。
-- M3.2 历练 API、页面、状态机与固定/check 结算当前为未提交工作区变更。
+- committed HEAD：`64185e4 feat(m3): add academy lectures`
+- M2 与 M3.1–M3.5 已提交。
+- M3.6 出题题库基础 slice 当前为未提交工作区变更。
 - 未执行 merge 或 push；仓库暂未配置远端。
 
 ## M2 状态
@@ -57,11 +57,12 @@
 - M3.2 focused 与全量质量门已通过；开发库迁移 `20260902100000_adventure_logs` 已应用。基础 fixed/check slice 可用。
 - `apps/api/src/modules/contest/npc.ts`：事件对手快照生成。
 - M3.3 基础 duel 接入与 ContestRecord 关联已完成；全量质量门 30 个测试文件、255 个测试通过。
-- R4/P5 的题库入库与连胜奖金、复合检定、讲课、招募仍待 T3.4–T3.6。
+- R4/P5 的题库入库与连胜奖金仍待后续系统；复合检定已随 T3.3 约束为不可用。
 - T3.4 高级学院招募池沿用 M1 已完成实现；T3.5 讲课 API、页面、LectureLog 和结算已完成，focused 6/6、全量 261/261 通过。
+- T3.6 出题 API、页面、ProblemLibraryEntry traitId 和质量评级已完成，focused 4/4、全量 265/265 通过；开发库迁移 `20260902170000_problem_traits` 已应用。
 
 ## 下一步
 
-1. 审阅并提交 M3.5 讲课独立 commit。
-2. 开始 T3.6：出题行动、质量评级和 ProblemLibraryEntry 入库。
+1. 审阅并提交 M3.6 出题题库独立 commit。
+2. 补齐 R4/P5 事件依赖，或进入 M4 PVP 管理端。
 3. 决定是否将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`。

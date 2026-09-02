@@ -156,7 +156,13 @@ export interface ProblemView {
   dominantDim: DimensionKey;
   rarity: Rarity;
   quality: number;
+  traitId: string | null;
   consumedAt: string | null;
+}
+
+export interface CreateProblemResult extends ProblemView {
+  cost: number;
+  staminaAfter: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -480,6 +486,42 @@ export function useProblems() {
     queryKey: ['problems'],
     queryFn: () => apiFetch<ProblemView[]>('/api/problems'),
     retry: false,
+  });
+}
+
+export function useProblemLibrary() {
+  return useQuery({
+    queryKey: ['problem-library'],
+    queryFn: () => apiFetch<ProblemView[]>('/api/problem-library'),
+  });
+}
+
+export function useCreateProblem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, dimension }: { studentId: number; dimension: DimensionKey }) =>
+      apiFetch<CreateProblemResult>('/api/problem-library', {
+        method: 'POST',
+        body: JSON.stringify({ studentId, dimension }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['problem-library'] });
+      qc.invalidateQueries({ queryKey: ['problems'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useDeleteProblem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<null>(`/api/problem-library/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['problem-library'] });
+      qc.invalidateQueries({ queryKey: ['problems'] });
+    },
   });
 }
 
