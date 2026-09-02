@@ -58,9 +58,10 @@
 - `apps/api/src/modules/contest/npc.ts`：事件对手快照生成。
 - M3.3 基础 duel 接入与 ContestRecord 关联已完成；全量质量门 30 个测试文件、255 个测试通过。
 - R4/P5 的题库入库与连胜奖金、复合检定、讲课、招募仍待 T3.4–T3.6。
+- T3.4 高级学院招募池沿用 M1 已完成实现；T3.5 讲课 API、页面、LectureLog 和结算已完成，focused 6/6、全量 261/261 通过。
 
 ## 下一步
 
-1. 审阅并提交 M3.3 基础 duel 接入独立 commit。
-2. 开始 T3.4：高级学院候选池和讲课规则拆分实现。
+1. 审阅并提交 M3.5 讲课独立 commit。
+2. 开始 T3.6：出题行动、质量评级和 ProblemLibraryEntry 入库。
 3. 决定是否将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`。

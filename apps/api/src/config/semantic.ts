@@ -1,6 +1,7 @@
 import {
   CONFIG_RARITIES,
   ECONOMY_QUALITY_TIERS,
+  lectureConfigSchema,
   type ConfigRarity,
   type EconomyConfig,
   type EventsConfig,
@@ -287,6 +288,27 @@ function checkEconomy(economy: EconomyConfig, issues: SemanticIssue[]): void {
         path: `recruitment.quality_mult.${tier}`,
         message: `quality_mult 四档须齐全且 ≥1，实得 ${v}`,
       });
+    }
+  }
+  const lecture = economy.lecture;
+  if (lecture !== undefined) {
+    const parsed = lectureConfigSchema.safeParse(lecture);
+    if (!parsed.success) return;
+    const completeLecture = parsed.data;
+    const ids = new Set<string>();
+    let previousThreshold = -1;
+    completeLecture.audience_tiers.forEach((tier, index) => {
+      if (ids.has(tier.id)) {
+        issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.id`, message: `讲课档位 id 重复：${tier.id}` });
+      }
+      ids.add(tier.id);
+      if (tier.threshold <= previousThreshold) {
+        issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.threshold`, message: '讲课门槛必须严格递增' });
+      }
+      previousThreshold = tier.threshold;
+    });
+    if (completeLecture.reputation_pay_curve.max_mult < completeLecture.reputation_pay_curve.min_mult) {
+      issues.push({ file: 'economy', path: 'lecture.reputation_pay_curve', message: '讲课声誉乘区上限不能低于下限' });
     }
   }
 }

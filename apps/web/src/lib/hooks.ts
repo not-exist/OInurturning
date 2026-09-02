@@ -116,6 +116,31 @@ export interface AdventureChoiceResult {
   completed: boolean;
 }
 
+export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
+
+export interface LectureTierView {
+  id: LectureTierId;
+  threshold: number;
+  baseMoney: number;
+  baseReputation: number;
+  available: boolean;
+}
+
+export interface LectureResultView {
+  id: number;
+  studentId: number;
+  tier: LectureTierId;
+  teachingValue: number;
+  threshold: number;
+  forced: boolean;
+  success: boolean;
+  money: number;
+  reputation: number;
+  staminaCost: number;
+  staminaAfter: number | null;
+  createdAt: string;
+}
+
 export interface TalentDefView {
   id: string;
   name: string;
@@ -318,6 +343,45 @@ export function useRecruit() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['academy'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useLectureTiers() {
+  return useQuery({
+    queryKey: ['lecture-tiers'],
+    queryFn: () => apiFetch<LectureTierView[]>('/api/academy/lecture-tiers'),
+  });
+}
+
+export function useLectureLogs() {
+  return useQuery({
+    queryKey: ['lecture-logs'],
+    queryFn: () => apiFetch<LectureResultView[]>('/api/academy/lectures'),
+  });
+}
+
+export function useTeachLecture() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      studentId,
+      tier,
+      force,
+    }: {
+      studentId: number;
+      tier: LectureTierId;
+      force: boolean;
+    }) =>
+      apiFetch<LectureResultView>('/api/academy/lectures', {
+        method: 'POST',
+        body: JSON.stringify({ studentId, tier, force }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lecture-tiers'] });
+      qc.invalidateQueries({ queryKey: ['lecture-logs'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
     },

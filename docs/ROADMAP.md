@@ -76,6 +76,8 @@
 
 > **M3.3 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：事件 duel outcome 已接入 M2 `simulateDuel`，生成确定性 HOME/ AWAY 快照、事件对手、四局题目、quality rule 与 tiebreak；玩家答题侧的精力和心态变化写回学员，完整 DuelReport 通过 ContestRecord 保存，并由 AdventureLog `contestRecordId` 关联。G2 真实友谊切磋路径已集成测试；R4/P5 因 bank_add/连胜奖金依赖 T3.6 等后续系统仍暂不可用，T3.3 全量事件验收待依赖收齐。全量回归 30 个测试文件、255 个测试通过。
 
+> **M3.5 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：讲课配置完整 schema、五档受众查询、LectureLog、即时钱/声誉结算、声誉乘区、能力溢出、强接风险和 04:00 日界每日额度已落地。`GET /api/academy/lecture-tiers`、`POST /api/academy/lectures`、`GET /api/academy/lectures` 与 `/academy/lecture` 页面已接入；exact threshold、差 1 门槛、强接窗口、声誉/溢出计算、全营 3 场/学员 2 场边界测试通过。全量质量门 31 个测试文件、261 个测试通过，开发库迁移 `20260902150000_lecture_logs` 已应用。
+
 ## M3 历练·学院·题库
 
 | 任务 | 内容 | 验收标准 |
@@ -83,8 +85,8 @@
 | [x] T3.1 | events 导入 + 抽取器：三层体力档权重、once 移除、冷却、情报道具预览 | 权重分布统计符合 events.yaml |
 | T3.2 | 历练 API+页面：投体力→事件卡→选项分支→结果结算（含 buff 存储 next_training 等） | 多段选项事件（Y7/L7/R5）全分支可走 |
 | T3.3 | 历练对决事件接入 T2.3 内核（G2/R1/R4/L1/L7/P1/P5/C1/C2 相关路径） | DuelReport 正确入 AdventureLog |
-| T3.4 | 高级学院：招募池 API/页面（含付费刷新）、招募费曲线、声誉加成 | 与 gameplay.md 参数一致 |
-| T3.5 | 讲课：五档受众门槛校验、报酬计算（声誉曲线+溢出加成）、强接惩罚、次数限制 | 边界（恰好达标/差1点）行为正确 |
+| [x] T3.4 | 高级学院：招募池 API/页面（含付费刷新）、招募费曲线、声誉加成 | 与 gameplay.md 参数一致 |
+| [x] T3.5 | 讲课：五档受众门槛校验、报酬计算（声誉曲线+溢出加成）、强接惩罚、次数限制 | 边界（恰好达标/差1点）行为正确 |
 | T3.6 | 出题玩法：出题行动、质量评级公式、ProblemLibraryEntry 入库、预制题管理页 | 评级与 contest.md 公式一致 |
 
 ## M4 PVP 与管理端

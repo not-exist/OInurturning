@@ -52,6 +52,7 @@ model User {
   contestRecords ContestRecord[]
   adventureLogs  AdventureLog[]
   storyProgress  StoryProgress[]
+  lectureLogs    LectureLog[]
 
   @@map("users")
 }
@@ -128,6 +129,27 @@ model AdventureWeeklyUsage {
   count   Int    @default(0)
 
   @@id([eventId, weekKey])
+}
+
+model LectureLog {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  studentId     Int
+  tier          String   @db.VarChar(32)
+  teachingValue Int
+  threshold     Int
+  forced        Boolean
+  success       Boolean
+  money         Int
+  reputation    Int
+  staminaCost   Int
+  createdAt     DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, studentId, createdAt])
 }
 
 // ───────────────────────── 配置域（yaml 导入目标，TECH-DESIGN §3） ─────────────────────────
@@ -258,6 +280,7 @@ model Student {
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   talents          StudentTalent[]
   adventures       AdventureLog[]
+  lectureLogs      LectureLog[]
   authoredProblems ProblemLibraryEntry[] @relation("ProblemAuthor")
 
   @@index([userId, status])

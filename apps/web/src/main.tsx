@@ -16,6 +16,7 @@ import { TrainingPage } from './features/training/TrainingPage';
 import { StoryPage } from './features/story/StoryPage';
 import { RecordReportPage } from './features/records/RecordReportPage';
 import { AdventurePage } from './features/adventure/AdventurePage';
+import { AcademyLecturePage } from './features/academy/AcademyLecturePage';
 
 const qc = new QueryClient();
 
@@ -38,6 +39,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/training" element={<TrainingPage />} />
               <Route path="/backpack" element={<InventoryPage />} />
               <Route path="/academy" element={<AcademyPage />} />
+              <Route path="/academy/lecture" element={<AcademyLecturePage />} />
               <Route path="/story" element={<StoryPage />} />
               <Route path="/adventure" element={<AdventurePage />} />
               <Route path="/records/:recordId" element={<RecordReportPage />} />
