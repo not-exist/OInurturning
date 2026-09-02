@@ -1,11 +1,24 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type AdventureLog, type Student } from '@prisma/client';
-import type { ConfigRarity, EventChoice, EventConfig, EventOutcome } from '@oinur/shared';
+import {
+  type ConfigRarity,
+  type DuelInput,
+  type DuelReport,
+  type EventChoice,
+  type EventConfig,
+  type EventOutcome,
+  type ParticipantSnapshot,
+  type QuestionSnapshot,
+} from '@oinur/shared';
 import { getConfig } from '../../config/loader.js';
 import { weekKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { createRandomStream } from '../contest/engine/rng.js';
+import { deriveStreamSeed } from '../contest/engine/rng.js';
+import { simulateDuel } from '../contest/engine/duel.js';
+import { generateDuelOpponent, type DuelOpponentKind } from '../contest/npc.js';
+import { createContestRecord } from '../contest/repository.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
 import {
@@ -44,6 +57,7 @@ export interface AdventureEventView {
 export interface AdventureLogView {
   id: number;
   studentId: number | null;
+  contestRecordId: string | null;
   tier: AdventureStaminaCost;
   status: 'PENDING' | 'RESOLVED';
   preview: boolean;
@@ -117,23 +131,33 @@ function weightedPick<T>(entries: readonly { value: T; weight: number }[], rando
 }
 
 function outcomeSupported(outcome: EventOutcome): boolean {
-  if (outcome.type === 'duel') return false;
   const raw = outcome as unknown as JsonRecord;
+  if (outcome.type === 'duel') {
+    const duel = record(raw.duel);
+    return (
+      typeof duel.opponent === 'string' &&
+      duel.rounds === 4 &&
+      typeof duel.quality_rule === 'boolean' &&
+      typeof duel.tiebreak === 'string' &&
+      ![raw.rewards_win, raw.rewards_lose, raw.rewards_draw].some(unsupportedRewards)
+    );
+  }
   if (outcome.type === 'check') {
     const check = record(raw.check);
     if (check.kind !== undefined && check.kind !== 'single') return false;
     if (typeof check.skill !== 'string' || typeof check.dc !== 'number') return false;
   }
-  const unsupportedRewards = (rewards: unknown) => {
-    const value = record(rewards);
-    if (['lecture', 'recruit', 'bank_add', 'win_streak_bonus'].some((key) => key in value)) return true;
-    if (value.target_student !== undefined && value.target_student !== 'participant') return true;
-    return 'chosen_skill' in record(value.stat_gain);
-  };
   if (unsupportedRewards(raw.rewards) || unsupportedRewards(raw.rewards_success) || unsupportedRewards(raw.rewards_fail)) {
     return false;
   }
   return true;
+}
+
+function unsupportedRewards(rewards: unknown): boolean {
+  const value = record(rewards);
+  if (['lecture', 'recruit', 'bank_add', 'win_streak_bonus'].some((key) => key in value)) return true;
+  if (value.target_student !== undefined && value.target_student !== 'participant') return true;
+  return 'chosen_skill' in record(value.stat_gain);
 }
 
 function choiceSupported(choice: EventChoice): boolean {
@@ -178,6 +202,7 @@ function toLogView(log: AdventureLog, event: EventConfig, revealChoices: boolean
   return {
     id: log.id,
     studentId: log.studentId,
+    contestRecordId: log.contestRecordId,
     tier,
     status: log.status,
     preview: resultPhase(log) === 'PREVIEW',
@@ -400,6 +425,144 @@ function resolveCheck(
   };
 }
 
+function clamp(value: number, lower: number, upper: number): number {
+  return Math.min(upper, Math.max(lower, value));
+}
+
+const DUEL_DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
+
+function studentParticipant(
+  student: Student & { talents?: { talentId: string }[] },
+  side: 'HOME' | 'AWAY',
+): ParticipantSnapshot {
+  return {
+    side,
+    userId: side === 'HOME' ? student.userId : null,
+    studentId: side === 'HOME' ? student.id : null,
+    displayName: student.name,
+    abilities: {
+      DS: student.ds,
+      DP: student.dp,
+      MATH: student.math,
+      GRAPH: student.graph,
+      GREEDY: student.greedy,
+      STRING: student.str,
+      CODING: student.code,
+      THINKING: student.thinking,
+      PROBLEM: student.setting,
+    },
+    traits: (student.talents ?? []).map((talent) => ({ traitId: talent.talentId })),
+    mindset: student.mindset,
+    focusCap: student.focusCap,
+    energy: student.energy,
+    energyMax: student.energyMax,
+  };
+}
+
+function duelTiebreak(value: unknown): DuelInput['tiebreak'] {
+  const modes: Record<string, NonNullable<DuelInput['tiebreak']>> = {
+    sudden_death: 'SUDDEN_DEATH',
+    by_energy: 'ENERGY',
+    by_quality: 'QUALITY',
+    friendly: 'FRIENDLY',
+  };
+  if (typeof value !== 'string' || modes[value] === undefined) {
+    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'invalid duel tiebreak' });
+  }
+  return modes[value];
+}
+
+function duelQuestions(
+  home: ParticipantSnapshot,
+  away: ParticipantSnapshot,
+  seed: number,
+): QuestionSnapshot[] {
+  const random = createRandomStream(deriveStreamSeed(seed, 'questions'), 'duel');
+  return Array.from({ length: 4 }, (_, index) => {
+    const setter = index % 2 === 0 ? home : away;
+    const dimension = DUEL_DIMENSIONS[
+      Math.max(
+        0,
+        DUEL_DIMENSIONS.reduce(
+          (best, key, position) =>
+            setter.abilities[key] > setter.abilities[DUEL_DIMENSIONS[best]!] ? position : best,
+          0,
+        ),
+      )
+    ]!;
+    const setting = setter.abilities.PROBLEM;
+    const dimensionValue = setter.abilities[dimension];
+    const thinking = setter.abilities.THINKING;
+    const demand = clamp(Math.round(setting + (random() * 2 - 1) * 3), 5, 98);
+    const thought = clamp(Math.round(setting * 0.92 + (random() * 2 - 1) * 3), 5, 98);
+    const codeVolume = clamp(Math.round(setting * 0.85 + (random() * 2 - 1) * 3), 3, 98);
+    const quality = clamp(Math.round(0.5 * setting + 0.3 * dimensionValue + 0.2 * thinking), 1, 100);
+    const timeLimitMin = clamp(Math.round(0.8 * demand + 0.6 * thought + 0.4 * codeVolume), 45, 160);
+    return {
+      instanceId: `adventure-duel:${seed}:round:${index + 1}`,
+      index,
+      tier: 'cspj',
+      dimension,
+      demand,
+      thought,
+      codeVolume,
+      score: quality,
+      quality,
+      timeLimitMin,
+      partialScores: false,
+      traits: [],
+      source: 'GENERATED',
+    };
+  });
+}
+
+function duelInput(
+  student: Student & { talents?: { talentId: string }[] },
+  duel: JsonRecord,
+  seed: number,
+): DuelInput {
+  const opponent = duel.opponent;
+  const kinds: readonly DuelOpponentKind[] = [
+    'random_common',
+    'random_skilled',
+    'random_elite',
+    'platform_reviewer',
+    'legendary_ghost',
+  ];
+  if (typeof opponent !== 'string' || !kinds.includes(opponent as DuelOpponentKind)) {
+    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'unknown duel opponent' });
+  }
+  const params = record(duel.opponent_params);
+  const powerMultiplier = typeof params.power_mult === 'number' ? params.power_mult : 1;
+  const home = studentParticipant(student, 'HOME');
+  const away = generateDuelOpponent(
+    opponent as DuelOpponentKind,
+    deriveStreamSeed(seed, 'opponent'),
+    powerMultiplier,
+  );
+  return {
+    home,
+    away,
+    questions: duelQuestions(home, away, seed),
+    qualityRuleOn: duel.quality_rule === true,
+    tiebreak: duelTiebreak(duel.tiebreak),
+  };
+}
+
+function playerDuelState(report: DuelReport, settled: Student): { energy: number; mindset: number } {
+  const initialEnergy = report.inputSnapshot.home.energy ?? report.inputSnapshot.home.energyMax;
+  const spent = report.rounds
+    .filter((round) => round.answererSide === 'HOME')
+    .reduce((total, round) => total + round.energyCost, 0);
+  const mindsetDelta = report.rounds
+    .filter((round) => round.answererSide === 'HOME')
+    .reduce((total, round) => total + round.answererMindsetDelta, 0);
+  return {
+    energy: clamp(initialEnergy - spent, 0, settled.energyMax),
+    mindset: clamp(settled.mindset + mindsetDelta, -10, 10),
+  };
+}
+
 function rewardItemId(
   rawId: string,
   rarity: ConfigRarity | undefined,
@@ -614,13 +777,30 @@ export async function chooseAdventure(
       choice.outcomes.map((outcome) => ({ value: outcome, weight: outcome.weight })),
       random,
     );
-    if (selected.type === 'duel') {
-      throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'duel outcome is scheduled for T3.3' });
-    }
     const outcomeRecord = { ...(selected as unknown as JsonRecord) };
+    let duelReport: DuelReport | undefined;
+    let rewardStudent = settled;
+    if (selected.type === 'duel') {
+      const duel = record(outcomeRecord.duel);
+      const inputSnapshot = duelInput(
+        { ...current, energy: settled.energy, mindset: settled.mindset },
+        duel,
+        log.seed,
+      );
+      duelReport = simulateDuel(inputSnapshot, log.seed);
+      const rewardKey =
+        duelReport.winnerSide === 'HOME'
+          ? 'rewards_win'
+          : duelReport.winnerSide === 'AWAY'
+            ? 'rewards_lose'
+            : 'rewards_draw';
+      outcomeRecord.rewards = record(outcomeRecord[rewardKey]);
+      const playerState = playerDuelState(duelReport, settled);
+      rewardStudent = { ...settled, energy: playerState.energy, mindset: playerState.mindset };
+    }
     let checkSummary: JsonRecord | undefined;
     if (selected.type === 'check') {
-      const checked = resolveCheck(outcomeRecord, settled, meta, random);
+      const checked = resolveCheck(outcomeRecord, rewardStudent, meta, random);
       outcomeRecord.rewards = checked.rewards;
       checkSummary = checked.check;
     }
@@ -628,7 +808,7 @@ export async function chooseAdventure(
       tx,
       userId,
       current,
-      settled,
+      rewardStudent,
       event,
       choice,
       outcomeRecord as EventOutcome,
@@ -647,11 +827,37 @@ export async function chooseAdventure(
         ...applied.studentData,
       },
     );
+    const contestRecord =
+      duelReport === undefined
+        ? null
+        : await createContestRecord(
+            {
+              userId,
+              type: 'ADVENTURE',
+              format: 'DUEL',
+              idempotencyKey: `adventure:${log.id}`,
+              inputSnapshot: duelReport.inputSnapshot,
+              report: duelReport,
+              summary: {
+                format: 'DUEL',
+                winnerSide: duelReport.winnerSide,
+                homeScore: duelReport.scores.home,
+                awayScore: duelReport.scores.away,
+                rewards: [],
+                growth: [],
+              },
+              rewards: [],
+              snapshotHash: duelReport.snapshotHash,
+              createdAt: now,
+            },
+            tx,
+          );
     const result = {
       status: 'RESOLVED',
       choiceIndex: input.optionIndex,
       outcomeType: selected.type,
       ...(checkSummary === undefined ? {} : { check: checkSummary }),
+      ...(contestRecord === null ? {} : { contestRecordId: contestRecord.id }),
       rewards: applied.rewardLines,
     };
     const resolved = await tx.adventureLog.update({
@@ -660,6 +866,7 @@ export async function chooseAdventure(
         status: 'RESOLVED',
         choices: [input.optionIndex],
         results: [result] as unknown as Prisma.InputJsonValue,
+        contestRecordId: contestRecord?.id,
         resolvedAt: now,
       },
     });

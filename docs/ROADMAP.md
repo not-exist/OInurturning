@@ -74,6 +74,8 @@
 
 > **M3.2 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：AdventureLog/AdventureWeeklyUsage 持久化、账号级 `intel-slip` 激活、PENDING/RESOLVED 状态机、事件抽取与固定/单属性检定结算已落地。`POST /api/adventures/draw`、`POST /api/adventures/:id/choice`、`GET /api/adventures/logs` 已接入；情报支持 accept/avoid，avoid 不扣体力且事件回池。奖励、道具消耗、声誉审计、学员能力/心态/精力与 `next_training` buff 在同一事务内结算；duel、复合检定、讲课、招募、题库入库仍待后续 slice，相关选项会标为不可用。全量回归 29 个测试文件、254 个测试通过，开发库迁移 `20260902100000_adventure_logs` 已应用；T3.2 的 duel 全分支验收留待 T3.3。
 
+> **M3.3 实测记录（2026-09-02，本地 MariaDB + 进程直跑）**：事件 duel outcome 已接入 M2 `simulateDuel`，生成确定性 HOME/ AWAY 快照、事件对手、四局题目、quality rule 与 tiebreak；玩家答题侧的精力和心态变化写回学员，完整 DuelReport 通过 ContestRecord 保存，并由 AdventureLog `contestRecordId` 关联。G2 真实友谊切磋路径已集成测试；R4/P5 因 bank_add/连胜奖金依赖 T3.6 等后续系统仍暂不可用，T3.3 全量事件验收待依赖收齐。全量回归 30 个测试文件、255 个测试通过。
+
 ## M3 历练·学院·题库
 
 | 任务 | 内容 | 验收标准 |

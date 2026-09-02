@@ -100,6 +100,7 @@ export interface AdventureEventView {
 export interface AdventureLogView {
   id: number;
   studentId: number | null;
+  contestRecordId: string | null;
   tier: 1 | 2 | 3;
   status: 'PENDING' | 'RESOLVED';
   preview: boolean;

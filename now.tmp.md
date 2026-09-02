@@ -55,10 +55,12 @@
 - `apps/api/src/modules/adventure/router.ts`：draw/choice/logs API。
 - `apps/web/src/features/adventure/AdventurePage.tsx`：历练操作与记录页面。
 - M3.2 focused 与全量质量门已通过；开发库迁移 `20260902100000_adventure_logs` 已应用。基础 fixed/check slice 可用。
-- duel、复合检定、讲课、招募、题库入库仍待 T3.3–T3.6。
+- `apps/api/src/modules/contest/npc.ts`：事件对手快照生成。
+- M3.3 基础 duel 接入与 ContestRecord 关联已完成；全量质量门 30 个测试文件、255 个测试通过。
+- R4/P5 的题库入库与连胜奖金、复合检定、讲课、招募仍待 T3.4–T3.6。
 
 ## 下一步
 
-1. 审阅并提交 M3.2 独立 commit。
-2. 开始 T3.3：事件 duel outcome 接入 M2 对决内核并写入 ContestRecord。
+1. 审阅并提交 M3.3 基础 duel 接入独立 commit。
+2. 开始 T3.4：高级学院候选池和讲课规则拆分实现。
 3. 决定是否将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`。

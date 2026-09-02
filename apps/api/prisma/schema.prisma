@@ -50,8 +50,8 @@ model User {
   reputationLogs  ReputationLog[]
   recruitPool     RecruitPool?
   contestRecords ContestRecord[]
+  adventureLogs  AdventureLog[]
   storyProgress  StoryProgress[]
-  adventureLogs   AdventureLog[]
 
   @@map("users")
 }
@@ -72,6 +72,7 @@ model ContestRecord {
   createdAt      DateTime      @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adventureLogs AdventureLog[]
 
   @@unique([userId, idempotencyKey])
   @@index([userId, type, createdAt])
@@ -102,6 +103,7 @@ model AdventureLog {
   userId     Int
   studentId  Int?
   eventId    String          @db.VarChar(64)
+  contestRecordId String?     @db.VarChar(64)
   tier       Int
   seed       Int
   status     AdventureStatus @default(PENDING)
@@ -112,10 +114,12 @@ model AdventureLog {
 
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   actorStudent Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  contestRecord ContestRecord? @relation(fields: [contestRecordId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([userId, status])
   @@index([userId, eventId])
+  @@index([contestRecordId])
 }
 
 model AdventureWeeklyUsage {
