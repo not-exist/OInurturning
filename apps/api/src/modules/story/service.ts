@@ -214,7 +214,14 @@ export async function getContestRecord(
   userId: number,
   recordId: string,
 ): Promise<ContestRecordView> {
-  const record = await getContestRecordForUser(userId, recordId);
+  let record = await getContestRecordForUser(userId, recordId);
+  if (record === null) {
+    const pvpMatch = await prisma.pvpMatch.findFirst({
+      where: { contestRecordId: recordId, OR: [{ homeUserId: userId }, { awayUserId: userId }] },
+      select: { contestRecord: { select: { userId: true } } },
+    });
+    if (pvpMatch?.contestRecord?.userId !== undefined) record = await getContestRecordForUser(pvpMatch.contestRecord.userId, recordId);
+  }
   if (record === null) throw new ApiError('NOT_FOUND', { resource: 'contestRecord', recordId });
   return record;
 }

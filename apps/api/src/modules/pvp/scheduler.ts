@@ -47,7 +47,10 @@ function participant(row: Registration, side: 'HOME' | 'AWAY'): ParticipantSnaps
 
 function questionFor(
   snapshot: { id: number; name: string; dominantDim: string; quality: number; traitId: string | null },
-  matchId: number,
+  tournamentId: number,
+  round: number,
+  slot: number,
+  snapshotKey: string,
   index: number,
 ): QuestionSnapshot {
   const dimensions = new Set(['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING']);
@@ -55,7 +58,7 @@ function questionFor(
     ? snapshot.dominantDim.toUpperCase()
     : 'DS';
   return {
-    instanceId: `pvp:${matchId}:${snapshot.id}:${index}`,
+    instanceId: `pvp:${tournamentId}:${round}:${slot}:${snapshotKey}:${snapshot.id}:${index}`,
     index,
     templateId: snapshot.name,
     dimension: dimension as QuestionSnapshot['dimension'],
@@ -72,9 +75,9 @@ function questionFor(
   };
 }
 
-function generatedQuestion(matchId: number, index: number, side: 'HOME' | 'AWAY'): QuestionSnapshot {
+function generatedQuestion(tournamentId: number, round: number, slot: number, snapshotKey: string, index: number, side: 'HOME' | 'AWAY'): QuestionSnapshot {
   return {
-    instanceId: `pvp:${matchId}:generated:${side}:${index}`,
+    instanceId: `pvp:${tournamentId}:${round}:${slot}:${snapshotKey}:generated:${side}:${index}`,
     index,
     dimension: index % 2 === 0 ? 'DS' : 'DP',
     demand: 40,
@@ -92,9 +95,10 @@ function generatedQuestion(matchId: number, index: number, side: 'HOME' | 'AWAY'
 function inputFor(match: PvpMatch, home: Registration, away: Registration): DuelInput {
   const homeProblems = (home.problemSnapshots as unknown as { id: number; name: string; dominantDim: string; quality: number; traitId: string | null }[]);
   const awayProblems = (away.problemSnapshots as unknown as { id: number; name: string; dominantDim: string; quality: number; traitId: string | null }[]);
+  const snapshotKey = stableHash({ home: home.roster, away: away.roster, homeProblems, awayProblems });
   const questions = [0, 1, 2, 3].map((index) => {
     const source = index % 2 === 0 ? homeProblems[index / 2] : awayProblems[(index - 1) / 2];
-    return source === undefined ? generatedQuestion(match.id, index, index % 2 === 0 ? 'HOME' : 'AWAY') : questionFor(source, match.id, index);
+    return source === undefined ? generatedQuestion(match.tournamentId, match.round, match.slot, snapshotKey, index, index % 2 === 0 ? 'HOME' : 'AWAY') : questionFor(source, match.tournamentId, match.round, match.slot, snapshotKey, index);
   });
   return {
     home: participant(home, 'HOME'),
@@ -173,16 +177,23 @@ async function playPending(tx: Prisma.TransactionClient, tournament: PvpTourname
   }
 }
 
-export async function advancePvpTournament(tournamentId: number, now: Date = new Date()): Promise<PvpTournamentDetail> {
+export async function advancePvpTournament(tournamentId: number, now?: Date, actorAdminId?: number): Promise<PvpTournamentDetail> {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM PvpTournament WHERE id = ${tournamentId} FOR UPDATE`;
     const tournament = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
     if (tournament === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
-    if ((tournament.status === 'REGISTERING' && now < tournament.autoStartAt) || tournament.status === 'FINISHED' || tournament.status === 'CANCELLED') return detailInTx(tx, tournament, null);
+    const auditStart = async (status: string): Promise<void> => {
+      if (actorAdminId === undefined) return;
+      const admin = await tx.user.findUniqueOrThrow({ where: { id: actorAdminId }, select: { username: true } });
+      await tx.adminAuditLog.create({ data: { adminId: actorAdminId, adminNameSnapshot: admin.username, action: 'PVP_TOURNAMENT_START', targetType: 'PVP_TOURNAMENT', targetId: String(tournamentId), payload: { status } } });
+    };
+    const effectiveNow = now ?? new Date();
+    if ((tournament.status === 'REGISTERING' && effectiveNow < tournament.autoStartAt) || tournament.status === 'FINISHED' || tournament.status === 'CANCELLED') { await auditStart(tournament.status); return detailInTx(tx, tournament, null); }
     const count = await tx.pvpRegistration.count({ where: { tournamentId } });
     if (count < 4) {
       await cancelAndRefund(tx, tournamentId);
       const cancelled = await tx.pvpTournament.findUniqueOrThrow({ where: { id: tournamentId } });
+      await auditStart(cancelled.status);
       return detailInTx(tx, cancelled, null);
     }
     const running = await tx.pvpTournament.update({ where: { id: tournamentId }, data: { status: 'RUNNING' } });
@@ -200,6 +211,7 @@ export async function advancePvpTournament(tournamentId: number, now: Date = new
       await ensureRound(tx, running, round + 1, winners);
     }
     const final = await tx.pvpTournament.findUniqueOrThrow({ where: { id: tournamentId } });
+    await auditStart(final.status);
     return detailInTx(tx, final, null, registrationRows);
   });
 }
@@ -209,18 +221,18 @@ async function detailInTx(tx: Db, tournament: PvpTournament, userId: number | nu
   return { id: tournament.id, name: tournament.name, status: tournament.status, size: tournament.size, registerEndsAt: tournament.registerEndsAt.toISOString(), autoStartAt: tournament.autoStartAt.toISOString(), prizes: tournament.prizes, config: tournament.config, registeredCount: rows.length, myRegistration: userId === null ? null : rows.find((row) => row.userId === userId)?.id ?? null };
 }
 
-export async function getPvpTournamentDetail(userId: number, tournamentId: number, now = new Date()): Promise<PvpTournamentDetail> {
+export async function getPvpTournamentDetail(userId: number, tournamentId: number, now?: Date): Promise<PvpTournamentDetail> {
   const detail = await advancePvpTournament(tournamentId, now);
   const registration = await prisma.pvpRegistration.findUnique({ where: { tournamentId_userId: { tournamentId, userId } }, select: { id: true } });
   return { ...detail, myRegistration: registration?.id ?? null };
 }
 
-export async function getPvpBracket(userId: number, tournamentId: number, now = new Date()): Promise<PvpMatchView[]> {
+export async function getPvpBracket(userId: number, tournamentId: number, now?: Date): Promise<PvpMatchView[]> {
   await getPvpTournamentDetail(userId, tournamentId, now);
   const rows = await prisma.pvpMatch.findMany({ where: { tournamentId }, orderBy: [{ round: 'asc' }, { slot: 'asc' }] });
   return rows.map(matchView);
 }
 
-export async function startPvpTournament(tournamentId: number, now = new Date()): Promise<PvpTournamentDetail> {
-  return advancePvpTournament(tournamentId, now);
+export async function startPvpTournament(adminId: number, tournamentId: number, now?: Date): Promise<PvpTournamentDetail> {
+  return advancePvpTournament(tournamentId, now, adminId);
 }

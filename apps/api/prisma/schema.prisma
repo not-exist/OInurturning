@@ -216,7 +216,7 @@ model PvpMatch {
   awayScore       Int?
   winnerUserId    Int?
   status          MatchStatus @default(PENDING)
-  contestRecordId String?     @db.VarChar(64)
+  contestRecordId String?     @unique @db.VarChar(64)
   playedAt        DateTime?
 
   tournament    PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

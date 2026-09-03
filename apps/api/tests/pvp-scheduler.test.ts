@@ -32,6 +32,7 @@ describe('PVP scheduler', () => {
     expect(first).toEqual(second);
     expect(first.filter((match) => match.status === 'BYE')).toHaveLength(3);
     expect(first.flatMap((match) => [match.homeUserId, match.awayUserId]).filter(Boolean)).toHaveLength(5);
+    expect(buildFirstRound(Array.from({ length: 17 }, (_, userId) => ({ userId: userId + 1 })), 32, 42)).toHaveLength(16);
   });
 
   it('exports a tournament advancement service', () => {
@@ -79,9 +80,11 @@ describe('PVP scheduler', () => {
     for (let index = 0; index < 8; index += 1) {
       const player = await entrant();
       players.push(player);
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      const problem = index === 0 ? await prisma.problemLibraryEntry.create({ data: { userId: player.userId, authorStudentId: player.studentId, name: 'Frozen problem', dominantDim: 'DS', rarity: 'green', quality: 60 } }) : null;
+      await registerPvp(player.userId, tournament.id, player.studentId, problem === null ? [] : [problem.id], PAST);
     }
     await prisma.student.update({ where: { id: players[0]!.studentId }, data: { name: 'Changed live name', ds: 99 } });
+    await prisma.problemLibraryEntry.updateMany({ where: { userId: players[0]!.userId }, data: { name: 'Changed live problem', quality: 99 } });
     await advancePvpTournament(tournament.id, PAST);
     const record = await prisma.contestRecord.findFirstOrThrow({ where: { type: 'PVP' }, orderBy: { createdAt: 'asc' } });
     const input = record.inputSnapshot as { home: { displayName: string; abilities: { DS: number } } };
@@ -98,5 +101,31 @@ describe('PVP scheduler', () => {
     await Promise.all([advancePvpTournament(tournament.id, PAST), advancePvpTournament(tournament.id, PAST), advancePvpTournament(tournament.id, PAST)]);
     expect(await prisma.pvpMatch.count({ where: { tournamentId: tournament.id } })).toBe(7);
     expect(await prisma.contestRecord.count({ where: { type: 'PVP' } })).toBe(7);
+  });
+
+  it('serves canonical detail/bracket/registration routes and scopes admin start', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'HTTP', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    const players = [];
+    for (let index = 0; index < 4; index += 1) {
+      const player = await entrant();
+      players.push(player);
+      const response = await request(app).post(`/api/pvp/tournaments/${tournament.id}/registration`).set('Authorization', `Bearer ${player.token}`).send({ studentId: player.studentId, problemEntryIds: [] });
+      expect(response.status).toBe(200);
+    }
+    expect((await request(app).get(`/api/pvp/tournaments/${tournament.id}`)).status).toBe(401);
+    const detail = await request(app).get(`/api/pvp/tournaments/${tournament.id}`).set('Authorization', `Bearer ${players[0]!.token}`);
+    expect(detail.status).toBe(200);
+    const bracket = await request(app).get(`/api/pvp/tournaments/${tournament.id}/bracket`).set('Authorization', `Bearer ${players[0]!.token}`);
+    expect(bracket.status).toBe(200);
+    const forbidden = await request(app).post(`/api/admin/pvp-tournaments/${tournament.id}/actions/start`).set('Authorization', `Bearer ${players[0]!.token}`);
+    expect(forbidden.status).toBe(403);
+    await prisma.user.update({ where: { id: players[0]!.userId }, data: { role: 'ADMIN' } });
+    const started = await request(app).post(`/api/admin/pvp-tournaments/${tournament.id}/actions/start`).set('Authorization', `Bearer ${players[0]!.token}`);
+    expect(started.status).toBe(200);
+    expect(await prisma.adminAuditLog.count({ where: { action: 'PVP_TOURNAMENT_START', targetId: String(tournament.id) } })).toBe(1);
+    const matches = await prisma.pvpMatch.findMany({ where: { tournamentId: tournament.id, status: 'DONE' } });
+    const away = matches[0]!.awayUserId!;
+    const awayRecord = await request(app).get(`/api/records/${matches[0]!.contestRecordId}`).set('Authorization', `Bearer ${players.find((player) => player.userId === away)!.token}`);
+    expect(awayRecord.status).toBe(200);
   });
 });

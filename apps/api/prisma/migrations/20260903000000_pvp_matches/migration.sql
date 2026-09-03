@@ -13,6 +13,7 @@ CREATE TABLE `PvpMatch` (
     `contestRecordId` VARCHAR(64) NULL,
     `playedAt` DATETIME(3) NULL,
 
+    UNIQUE INDEX `PvpMatch_contestRecordId_key`(`contestRecordId`),
     INDEX `PvpMatch_tournamentId_round_idx`(`tournamentId`, `round`),
     UNIQUE INDEX `PvpMatch_tournamentId_round_slot_key`(`tournamentId`, `round`, `slot`),
     PRIMARY KEY (`id`)

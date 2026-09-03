@@ -213,6 +213,27 @@ export interface PvpRegistrationView {
   replayed: boolean;
 }
 
+export interface PvpTournamentDetailView extends PvpTournamentView {
+  prizes: unknown;
+  config: unknown;
+  registeredCount: number;
+  myRegistration: number | null;
+}
+
+export interface PvpMatchView {
+  id: number;
+  round: number;
+  slot: number;
+  homeUserId: number | null;
+  awayUserId: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  winnerUserId: number | null;
+  status: 'PENDING' | 'DONE' | 'BYE';
+  contestRecordId: string | null;
+  reportUrl: string | null;
+}
+
 export interface TalentDefView {
   id: string;
   name: string;
@@ -676,6 +697,14 @@ export function usePvpRegistration(tournamentId: number | undefined) {
     enabled: tournamentId !== undefined,
     retry: false,
   });
+}
+
+export function usePvpTournamentDetail(tournamentId: number | undefined) {
+  return useQuery({ queryKey: ['pvp-detail', tournamentId], queryFn: () => apiFetch<PvpTournamentDetailView>(`/api/pvp/tournaments/${tournamentId}`), enabled: tournamentId !== undefined });
+}
+
+export function usePvpBracket(tournamentId: number | undefined) {
+  return useQuery({ queryKey: ['pvp-bracket', tournamentId], queryFn: () => apiFetch<PvpMatchView[]>(`/api/pvp/tournaments/${tournamentId}/bracket`), enabled: tournamentId !== undefined });
 }
 
 export function useRegisterPvp() {

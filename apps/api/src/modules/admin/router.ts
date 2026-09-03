@@ -95,7 +95,7 @@ adminRouter.post('/pvp-tournaments/:id/actions/start', async (req, res, next) =>
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
-    res.json({ ok: true, data: await startPvpTournament(id) });
+    res.json({ ok: true, data: await startPvpTournament(req.user!.id, id) });
   } catch (error) {
     next(error);
   }

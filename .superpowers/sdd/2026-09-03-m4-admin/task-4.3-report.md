@@ -34,3 +34,14 @@
 
 - `4a72fdf feat(api): add pvp tournament scheduler`
 - Follow-up commit adds the seeded PVP schema/migration/bracket files and expanded scheduler coverage.
+
+## Review follow-up
+
+- Added Web bracket/detail rendering and query hooks in `apps/web/src/features/pvp/PvpPage.tsx` and `apps/web/src/lib/hooks.ts`.
+- Added HTTP coverage for canonical detail/bracket/registration, auth/admin scope, admin audit, and away-side report access.
+- PVP record links now authorize both match participants; unrelated users remain denied.
+- Lock acquisition now captures default request time after `FOR UPDATE`; explicit test times remain supported.
+- Question instance IDs use tournament/round/slot plus immutable snapshot hash, independent of auto-increment match IDs.
+- Admin start writes `PVP_TOURNAMENT_START` audit entries.
+- `PvpMatch.contestRecordId` is unique in schema and migration for the intended 1:1 relation.
+- Review follow-up tests: scheduler focused suite 8 tests and registration suite 4 tests passed; Web typecheck/build and API typecheck/lint/build passed. Full API suite should be rerun by integration.

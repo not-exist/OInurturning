@@ -3,6 +3,8 @@ import { ApiCallError } from '../../lib/api';
 import {
   useInventory,
   usePvpRegistration,
+  usePvpTournamentDetail,
+  usePvpBracket,
   usePvpTournaments,
   useProblems,
   useRegisterPvp,
@@ -19,10 +21,12 @@ export function PvpPage(): JSX.Element {
   const [studentId, setStudentId] = useState<number>();
   const selectedTournamentId = tournamentId ?? tournaments.data?.[0]?.id;
   const registration = usePvpRegistration(selectedTournamentId);
+  const detail = usePvpTournamentDetail(selectedTournamentId);
+  const bracket = usePvpBracket(selectedTournamentId);
   const register = useRegisterPvp();
   const [problemIds, setProblemIds] = useState<number[]>([]);
 
-  if (tournaments.isPending || students.isPending || problems.isPending || inventory.isPending) {
+  if (tournaments.isPending || students.isPending || problems.isPending || inventory.isPending || detail.isPending || bracket.isPending) {
     return <p className="text-neutral-500">加载 PVP 数据…</p>;
   }
   if (
@@ -34,11 +38,16 @@ export function PvpPage(): JSX.Element {
     !students.data ||
     !problems.data ||
     !inventory.data
+    || !detail.data
+    || !bracket.data
   ) {
     return <p className="text-red-600">PVP 数据加载失败。</p>;
   }
 
-  const selectedTournament = tournaments.data.find((entry) => entry.id === selectedTournamentId);
+  const selectedTournamentEntry = tournaments.data.find((entry) => entry.id === selectedTournamentId);
+  const selectedTournament = selectedTournamentEntry === undefined || detail.data === undefined
+    ? selectedTournamentEntry
+    : { ...selectedTournamentEntry, ...detail.data };
   const selectedStudentId = studentId ?? students.data[0]?.id;
   const selectedRegistration = registration.data;
   const tickets = inventory.data.find((item) => item.itemId === 'entry-ticket')?.quantity ?? 0;
@@ -68,10 +77,36 @@ export function PvpPage(): JSX.Element {
                 <span className="text-neutral-500">报名券 {tickets}</span>
               </div>
               {selectedRegistration ? <RegistrationView registration={selectedRegistration} /> : selectedTournament.status !== 'REGISTERING' ? <p className="mt-4 text-sm text-amber-700">报名已关闭。</p> : <RegistrationForm students={students.data} problems={eligibleProblems} studentId={selectedStudentId} onStudentChange={setStudentId} problemIds={problemIds} onProblemsChange={setProblemIds} onSubmit={() => selectedStudentId !== undefined && register.mutate({ tournamentId: selectedTournament.id, studentId: selectedStudentId, problemEntryIds: problemIds })} pending={register.isPending} error={register.error} />}
+              {bracket.data.length > 0 && <BracketView matches={bracket.data} />}
             </section>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function BracketView({ matches }: { matches: import('../../lib/hooks').PvpMatchView[] }): JSX.Element {
+  const rounds = [...new Set(matches.map((match) => match.round))];
+  return (
+    <div className="mt-6 border-t border-neutral-200 pt-4">
+      <h2 className="text-sm font-medium">对阵结果</h2>
+      <div className="mt-3 grid gap-4 md:grid-cols-3">
+        {rounds.map((round) => (
+          <div key={round}>
+            <h3 className="text-xs font-semibold uppercase text-neutral-500">第 {round} 轮</h3>
+            <div className="mt-2 space-y-2">
+              {matches.filter((match) => match.round === round).map((match) => (
+                <div key={match.id} className="border border-neutral-200 p-2 text-xs">
+                  <p>{match.homeUserId ?? '轮空'} {match.homeScore ?? '-'} : {match.awayScore ?? '-'} {match.awayUserId ?? '轮空'}</p>
+                  <p className="mt-1 text-neutral-500">胜者：{match.winnerUserId ?? '-'}</p>
+                  {match.reportUrl && <a className="mt-1 inline-block text-blue-700 underline" href={match.reportUrl}>查看战报</a>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
