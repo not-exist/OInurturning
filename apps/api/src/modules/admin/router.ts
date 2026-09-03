@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ApiError } from '../../lib/errors.js';
 import { requireAdmin } from '../../middlewares/requireAdmin.js';
 import * as service from './service.js';
+import { startPvpTournament } from '../pvp/scheduler.js';
 
 const tournamentSchema = z
   .object({
@@ -85,6 +86,16 @@ adminRouter.get('/users', async (req, res, next) => {
 adminRouter.get('/audits', async (req, res, next) => {
   try {
     res.json({ ok: true, data: await service.listAudits(limitOf(req.query.limit, 100)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post('/pvp-tournaments/:id/actions/start', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
+    res.json({ ok: true, data: await startPvpTournament(id) });
   } catch (error) {
     next(error);
   }

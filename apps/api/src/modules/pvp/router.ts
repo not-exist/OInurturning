@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as service from './registration.js';
+import * as scheduler from './scheduler.js';
 
 const registrationSchema = z
   .object({
@@ -38,6 +39,22 @@ pvpRouter.get('/tournaments/:id/registration', async (req, res, next) => {
   }
 });
 
+pvpRouter.get('/tournaments/:id', async (req, res, next) => {
+  try {
+    res.json({ ok: true, data: await scheduler.getPvpTournamentDetail(req.user!.id, parseId(req.params.id)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+pvpRouter.get('/tournaments/:id/bracket', async (req, res, next) => {
+  try {
+    res.json({ ok: true, data: await scheduler.getPvpBracket(req.user!.id, parseId(req.params.id)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 pvpRouter.post('/tournaments/:id/register', async (req, res, next) => {
   try {
     const parsed = registrationSchema.safeParse(req.body);
@@ -51,6 +68,17 @@ pvpRouter.post('/tournaments/:id/register', async (req, res, next) => {
         parsed.data.problemEntryIds,
       ),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Canonical TECH-DESIGN alias; retain /register for M4.2 clients.
+pvpRouter.post('/tournaments/:id/registration', async (req, res, next) => {
+  try {
+    const parsed = registrationSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    res.json({ ok: true, data: await service.registerPvp(req.user!.id, parseId(req.params.id), parsed.data.studentId, parsed.data.problemEntryIds) });
   } catch (error) {
     next(error);
   }
