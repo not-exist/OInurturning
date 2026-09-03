@@ -60,4 +60,43 @@ describe('PVP scheduler', () => {
     expect(await prisma.pvpMatch.count({ where: { tournamentId: tournament.id } })).toBe(7);
     expect(await prisma.contestRecord.count({ where: { type: 'PVP' } })).toBe(7);
   });
+
+  it('advances a sixteen-player tournament through all four rounds', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Sixteen', size: 16, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    for (let index = 0; index < 16; index += 1) {
+      const player = await entrant();
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    }
+    await advancePvpTournament(tournament.id, PAST);
+    expect((await prisma.pvpTournament.findUniqueOrThrow({ where: { id: tournament.id } })).status).toBe('FINISHED');
+    expect(await prisma.pvpMatch.count({ where: { tournamentId: tournament.id } })).toBe(15);
+    expect(await prisma.pvpMatch.count({ where: { tournamentId: tournament.id, status: 'DONE' } })).toBe(15);
+  });
+
+  it('uses registration snapshots after live student and problem rows change', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Snapshots', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    const players = [];
+    for (let index = 0; index < 8; index += 1) {
+      const player = await entrant();
+      players.push(player);
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    }
+    await prisma.student.update({ where: { id: players[0]!.studentId }, data: { name: 'Changed live name', ds: 99 } });
+    await advancePvpTournament(tournament.id, PAST);
+    const record = await prisma.contestRecord.findFirstOrThrow({ where: { type: 'PVP' }, orderBy: { createdAt: 'asc' } });
+    const input = record.inputSnapshot as { home: { displayName: string; abilities: { DS: number } } };
+    expect(input.home.displayName).not.toBe('Changed live name');
+    expect(input.home.abilities.DS).toBe(35);
+  });
+
+  it('serializes concurrent advances without duplicate matches or records', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Concurrent', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    for (let index = 0; index < 8; index += 1) {
+      const player = await entrant();
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    }
+    await Promise.all([advancePvpTournament(tournament.id, PAST), advancePvpTournament(tournament.id, PAST), advancePvpTournament(tournament.id, PAST)]);
+    expect(await prisma.pvpMatch.count({ where: { tournamentId: tournament.id } })).toBe(7);
+    expect(await prisma.contestRecord.count({ where: { type: 'PVP' } })).toBe(7);
+  });
 });

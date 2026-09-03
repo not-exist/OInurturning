@@ -35,6 +35,12 @@ enum TournamentStatus {
   CANCELLED
 }
 
+enum MatchStatus {
+  PENDING
+  DONE
+  BYE
+}
+
 model User {
   id            Int       @id @default(autoincrement())
   username      String    @unique @db.VarChar(32)
@@ -85,6 +91,7 @@ model ContestRecord {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   adventureLogs AdventureLog[]
+  pvpMatches PvpMatch[]
 
   @@unique([userId, idempotencyKey])
   @@index([userId, type, createdAt])
@@ -177,6 +184,7 @@ model PvpTournament {
 
   creator User? @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   registrations PvpRegistration[]
+  matches       PvpMatch[]
 
   @@index([status, autoStartAt])
 }
@@ -195,6 +203,27 @@ model PvpRegistration {
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, createdAt])
+}
+
+model PvpMatch {
+  id              Int         @id @default(autoincrement())
+  tournamentId    Int
+  round           Int
+  slot            Int
+  homeUserId      Int?
+  awayUserId      Int?
+  homeScore       Int?
+  awayScore       Int?
+  winnerUserId    Int?
+  status          MatchStatus @default(PENDING)
+  contestRecordId String?     @db.VarChar(64)
+  playedAt        DateTime?
+
+  tournament    PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  contestRecord ContestRecord? @relation(fields: [contestRecordId], references: [id], onDelete: SetNull)
+
+  @@unique([tournamentId, round, slot])
+  @@index([tournamentId, round])
 }
 
 model AdminAnnouncement {
