@@ -61,7 +61,7 @@
 - T3.4 高级学院招募池沿用 M1 已完成实现；T3.5 讲课 API、页面、LectureLog 和结算已完成，focused 6/6、全量 261/261 通过。
 - T3.6 出题 API、页面、ProblemLibraryEntry traitId 和质量评级已完成，focused 4/4、全量 268/268 通过；开发库迁移 `20260902170000_problem_traits` 已应用。
 - T4.1 管理端 API、页面、PvpTournament/AdminAnnouncement/AdminAuditLog 和 `requireAdmin` 已完成，focused 3/3、全量 271/271 通过；开发库迁移 `20260902190000_admin_tools` 已应用。
-- T4.2 PVP 报名 API、页面、PvpRegistration 与快照锁定已完成，focused 4/4；entry-ticket、容量、唯一报名、质量/归属、截止时间和 HTTP 路由均已覆盖；开发库迁移 `20260902210000_pvp_registrations` 已应用。
+- T4.2 PVP 报名 API、页面、PvpRegistration 与快照锁定已完成，focused 4/4；entry-ticket、容量、唯一报名、质量/归属、截止时间、题目顺序和 HTTP 路由均已覆盖；开发库迁移 `20260902210000_pvp_registrations` 已应用。
 
 ## 下一步
 
