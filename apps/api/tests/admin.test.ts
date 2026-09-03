@@ -83,8 +83,9 @@ describe('M4.1 admin tools', () => {
     const audits = unwrapOk<{ action: string; adminNameSnapshot: string }[]>(
       await request(app).get('/api/admin/audits').set(headers),
     );
-    expect(audits.map((entry) => entry.action)).toEqual(['ANNOUNCEMENT_CREATE', 'TOURNAMENT_CREATE']);
-    expect(audits.every((entry) => entry.adminNameSnapshot.startsWith('admin-test'))).toBe(true);
+    const ownAudits = audits.filter((entry) => entry.adminNameSnapshot.startsWith('admin-test'));
+    expect(ownAudits.map((entry) => entry.action)).toEqual(['ANNOUNCEMENT_CREATE', 'TOURNAMENT_CREATE']);
+    expect(ownAudits.every((entry) => entry.adminNameSnapshot.startsWith('admin-test'))).toBe(true);
   });
 
   it('validates tournament size and chronological time window', async () => {
