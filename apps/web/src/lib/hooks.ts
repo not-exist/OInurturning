@@ -141,6 +141,48 @@ export interface LectureResultView {
   createdAt: string;
 }
 
+export interface TournamentView {
+  id: number;
+  name: string;
+  status: 'REGISTERING' | 'RUNNING' | 'FINISHED' | 'CANCELLED';
+  size: number;
+  registerEndsAt: string;
+  autoStartAt: string;
+  prizes: unknown;
+  config: unknown;
+  createdBy: number | null;
+  createdAt: string;
+}
+
+export interface AnnouncementView {
+  id: number;
+  title: string;
+  body: string;
+  authorId: number;
+  createdAt: string;
+}
+
+export interface UserAdminView {
+  id: number;
+  username: string;
+  role: 'USER' | 'ADMIN';
+  money: number;
+  reputation: number;
+  bannedAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditView {
+  id: number;
+  adminId: number | null;
+  adminNameSnapshot: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  payload: unknown;
+  createdAt: string;
+}
+
 export interface TalentDefView {
   id: string;
   name: string;
@@ -522,6 +564,71 @@ export function useDeleteProblem() {
       qc.invalidateQueries({ queryKey: ['problem-library'] });
       qc.invalidateQueries({ queryKey: ['problems'] });
     },
+  });
+}
+
+export function useAdminTournaments() {
+  return useQuery({
+    queryKey: ['admin-tournaments'],
+    queryFn: () => apiFetch<TournamentView[]>('/api/admin/tournaments'),
+  });
+}
+
+export function useCreateTournament() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      name: string;
+      size: 8 | 16 | 32;
+      registerEndsAt: string;
+      autoStartAt: string;
+      prizes: Record<string, unknown>;
+      config: Record<string, unknown>;
+    }) =>
+      apiFetch<TournamentView>('/api/admin/tournaments', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-tournaments'] });
+      qc.invalidateQueries({ queryKey: ['admin-audits'] });
+    },
+  });
+}
+
+export function useCreateAnnouncement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ title, body }: { title: string; body: string }) =>
+      apiFetch<AnnouncementView>('/api/admin/announcements', {
+        method: 'POST',
+        body: JSON.stringify({ title, body }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-announcements'] });
+      qc.invalidateQueries({ queryKey: ['admin-audits'] });
+    },
+  });
+}
+
+export function useAdminAnnouncements() {
+  return useQuery({
+    queryKey: ['admin-announcements'],
+    queryFn: () => apiFetch<AnnouncementView[]>('/api/admin/announcements'),
+  });
+}
+
+export function useAdminUsers(query: string) {
+  return useQuery({
+    queryKey: ['admin-users', query],
+    queryFn: () => apiFetch<UserAdminView[]>(`/api/admin/users?query=${encodeURIComponent(query)}`),
+  });
+}
+
+export function useAdminAudits() {
+  return useQuery({
+    queryKey: ['admin-audits'],
+    queryFn: () => apiFetch<AuditView[]>('/api/admin/audits'),
   });
 }
 

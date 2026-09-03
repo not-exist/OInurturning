@@ -20,6 +20,7 @@ export function Layout() {
   const { me, setMe } = useAuthStore();
   const nav = useNavigate();
   const qc = useQueryClient();
+  const tabs = me?.role === 'ADMIN' ? [...TABS, { to: '/admin', label: '管理端' }] : TABS;
 
   async function logout(): Promise<void> {
     try {
@@ -45,7 +46,7 @@ export function Layout() {
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <nav className="flex w-full shrink-0 gap-1 overflow-x-auto border-b bg-white p-2 text-sm md:block md:w-44 md:border-r md:border-b-0">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <NavLink
               key={t.to}
               to={t.to}

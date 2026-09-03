@@ -28,6 +28,13 @@ enum AdventureStatus {
   RESOLVED
 }
 
+enum TournamentStatus {
+  REGISTERING
+  RUNNING
+  FINISHED
+  CANCELLED
+}
+
 model User {
   id            Int       @id @default(autoincrement())
   username      String    @unique @db.VarChar(32)
@@ -53,6 +60,9 @@ model User {
   adventureLogs  AdventureLog[]
   storyProgress  StoryProgress[]
   lectureLogs    LectureLog[]
+  createdTournaments PvpTournament[] @relation("TournamentCreator")
+  adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
+  announcements AdminAnnouncement[]
 
   @@map("users")
 }
@@ -150,6 +160,51 @@ model LectureLog {
 
   @@index([userId, createdAt])
   @@index([userId, studentId, createdAt])
+}
+
+model PvpTournament {
+  id           Int              @id @default(autoincrement())
+  name         String           @db.VarChar(64)
+  status       TournamentStatus @default(REGISTERING)
+  size         Int
+  registerEndsAt DateTime
+  autoStartAt  DateTime
+  prizes       Json             @default("{}")
+  config       Json             @default("{}")
+  createdBy    Int?
+  createdAt    DateTime         @default(now())
+
+  creator User? @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([status, autoStartAt])
+}
+
+model AdminAnnouncement {
+  id        Int      @id @default(autoincrement())
+  authorId  Int
+  title     String   @db.VarChar(128)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id                Int      @id @default(autoincrement())
+  adminId           Int?
+  adminNameSnapshot String   @db.VarChar(32)
+  action            String   @db.VarChar(64)
+  targetType        String?  @db.VarChar(32)
+  targetId          String?  @db.VarChar(64)
+  payload           Json?
+  createdAt         DateTime @default(now())
+
+  admin User? @relation("AdminAuditActor", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
 }
 
 // ───────────────────────── 配置域（yaml 导入目标，TECH-DESIGN §3） ─────────────────────────
