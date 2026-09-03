@@ -1,6 +1,6 @@
 # OInurturning M2 完成交接
 
-更新时间：2026-09-03
+更新时间：2026-09-04
 
 ## 工作区
 
@@ -9,7 +9,6 @@
 - committed HEAD：`ff3d2ea fix(pvp): redact outsider bracket reports`
 - M2、M3.1–M3.6、M4.1、M4.2 与 T4.3 已提交。
 - 工作树干净；未执行 merge 或 push；仓库暂未配置远端。
-- 未执行 merge 或 push；仓库暂未配置远端。
 
 ## M2 状态
 
