@@ -6,9 +6,9 @@
 
 - worktree：`/home/qzez/OInurturning/.claude/worktrees/m2-contest-story-work`
 - branch：`worktree-m2-contest-story-work`
-- committed HEAD：`9a19baa feat(m3): complete adventure rewards`
-- M2 与 M3.1–M3.6 已提交。
-- M4.1 管理端基础当前为未提交工作区变更。
+- committed HEAD：`bf8bc30 feat(m4): add admin tools`
+- M2、M3.1–M3.6 与 M4.1 已提交。
+- M4.2 报名与快照锁定当前为未提交工作区变更。
 - 未执行 merge 或 push；仓库暂未配置远端。
 
 ## M2 状态
@@ -61,9 +61,10 @@
 - T3.4 高级学院招募池沿用 M1 已完成实现；T3.5 讲课 API、页面、LectureLog 和结算已完成，focused 6/6、全量 261/261 通过。
 - T3.6 出题 API、页面、ProblemLibraryEntry traitId 和质量评级已完成，focused 4/4、全量 268/268 通过；开发库迁移 `20260902170000_problem_traits` 已应用。
 - T4.1 管理端 API、页面、PvpTournament/AdminAnnouncement/AdminAuditLog 和 `requireAdmin` 已完成，focused 3/3、全量 271/271 通过；开发库迁移 `20260902190000_admin_tools` 已应用。
+- T4.2 PVP 报名 API、页面、PvpRegistration 与快照锁定已完成，focused 4/4；entry-ticket、容量、唯一报名、质量/归属、截止时间和 HTTP 路由均已覆盖；开发库迁移 `20260902210000_pvp_registrations` 已应用。
 
 ## 下一步
 
-1. 审阅并提交 M4.1 管理端独立 commit。
-2. 开始 T4.2：entry-ticket 报名、出战名单与预制题快照锁定。
+1. 审阅并提交 M4.2 报名独立 commit。
+2. 开始 T4.3：对阵树、轮次推进和批量自动模拟。
 3. 决定是否将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`。

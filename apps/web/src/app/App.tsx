@@ -13,7 +13,7 @@ const TABS = [
   { to: '/problem-library', label: '出题题库' },
   { to: '/adventure', label: '历练' },
   { to: '/story', label: '剧情模式' },
-  { to: '/pvp', label: 'PVP', soon: true },
+  { to: '/pvp', label: 'PVP' },
 ] as const;
 
 export function Layout() {

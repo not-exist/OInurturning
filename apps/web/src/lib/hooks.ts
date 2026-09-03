@@ -183,6 +183,36 @@ export interface AuditView {
   createdAt: string;
 }
 
+export interface PvpTournamentView {
+  id: number;
+  name: string;
+  status: 'REGISTERING' | 'RUNNING' | 'FINISHED' | 'CANCELLED';
+  size: number;
+  registerEndsAt: string;
+  autoStartAt: string;
+  registered: boolean;
+}
+
+export interface PvpProblemSnapshot {
+  id: number;
+  name: string;
+  dominantDim: string;
+  rarity: string;
+  quality: number;
+  traitId: string | null;
+}
+
+export interface PvpRegistrationView {
+  id: number;
+  tournamentId: number;
+  userId: number;
+  roster: import('@oinur/shared').ParticipantSnapshot[];
+  problemEntryIds: number[];
+  problemSnapshots: PvpProblemSnapshot[];
+  createdAt: string;
+  replayed: boolean;
+}
+
 export interface TalentDefView {
   id: string;
   name: string;
@@ -629,6 +659,38 @@ export function useAdminAudits() {
   return useQuery({
     queryKey: ['admin-audits'],
     queryFn: () => apiFetch<AuditView[]>('/api/admin/audits'),
+  });
+}
+
+export function usePvpTournaments() {
+  return useQuery({
+    queryKey: ['pvp-tournaments'],
+    queryFn: () => apiFetch<PvpTournamentView[]>('/api/pvp/tournaments'),
+  });
+}
+
+export function usePvpRegistration(tournamentId: number | undefined) {
+  return useQuery({
+    queryKey: ['pvp-registration', tournamentId],
+    queryFn: () => apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/registration`),
+    enabled: tournamentId !== undefined,
+    retry: false,
+  });
+}
+
+export function useRegisterPvp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tournamentId, studentId, problemEntryIds }: { tournamentId: number; studentId: number; problemEntryIds: number[] }) =>
+      apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/register`, {
+        method: 'POST',
+        body: JSON.stringify({ studentId, problemEntryIds }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pvp-tournaments'] });
+      qc.invalidateQueries({ queryKey: ['pvp-registration'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+    },
   });
 }
 

@@ -63,6 +63,7 @@ model User {
   createdTournaments PvpTournament[] @relation("TournamentCreator")
   adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
   announcements AdminAnnouncement[]
+  pvpRegistrations PvpRegistration[]
 
   @@map("users")
 }
@@ -175,8 +176,25 @@ model PvpTournament {
   createdAt    DateTime         @default(now())
 
   creator User? @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  registrations PvpRegistration[]
 
   @@index([status, autoStartAt])
+}
+
+model PvpRegistration {
+  id              Int      @id @default(autoincrement())
+  tournamentId    Int
+  userId          Int
+  roster          Json
+  problemEntryIds Json     @default("[]")
+  problemSnapshots Json    @default("[]")
+  createdAt       DateTime @default(now())
+
+  tournament PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, createdAt])
 }
 
 model AdminAnnouncement {

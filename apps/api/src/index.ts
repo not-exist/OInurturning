@@ -19,6 +19,7 @@ import { usersRouter } from './modules/users/router.js';
 import { recordRouter, storyRouter } from './modules/story/router.js';
 import { adventureRouter } from './modules/adventure/router.js';
 import { adminRouter } from './modules/admin/router.js';
+import { pvpRouter } from './modules/pvp/router.js';
 import type { ApiEnvelope } from '@oinur/shared';
 
 export interface AppOptions {
@@ -83,6 +84,7 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use('/api/records', recordRouter);
   app.use('/api/adventures', adventureRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/pvp', pvpRouter);
 
   app.use(errorHandler);
   return app;
