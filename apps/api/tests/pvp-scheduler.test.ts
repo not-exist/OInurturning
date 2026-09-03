@@ -35,10 +35,6 @@ describe('PVP scheduler', () => {
     expect(buildFirstRound(Array.from({ length: 17 }, (_, userId) => ({ userId: userId + 1 })), 32, 42)).toHaveLength(16);
   });
 
-  it('exports a tournament advancement service', () => {
-    expect(typeof advancePvpTournament).toBe('function');
-  });
-
   it('cancels underfilled tournaments and refunds tickets once', async () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Small', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     const player = await entrant();
@@ -127,5 +123,22 @@ describe('PVP scheduler', () => {
     const away = matches[0]!.awayUserId!;
     const awayRecord = await request(app).get(`/api/records/${matches[0]!.contestRecordId}`).set('Authorization', `Bearer ${players.find((player) => player.userId === away)!.token}`);
     expect(awayRecord.status).toBe(200);
+    const outsider = await entrant();
+    const outsiderRecord = await request(app).get(`/api/records/${matches[0]!.contestRecordId}`).set('Authorization', `Bearer ${outsider.token}`);
+    expect([403, 404]).toContain(outsiderRecord.status);
+  });
+
+  it('settles concurrent registration and underfilled advance without deadlock', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Race', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    const player = await entrant();
+    const outcome = await Promise.race([
+      Promise.allSettled([
+        registerPvp(player.userId, tournament.id, player.studentId, [], PAST),
+        advancePvpTournament(tournament.id, PAST),
+      ]),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('registration/advance timeout')), 5_000)),
+    ]);
+    expect(outcome).toHaveLength(2);
+    expect((await prisma.pvpTournament.findUniqueOrThrow({ where: { id: tournament.id } })).status).toBe('CANCELLED');
   });
 });

@@ -3,7 +3,7 @@
 ## TDD evidence
 
 - RED: `pnpm -C apps/api test tests/pvp-scheduler.test.ts` failed because `scheduler.js` was not present.
-- GREEN: focused scheduler and registration suites pass: 8 tests passed.
+- GREEN: focused scheduler and registration suites pass: scheduler 8 + registration 4 = 12 tests.
 - Added coverage for deterministic odd-count byes, underfilled cancellation/refund idempotency, eight- and sixteen-player advancement to `FINISHED`, immutable live-row changes, and concurrent duplicate-safe match/record creation.
 
 ## Implementation
@@ -18,8 +18,8 @@
 - `pnpm -C apps/api typecheck`: pass
 - `pnpm -C apps/api lint`: pass
 - `pnpm -C apps/api build`: pass
-- `pnpm -C apps/api test tests/pvp-scheduler.test.ts`: pass (7 tests)
-- `pnpm -C apps/api test`: pass (35 files, 279 tests)
+- `pnpm -C apps/api test tests/pvp-scheduler.test.ts tests/pvp-registration.test.ts`: pass (scheduler 8 + registration 4 = 12 tests)
+- `pnpm -C apps/api test`: first run exposed the global admin-audit assertion; after `129c876` audit fix, pass (35 files, 283 tests)
 - `git diff --check`: pass
 - `prisma validate`: pass
 - `prisma migrate status`: reports pending intentional `20260903000000_pvp_matches` migration
@@ -44,4 +44,8 @@
 - Question instance IDs use tournament/round/slot plus immutable snapshot hash, independent of auto-increment match IDs.
 - Admin start writes `PVP_TOURNAMENT_START` audit entries.
 - `PvpMatch.contestRecordId` is unique in schema and migration for the intended 1:1 relation.
-- Review follow-up tests: scheduler focused suite 8 tests and registration suite 4 tests passed; Web typecheck/build and API typecheck/lint/build passed. Full API suite should be rerun by integration.
+- Registration and underfilled-advance race test has a 5s timeout and confirms cancellation/no deadlock.
+- Registration now follows the scheduler's Tournament -> User -> Student lock order; focused race coverage confirms both paths settle.
+- HTTP result coverage confirms match participants can read a linked report while an unrelated outsider receives 403/404.
+- Review follow-up tests: scheduler focused suite 8 tests and registration suite 4 tests passed; Web typecheck/build and API typecheck/lint/build passed.
+- Final focused: scheduler 8 + registration 4 = 12 tests passed. Final full API: 35 files, 283 tests passed. The first full run exposed the global admin-audit assertion; after `129c876` fixed that audit path, the rerun passed.

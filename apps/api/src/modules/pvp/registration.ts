@@ -116,8 +116,9 @@ export async function registerPvp(
     throw new ApiError('VALIDATION_FAILED', { field: 'problemEntryIds', reason: 'at most two unique problems' });
   }
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    // PVP lock ordering is Tournament -> User -> Student, matching scheduler/refund paths.
     await tx.$queryRaw`SELECT id FROM PvpTournament WHERE id = ${tournamentId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const tournament = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
     if (tournament === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
     const existing = await tx.pvpRegistration.findUnique({
