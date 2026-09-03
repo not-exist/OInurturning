@@ -6,9 +6,9 @@
 
 - worktree：`/home/qzez/OInurturning/.claude/worktrees/m2-contest-story-work`
 - branch：`worktree-m2-contest-story-work`
-- committed HEAD：`bf8bc30 feat(m4): add admin tools`
-- M2、M3.1–M3.6 与 M4.1 已提交。
-- M4.2 报名与快照锁定当前为未提交工作区变更。
+- committed HEAD：`ff3d2ea fix(pvp): redact outsider bracket reports`
+- M2、M3.1–M3.6、M4.1、M4.2 与 T4.3 已提交。
+- 工作树干净；未执行 merge 或 push；仓库暂未配置远端。
 - 未执行 merge 或 push；仓库暂未配置远端。
 
 ## M2 状态
@@ -62,9 +62,11 @@
 - T3.6 出题 API、页面、ProblemLibraryEntry traitId 和质量评级已完成，focused 4/4、全量 268/268 通过；开发库迁移 `20260902170000_problem_traits` 已应用。
 - T4.1 管理端 API、页面、PvpTournament/AdminAnnouncement/AdminAuditLog 和 `requireAdmin` 已完成，focused 3/3、全量 271/271 通过；开发库迁移 `20260902190000_admin_tools` 已应用。
 - T4.2 PVP 报名 API、页面、PvpRegistration 与快照锁定已完成，focused 4/4；entry-ticket、容量、唯一报名、质量/归属、截止时间、题目顺序和 HTTP 路由均已覆盖；开发库迁移 `20260902210000_pvp_registrations` 已应用。
+- T4.3 PVP 调度器、确定性 bracket/bye、8/16 人自动推进、取消退款、快照重放、参赛双方战报权限、管理员审计和 Web bracket 已完成；focused 12/12、全量 283/283、workspace typecheck/lint/build 通过；migration `20260903000000_pvp_matches` 已应用。
 
 ## 下一步
 
-1. 审阅并提交 M4.2 报名独立 commit。
-2. 开始 T4.3：对阵树、轮次推进和批量自动模拟。
-3. 决定是否将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`。
+1. 开始 T4.4：加赛（sudden_death）与平局分流的 PVP 规则集成。
+2. 完成 T4.5：己方题库入赛与声誉计次防刷。
+3. 完成 T4.6：tag-card 冠军独占、奖池结算和领奖公示。
+4. M4 完成后将 `worktree-m2-contest-story-work` 合并回 `m2-contest-story`，再安排最终 Docker/浏览器手动验收和 M5。
