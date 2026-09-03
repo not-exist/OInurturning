@@ -47,5 +47,6 @@
 - Registration and underfilled-advance race test has a 5s timeout and confirms cancellation/no deadlock.
 - Registration now follows the scheduler's Tournament -> User -> Student lock order; focused race coverage confirms both paths settle.
 - HTTP result coverage confirms match participants can read a linked report while an unrelated outsider receives 403/404.
+- Bracket projections now redact `contestRecordId`/`reportUrl` for non-participants; outsider bracket and record requests are covered and denied/redacted.
 - Review follow-up tests: scheduler focused suite 8 tests and registration suite 4 tests passed; Web typecheck/build and API typecheck/lint/build passed.
 - Final focused: scheduler 8 + registration 4 = 12 tests passed. Final full API: 35 files, 283 tests passed. The first full run exposed the global admin-audit assertion; after `129c876` fixed that audit path, the rerun passed.

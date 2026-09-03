@@ -109,7 +109,8 @@ function inputFor(match: PvpMatch, home: Registration, away: Registration): Duel
   };
 }
 
-function matchView(row: PvpMatch): PvpMatchView {
+function matchView(row: PvpMatch, viewerUserId: number): PvpMatchView {
+  const canRead = viewerUserId === row.homeUserId || viewerUserId === row.awayUserId;
   return {
     id: row.id,
     round: row.round,
@@ -120,8 +121,8 @@ function matchView(row: PvpMatch): PvpMatchView {
     awayScore: row.awayScore,
     winnerUserId: row.winnerUserId,
     status: row.status,
-    contestRecordId: row.contestRecordId,
-    reportUrl: row.contestRecordId === null ? null : `/api/records/${row.contestRecordId}`,
+    contestRecordId: canRead ? row.contestRecordId : null,
+    reportUrl: canRead && row.contestRecordId !== null ? `/api/records/${row.contestRecordId}` : null,
   };
 }
 
@@ -230,7 +231,7 @@ export async function getPvpTournamentDetail(userId: number, tournamentId: numbe
 export async function getPvpBracket(userId: number, tournamentId: number, now?: Date): Promise<PvpMatchView[]> {
   await getPvpTournamentDetail(userId, tournamentId, now);
   const rows = await prisma.pvpMatch.findMany({ where: { tournamentId }, orderBy: [{ round: 'asc' }, { slot: 'asc' }] });
-  return rows.map(matchView);
+  return rows.map((row) => matchView(row, userId));
 }
 
 export async function startPvpTournament(adminId: number, tournamentId: number, now?: Date): Promise<PvpTournamentDetail> {

@@ -126,6 +126,9 @@ describe('PVP scheduler', () => {
     const outsider = await entrant();
     const outsiderRecord = await request(app).get(`/api/records/${matches[0]!.contestRecordId}`).set('Authorization', `Bearer ${outsider.token}`);
     expect([403, 404]).toContain(outsiderRecord.status);
+    const outsiderBracket = await request(app).get(`/api/pvp/tournaments/${tournament.id}/bracket`).set('Authorization', `Bearer ${outsider.token}`);
+    expect(outsiderBracket.status).toBe(200);
+    expect(outsiderBracket.body.data.every((match: { contestRecordId: string | null; reportUrl: string | null }) => match.contestRecordId === null && match.reportUrl === null)).toBe(true);
   });
 
   it('settles concurrent registration and underfilled advance without deadlock', async () => {
