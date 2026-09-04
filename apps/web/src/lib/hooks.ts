@@ -234,6 +234,21 @@ export interface PvpMatchView {
   reportUrl: string | null;
 }
 
+export type PvpRewardLine =
+  | { type: 'item'; itemId: string; count: number }
+  | { type: 'money'; amount: number }
+  | { type: 'reputation'; amount: number };
+
+export interface PvpRewardGrantView {
+  id: number;
+  tournamentId: number;
+  userId: number;
+  rank: number;
+  rewards: PvpRewardLine[];
+  claimedAt: string | null;
+  claimable: boolean;
+}
+
 export interface TalentDefView {
   id: string;
   name: string;
@@ -647,6 +662,21 @@ export function useCreateTournament() {
   });
 }
 
+export function useUpdateTournamentPrizes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tournamentId, prizes }: { tournamentId: number; prizes: Record<string, unknown> }) =>
+      apiFetch<TournamentView>(`/api/admin/pvp-tournaments/${tournamentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ prizes }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-tournaments'] });
+      qc.invalidateQueries({ queryKey: ['admin-audits'] });
+    },
+  });
+}
+
 export function useCreateAnnouncement() {
   const qc = useQueryClient();
   return useMutation({
@@ -705,6 +735,22 @@ export function usePvpTournamentDetail(tournamentId: number | undefined) {
 
 export function usePvpBracket(tournamentId: number | undefined) {
   return useQuery({ queryKey: ['pvp-bracket', tournamentId], queryFn: () => apiFetch<PvpMatchView[]>(`/api/pvp/tournaments/${tournamentId}/bracket`), enabled: tournamentId !== undefined });
+}
+
+export function usePvpRewards(tournamentId: number | undefined) {
+  return useQuery({ queryKey: ['pvp-rewards', tournamentId], queryFn: () => apiFetch<PvpRewardGrantView[]>(`/api/pvp/tournaments/${tournamentId}/rewards`), enabled: tournamentId !== undefined });
+}
+
+export function useClaimPvpReward() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tournamentId: number) => apiFetch<PvpRewardGrantView>(`/api/pvp/tournaments/${tournamentId}/rewards/claim`, { method: 'POST' }),
+    onSuccess: (_, tournamentId) => {
+      qc.invalidateQueries({ queryKey: ['pvp-rewards', tournamentId] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
 }
 
 export function useRegisterPvp() {

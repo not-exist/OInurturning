@@ -64,8 +64,8 @@
 - T4.3 PVP 调度器、确定性 bracket/bye、8/16 人自动推进、取消退款、快照重放、参赛双方战报权限、管理员审计和 Web bracket 已完成；focused 12/12、全量 283/283、workspace typecheck/lint/build 通过；migration `20260903000000_pvp_matches` 已应用。
 - T4.4 PVP 调度器已读取赛事 `rules.qualityScoring`（兼容顶层 camelCase/snake_case），透传到每场 duel；PVP tiebreak 固定 `SUDDEN_DEATH`。新增质量规则集成测试；focused scheduler+duel 20/20、全量 35 files/284 tests、workspace typecheck/lint/build 与 `git diff --check` 通过。
 - T4.5 PVP 调度器已对携带预制题的对手未解题结果发放声誉；`PVP_PROBLEM` 审计键实现同题同场幂等和单题单届 12 点上限。新增未解题收益/重放与上限测试；focused scheduler+duel 21/21、全量 35 files/286 tests、workspace typecheck/lint/build 与 Prisma 校验通过。
+- T4.6 PVP 奖励台账、冠军独占 `tag-card`、管理员奖池 PATCH、公开奖励查询与本人幂等领取已完成；默认奖励桶和首轮胜者返票已覆盖；全量 35 files/289 tests、workspace typecheck/lint/build 与 Prisma 校验通过；开发库迁移 `20260904120000_pvp_reward_grants` 已应用。
 
 ## 下一步
 
-1. 完成 T4.6：tag-card 冠军独占、奖池结算和领奖公示。
-2. M4 完成后安排最终 Docker/浏览器手动验收和 M5。
+1. M4 完成后安排最终 Docker/浏览器手动验收和 M5。

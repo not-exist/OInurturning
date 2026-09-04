@@ -5,11 +5,15 @@ import {
   usePvpRegistration,
   usePvpTournamentDetail,
   usePvpBracket,
+  usePvpRewards,
+  useClaimPvpReward,
   usePvpTournaments,
   useProblems,
   useRegisterPvp,
   useStudents,
   type PvpRegistrationView,
+  type PvpRewardGrantView,
+  type PvpRewardLine,
 } from '../../lib/hooks';
 
 export function PvpPage(): JSX.Element {
@@ -23,10 +27,12 @@ export function PvpPage(): JSX.Element {
   const registration = usePvpRegistration(selectedTournamentId);
   const detail = usePvpTournamentDetail(selectedTournamentId);
   const bracket = usePvpBracket(selectedTournamentId);
+  const rewards = usePvpRewards(selectedTournamentId);
   const register = useRegisterPvp();
+  const claimReward = useClaimPvpReward();
   const [problemIds, setProblemIds] = useState<number[]>([]);
 
-  if (tournaments.isPending || students.isPending || problems.isPending || inventory.isPending || detail.isPending || bracket.isPending) {
+  if (tournaments.isPending || students.isPending || problems.isPending || inventory.isPending || detail.isPending || bracket.isPending || rewards.isPending) {
     return <p className="text-neutral-500">加载 PVP 数据…</p>;
   }
   if (
@@ -40,6 +46,7 @@ export function PvpPage(): JSX.Element {
     !inventory.data
     || !detail.data
     || !bracket.data
+    || !rewards.data
   ) {
     return <p className="text-red-600">PVP 数据加载失败。</p>;
   }
@@ -78,10 +85,36 @@ export function PvpPage(): JSX.Element {
               </div>
               {selectedRegistration ? <RegistrationView registration={selectedRegistration} /> : selectedTournament.status !== 'REGISTERING' ? <p className="mt-4 text-sm text-amber-700">报名已关闭。</p> : <RegistrationForm students={students.data} problems={eligibleProblems} studentId={selectedStudentId} onStudentChange={setStudentId} problemIds={problemIds} onProblemsChange={setProblemIds} onSubmit={() => selectedStudentId !== undefined && register.mutate({ tournamentId: selectedTournament.id, studentId: selectedStudentId, problemEntryIds: problemIds })} pending={register.isPending} error={register.error} />}
               {bracket.data.length > 0 && <BracketView matches={bracket.data} />}
+              {rewards.data.length > 0 && <RewardGrants grants={rewards.data} onClaim={() => selectedTournamentId !== undefined && claimReward.mutate(selectedTournamentId)} pending={claimReward.isPending} />}
             </section>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function rewardLabel(reward: PvpRewardLine): string {
+  if (reward.type === 'item') return `${reward.itemId} ×${reward.count}`;
+  if (reward.type === 'money') return `资金 +${reward.amount}`;
+  return `声誉 +${reward.amount}`;
+}
+
+function RewardGrants({ grants, onClaim, pending }: { grants: PvpRewardGrantView[]; onClaim: () => void; pending: boolean }): JSX.Element {
+  return (
+    <div className="mt-6 border-t border-neutral-200 pt-4">
+      <h2 className="text-sm font-medium">赛事奖励公示</h2>
+      <div className="mt-3 divide-y divide-neutral-200 border-y border-neutral-200 text-sm">
+        {grants.map((grant) => (
+          <div key={grant.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div>
+              <p className="font-medium">第 {grant.rank} 名 · 用户 {grant.userId}</p>
+              <p className="mt-1 text-xs text-neutral-500">{grant.rewards.length === 0 ? '无奖励' : grant.rewards.map(rewardLabel).join(' · ')}</p>
+            </div>
+            {grant.claimedAt !== null ? <span className="text-xs text-green-700">已领取</span> : grant.claimable ? <button type="button" className="rounded bg-neutral-900 px-3 py-2 text-xs text-white disabled:opacity-50" disabled={pending} onClick={onClaim}>{pending ? '领取中…' : '领取奖励'}</button> : null}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

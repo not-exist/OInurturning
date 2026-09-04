@@ -55,6 +55,18 @@ adminRouter.get('/tournaments', async (_req, res, next) => {
   }
 });
 
+adminRouter.patch('/pvp-tournaments/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
+    const parsed = z.object({ prizes: z.record(z.unknown()) }).strict().safeParse(req.body);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    res.json({ ok: true, data: await service.updateTournamentPrizes(req.user!.id, id, parsed.data.prizes) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 adminRouter.post('/announcements', async (req, res, next) => {
   try {
     const parsed = announcementSchema.safeParse(req.body);

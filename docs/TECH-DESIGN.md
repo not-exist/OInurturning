@@ -546,6 +546,7 @@ model User {
   storyProgress    StoryProgress[]
   adventureLogs    AdventureLog[]
   pvpRegistrations PvpRegistration[]
+  pvpRewardGrants  PvpRewardGrant[]
   passiveSources   PassiveIncomeSource[]
   reputationLogs   ReputationLog[]
 }
@@ -728,6 +729,7 @@ model PvpTournament {
   admin         User?             @relation(fields: [createdBy], references: [id], onDelete: SetNull)
   registrations PvpRegistration[]
   matches       PvpMatch[]
+  rewardGrants  PvpRewardGrant[]
 
   @@index([status, autoStartAt])                              // 懒推进扫描
 }
@@ -765,6 +767,22 @@ model PvpMatch {
 
   @@unique([tournamentId, round, slot])
   @@index([tournamentId, round])
+}
+
+model PvpRewardGrant {
+  id           Int      @id @default(autoincrement())
+  tournamentId Int
+  userId       Int
+  rank         Int
+  rewards      Json     @default("[]")
+  claimedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  tournament PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, rank])
 }
 
 // ───────────────────────── 被动收入 ─────────────────────────
@@ -884,6 +902,7 @@ model AdminAuditLog {
 | PvpTournament | `(status,autoStartAt)` | 锦标赛列表 + 懒推进候选扫描 |
 | PvpRegistration | `(tournamentId,userId)` unique | 报名幂等；重复报名直接冲突报错 |
 | PvpMatch | `(tournamentId,round,slot)` unique、`(tournamentId,round)` | 轮次生成防重；对阵树按轮读取 |
+| PvpRewardGrant | `(tournamentId,userId)` unique、`(tournamentId,rank)` | 赛事奖励台账幂等；公示按名次读取 |
 | PassiveIncomeSource | `(userId)` | 用户级惰性收入结算扫描 |
 | Config* 表 | 主键即语义 id | 运行时点查为主；导入走 upsert 主键命中 |
 | ReputationLog / AdminAuditLog | `(userId/adminId,createdAt)` | 审计时间线倒序分页 |
@@ -1113,6 +1132,8 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | 35 | POST /api/pvp/tournaments/:id/registration | 登录 | roster[]+problemEntryIds[]；截止前可提交 | 冻结阵容快照入库；重复报名 409 | 报名锁阵 |
 | 36 | DELETE /api/pvp/tournaments/:id/registration | 登录 | — | 截止前退赛；截止后 409 | 退赛 |
 | 37 | GET /api/pvp/tournaments/:id/bracket | 登录 | — | 对阵树（轮次/比分/胜者/战报链接）；顺带触发懒推进 | 对阵树 |
+| 38 | GET /api/pvp/tournaments/:id/rewards | 登录 | — | 奖励公示与领取状态；顺带触发懒推进 | 公示领奖 |
+| 39 | POST /api/pvp/tournaments/:id/rewards/claim | 登录 | — | 本人奖励原子入账；重复请求返回已领取台账 | 领奖 |
 
 **背包与商城**
 

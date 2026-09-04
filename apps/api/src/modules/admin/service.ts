@@ -1,5 +1,7 @@
 import { Prisma, type AdminAnnouncement, type AdminAuditLog, type PvpTournament } from '@prisma/client';
+import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { validatePvpPrizes } from '../pvp/rewards.js';
 
 export interface CreateTournamentInput {
   name: string;
@@ -119,6 +121,7 @@ export async function createTournament(
   adminId: number,
   input: CreateTournamentInput,
 ): Promise<TournamentView> {
+  validatePvpPrizes(input.prizes);
   return prisma.$transaction(async (tx) => {
     const row = await tx.pvpTournament.create({
       data: {
@@ -137,6 +140,26 @@ export async function createTournament(
       registerEndsAt: row.registerEndsAt.toISOString(),
       autoStartAt: row.autoStartAt.toISOString(),
     });
+    return tournamentView(row);
+  });
+}
+
+export async function updateTournamentPrizes(
+  adminId: number,
+  tournamentId: number,
+  prizes: unknown,
+  now: Date = new Date(),
+): Promise<TournamentView> {
+  validatePvpPrizes(prizes);
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM PvpTournament WHERE id = ${tournamentId} FOR UPDATE`;
+    const current = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
+    if (current === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
+    if (current.status !== 'REGISTERING' || now >= current.registerEndsAt) {
+      throw new ApiError('STATE_CONFLICT', { resource: 'tournament', id: tournamentId, reason: 'prize configuration is frozen' });
+    }
+    const row = await tx.pvpTournament.update({ where: { id: tournamentId }, data: { prizes: json(prizes) } });
+    await audit(tx, adminId, 'TOURNAMENT_PRIZES_UPDATE', 'PVP_TOURNAMENT', String(tournamentId), { prizes });
     return tournamentView(row);
   });
 }

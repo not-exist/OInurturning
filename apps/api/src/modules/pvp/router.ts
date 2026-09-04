@@ -4,6 +4,7 @@ import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as service from './registration.js';
 import * as scheduler from './scheduler.js';
+import { claimPvpReward, listPvpRewardGrants } from './rewards.js';
 
 const registrationSchema = z
   .object({
@@ -50,6 +51,26 @@ pvpRouter.get('/tournaments/:id', async (req, res, next) => {
 pvpRouter.get('/tournaments/:id/bracket', async (req, res, next) => {
   try {
     res.json({ ok: true, data: await scheduler.getPvpBracket(req.user!.id, parseId(req.params.id)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+pvpRouter.get('/tournaments/:id/rewards', async (req, res, next) => {
+  try {
+    const tournamentId = parseId(req.params.id);
+    await scheduler.getPvpTournamentDetail(req.user!.id, tournamentId);
+    res.json({ ok: true, data: await listPvpRewardGrants(req.user!.id, tournamentId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+pvpRouter.post('/tournaments/:id/rewards/claim', async (req, res, next) => {
+  try {
+    const tournamentId = parseId(req.params.id);
+    await scheduler.getPvpTournamentDetail(req.user!.id, tournamentId);
+    res.json({ ok: true, data: await claimPvpReward(req.user!.id, tournamentId) });
   } catch (error) {
     next(error);
   }

@@ -203,4 +203,54 @@ describe('PVP scheduler', () => {
     expect(logs.reduce((sum, log) => sum + log.delta, 0)).toBe(12);
     expect(user.reputation).toBe(12);
   });
+
+  it('publishes idempotent prize grants and lets the champion claim once', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Prize grants', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: { champion: { money: 1234, items: [{ itemId: 'tag-card', count: 9 }] } }, config: {} } });
+    const players = [];
+    for (let index = 0; index < 4; index += 1) {
+      const player = await entrant();
+      players.push(player);
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    }
+
+    await advancePvpTournament(tournament.id, PAST);
+    const grantsResponse = await request(app).get(`/api/pvp/tournaments/${tournament.id}/rewards`).set('Authorization', `Bearer ${players[0]!.token}`);
+    expect(grantsResponse.status).toBe(200);
+    expect(grantsResponse.body.data).toHaveLength(4);
+    const championGrant = grantsResponse.body.data.find((grant: { rank: number }) => grant.rank === 1);
+    expect(championGrant.rewards).toEqual(expect.arrayContaining([{ type: 'item', itemId: 'tag-card', count: 1 }]));
+    expect(championGrant.rewards.filter((reward: { itemId?: string }) => reward.itemId === 'tag-card')).toHaveLength(1);
+
+    const final = await prisma.pvpMatch.findFirstOrThrow({ where: { tournamentId: tournament.id, status: 'DONE' }, orderBy: { round: 'desc' } });
+    const champion = players.find((player) => player.userId === final.winnerUserId)!;
+    const claim = await request(app).post(`/api/pvp/tournaments/${tournament.id}/rewards/claim`).set('Authorization', `Bearer ${champion.token}`);
+    expect(claim.status).toBe(200);
+    expect(claim.body.data.claimedAt).not.toBeNull();
+    expect((await prisma.userItem.findUniqueOrThrow({ where: { userId_itemId: { userId: champion.userId, itemId: 'tag-card' } } })).quantity).toBe(1);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: champion.userId }, select: { money: true } })).money).toBe(1234);
+
+    const replay = await request(app).post(`/api/pvp/tournaments/${tournament.id}/rewards/claim`).set('Authorization', `Bearer ${champion.token}`);
+    expect(replay.status).toBe(200);
+    expect((await prisma.userItem.findUniqueOrThrow({ where: { userId_itemId: { userId: champion.userId, itemId: 'tag-card' } } })).quantity).toBe(1);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: champion.userId }, select: { money: true } })).money).toBe(1234);
+  });
+
+  it('uses the default prize buckets for champion, finalist and other first-round winners', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Default prizes', size: 16, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    for (let index = 0; index < 16; index += 1) {
+      const player = await entrant();
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    }
+    await advancePvpTournament(tournament.id, PAST);
+    const grants = await prisma.pvpRewardGrant.findMany({ where: { tournamentId: tournament.id }, orderBy: { rank: 'asc' } });
+    const champion = grants.find((grant) => grant.rank === 1)!;
+    const ticketGrant = grants.find((grant) => grant.rank > 4 && (grant.rewards as Array<{ itemId?: string }>).some((reward) => reward.itemId === 'entry-ticket'));
+    expect(champion.rewards).toEqual(expect.arrayContaining([
+      { type: 'item', itemId: 'tag-card', count: 1 },
+      { type: 'item', itemId: 'advance-stone', count: 2 },
+      { type: 'item', itemId: 'trophy-champion', count: 1 },
+    ]));
+    expect(ticketGrant).toBeDefined();
+    expect(ticketGrant!.rewards).toEqual(expect.arrayContaining([{ type: 'item', itemId: 'entry-ticket', count: 1 }]));
+  });
 });

@@ -102,15 +102,27 @@ function TournamentForm(): JSX.Element {
   const [size, setSize] = useState<8 | 16 | 32>(16);
   const [registerEndsAt, setRegisterEndsAt] = useState(futureDate(24));
   const [autoStartAt, setAutoStartAt] = useState(futureDate(48));
+  const [prizes, setPrizes] = useState('{}');
+  const [prizeError, setPrizeError] = useState(false);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    let parsedPrizes: Record<string, unknown>;
+    try {
+      const value: unknown = JSON.parse(prizes);
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('prizes must be an object');
+      parsedPrizes = value as Record<string, unknown>;
+      setPrizeError(false);
+    } catch {
+      setPrizeError(true);
+      return;
+    }
     create.mutate({
       name,
       size,
       registerEndsAt: new Date(registerEndsAt).toISOString(),
       autoStartAt: new Date(autoStartAt).toISOString(),
-      prizes: {},
+      prizes: parsedPrizes,
       config: {},
     });
   };
@@ -124,6 +136,8 @@ function TournamentForm(): JSX.Element {
         <label className="text-sm">报名截止<input required type="datetime-local" className="mt-1 w-full rounded border px-2 py-2" value={registerEndsAt} onChange={(event) => setRegisterEndsAt(event.target.value)} /></label>
         <label className="text-sm">自动开始<input required type="datetime-local" className="mt-1 w-full rounded border px-2 py-2" value={autoStartAt} onChange={(event) => setAutoStartAt(event.target.value)} /></label>
       </div>
+      <label className="block text-sm"><span className="mb-1 block text-neutral-500">奖池配置（JSON）</span><textarea className="min-h-24 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs" value={prizes} onChange={(event) => setPrizes(event.target.value)} placeholder='{"champion":{"money":1000}}' /></label>
+      {prizeError && <p className="text-sm text-red-600">奖池必须是有效 JSON 对象。</p>}
       <button className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50" disabled={create.isPending}>{create.isPending ? '创建中…' : '创建赛事'}</button>
       {create.isError && <p className="text-sm text-red-600">赛事创建失败，请检查时间窗口。</p>}
     </form>

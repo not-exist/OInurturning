@@ -8,6 +8,7 @@ import { simulateDuel } from '../contest/engine/duel.js';
 import { stableHash } from '../contest/engine/report.js';
 import { createContestRecord } from '../contest/repository.js';
 import { buildFirstRound, buildNextRound } from './bracket.js';
+import { ensurePvpRewardGrants } from './rewards.js';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 type Registration = PvpRegistration;
@@ -268,7 +269,12 @@ export async function advancePvpTournament(tournamentId: number, now?: Date, act
       await tx.adminAuditLog.create({ data: { adminId: actorAdminId, adminNameSnapshot: admin.username, action: 'PVP_TOURNAMENT_START', targetType: 'PVP_TOURNAMENT', targetId: String(tournamentId), payload: { status } } });
     };
     const effectiveNow = now ?? new Date();
-    if ((tournament.status === 'REGISTERING' && effectiveNow < tournament.autoStartAt) || tournament.status === 'FINISHED' || tournament.status === 'CANCELLED') { await auditStart(tournament.status); return detailInTx(tx, tournament, null); }
+    if (tournament.status === 'FINISHED') {
+      await ensurePvpRewardGrants(tx, tournament);
+      await auditStart(tournament.status);
+      return detailInTx(tx, tournament, null);
+    }
+    if ((tournament.status === 'REGISTERING' && effectiveNow < tournament.autoStartAt) || tournament.status === 'CANCELLED') { await auditStart(tournament.status); return detailInTx(tx, tournament, null); }
     const count = await tx.pvpRegistration.count({ where: { tournamentId } });
     if (count < 4) {
       await cancelAndRefund(tx, tournamentId);
@@ -291,6 +297,7 @@ export async function advancePvpTournament(tournamentId: number, now?: Date, act
       await ensureRound(tx, running, round + 1, winners);
     }
     const final = await tx.pvpTournament.findUniqueOrThrow({ where: { id: tournamentId } });
+    if (final.status === 'FINISHED') await ensurePvpRewardGrants(tx, final);
     await auditStart(final.status);
     return detailInTx(tx, final, null, registrationRows);
   });
