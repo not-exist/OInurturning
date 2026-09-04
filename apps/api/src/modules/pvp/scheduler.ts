@@ -11,6 +11,17 @@ import { buildFirstRound, buildNextRound } from './bracket.js';
 type Db = typeof prisma | Prisma.TransactionClient;
 type Registration = PvpRegistration;
 
+function qualityScoringEnabled(config: unknown): boolean {
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) return false;
+  const root = config as Record<string, unknown>;
+  const rules = root.rules;
+  if (typeof rules === 'object' && rules !== null && !Array.isArray(rules)) {
+    const ruleConfig = rules as Record<string, unknown>;
+    if (ruleConfig.qualityScoring === true || ruleConfig.quality_scoring === true) return true;
+  }
+  return root.qualityScoring === true || root.quality_scoring === true;
+}
+
 export interface PvpMatchView {
   id: number;
   round: number;
@@ -92,7 +103,7 @@ function generatedQuestion(tournamentId: number, round: number, slot: number, sn
   };
 }
 
-function inputFor(match: PvpMatch, home: Registration, away: Registration): DuelInput {
+function inputFor(match: PvpMatch, home: Registration, away: Registration, qualityRuleOn: boolean): DuelInput {
   const homeProblems = (home.problemSnapshots as unknown as { id: number; name: string; dominantDim: string; quality: number; traitId: string | null }[]);
   const awayProblems = (away.problemSnapshots as unknown as { id: number; name: string; dominantDim: string; quality: number; traitId: string | null }[]);
   const snapshotKey = stableHash({ home: home.roster, away: away.roster, homeProblems, awayProblems });
@@ -104,7 +115,7 @@ function inputFor(match: PvpMatch, home: Registration, away: Registration): Duel
     home: participant(home, 'HOME'),
     away: participant(away, 'AWAY'),
     questions,
-    qualityRuleOn: false,
+    qualityRuleOn,
     tiebreak: 'SUDDEN_DEATH',
   };
 }
@@ -162,13 +173,14 @@ async function cancelAndRefund(tx: Prisma.TransactionClient, tournamentId: numbe
 
 async function playPending(tx: Prisma.TransactionClient, tournament: PvpTournament, round: number): Promise<void> {
   const pending = await tx.pvpMatch.findMany({ where: { tournamentId: tournament.id, round, status: 'PENDING' }, orderBy: { slot: 'asc' } });
+  const qualityRuleOn = qualityScoringEnabled(tournament.config);
   for (const match of pending) {
     if (match.homeUserId === null || match.awayUserId === null) continue;
     const registrations = await tx.pvpRegistration.findMany({ where: { tournamentId: tournament.id, userId: { in: [match.homeUserId, match.awayUserId] } } });
     const home = registrations.find((row) => row.userId === match.homeUserId);
     const away = registrations.find((row) => row.userId === match.awayUserId);
     if (home === undefined || away === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'registration' });
-    const input = inputFor(match, home, away);
+    const input = inputFor(match, home, away, qualityRuleOn);
     const seed = deriveSeed(tournament.id, round, match.slot, stableHash(input));
     const report = simulateDuel(input, seed);
     const winnerUserId = report.winnerSide === 'AWAY' ? match.awayUserId : match.homeUserId;

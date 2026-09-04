@@ -144,4 +144,17 @@ describe('PVP scheduler', () => {
     expect(outcome).toHaveLength(2);
     expect((await prisma.pvpTournament.findUniqueOrThrow({ where: { id: tournament.id } })).status).toBe('CANCELLED');
   });
+
+  it('passes the tournament quality-scoring rule into every duel report', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Quality rule', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: { rules: { qualityScoring: true } } } });
+    for (let index = 0; index < 4; index += 1) {
+      const player = await entrant();
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    }
+    await advancePvpTournament(tournament.id, PAST);
+    const records = await prisma.contestRecord.findMany({ where: { type: 'PVP' } });
+    expect(records.length).toBe(3);
+    expect(records.every((record) => (record.report as { qualityRuleOn: boolean }).qualityRuleOn)).toBe(true);
+    expect(records.every((record) => (record.report as { tiebreak: string }).tiebreak === 'SUDDEN_DEATH')).toBe(true);
+  });
 });
