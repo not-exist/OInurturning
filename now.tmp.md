@@ -6,7 +6,7 @@
 
 - worktree：`/home/qzez/OInurturning`
 - branch：`m2-contest-story`
-- committed HEAD：`a016342 feat(m4): credit pvp carried problem reputation`
+- committed HEAD：`6caf5de feat(m4): add pvp reward grants and claiming`
 - M2、M3.1–M3.6、M4.1、M4.2、T4.3、T4.4 与 T4.5 已提交。
 - 工作树干净；未执行 merge 或 push；仓库暂未配置远端。
 
