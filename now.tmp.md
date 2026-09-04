@@ -4,9 +4,9 @@
 
 ## 工作区
 
-- worktree：`/home/qzez/OInurturning/.claude/worktrees/m4-pvp-tiebreak`
-- branch：`m4-pvp-tiebreak`
-- committed base：`be0ff93 merge: M4.3 PVP tournament scheduler`
+- worktree：`/home/qzez/OInurturning`
+- branch：`m2-contest-story`
+- committed HEAD：`f1c6bb0 feat(m4): wire pvp quality scoring rule`
 - M2、M3.1–M3.6、M4.1、M4.2、T4.3 与 T4.4 已提交。
 - 工作树干净；未执行 merge 或 push；仓库暂未配置远端。
 
@@ -68,4 +68,4 @@
 
 1. 完成 T4.5：己方题库入赛与声誉计次防刷。
 2. 完成 T4.6：tag-card 冠军独占、奖池结算和领奖公示。
-3. M4 完成后将 `m4-pvp-tiebreak` 合并回 `m2-contest-story`，再安排最终 Docker/浏览器手动验收和 M5。
+3. M4 完成后安排最终 Docker/浏览器手动验收和 M5。
