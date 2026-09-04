@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DimensionKey, QualityTier, Rarity, StudentView } from '@oinur/shared';
+import type {
+  ContestRecordView,
+  DimensionKey,
+  QualityTier,
+  Rarity,
+  StudentView,
+} from '@oinur/shared';
 import { apiFetch } from './api';
 
 // ---------------------------------------------------------------------------
@@ -72,6 +78,162 @@ export interface TrainingResult {
   staminaAfter: number;
 }
 
+export interface AdventureChoiceView {
+  index: number;
+  text: string;
+  available: boolean;
+  requiresItem?: string;
+  costMoney?: number;
+}
+
+export interface AdventureEventView {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  rarity: string;
+  staminaCost: 1 | 2 | 3;
+  description: string;
+  choices: AdventureChoiceView[] | null;
+}
+
+export interface AdventureLogView {
+  id: number;
+  studentId: number | null;
+  contestRecordId: string | null;
+  tier: 1 | 2 | 3;
+  status: 'PENDING' | 'RESOLVED';
+  preview: boolean;
+  event: AdventureEventView;
+  choices: number[];
+  results: unknown[];
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface AdventureChoiceResult {
+  adventure: AdventureLogView;
+  completed: boolean;
+}
+
+export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
+
+export interface LectureTierView {
+  id: LectureTierId;
+  threshold: number;
+  baseMoney: number;
+  baseReputation: number;
+  available: boolean;
+}
+
+export interface LectureResultView {
+  id: number;
+  studentId: number;
+  tier: LectureTierId;
+  teachingValue: number;
+  threshold: number;
+  forced: boolean;
+  success: boolean;
+  money: number;
+  reputation: number;
+  staminaCost: number;
+  staminaAfter: number | null;
+  createdAt: string;
+}
+
+export interface TournamentView {
+  id: number;
+  name: string;
+  status: 'REGISTERING' | 'RUNNING' | 'FINISHED' | 'CANCELLED';
+  size: number;
+  registerEndsAt: string;
+  autoStartAt: string;
+  prizes: unknown;
+  config: unknown;
+  createdBy: number | null;
+  createdAt: string;
+}
+
+export interface AnnouncementView {
+  id: number;
+  title: string;
+  body: string;
+  authorId: number;
+  createdAt: string;
+}
+
+export interface UserAdminView {
+  id: number;
+  username: string;
+  role: 'USER' | 'ADMIN';
+  money: number;
+  reputation: number;
+  bannedAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditView {
+  id: number;
+  adminId: number | null;
+  adminNameSnapshot: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  payload: unknown;
+  createdAt: string;
+}
+
+export interface PvpTournamentView {
+  id: number;
+  name: string;
+  status: 'REGISTERING' | 'RUNNING' | 'FINISHED' | 'CANCELLED';
+  size: number;
+  registerEndsAt: string;
+  autoStartAt: string;
+  registered: boolean;
+}
+
+export interface PvpProblemSnapshot {
+  id: number;
+  name: string;
+  dominantDim: string;
+  rarity: string;
+  quality: number;
+  traitId: string | null;
+}
+
+export interface PvpRegistrationView {
+  id: number;
+  tournamentId: number;
+  userId: number;
+  roster: import('@oinur/shared').ParticipantSnapshot[];
+  problemEntryIds: number[];
+  problemSnapshots: PvpProblemSnapshot[];
+  createdAt: string;
+  replayed: boolean;
+}
+
+export interface PvpTournamentDetailView extends PvpTournamentView {
+  prizes: unknown;
+  config: unknown;
+  registeredCount: number;
+  myRegistration: number | null;
+}
+
+export interface PvpMatchView {
+  id: number;
+  round: number;
+  slot: number;
+  homeUserId: number | null;
+  awayUserId: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  winnerUserId: number | null;
+  status: 'PENDING' | 'DONE' | 'BYE';
+  contestRecordId: string | null;
+  reportUrl: string | null;
+}
+
 export interface TalentDefView {
   id: string;
   name: string;
@@ -87,7 +249,13 @@ export interface ProblemView {
   dominantDim: DimensionKey;
   rarity: Rarity;
   quality: number;
+  traitId: string | null;
   consumedAt: string | null;
+}
+
+export interface CreateProblemResult extends ProblemView {
+  cost: number;
+  staminaAfter: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,6 +448,45 @@ export function useRecruit() {
   });
 }
 
+export function useLectureTiers() {
+  return useQuery({
+    queryKey: ['lecture-tiers'],
+    queryFn: () => apiFetch<LectureTierView[]>('/api/academy/lecture-tiers'),
+  });
+}
+
+export function useLectureLogs() {
+  return useQuery({
+    queryKey: ['lecture-logs'],
+    queryFn: () => apiFetch<LectureResultView[]>('/api/academy/lectures'),
+  });
+}
+
+export function useTeachLecture() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      studentId,
+      tier,
+      force,
+    }: {
+      studentId: number;
+      tier: LectureTierId;
+      force: boolean;
+    }) =>
+      apiFetch<LectureResultView>('/api/academy/lectures', {
+        method: 'POST',
+        body: JSON.stringify({ studentId, tier, force }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lecture-tiers'] });
+      qc.invalidateQueries({ queryKey: ['lecture-logs'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 背包
 // ---------------------------------------------------------------------------
@@ -294,15 +501,64 @@ export function useInventory() {
 export function useUseItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, studentId }: { itemId: string; studentId: number }) =>
-      apiFetch<StudentView>('/api/items/use', {
+    mutationFn: ({ itemId, studentId }: { itemId: string; studentId?: number }) =>
+      apiFetch<StudentView | { itemId: string; activated: true }>('/api/items/use', {
         method: 'POST',
         body: JSON.stringify({ itemId, studentId }),
       }),
-    onSuccess: (s) => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['items'] });
       qc.invalidateQueries({ queryKey: ['students'] });
-      qc.invalidateQueries({ queryKey: ['student', s.id] });
+      if ('id' in result) qc.invalidateQueries({ queryKey: ['student', result.id] });
+    },
+  });
+}
+
+export function useAdventureLogs() {
+  return useQuery({
+    queryKey: ['adventure-logs'],
+    queryFn: () => apiFetch<AdventureLogView[]>('/api/adventures/logs'),
+  });
+}
+
+export function useDrawAdventure() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, tier }: { studentId: number; tier: 1 | 2 | 3 }) =>
+      apiFetch<AdventureLogView>('/api/adventures/draw', {
+        method: 'POST',
+        body: JSON.stringify({ studentId, tier }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['adventure-logs'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+}
+
+export function useChooseAdventure() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      action,
+      optionIndex,
+      skill,
+    }: {
+      id: number;
+      action?: 'accept' | 'avoid';
+      optionIndex?: number;
+      skill?: string;
+    }) =>
+      apiFetch<AdventureChoiceResult>(`/api/adventures/${id}/choice`, {
+        method: 'POST',
+        body: JSON.stringify({ action, optionIndex, skill }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['adventure-logs'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
     },
   });
 }
@@ -323,6 +579,147 @@ export function useProblems() {
     queryKey: ['problems'],
     queryFn: () => apiFetch<ProblemView[]>('/api/problems'),
     retry: false,
+  });
+}
+
+export function useProblemLibrary() {
+  return useQuery({
+    queryKey: ['problem-library'],
+    queryFn: () => apiFetch<ProblemView[]>('/api/problem-library'),
+  });
+}
+
+export function useCreateProblem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, dimension }: { studentId: number; dimension: DimensionKey }) =>
+      apiFetch<CreateProblemResult>('/api/problem-library', {
+        method: 'POST',
+        body: JSON.stringify({ studentId, dimension }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['problem-library'] });
+      qc.invalidateQueries({ queryKey: ['problems'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useDeleteProblem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<null>(`/api/problem-library/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['problem-library'] });
+      qc.invalidateQueries({ queryKey: ['problems'] });
+    },
+  });
+}
+
+export function useAdminTournaments() {
+  return useQuery({
+    queryKey: ['admin-tournaments'],
+    queryFn: () => apiFetch<TournamentView[]>('/api/admin/tournaments'),
+  });
+}
+
+export function useCreateTournament() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      name: string;
+      size: 8 | 16 | 32;
+      registerEndsAt: string;
+      autoStartAt: string;
+      prizes: Record<string, unknown>;
+      config: Record<string, unknown>;
+    }) =>
+      apiFetch<TournamentView>('/api/admin/tournaments', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-tournaments'] });
+      qc.invalidateQueries({ queryKey: ['admin-audits'] });
+    },
+  });
+}
+
+export function useCreateAnnouncement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ title, body }: { title: string; body: string }) =>
+      apiFetch<AnnouncementView>('/api/admin/announcements', {
+        method: 'POST',
+        body: JSON.stringify({ title, body }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-announcements'] });
+      qc.invalidateQueries({ queryKey: ['admin-audits'] });
+    },
+  });
+}
+
+export function useAdminAnnouncements() {
+  return useQuery({
+    queryKey: ['admin-announcements'],
+    queryFn: () => apiFetch<AnnouncementView[]>('/api/admin/announcements'),
+  });
+}
+
+export function useAdminUsers(query: string) {
+  return useQuery({
+    queryKey: ['admin-users', query],
+    queryFn: () => apiFetch<UserAdminView[]>(`/api/admin/users?query=${encodeURIComponent(query)}`),
+  });
+}
+
+export function useAdminAudits() {
+  return useQuery({
+    queryKey: ['admin-audits'],
+    queryFn: () => apiFetch<AuditView[]>('/api/admin/audits'),
+  });
+}
+
+export function usePvpTournaments() {
+  return useQuery({
+    queryKey: ['pvp-tournaments'],
+    queryFn: () => apiFetch<PvpTournamentView[]>('/api/pvp/tournaments'),
+  });
+}
+
+export function usePvpRegistration(tournamentId: number | undefined) {
+  return useQuery({
+    queryKey: ['pvp-registration', tournamentId],
+    queryFn: () => apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/registration`),
+    enabled: tournamentId !== undefined,
+    retry: false,
+  });
+}
+
+export function usePvpTournamentDetail(tournamentId: number | undefined) {
+  return useQuery({ queryKey: ['pvp-detail', tournamentId], queryFn: () => apiFetch<PvpTournamentDetailView>(`/api/pvp/tournaments/${tournamentId}`), enabled: tournamentId !== undefined });
+}
+
+export function usePvpBracket(tournamentId: number | undefined) {
+  return useQuery({ queryKey: ['pvp-bracket', tournamentId], queryFn: () => apiFetch<PvpMatchView[]>(`/api/pvp/tournaments/${tournamentId}/bracket`), enabled: tournamentId !== undefined });
+}
+
+export function useRegisterPvp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tournamentId, studentId, problemEntryIds }: { tournamentId: number; studentId: number; problemEntryIds: number[] }) =>
+      apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/register`, {
+        method: 'POST',
+        body: JSON.stringify({ studentId, problemEntryIds }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pvp-tournaments'] });
+      qc.invalidateQueries({ queryKey: ['pvp-registration'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+    },
   });
 }
 
@@ -370,5 +767,95 @@ export function useSpecializedTrain() {
       qc.invalidateQueries({ queryKey: ['problems'] });
       qc.invalidateQueries({ queryKey: ['me'] });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 剧情与战报
+// ---------------------------------------------------------------------------
+
+export interface StoryStageProgress {
+  stageKey: string;
+  ngLevel: number;
+  name?: string;
+  recommendedLevel?: number;
+  durationMin?: number;
+  staminaCost?: number;
+  unlocked: boolean;
+  cleared: boolean;
+  clearCount: number;
+  bestRank: number | null;
+  firstClearAt: string | null;
+}
+
+export interface StoryChapterView {
+  chapter: string;
+  stages: StoryStageProgress[];
+}
+
+export interface StoryOverview {
+  ngLevel: number;
+  chapters: StoryChapterView[];
+  ngPlusUnlocked: boolean;
+  maxUnlockedNgLevel: number;
+}
+
+export interface StoryEntryResult {
+  record: ContestRecordView;
+  replayed: boolean;
+  firstClear: boolean;
+}
+
+export function useStoryOverview(ngLevel = 0) {
+  return useQuery({
+    queryKey: ['story-overview', ngLevel],
+    queryFn: () => apiFetch<StoryOverview>(`/api/story/overview?ngLevel=${ngLevel}`),
+  });
+}
+
+export function useStoryProgress(ngLevel?: number) {
+  const query = ngLevel === undefined ? '' : `?ngLevel=${ngLevel}`;
+  return useQuery({
+    queryKey: ['story-progress', ngLevel ?? 'all'],
+    queryFn: () =>
+      apiFetch<import('@oinur/shared').StoryProgressView[]>(`/api/story/progress${query}`),
+  });
+}
+
+export function useEnterStoryStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      stageKey,
+      roster,
+      ngLevel,
+      idempotencyKey,
+    }: {
+      stageKey: string;
+      roster: number[];
+      ngLevel: number;
+      idempotencyKey: string;
+    }) =>
+      apiFetch<StoryEntryResult>(`/api/story/stages/${encodeURIComponent(stageKey)}/enter`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ roster, ngLevel }),
+      }),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['story-overview'] });
+      qc.invalidateQueries({ queryKey: ['story-progress'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      return result;
+    },
+  });
+}
+
+export function useContestRecord(recordId: string | undefined) {
+  return useQuery({
+    queryKey: ['contest-record', recordId],
+    queryFn: () => apiFetch<ContestRecordView>(`/api/records/${recordId}`),
+    enabled: recordId !== undefined,
   });
 }

@@ -9,15 +9,18 @@ const TABS = [
   { to: '/training', label: '训练中心' },
   { to: '/backpack', label: '背包' },
   { to: '/academy', label: '高级学院' },
-  { to: '/adventure', label: '历练', soon: true },
-  { to: '/story', label: '剧情模式', soon: true },
-  { to: '/pvp', label: 'PVP', soon: true },
+  { to: '/academy/lecture', label: '讲课' },
+  { to: '/problem-library', label: '出题题库' },
+  { to: '/adventure', label: '历练' },
+  { to: '/story', label: '剧情模式' },
+  { to: '/pvp', label: 'PVP' },
 ] as const;
 
 export function Layout() {
   const { me, setMe } = useAuthStore();
   const nav = useNavigate();
   const qc = useQueryClient();
+  const tabs = me?.role === 'ADMIN' ? [...TABS, { to: '/admin', label: '管理端' }] : TABS;
 
   async function logout(): Promise<void> {
     try {
@@ -41,15 +44,15 @@ export function Layout() {
           </button>
         </div>
       </header>
-      <div className="flex flex-1">
-        <nav className="w-44 shrink-0 border-r bg-white p-2 text-sm">
-          {TABS.map((t) => (
+      <div className="flex flex-1 flex-col md:flex-row">
+        <nav className="flex w-full shrink-0 gap-1 overflow-x-auto border-b bg-white p-2 text-sm md:block md:w-44 md:border-r md:border-b-0">
+          {tabs.map((t) => (
             <NavLink
               key={t.to}
               to={t.to}
               end
               className={({ isActive }) =>
-                `block rounded px-3 py-2 ${isActive ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-100'} ${'soon' in t && t.soon ? 'text-neutral-400' : ''}`
+                `shrink-0 rounded px-3 py-2 md:block ${isActive ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-100'} ${'soon' in t && t.soon ? 'text-neutral-400' : ''}`
               }
             >
               {t.label}
@@ -59,13 +62,13 @@ export function Layout() {
           <NavLink
             to="/settings"
             className={({ isActive }) =>
-              `block rounded px-3 py-2 ${isActive ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-100'}`
+              `shrink-0 rounded px-3 py-2 md:block ${isActive ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-100'}`
             }
           >
             用户设置
           </NavLink>
         </nav>
-        <main className="flex-1 p-6">
+        <main className="min-w-0 flex-1 p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

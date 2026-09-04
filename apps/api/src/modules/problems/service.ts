@@ -20,6 +20,7 @@ export interface ProblemView {
   dominantDim: DimensionKey;
   rarity: Rarity;
   quality: number;
+  traitId: string | null;
   consumedAt: string | null;
 }
 
@@ -34,6 +35,7 @@ export async function listProblems(userId: number): Promise<ProblemView[]> {
     dominantDim: r.dominantDim as DimensionKey,
     rarity: toRarity(r.rarity as ConfigRarity),
     quality: r.quality,
+    traitId: r.traitId,
     consumedAt: r.consumedAt ? r.consumedAt.toISOString() : null,
   }));
 }

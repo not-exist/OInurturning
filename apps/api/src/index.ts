@@ -11,10 +11,15 @@ import { academyRouter } from './modules/academy/router.js';
 import { authRouter } from './modules/auth/router.js';
 import { itemsRouter } from './modules/items/router.js';
 import { problemsRouter } from './modules/problems/router.js';
+import { problemLibraryRouter } from './modules/problems/library-router.js';
 import { studentsRouter } from './modules/students/router.js';
 import { talentsRouter } from './modules/talents/router.js';
 import { trainingRouter } from './modules/training/router.js';
 import { usersRouter } from './modules/users/router.js';
+import { recordRouter, storyRouter } from './modules/story/router.js';
+import { adventureRouter } from './modules/adventure/router.js';
+import { adminRouter } from './modules/admin/router.js';
+import { pvpRouter } from './modules/pvp/router.js';
 import type { ApiEnvelope } from '@oinur/shared';
 
 export interface AppOptions {
@@ -30,14 +35,15 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use(requestId);
 
   app.get('/api/health', (_req, res) => {
-    const body: ApiEnvelope<{ uptime: number; serverTime: string; configVersion: string | null }> = {
-      ok: true,
-      data: {
-        uptime: process.uptime(),
-        serverTime: new Date().toISOString(),
-        configVersion: getConfig()?.sourceHash.slice(0, 12) ?? null,
-      },
-    };
+    const body: ApiEnvelope<{ uptime: number; serverTime: string; configVersion: string | null }> =
+      {
+        ok: true,
+        data: {
+          uptime: process.uptime(),
+          serverTime: new Date().toISOString(),
+          configVersion: getConfig()?.sourceHash.slice(0, 12) ?? null,
+        },
+      };
     res.json(body);
   });
 
@@ -45,12 +51,23 @@ export function createApp(opts: AppOptions = {}): express.Express {
   const skipRateLimit = opts.skipRateLimit ?? process.env.NODE_ENV === 'test';
   const skip = (): boolean => skipRateLimit;
   // 命中限流时走统一错误信封（RATE_LIMITED），而非框架默认纯文本
-  const limitedHandler: express.RequestHandler = (_req, _res, next) => next(new ApiError('RATE_LIMITED'));
+  const limitedHandler: express.RequestHandler = (_req, _res, next) =>
+    next(new ApiError('RATE_LIMITED'));
   const authLimiter = rateLimit({
-    windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, skip, handler: limitedHandler,
+    windowMs: 15 * 60_000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip,
+    handler: limitedHandler,
   });
   const globalLimiter = rateLimit({
-    windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false, skip, handler: limitedHandler,
+    windowMs: 60_000,
+    limit: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip,
+    handler: limitedHandler,
   });
 
   app.use(globalLimiter);
@@ -60,8 +77,14 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use('/api/students', studentsRouter);
   app.use('/api/items', itemsRouter);
   app.use('/api/problems', problemsRouter);
+  app.use('/api/problem-library', problemLibraryRouter);
   app.use('/api/talents', talentsRouter);
   app.use('/api/training', trainingRouter);
+  app.use('/api/story', storyRouter);
+  app.use('/api/records', recordRouter);
+  app.use('/api/adventures', adventureRouter);
+  app.use('/api/admin', adminRouter);
+  app.use('/api/pvp', pvpRouter);
 
   app.use(errorHandler);
   return app;
@@ -74,7 +97,10 @@ export function startServer(): void {
 }
 
 // 测试环境的默认配置目录：apps/api/tests/fixtures/config
-const TEST_CONFIG_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../tests/fixtures/config');
+const TEST_CONFIG_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../tests/fixtures/config',
+);
 
 // 启动即执行配置即数据管线（坏配置快速失败，绝不带病上线）；
 // VITEST 门控内同样执行，使用测试 CONFIG_DIR（可被 env.CONFIG_DIR 显式覆盖）

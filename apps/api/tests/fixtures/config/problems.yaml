@@ -1,0 +1,25 @@
+version: 1
+updated: '2026-08-31'
+conventions:
+  requirement_band_reference: test
+  time_limit_semantics: test
+  implicit_no_trait_weight: 30
+  adhoc_dim_mapping: greedy
+severity_ladder: [red]
+traits:
+  - id: test-trait
+    name: 测试特性
+    severity: red
+    family: null
+    effect: 测试
+    hooks: {}
+templates:
+  - id: test-problem
+    tier: cspj
+    title: 测试题
+    dim: ds
+    requirements: {d: 1, m: 1, c: 1}
+    score: 100
+    time_limit_min: 10
+    trait_pool: []
+    partial_scores: false

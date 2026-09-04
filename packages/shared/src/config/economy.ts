@@ -56,10 +56,40 @@ export const economyRecruitmentSchema = z
   .passthrough();
 export type EconomyRecruitment = z.infer<typeof economyRecruitmentSchema>;
 
+export const lectureTierSchema = z
+  .object({
+    id: z.string().regex(/^[a-z][a-z0-9-]*$/),
+    threshold: z.number().int().nonnegative(),
+    base_money: z.number().int().nonnegative(),
+    base_reputation: z.number().int().nonnegative(),
+  })
+  .strict();
+export type LectureTier = z.infer<typeof lectureTierSchema>;
+
+export const lectureConfigSchema = z
+  .object({
+    audience_tiers: z.array(lectureTierSchema).length(5),
+    reputation_pay_curve: z.object({
+      rep_divisor: z.number().positive(),
+      min_mult: z.number().nonnegative(),
+      max_mult: z.number().nonnegative(),
+    }).passthrough(),
+    overflow_bonus: z.object({
+      overflow_step: z.number().positive(),
+      overflow_pct: z.number().nonnegative(),
+      overflow_cap_pct: z.number().nonnegative(),
+    }).passthrough(),
+  })
+  .passthrough();
+export type LectureConfig = z.infer<typeof lectureConfigSchema>;
+
 export const economyConfigSchema = z
   .object({
     training: economyTrainingSchema,
     recruitment: economyRecruitmentSchema,
+    // M1 fixtures may carry a partial passthrough lecture block; M3 lecture
+    // paths parse the complete shape before using it.
+    lecture: z.union([lectureConfigSchema, z.record(z.unknown())]).optional(),
   })
   .passthrough();
 export type EconomyConfig = z.infer<typeof economyConfigSchema>;

@@ -12,6 +12,35 @@ enum Role {
   ADMIN
 }
 
+enum ContestType {
+  STORY
+  PVP
+  ADVENTURE
+}
+
+enum ContestFormat {
+  RANKING
+  DUEL
+}
+
+enum AdventureStatus {
+  PENDING
+  RESOLVED
+}
+
+enum TournamentStatus {
+  REGISTERING
+  RUNNING
+  FINISHED
+  CANCELLED
+}
+
+enum MatchStatus {
+  PENDING
+  DONE
+  BYE
+}
+
 model User {
   id            Int       @id @default(autoincrement())
   username      String    @unique @db.VarChar(32)
@@ -24,6 +53,7 @@ model User {
   bannedAt      DateTime?
   lastLoginAt   DateTime?
   lastSettledAt DateTime  @default(now())
+  adventureIntelReady Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -32,8 +62,196 @@ model User {
   problemEntries  ProblemLibraryEntry[]
   reputationLogs  ReputationLog[]
   recruitPool     RecruitPool?
+  contestRecords ContestRecord[]
+  adventureLogs  AdventureLog[]
+  storyProgress  StoryProgress[]
+  lectureLogs    LectureLog[]
+  createdTournaments PvpTournament[] @relation("TournamentCreator")
+  adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
+  announcements AdminAnnouncement[]
+  pvpRegistrations PvpRegistration[]
 
   @@map("users")
+}
+
+model ContestRecord {
+  id             String        @id @default(cuid()) @db.VarChar(64)
+  userId         Int
+  type           ContestType
+  format         ContestFormat
+  stageKey       String?       @db.VarChar(64)
+  ngLevel        Int?
+  idempotencyKey String        @db.VarChar(128)
+  inputSnapshot  Json
+  report         Json
+  summary        Json
+  rewards        Json
+  snapshotHash   String        @db.VarChar(64)
+  createdAt      DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adventureLogs AdventureLog[]
+  pvpMatches PvpMatch[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, type, createdAt])
+}
+
+model StoryProgress {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  ngLevel      Int
+  stageKey     String    @db.VarChar(64)
+  firstClearAt DateTime?
+  bestRank     Int?
+  clearCount   Int       @default(0)
+  rewards      Json      @default("[]")
+  growth       Json      @default("[]")
+  lastRecordId String?   @db.VarChar(64)
+  lastSummary  Json?
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ngLevel, stageKey])
+  @@index([userId, ngLevel])
+}
+
+model AdventureLog {
+  id         Int             @id @default(autoincrement())
+  userId     Int
+  studentId  Int?
+  eventId    String          @db.VarChar(64)
+  contestRecordId String?     @db.VarChar(64)
+  tier       Int
+  seed       Int
+  status     AdventureStatus @default(PENDING)
+  choices    Json            @default("[]")
+  results    Json            @default("[]")
+  createdAt  DateTime        @default(now())
+  resolvedAt DateTime?
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actorStudent Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  contestRecord ContestRecord? @relation(fields: [contestRecordId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([userId, eventId])
+  @@index([contestRecordId])
+}
+
+model AdventureWeeklyUsage {
+  eventId String @db.VarChar(64)
+  weekKey String @db.VarChar(10)
+  count   Int    @default(0)
+
+  @@id([eventId, weekKey])
+}
+
+model LectureLog {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  studentId     Int
+  tier          String   @db.VarChar(32)
+  teachingValue Int
+  threshold     Int
+  forced        Boolean
+  success       Boolean
+  money         Int
+  reputation    Int
+  staminaCost   Int
+  createdAt     DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, studentId, createdAt])
+}
+
+model PvpTournament {
+  id           Int              @id @default(autoincrement())
+  name         String           @db.VarChar(64)
+  status       TournamentStatus @default(REGISTERING)
+  size         Int
+  registerEndsAt DateTime
+  autoStartAt  DateTime
+  prizes       Json             @default("{}")
+  config       Json             @default("{}")
+  createdBy    Int?
+  createdAt    DateTime         @default(now())
+
+  creator User? @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  registrations PvpRegistration[]
+  matches       PvpMatch[]
+
+  @@index([status, autoStartAt])
+}
+
+model PvpRegistration {
+  id              Int      @id @default(autoincrement())
+  tournamentId    Int
+  userId          Int
+  roster          Json
+  problemEntryIds Json     @default("[]")
+  problemSnapshots Json    @default("[]")
+  createdAt       DateTime @default(now())
+
+  tournament PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, createdAt])
+}
+
+model PvpMatch {
+  id              Int         @id @default(autoincrement())
+  tournamentId    Int
+  round           Int
+  slot            Int
+  homeUserId      Int?
+  awayUserId      Int?
+  homeScore       Int?
+  awayScore       Int?
+  winnerUserId    Int?
+  status          MatchStatus @default(PENDING)
+  contestRecordId String?     @unique @db.VarChar(64)
+  playedAt        DateTime?
+
+  tournament    PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  contestRecord ContestRecord? @relation(fields: [contestRecordId], references: [id], onDelete: SetNull)
+
+  @@unique([tournamentId, round, slot])
+  @@index([tournamentId, round])
+}
+
+model AdminAnnouncement {
+  id        Int      @id @default(autoincrement())
+  authorId  Int
+  title     String   @db.VarChar(128)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id                Int      @id @default(autoincrement())
+  adminId           Int?
+  adminNameSnapshot String   @db.VarChar(32)
+  action            String   @db.VarChar(64)
+  targetType        String?  @db.VarChar(32)
+  targetId          String?  @db.VarChar(64)
+  payload           Json?
+  createdAt         DateTime @default(now())
+
+  admin User? @relation("AdminAuditActor", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
 }
 
 // ───────────────────────── 配置域（yaml 导入目标，TECH-DESIGN §3） ─────────────────────────
@@ -163,7 +381,9 @@ model Student {
 
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   talents          StudentTalent[]
-  authoredProblems ProblemLibraryEntry[]  @relation("ProblemAuthor")
+  adventures       AdventureLog[]
+  lectureLogs      LectureLog[]
+  authoredProblems ProblemLibraryEntry[] @relation("ProblemAuthor")
 
   @@index([userId, status])
 }
@@ -218,6 +438,7 @@ model ProblemLibraryEntry {
   dominantDim     String    @db.VarChar(8) // DS/DP/MATH/GRAPH/GREEDY/STRING
   rarity          String    @db.VarChar(8) // 六档
   quality         Int // Q 分 0–100
+  traitId         String?   @db.VarChar(64)
   consumedAt      DateTime?
   createdAt       DateTime  @default(now())
 

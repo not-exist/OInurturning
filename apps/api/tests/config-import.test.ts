@@ -121,9 +121,13 @@ describe('config zod schemas', () => {
   });
 
   it('坏 category / 坏 effect.kind 被拒绝', () => {
-    expect(itemsFileSchema.safeParse({ items: [{ ...goodItem, category: 'weapon' }] }).success).toBe(false);
     expect(
-      itemsFileSchema.safeParse({ items: [{ ...goodItem, effect: { desc: 'x', kind: 'fireball' } }] }).success,
+      itemsFileSchema.safeParse({ items: [{ ...goodItem, category: 'weapon' }] }).success,
+    ).toBe(false);
+    expect(
+      itemsFileSchema.safeParse({
+        items: [{ ...goodItem, effect: { desc: 'x', kind: 'fireball' } }],
+      }).success,
     ).toBe(false);
   });
 
@@ -138,14 +142,16 @@ describe('config zod schemas', () => {
   });
 
   it('economy 缺 M1 必需字段 / quality_mult 缺档被拒绝', () => {
-    expect(economyConfigSchema.safeParse({ recruitment: goodEconomy.recruitment }).success).toBe(false);
+    expect(economyConfigSchema.safeParse({ recruitment: goodEconomy.recruitment }).success).toBe(
+      false,
+    );
     const badMult = {
       ...(goodEconomy.recruitment as Record<string, unknown>),
       quality_mult: { common: 1.0, good: 1.5, elite: 2.5 },
     };
-    expect(
-      economyConfigSchema.safeParse({ ...goodEconomy, recruitment: badMult }).success,
-    ).toBe(false);
+    expect(economyConfigSchema.safeParse({ ...goodEconomy, recruitment: badMult }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -154,7 +160,8 @@ describe('config zod schemas', () => {
 // ---------------------------------------------------------------------------
 
 const baseTalent = talentsFileSchema.parse({ version: 1, talents: [goodTalent] }).talents[0]!;
-const baseTalentUpper = talentsFileSchema.parse({ version: 1, talents: [goodTalentUpper] }).talents[0]!;
+const baseTalentUpper = talentsFileSchema.parse({ version: 1, talents: [goodTalentUpper] })
+  .talents[0]!;
 function makeTalent(over: Partial<TalentDef>): TalentDef {
   return { ...baseTalent, ...over };
 }
@@ -207,7 +214,11 @@ describe('runSemanticChecks', () => {
         quality_mult: { common: 0.5, good: 1.5, elite: 2.5, genius: 5.0 },
       },
     });
-    const errs = runSemanticChecks({ talents: [makeTalent({})], items: parsedItem, economy: badEconomy });
+    const errs = runSemanticChecks({
+      talents: [makeTalent({})],
+      items: parsedItem,
+      economy: badEconomy,
+    });
     expect(errs.some((e) => e.message.includes('quality_mult'))).toBe(true);
   });
 });
@@ -288,6 +299,93 @@ talents:
     upgrade_to: null
 `;
 
+const MINIMAL_PROBLEMS = `version: 1
+updated: '2026-08-31'
+conventions:
+  requirement_band_reference: test
+  time_limit_semantics: test
+  implicit_no_trait_weight: 30
+  adhoc_dim_mapping: greedy
+severity_ladder: [red]
+traits:
+  - id: test-trait
+    name: 测试特性
+    severity: red
+    family: null
+    effect: 测试
+    hooks: {}
+templates:
+  - id: test-problem
+    tier: cspj
+    title: 测试题
+    dim: ds
+    requirements: {d: 1, m: 1, c: 1}
+    score: 100
+    time_limit_min: 10
+    trait_pool: []
+    partial_scores: false
+`;
+
+const MINIMAL_STAGES = `version: 1
+updated: '2026-08-31'
+defaults:
+  engine_ref: docs/systems/contest.md
+  stamina_cost_by_chapter: {cspj: 1, csps: 1, noip: 1, province: 1, noi: 2, ctt: 2, cts: 2, ioi: 2}
+  pass_rank_max: 8
+stages:
+  - chapter: cspj
+    stage_index: 1
+    name: 测试关
+    recommended_level: 1
+    duration_min: 10
+    problem_slots: [{tier: cspj, count: 1}]
+    npc_pool: {size: 1, mean_level: 1, spread: 0}
+    first_clear:
+      money: 1
+      items: {count: 1, chance: 1, pool: [{rarity: gray, weight: 1}]}
+      milestone: {items: [{item: rename-card, count: 1}]}
+full_clear:
+  condition: test
+  money: 1
+  items: [{item: rename-card, count: 1}]
+  unlocks: ng_plus
+ng_plus:
+  layer_param: k
+  demand_multiplier: '1 + 0.15k'
+  trait_chance_bonus: '1 + 0.10k'
+  trait_pool_shift:
+    weight_scale: '1 + 0.10k'
+    high_severity_extra: {min_severity: blue, scale: '1 + 0.05k', cap: colorful}
+  first_clear_money_multiplier: '1 + 0.5k'
+  item_rarity_shift: {from_layer: 2, shift: 1, cap: colorful}
+  milestone_rule: fixed
+  advance_stone_per_layer_clear: 5
+  layer_badge: {item_id_template: 'badge-ng{k}', count: 1}
+  repeat_clear_rank_bonus: {champion: 0.3, runner_up: 0.2, third_to_eighth: 0.1, others: 0}
+  layer_cap: null
+`;
+
+const MINIMAL_EVENTS = `version: 0.1.0
+events:
+  - id: evt-test-warmup
+    code: G1
+    name: 测试事件
+    category: trial
+    rarity: gray
+    stamina_cost: 1
+    repeatable: true
+    cooldown_days: 0
+    weight: 100
+    requirements: null
+    description: 测试用事件。
+    choices:
+      - text: 开始
+        outcomes:
+          - weight: 100
+            type: fixed
+            rewards: {}
+`;
+
 const tmpDirs: string[] = [];
 function writeConfigDir(files: { talents: string; items: string; economy: string }): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'oinur-config-'));
@@ -295,6 +393,10 @@ function writeConfigDir(files: { talents: string; items: string; economy: string
   writeFileSync(path.join(dir, 'talents.yaml'), files.talents);
   writeFileSync(path.join(dir, 'items.yaml'), files.items);
   writeFileSync(path.join(dir, 'economy.yaml'), files.economy);
+  writeFileSync(path.join(dir, 'problems.yaml'), MINIMAL_PROBLEMS);
+  const itemId = /^\s*- id: ([a-z0-9-]+)/m.exec(files.items)?.[1] ?? 'rename-card';
+  writeFileSync(path.join(dir, 'stages.yaml'), MINIMAL_STAGES.replaceAll('rename-card', itemId));
+  writeFileSync(path.join(dir, 'events.yaml'), MINIMAL_EVENTS);
   return dir;
 }
 
@@ -315,10 +417,14 @@ describe('importConfigs', () => {
 
     const rows = await prisma.configTalent.findMany({ where: { id: { startsWith: 'focus-' } } });
     expect(rows).toHaveLength(2);
-    expect(rows.every((r) => r.deprecated === false && r.sourceHash === bundle.sourceHash)).toBe(true);
+    expect(rows.every((r) => r.deprecated === false && r.sourceHash === bundle.sourceHash)).toBe(
+      true,
+    );
     const eco = await prisma.configEconomy.findUnique({ where: { id: 'active' } });
     expect(eco?.sourceHash).toBe(bundle.sourceHash);
-    const rec = await prisma.configImport.count({ where: { sourceHash: bundle.sourceHash, ok: true } });
+    const rec = await prisma.configImport.count({
+      where: { sourceHash: bundle.sourceHash, ok: true },
+    });
     expect(rec).toBe(1);
   });
 
@@ -327,7 +433,9 @@ describe('importConfigs', () => {
     const first = await importConfigs({ configDir: dir });
     const second = await importConfigs({ configDir: dir });
     expect(second.sourceHash).toBe(first.sourceHash);
-    const rec = await prisma.configImport.count({ where: { sourceHash: first.sourceHash, ok: true } });
+    const rec = await prisma.configImport.count({
+      where: { sourceHash: first.sourceHash, ok: true },
+    });
     expect(rec).toBe(1);
   });
 
@@ -345,7 +453,10 @@ describe('importConfigs', () => {
     expect(deprecated?.deprecated).toBe(true);
 
     // 恢复 focus-green 但内容有变（新 hash，走 upsert 路径）→ 复活并取消弃用
-    writeFileSync(path.join(dir, 'talents.yaml'), BASE_TALENTS.replace('测试用天赋上级。', '测试用天赋上级·改。'));
+    writeFileSync(
+      path.join(dir, 'talents.yaml'),
+      BASE_TALENTS.replace('测试用天赋上级。', '测试用天赋上级·改。'),
+    );
     const third = await importConfigs({ configDir: dir });
     expect(third.sourceHash).not.toBe(second.sourceHash);
     const revived = await prisma.configTalent.findUnique({ where: { id: 'focus-green' } });
@@ -359,7 +470,10 @@ describe('importConfigs', () => {
     const first = await importConfigs({ configDir: dir });
 
     // 批次 B：删除 focus-green（软弃用）并改写 focus-yellow 的 name → 新 hash
-    writeFileSync(path.join(dir, 'talents.yaml'), REDUCED_TALENTS.replace('name: 专注', 'name: 专注·改'));
+    writeFileSync(
+      path.join(dir, 'talents.yaml'),
+      REDUCED_TALENTS.replace('name: 专注', 'name: 专注·改'),
+    );
     const second = await importConfigs({ configDir: dir });
     expect(second.sourceHash).not.toBe(first.sourceHash);
     expect(second.talents['focus-yellow']?.name).toBe('专注·改');
@@ -373,7 +487,9 @@ describe('importConfigs', () => {
     expect(third.sourceHash).toBe(first.sourceHash);
 
     // 审计幂等：不新增 configImport 行
-    const rec = await prisma.configImport.count({ where: { sourceHash: first.sourceHash, ok: true } });
+    const rec = await prisma.configImport.count({
+      where: { sourceHash: first.sourceHash, ok: true },
+    });
     expect(rec).toBe(1);
 
     // 被弃用条目复活，且 payload 回滚到历史版本
@@ -390,7 +506,11 @@ describe('importConfigs', () => {
 
   it('不同 CONFIG_DIR 交替导入后，CONFIG 必然等于本进程自身 CONFIG_DIR 的 yaml', async () => {
     // 模拟多进程共享 DB：进程 A/B fixtures 不同，交替启动时 DB 被互相改写
-    const dirA = writeConfigDir({ talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY });
+    const dirA = writeConfigDir({
+      talents: BASE_TALENTS,
+      items: BASE_ITEMS,
+      economy: BASE_ECONOMY,
+    });
     const dirB = writeConfigDir({
       talents: `version: 1
 talents:

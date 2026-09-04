@@ -91,13 +91,55 @@ export interface UseItemInput {
   payload?: any;
 }
 
+export interface AccountItemActivationView {
+  itemId: string;
+  activated: true;
+}
+
+async function activateAdventureIntel(userId: number): Promise<AccountItemActivationView> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { adventureIntelReady: true },
+    });
+    if (user.adventureIntelReady) {
+      throw new ApiError('VALIDATION_FAILED', {
+        resource: 'intel-slip',
+        reason: '已有一条待使用的情报',
+      });
+    }
+    const held = await tx.userItem.findUnique({
+      where: { userId_itemId: { userId, itemId: 'intel-slip' } },
+    });
+    if (!held || held.quantity < 1) {
+      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'intel-slip', need: 1 });
+    }
+    const consumed = await tx.userItem.updateMany({
+      where: { userId, itemId: 'intel-slip', quantity: { gte: 1 } },
+      data: { quantity: { decrement: 1 } },
+    });
+    if (consumed.count !== 1) {
+      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'intel-slip', need: 1 });
+    }
+    await tx.userItem.deleteMany({ where: { userId, itemId: 'intel-slip', quantity: { lte: 0 } } });
+    await tx.user.update({ where: { id: userId }, data: { adventureIntelReady: true } });
+    return { itemId: 'intel-slip', activated: true };
+  });
+}
+
 /**
  * POST 使用道具：锁学员行 → 读取（含天赋）并 settle 投影 → effects 分派 → 更新学员（乐观并发）
  * → 扣道具（quantity≥1 条件 UPDATE，扣到 0 删行）。全部在一个事务内，失败整体回滚。
  */
-export async function useItem(userId: number, input: UseItemInput, now: Date = new Date()): Promise<StudentView> {
+export async function useItem(
+  userId: number,
+  input: UseItemInput,
+  now: Date = new Date(),
+): Promise<StudentView | AccountItemActivationView> {
   requireConfig();
   if (!input.itemId) throw new ApiError('VALIDATION_FAILED', { resource: 'item', reason: 'itemId 必填' });
+  if (input.itemId === 'intel-slip') return activateAdventureIntel(userId);
   if (input.studentId == null) throw new ApiError('VALIDATION_FAILED', { resource: 'student', reason: 'studentId 必填' });
   const id = input.studentId;
 
