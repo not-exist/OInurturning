@@ -2,6 +2,7 @@ import { Prisma, type PvpMatch, type PvpRegistration, type PvpTournament } from 
 import type { DuelInput, ParticipantSnapshot, QuestionSnapshot } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { getConfig } from '../../config/loader.js';
 import { deriveSeed } from '../contest/engine/rng.js';
 import { simulateDuel } from '../contest/engine/duel.js';
 import { stableHash } from '../contest/engine/report.js';
@@ -10,6 +11,35 @@ import { buildFirstRound, buildNextRound } from './bracket.js';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 type Registration = PvpRegistration;
+
+const PVP_PROBLEM_REASON = 'PVP_PROBLEM';
+
+interface PvpProblemReputationRules {
+  perUnsolved: number;
+  perMatchCap: number;
+  perTournamentCap: number;
+}
+
+function pvpProblemReputationRules(): PvpProblemReputationRules {
+  const economy = getConfig()?.economy as Record<string, unknown> | undefined;
+  const pvp = economy?.pvp;
+  if (typeof pvp !== 'object' || pvp === null || Array.isArray(pvp)) {
+    throw new Error('[pvp] CONFIG.economy.pvp 未加载');
+  }
+  const rules = pvp as Record<string, unknown>;
+  const readNonnegativeInteger = (key: string): number => {
+    const value = rules[key];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      throw new Error(`[pvp] economy.pvp.${key} 必须是非负整数`);
+    }
+    return value;
+  };
+  return {
+    perUnsolved: readNonnegativeInteger('problem_reputation_per_unsolved'),
+    perMatchCap: readNonnegativeInteger('problem_rep_cap_per_match'),
+    perTournamentCap: readNonnegativeInteger('problem_rep_cap_per_tournament'),
+  };
+}
 
 function qualityScoringEnabled(config: unknown): boolean {
   if (typeof config !== 'object' || config === null || Array.isArray(config)) return false;
@@ -120,6 +150,42 @@ function inputFor(match: PvpMatch, home: Registration, away: Registration, quali
   };
 }
 
+async function awardProblemReputation(
+  tx: Prisma.TransactionClient,
+  tournament: PvpTournament,
+  match: PvpMatch,
+  report: Awaited<ReturnType<typeof simulateDuel>>,
+): Promise<void> {
+  const rules = pvpProblemReputationRules();
+  if (rules.perUnsolved === 0 || rules.perMatchCap === 0 || rules.perTournamentCap === 0) return;
+  const seenInMatch = new Map<number, number>();
+
+  for (const round of report.rounds) {
+    if (round.problemSource !== 'PREMADE' || round.solved || round.question.premadeEntryId === undefined) continue;
+    const problemId = round.question.premadeEntryId;
+    const setterUserId = round.setterSide === 'HOME' ? match.homeUserId : match.awayUserId;
+    if (setterUserId === null) continue;
+    const occurrence = (seenInMatch.get(problemId) ?? 0) + 1;
+    seenInMatch.set(problemId, occurrence);
+    if (occurrence > rules.perMatchCap) continue;
+
+    const reason = `${PVP_PROBLEM_REASON}:${tournament.id}:${problemId}:${match.id}:${occurrence}`;
+    const existing = await tx.reputationLog.findFirst({ where: { userId: setterUserId, reason }, select: { id: true } });
+    if (existing !== null) continue;
+
+    const tournamentPrefix = `${PVP_PROBLEM_REASON}:${tournament.id}:${problemId}:`;
+    const total = await tx.reputationLog.aggregate({
+      where: { userId: setterUserId, reason: { startsWith: tournamentPrefix } },
+      _sum: { delta: true },
+    });
+    const remaining = rules.perTournamentCap - (total._sum.delta ?? 0);
+    if (remaining <= 0) continue;
+    const delta = Math.min(rules.perUnsolved, remaining);
+    await tx.user.update({ where: { id: setterUserId }, data: { reputation: { increment: delta } } });
+    await tx.reputationLog.create({ data: { userId: setterUserId, delta, reason } });
+  }
+}
+
 function matchView(row: PvpMatch, viewerUserId: number): PvpMatchView {
   const canRead = viewerUserId === row.homeUserId || viewerUserId === row.awayUserId;
   return {
@@ -186,6 +252,7 @@ async function playPending(tx: Prisma.TransactionClient, tournament: PvpTourname
     const winnerUserId = report.winnerSide === 'AWAY' ? match.awayUserId : match.homeUserId;
     const summary = { format: 'DUEL' as const, winnerSide: report.winnerSide, homeScore: report.scores.home, awayScore: report.scores.away, rewards: [], growth: [] };
     const record = await createContestRecord({ userId: match.homeUserId, type: 'PVP', format: 'DUEL', idempotencyKey: `pvp:${tournament.id}:${round}:${match.slot}`, inputSnapshot: report.inputSnapshot, report, summary, rewards: [], snapshotHash: report.snapshotHash }, tx);
+    await awardProblemReputation(tx, tournament, match, report);
     await tx.pvpMatch.update({ where: { id: match.id }, data: { homeScore: report.scores.home, awayScore: report.scores.away, winnerUserId, status: 'DONE', contestRecordId: record.id, playedAt: new Date() } });
   }
 }

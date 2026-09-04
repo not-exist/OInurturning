@@ -157,4 +157,50 @@ describe('PVP scheduler', () => {
     expect(records.every((record) => (record.report as { qualityRuleOn: boolean }).qualityRuleOn)).toBe(true);
     expect(records.every((record) => (record.report as { tiebreak: string }).tiebreak === 'SUDDEN_DEATH')).toBe(true);
   });
+
+  it('awards reputation for an unsolved carried problem once per match', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Problem reputation', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    const owner = await entrant();
+    const problem = await prisma.problemLibraryEntry.create({ data: { userId: owner.userId, authorStudentId: owner.studentId, name: 'Hard carried problem', dominantDim: 'DS', rarity: 'rainbow', quality: 100 } });
+    await registerPvp(owner.userId, tournament.id, owner.studentId, [problem.id], PAST);
+    for (let index = 0; index < 3; index += 1) {
+      const player = await entrant();
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    }
+
+    await advancePvpTournament(tournament.id, PAST);
+    const repAfterFirstAdvance = (await prisma.user.findUniqueOrThrow({ where: { id: owner.userId }, select: { reputation: true } })).reputation;
+    const logsAfterFirstAdvance = await prisma.reputationLog.findMany({ where: { userId: owner.userId, reason: { startsWith: 'PVP_PROBLEM:' } } });
+    expect(logsAfterFirstAdvance.length).toBeGreaterThanOrEqual(1);
+    expect(repAfterFirstAdvance).toBe(logsAfterFirstAdvance.length * 2);
+    expect(logsAfterFirstAdvance.every((log) => log.delta === 2)).toBe(true);
+    expect(new Set(logsAfterFirstAdvance.map((log) => log.reason)).size).toBe(logsAfterFirstAdvance.length);
+
+    await advancePvpTournament(tournament.id, PAST);
+    const repAfterReplay = (await prisma.user.findUniqueOrThrow({ where: { id: owner.userId }, select: { reputation: true } })).reputation;
+    const logsAfterReplay = await prisma.reputationLog.findMany({ where: { userId: owner.userId, reason: { startsWith: 'PVP_PROBLEM:' } } });
+    expect(repAfterReplay).toBe(repAfterFirstAdvance);
+    expect(logsAfterReplay).toHaveLength(logsAfterFirstAdvance.length);
+  });
+
+  it('caps one carried problem reputation at twelve points per tournament', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Problem reputation cap', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    const owner = await entrant();
+    const problem = await prisma.problemLibraryEntry.create({ data: { userId: owner.userId, authorStudentId: owner.studentId, name: 'Capped carried problem', dominantDim: 'DS', rarity: 'rainbow', quality: 100 } });
+    await registerPvp(owner.userId, tournament.id, owner.studentId, [problem.id], PAST);
+    for (let index = 0; index < 3; index += 1) {
+      const player = await entrant();
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    }
+    await prisma.user.update({ where: { id: owner.userId }, data: { reputation: 10 } });
+    for (let index = 0; index < 5; index += 1) {
+      await prisma.reputationLog.create({ data: { userId: owner.userId, delta: 2, reason: `PVP_PROBLEM:${tournament.id}:${problem.id}:seed-${index}:1` } });
+    }
+
+    await advancePvpTournament(tournament.id, PAST);
+    const logs = await prisma.reputationLog.findMany({ where: { userId: owner.userId, reason: { startsWith: `PVP_PROBLEM:${tournament.id}:${problem.id}:` } } });
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: owner.userId }, select: { reputation: true } });
+    expect(logs.reduce((sum, log) => sum + log.delta, 0)).toBe(12);
+    expect(user.reputation).toBe(12);
+  });
 });
