@@ -6,8 +6,8 @@
 
 - worktree：`/home/qzez/OInurturning`
 - branch：`m2-contest-story`
-- committed HEAD：`6caf5de feat(m4): add pvp reward grants and claiming`
-- M2、M3.1–M3.6、M4.1、M4.2、T4.3、T4.4 与 T4.5 已提交。
+- committed HEAD：`11572bd docs(m4): refresh reward handoff`
+- M2、M3.1–M3.6、M4.1、M4.2、T4.3、T4.4、T4.5 与 T4.6 已提交。
 - 工作树干净；未执行 merge 或 push；仓库暂未配置远端。
 
 ## M2 状态
