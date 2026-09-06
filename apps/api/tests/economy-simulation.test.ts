@@ -130,4 +130,22 @@ describe('pure economy simulation engine', () => {
     expect(rs.map((p) => p.id)).toEqual(['beginner', 'mid', 'late']);
     expect(rs.every((p) => Number.isFinite(p.incomeTotal) && Number.isFinite(p.expenseTotal))).toBe(true);
   });
+  it('sorts profiles into canonical order regardless of input order', () => {
+    const reordered = structuredClone(parsedEconomy) as any;
+    reordered.simulation.profiles.reverse();
+    expect(simulateEconomy({ economy: reordered, items: itemMap as any, stages: stageMap as any }).profiles.map((p) => p.id)).toEqual(['beginner', 'mid', 'late']);
+  });
+  it('rejects malformed NG+ formulas and missing rank coefficients', () => {
+    const malformed = structuredClone(parsedEconomy) as any;
+    malformed.contest.ngplus_money_multiplier.formula = 'broken';
+    expect(() => simulateEconomy({ economy: malformed, items: itemMap as any, stages: stageMap as any })).toThrow(/contest\.ngplus_money_multiplier\.formula/);
+    const missingRank = structuredClone(parsedEconomy) as any;
+    delete missingRank.contest.rank_coeffs.third_to_eighth;
+    expect(() => simulateEconomy({ economy: missingRank, items: itemMap as any, stages: stageMap as any })).toThrow(/contest\.rank_coeffs\.third_to_eighth/);
+  });
+  it('rejects a missing target ratio range', () => {
+    const malformed = structuredClone(parsedEconomy) as any;
+    delete malformed.meta.calibration_profile.target_income_expense_ratio;
+    expect(() => simulateEconomy({ economy: malformed, items: itemMap as any, stages: stageMap as any })).toThrow(/meta\.calibration_profile\.target_income_expense_ratio/);
+  });
 });

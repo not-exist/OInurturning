@@ -32,8 +32,20 @@ export function simulateEconomy(input: SimulationInput): EconomySimulationReport
   const passive = economy.passive;
   const rankCoeffs = contest.rank_coeffs ?? {};
   const ngFormula = String(contest.ngplus_money_multiplier?.formula ?? '');
-  const ngCoeff = Number(ngFormula.match(/([0-9]+(?:\.[0-9]+)?)\s*\*\s*k/)?.[1] ?? 0);
-  const profiles: ProfileSimulation[] = simulation.profiles.map((profile: any) => {
+  const ngMatch = ngFormula.match(/1\s*\+\s*([0-9]+(?:\.[0-9]+)?)\s*\*\s*k/);
+  if (!ngMatch) throw new Error('contest.ngplus_money_multiplier.formula: expected "1 + coefficient * k"');
+  const ngCoeff = Number(ngMatch[1]);
+  for (const rank of ['champion', 'runner_up', 'third_to_eighth']) {
+    if (!Number.isFinite(rankCoeffs[rank])) throw new Error(`contest.rank_coeffs.${rank}: missing or invalid coefficient`);
+  }
+  const targetRange = economy.meta?.calibration_profile?.target_income_expense_ratio;
+  if (!Array.isArray(targetRange) || targetRange.length !== 2 || !targetRange.every((value: unknown) => typeof value === 'number' && Number.isFinite(value))) {
+    throw new Error('meta.calibration_profile.target_income_expense_ratio: expected finite [min, max]');
+  }
+  const order = ['beginner', 'mid', 'late'] as const;
+  const profiles: ProfileSimulation[] = order.map((id) => {
+    const profile = simulation.profiles.find((candidate: any) => candidate.id === id);
+    if (!profile) throw new Error(`simulation.profiles.${id}: missing profile`);
     const income: SimulationLine[] = [];
     const expenses: SimulationLine[] = [];
     const scale = 1 + training.student_coeff * (profile.owned_students - 1);
@@ -85,6 +97,5 @@ export function simulateEconomy(input: SimulationInput): EconomySimulationReport
     return { id: profile.id, label: profile.label, income, expenses, incomeTotal, expenseTotal, net: incomeTotal - expenseTotal, ratio };
   });
   const targetProfile = profiles.find((profile) => profile.id === simulation.target_profile)!;
-  const targetRange = economy.meta?.calibration_profile?.target_income_expense_ratio ?? [0, Infinity];
   return { profiles, target: { profileId: simulation.target_profile, min: targetRange[0], max: targetRange[1], actual: targetProfile.ratio, pass: targetProfile.ratio != null && targetProfile.ratio >= targetRange[0] && targetProfile.ratio <= targetRange[1] } };
 }
