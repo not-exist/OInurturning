@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import { economyConfigSchema } from '@oinur/shared';
 import { runSemanticChecks, type SemanticIssue } from '../src/config/semantic.js';
+import { simulateEconomy } from '../src/modules/economy/simulation.js';
 
 const dataPath = (file: string) => path.resolve(import.meta.dirname, '../../../docs/data', file);
 const economy = parseYaml(readFileSync(dataPath('economy.yaml'), 'utf8')) as Record<string, unknown>;
@@ -74,5 +75,59 @@ describe('economy simulation configuration', () => {
     config.simulation.profiles[0].adventures.rarity_mix = { gray: 0, yellow: 0 };
     const parsed = economyConfigSchema.safeParse(config);
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('pure economy simulation engine', () => {
+  const parsedEconomy = economyConfigSchema.parse(economy);
+  const itemMap = Object.fromEntries(items.items.map((item: any) => [item.id, item]));
+  const stageMap = Object.fromEntries((stages as any).stages.map((stage: any) => [`${stage.chapter}:${stage.stage_index}`, stage]));
+  const report = () => simulateEconomy({ economy: parsedEconomy as any, items: itemMap as any, stages: stageMap as any });
+
+  it('scales training costs by owned students', () => {
+    const r = report().profiles[1]!;
+    expect(r.expenses.find((line) => line.key === 'training.basic')?.amount).toBe(395);
+  });
+  it('charges the selected directed book price', () => {
+    const r = report().profiles[1]!;
+    expect(r.expenses.find((line) => line.key === 'books.directed')?.amount).toBe(1280);
+  });
+  it('applies recruitment quality and fractional weekly frequency', () => {
+    const r = report().profiles[2]!;
+    expect(r.expenses.find((line) => line.key === 'recruitment')?.amount).toBe(1508);
+  });
+  it('applies lecture reputation and overflow multipliers', () => {
+    const r = report().profiles[1]!;
+    expect(r.income.find((line) => line.key === 'lectures')?.amount).toBe(2520);
+  });
+  it('uses rarity-weighted adventure midpoints', () => {
+    const r = report().profiles[1]!;
+    expect(r.income.find((line) => line.key === 'adventures')?.amount).toBe(600);
+  });
+  it('applies chapter prize, rank, and NG+ multipliers', () => {
+    const r = report().profiles[2]!;
+    expect(r.income.find((line) => line.key === 'story')?.amount).toBe(27000);
+  });
+  it('calculates passive sponsor and coach income', () => {
+    const r = report().profiles[2]!;
+    expect(r.income.find((line) => line.key === 'passive.sponsor')?.amount).toBe(2660);
+    expect(r.income.find((line) => line.key === 'passive.coach')?.amount).toBe(270);
+  });
+  it('sums line items and returns null ratio for zero expenses', () => {
+    const r = report().profiles[0]!;
+    expect(r.incomeTotal).toBe(r.income.reduce((s, l) => s + l.amount, 0));
+    const zero = structuredClone(parsedEconomy) as any;
+    zero.simulation.profiles[0].fixed_weekly_expense = 0;
+    zero.simulation.profiles[0].training.basic_sessions = 0;
+    zero.simulation.profiles[0].training.directed_sessions = 0;
+    zero.simulation.profiles[0].training.specialized_sessions = 0;
+    zero.simulation.profiles[0].recruitment.recruits_per_week = 0;
+    zero.simulation.profiles[0].recruitment.manual_refreshes_per_week = 0;
+    expect(simulateEconomy({ economy: zero, items: itemMap as any, stages: stageMap as any }).profiles[0]!.ratio).toBeNull();
+  });
+  it('keeps real profile order and finite totals', () => {
+    const rs = report().profiles;
+    expect(rs.map((p) => p.id)).toEqual(['beginner', 'mid', 'late']);
+    expect(rs.every((p) => Number.isFinite(p.incomeTotal) && Number.isFinite(p.expenseTotal))).toBe(true);
   });
 });
