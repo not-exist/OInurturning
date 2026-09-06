@@ -335,7 +335,9 @@ function checkSimulation(
     }
     seenIds.add(profile.id);
 
-    if (lecture && lecture.success && !lectureIds.has(profile.lectures.tier)) {
+    if (lecture === undefined || !lecture.success) {
+      issues.push({ file: 'economy', path: `${base}.lectures.tier`, message: '讲课档位配置缺失或不完整，无法验证 tier 引用' });
+    } else if (!lectureIds.has(profile.lectures.tier)) {
       issues.push({ file: 'economy', path: `${base}.lectures.tier`, message: `讲课 tier 引用不存在：${profile.lectures.tier}` });
     }
     const book = itemById.get(profile.training.directed_book_item_id);

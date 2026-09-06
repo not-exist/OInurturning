@@ -31,3 +31,11 @@ Additional checks: `pnpm -C packages/shared exec tsc --noEmit` passed. API typec
 The schema keeps `simulation` optional for legacy fixtures, enforces exactly three profile entries and strict nested shapes, and leaves cross-file validation in `semantic.ts`. Semantic paths include the profile ID and failing field. Duplicate IDs are intentionally semantic (array uniqueness is not a schema concern).
 
 Concern: the full API suite remains red due to the unrelated Prisma/PVP model mismatch noted above.
+
+## Review Fix Round 1
+
+Addressed the semantic validation gap where simulation lecture tiers were unverifiable if `economy.lecture` was missing or partial. `checkSimulation` now emits an issue at each affected `simulation.profiles.<id>.lectures.tier` path unless the complete lecture schema is available. Added regression coverage for both missing and partial lecture blocks.
+
+Command: `pnpm -C apps/api exec vitest run tests/economy-simulation.test.ts tests/config-m2-schema.test.ts --no-file-parallelism`
+
+Result: 2 files passed, 12 tests passed.

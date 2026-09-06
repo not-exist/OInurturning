@@ -57,6 +57,18 @@ describe('economy simulation configuration', () => {
     expect(issues.some((issue: SemanticIssue) => issue.path.endsWith('.id') && issue.message.includes('重复'))).toBe(true);
   });
 
+  it('reports unverifiable lecture references when lecture config is missing or partial', () => {
+    const missing = structuredClone(economy) as any;
+    delete missing.lecture;
+    const missingIssues = runSemanticChecks({ talents: talents.talents as never[], items: items.items as never[], economy: missing as never, stages: stages as never });
+    expect(missingIssues.some((issue: SemanticIssue) => issue.path === 'simulation.profiles.beginner.lectures.tier')).toBe(true);
+
+    const partial = structuredClone(economy) as any;
+    partial.lecture = { audience_tiers: [] };
+    const partialIssues = runSemanticChecks({ talents: talents.talents as never[], items: items.items as never[], economy: partial as never, stages: stages as never });
+    expect(partialIssues.some((issue: SemanticIssue) => issue.path === 'simulation.profiles.mid.lectures.tier')).toBe(true);
+  });
+
   it('rejects a zero-total rarity mix', () => {
     const config = structuredClone(economy) as any;
     config.simulation.profiles[0].adventures.rarity_mix = { gray: 0, yellow: 0 };
