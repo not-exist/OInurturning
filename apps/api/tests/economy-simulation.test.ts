@@ -1,0 +1,66 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { parse as parseYaml } from 'yaml';
+import { economyConfigSchema } from '@oinur/shared';
+import { runSemanticChecks, type SemanticIssue } from '../src/config/semantic.js';
+
+const dataPath = (file: string) => path.resolve(import.meta.dirname, '../../../docs/data', file);
+const economy = parseYaml(readFileSync(dataPath('economy.yaml'), 'utf8')) as Record<string, unknown>;
+const items = parseYaml(readFileSync(dataPath('items.yaml'), 'utf8')) as { items: unknown[] };
+const problems = parseYaml(readFileSync(dataPath('problems.yaml'), 'utf8')) as { templates: unknown[] };
+const stages = parseYaml(readFileSync(dataPath('stages.yaml'), 'utf8')) as unknown;
+const talents = parseYaml(readFileSync(dataPath('talents.yaml'), 'utf8')) as { talents: unknown[] };
+
+describe('economy simulation configuration', () => {
+  it('parses the approved profiles in economy.yaml', () => {
+    const parsed = economyConfigSchema.parse(economy);
+    expect(parsed.simulation?.target_profile).toBe('mid');
+    expect(parsed.simulation?.profiles.map((profile) => profile.id)).toEqual(['beginner', 'mid', 'late']);
+  });
+
+  it('rejects malformed profile values', () => {
+    const malformed = structuredClone(economy);
+    const profiles = (malformed.simulation as { profiles: Array<Record<string, unknown>> }).profiles;
+    (profiles[1]!.training as Record<string, unknown>).basic_sessions = -1;
+    expect(() => economyConfigSchema.parse(malformed)).toThrow();
+  });
+
+  const semantic = (simulationPatch: Record<string, unknown>) => {
+    const config = structuredClone(economy) as Record<string, unknown>;
+    config.simulation = {
+      ...(config.simulation as Record<string, unknown>),
+      profiles: ((config.simulation as { profiles: unknown[] }).profiles).map((profile) => ({
+        ...(profile as Record<string, unknown>),
+        ...simulationPatch,
+      })),
+    };
+    return runSemanticChecks({
+      talents: talents.talents as never[],
+      items: items.items as never[],
+      economy: config as never,
+      problems: problems as never,
+      stages: stages as never,
+    });
+  };
+
+  it('rejects unknown lecture tiers, books, and stage keys', () => {
+    expect(semantic({ lectures: { sessions: 1, tier: 'missing-tier' } }).some((issue: SemanticIssue) => issue.path.includes('.lectures.tier'))).toBe(true);
+    expect(semantic({ training: { ...(economy.simulation as any).profiles[0].training, directed_book_item_id: 'missing-book' } }).some((issue: SemanticIssue) => issue.path.includes('directed_book_item_id'))).toBe(true);
+    expect(semantic({ story: { ...(economy.simulation as any).profiles[0].story, stage_key: 'missing:1' } }).some((issue: SemanticIssue) => issue.path.includes('.story.stage_key'))).toBe(true);
+  });
+
+  it('reports duplicate profile IDs semantically', () => {
+    const config = structuredClone(economy) as any;
+    config.simulation.profiles[1].id = config.simulation.profiles[0].id;
+    const issues = runSemanticChecks({ talents: talents.talents as never[], items: items.items as never[], economy: config as never, stages: stages as never });
+    expect(issues.some((issue: SemanticIssue) => issue.path.endsWith('.id') && issue.message.includes('重复'))).toBe(true);
+  });
+
+  it('rejects a zero-total rarity mix', () => {
+    const config = structuredClone(economy) as any;
+    config.simulation.profiles[0].adventures.rarity_mix = { gray: 0, yellow: 0 };
+    const parsed = economyConfigSchema.safeParse(config);
+    expect(parsed.success).toBe(false);
+  });
+});

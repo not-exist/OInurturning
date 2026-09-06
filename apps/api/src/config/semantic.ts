@@ -35,6 +35,7 @@ export function runSemanticChecks(input: {
   checkTalents(input.talents, issues);
   checkItems(input.items, issues);
   checkEconomy(input.economy, issues);
+  checkSimulation(input.economy, input.items, input.stages, issues);
   if (input.problems !== undefined) checkProblems(input.problems, issues);
   if (input.stages !== undefined) checkStages(input.stages, input.problems, input.items, issues);
   if (input.events !== undefined) checkEvents(input.events, input.items, issues);
@@ -311,4 +312,43 @@ function checkEconomy(economy: EconomyConfig, issues: SemanticIssue[]): void {
       issues.push({ file: 'economy', path: 'lecture.reputation_pay_curve', message: '讲课声誉乘区上限不能低于下限' });
     }
   }
+}
+
+function checkSimulation(
+  economy: EconomyConfig,
+  items: ItemDef[],
+  stages: StagesConfig | undefined,
+  issues: SemanticIssue[],
+): void {
+  const simulation = economy.simulation;
+  if (simulation === undefined) return;
+  const seenIds = new Set<string>();
+  const lecture = economy.lecture !== undefined ? lectureConfigSchema.safeParse(economy.lecture) : undefined;
+  const lectureIds = new Set(lecture?.success ? lecture.data.audience_tiers.map((tier) => tier.id) : []);
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const stageKeys = new Set(stages?.stages.map((stage) => `${stage.chapter}:${stage.stage_index}`));
+
+  simulation.profiles.forEach((profile) => {
+    const base = `simulation.profiles.${profile.id}`;
+    if (seenIds.has(profile.id)) {
+      issues.push({ file: 'economy', path: `${base}.id`, message: `模拟画像 id 重复：${profile.id}` });
+    }
+    seenIds.add(profile.id);
+
+    if (lecture && lecture.success && !lectureIds.has(profile.lectures.tier)) {
+      issues.push({ file: 'economy', path: `${base}.lectures.tier`, message: `讲课 tier 引用不存在：${profile.lectures.tier}` });
+    }
+    const book = itemById.get(profile.training.directed_book_item_id);
+    if (book === undefined || book.price === null) {
+      issues.push({ file: 'economy', path: `${base}.training.directed_book_item_id`, message: `定向训练书籍不存在或无价格：${profile.training.directed_book_item_id}` });
+    }
+    if (stages !== undefined && !stageKeys.has(profile.story.stage_key)) {
+      issues.push({ file: 'economy', path: `${base}.story.stage_key`, message: `剧情关卡 key 不存在：${profile.story.stage_key}` });
+    }
+    const weights = Object.values(profile.adventures.rarity_mix);
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    if (weights.some((weight) => !Number.isFinite(weight)) || !Number.isFinite(total) || total <= 0) {
+      issues.push({ file: 'economy', path: `${base}.adventures.rarity_mix`, message: '历练稀有度权重必须为有限数且总和大于 0' });
+    }
+  });
 }

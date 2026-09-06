@@ -107,6 +107,78 @@ lecture:
   frequency_cap_note: 讲课次数限制机制由 systems/gameplay.md 定义（ROADMAP T3.5）
 
 # ----------------------------------------------------------------------
+# T5.1 周收支模拟画像
+# ----------------------------------------------------------------------
+simulation:
+  target_profile: mid
+  profiles:
+    - id: beginner
+      label: 新手周
+      owned_students: 3
+      ability: 30
+      reputation: 50
+      training:
+        basic_sessions: 6
+        directed_sessions: 2
+        specialized_sessions: 1
+        directed_book_item_id: book-ds-yellow
+      recruitment:
+        recruits_per_week: 0.25
+        quality: common
+        manual_refreshes_per_week: 1
+      lectures: {sessions: 4, tier: junior}
+      adventures:
+        sessions: 4
+        rarity_mix: {gray: 3, yellow: 1}
+      story: {sessions: 2, stage_key: "csps:1", rank_tier: third_to_eighth, ng_level: 0}
+      passive: {sponsor_contracts: 0, substitute_coaches: 0}
+      fixed_weekly_expense: 100
+
+    - id: mid
+      label: 中期周
+      owned_students: 5
+      ability: 50
+      reputation: 200
+      training:
+        basic_sessions: 5
+        directed_sessions: 4
+        specialized_sessions: 2
+        directed_book_item_id: book-ds-green
+      recruitment:
+        recruits_per_week: 0.5
+        quality: common
+        manual_refreshes_per_week: 1
+      lectures: {sessions: 5, tier: senior}
+      adventures:
+        sessions: 5
+        rarity_mix: {gray: 1, yellow: 1, green: 1}
+      story: {sessions: 2, stage_key: "noip:1", rank_tier: third_to_eighth, ng_level: 0}
+      passive: {sponsor_contracts: 0, substitute_coaches: 1}
+      fixed_weekly_expense: 300
+
+    - id: late
+      label: 后期周
+      owned_students: 10
+      ability: 92
+      reputation: 3000
+      training:
+        basic_sessions: 3
+        directed_sessions: 2
+        specialized_sessions: 3
+        directed_book_item_id: book-ds-purple
+      recruitment:
+        recruits_per_week: 0.1
+        quality: elite
+        manual_refreshes_per_week: 2
+      lectures: {sessions: 4, tier: national}
+      adventures:
+        sessions: 6
+        rarity_mix: {blue: 3, purple: 1}
+      story: {sessions: 1, stage_key: "ioi:1", rank_tier: third_to_eighth, ng_level: 1}
+      passive: {sponsor_contracts: 1, substitute_coaches: 1}
+      fixed_weekly_expense: 1000
+
+# ----------------------------------------------------------------------
 # 赛事与剧情奖金（GAME-DESIGN §13.3；细则见 systems/progression.md §1.9）
 # ----------------------------------------------------------------------
 contest:

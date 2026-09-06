@@ -83,6 +83,59 @@ export const lectureConfigSchema = z
   .passthrough();
 export type LectureConfig = z.infer<typeof lectureConfigSchema>;
 
+const simulationProfileIdSchema = z.enum(['beginner', 'mid', 'late']);
+
+export const simulationProfileSchema = z
+  .object({
+    id: simulationProfileIdSchema,
+    label: z.string().min(1),
+    owned_students: z.number().int().nonnegative(),
+    ability: z.number().finite().nonnegative(),
+    reputation: z.number().int().nonnegative(),
+    training: z
+      .object({
+        basic_sessions: z.number().nonnegative(),
+        directed_sessions: z.number().nonnegative(),
+        specialized_sessions: z.number().nonnegative(),
+        directed_book_item_id: z.string().min(1),
+      })
+      .strict(),
+    recruitment: z
+      .object({
+        recruits_per_week: z.number().nonnegative(),
+        quality: z.enum(ECONOMY_QUALITY_TIERS),
+        manual_refreshes_per_week: z.number().nonnegative(),
+      })
+      .strict(),
+    lectures: z.object({ sessions: z.number().nonnegative(), tier: z.string().min(1) }).strict(),
+    adventures: z
+      .object({
+        sessions: z.number().nonnegative(),
+        rarity_mix: z.record(z.number().nonnegative()).refine((mix) => Object.values(mix).some((weight) => weight > 0)),
+      })
+      .strict(),
+    story: z
+      .object({
+        sessions: z.number().nonnegative(),
+        stage_key: z.string().min(1),
+        rank_tier: z.enum(['champion', 'runner_up', 'third_to_eighth']),
+        ng_level: z.number().int().nonnegative(),
+      })
+      .strict(),
+    passive: z.object({ sponsor_contracts: z.number().nonnegative(), substitute_coaches: z.number().nonnegative() }).strict(),
+    fixed_weekly_expense: z.number().nonnegative(),
+  })
+  .strict();
+export type SimulationProfile = z.infer<typeof simulationProfileSchema>;
+
+export const simulationConfigSchema = z
+  .object({
+    target_profile: simulationProfileIdSchema,
+    profiles: z.array(simulationProfileSchema).length(3),
+  })
+  .strict();
+export type SimulationConfig = z.infer<typeof simulationConfigSchema>;
+
 export const economyConfigSchema = z
   .object({
     training: economyTrainingSchema,
@@ -90,6 +143,7 @@ export const economyConfigSchema = z
     // M1 fixtures may carry a partial passthrough lecture block; M3 lecture
     // paths parse the complete shape before using it.
     lecture: z.union([lectureConfigSchema, z.record(z.unknown())]).optional(),
+    simulation: simulationConfigSchema.optional(),
   })
   .passthrough();
 export type EconomyConfig = z.infer<typeof economyConfigSchema>;
