@@ -32,7 +32,7 @@ export function simulateEconomy(input: SimulationInput): EconomySimulationReport
   const passive = economy.passive;
   const rankCoeffs = contest.rank_coeffs ?? {};
   const ngFormula = String(contest.ngplus_money_multiplier?.formula ?? '');
-  const ngMatch = ngFormula.match(/1\s*\+\s*([0-9]+(?:\.[0-9]+)?)\s*\*\s*k/);
+  const ngMatch = ngFormula.match(/^\s*mult\(k\)\s*=\s*1\s*\+\s*([0-9]+(?:\.[0-9]+)?)\s*\*\s*k\s*$/);
   if (!ngMatch) throw new Error('contest.ngplus_money_multiplier.formula: expected "1 + coefficient * k"');
   const ngCoeff = Number(ngMatch[1]);
   for (const rank of ['champion', 'runner_up', 'third_to_eighth']) {

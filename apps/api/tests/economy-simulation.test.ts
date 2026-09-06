@@ -143,6 +143,13 @@ describe('pure economy simulation engine', () => {
     delete missingRank.contest.rank_coeffs.third_to_eighth;
     expect(() => simulateEconomy({ economy: missingRank, items: itemMap as any, stages: stageMap as any })).toThrow(/contest\.rank_coeffs\.third_to_eighth/);
   });
+  it('rejects NG+ formulas with valid substrings but malformed tails', () => {
+    for (const formula of ['mult(k) = 1 + 0.5 * k + typo', 'mult(k) = 1 + 0.5 * k2']) {
+      const malformed = structuredClone(parsedEconomy) as any;
+      malformed.contest.ngplus_money_multiplier.formula = formula;
+      expect(() => simulateEconomy({ economy: malformed, items: itemMap as any, stages: stageMap as any })).toThrow(/contest\.ngplus_money_multiplier\.formula/);
+    }
+  });
   it('rejects a missing target ratio range', () => {
     const malformed = structuredClone(parsedEconomy) as any;
     delete malformed.meta.calibration_profile.target_income_expense_ratio;
