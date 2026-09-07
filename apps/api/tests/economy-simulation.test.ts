@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
@@ -186,11 +187,19 @@ describe('economy simulation CLI', () => {
     const lines = captureOutput();
 
     const exitCode = await run(['--json']);
-    const json = JSON.parse(lines.join('\n'));
+    const json = JSON.parse(lines[0]!);
 
     expect(exitCode).toBe(0);
     expect(json.profiles.map((profile: { id: string }) => profile.id)).toEqual(['beginner', 'mid', 'late']);
     expect(json.target.pass).toBe(true);
+  });
+
+  it('emits parseable JSON from the root pnpm command', () => {
+    const root = path.resolve(import.meta.dirname, '../../..');
+    const child = spawnSync('pnpm', ['sim:economy', '--', '--json'], { cwd: root, encoding: 'utf8' });
+
+    expect(child.status).toBe(0);
+    expect(JSON.parse(child.stdout).target.pass).toBe(true);
   });
 
   it('reports the data path when economy simulation data is malformed', async () => {
@@ -204,6 +213,41 @@ describe('economy simulation CLI', () => {
 
     expect(exitCode).toBe(1);
     expect(lines.join('\n')).toContain('economy.yaml');
+  });
+
+  it('reports the economy YAML path for a missing book reference', async () => {
+    const lines = captureOutput();
+    const malformed = structuredClone(economy) as any;
+    malformed.simulation.profiles[0].training.directed_book_item_id = 'missing-book';
+    const exitCode = await run([], { loadData: (file) => file.endsWith('economy.yaml') ? malformed : parseYaml(readFileSync(file, 'utf8')) });
+    expect(exitCode).toBe(1);
+    expect(lines.join('\n')).toContain('economy.yaml');
+  });
+
+  it('reports the items YAML path for a malformed items file', async () => {
+    const lines = captureOutput();
+    const malformedItems = { items: [] };
+    const exitCode = await run([], { loadData: (file) => file.endsWith('items.yaml') ? malformedItems : parseYaml(readFileSync(file, 'utf8')) });
+    expect(exitCode).toBe(1);
+    expect(lines.join('\n')).toContain('items.yaml');
+  });
+
+  it('rejects a non-mid target profile with its config path', async () => {
+    const lines = captureOutput();
+    const malformed = structuredClone(economy) as any;
+    malformed.simulation.target_profile = 'late';
+    const exitCode = await run([], { loadData: (file) => file.endsWith('economy.yaml') ? malformed : parseYaml(readFileSync(file, 'utf8')) });
+    expect(exitCode).toBe(1);
+    expect(lines.join('\n')).toContain('simulation.target_profile');
+  });
+
+  it('identifies the target ratio path when the gate fails', async () => {
+    const lines = captureOutput();
+    const malformed = structuredClone(economy) as any;
+    malformed.meta.calibration_profile.target_income_expense_ratio = [99, 100];
+    const exitCode = await run([], { loadData: (file) => file.endsWith('economy.yaml') ? malformed : parseYaml(readFileSync(file, 'utf8')) });
+    expect(exitCode).toBe(1);
+    expect(lines.join('\n')).toContain('meta.calibration_profile.target_income_expense_ratio');
   });
 
   it('renders null rather than Infinity for zero-expense profiles', async () => {
@@ -221,7 +265,7 @@ describe('economy simulation CLI', () => {
     const exitCode = await run(['--json'], {
       loadData: (file) => file.endsWith('economy.yaml') ? zeroExpense : parseYaml(readFileSync(file, 'utf8')),
     });
-    const json = JSON.parse(lines.join('\n'));
+    const json = JSON.parse(lines[0]!);
 
     expect(exitCode).toBe(1);
     expect(json.profiles.every((profile: { ratio: number | null }) => profile.ratio === null)).toBe(true);

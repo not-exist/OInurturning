@@ -57,4 +57,32 @@ beginner,mid,late true 0.762423417290674,1.0488958990536277,7.323905796322185
 
 ## Self-review and concerns
 
-The CLI validates schema presence, profile/reference semantics, target configuration, and simulation errors before calculating. JSON uses `JSON.stringify(report, null, 2)`, preserving canonical profile and line-item order; zero expense is represented as `null` by the pure engine. The root pnpm command includes pnpm lifecycle logs unless invoked with `--silent`; the emitted CLI payload itself is valid stable JSON.
+The CLI validates schema presence, profile/reference semantics, target configuration, and simulation errors before calculating. JSON uses `JSON.stringify(report, null, 2)`, preserving canonical profile and line-item order; zero expense is represented as `null` by the pure engine.
+
+## Review Fix Round 1
+
+Fixed all review findings in commit pending this report update:
+
+- Added `reporter: silent` to `pnpm-workspace.yaml`, which suppresses pnpm lifecycle banners at the project boundary. The exact required invocation, `pnpm sim:economy -- --json`, now emits JSON-only stdout. A Vitest child-process regression executes that command and parses `stdout`.
+- Corrected semantic issue path interpolation to select `economy.yaml`, `items.yaml`, or `stages.yaml` by `issue.file` rather than interpolating the path map object.
+- Wrapped each shared-schema parse error with its source YAML path.
+- Rejected `simulation.target_profile` values other than `mid` with `simulation.target_profile` in the error.
+- Emitted `meta.calibration_profile.target_income_expense_ratio` when the calculated target gate fails, while retaining JSON report output and status 1.
+
+Fresh verification:
+
+```text
+pnpm -C apps/api exec vitest run tests/economy-simulation.test.ts --no-file-parallelism -t "CLI"
+Test Files  1 passed (1)
+Tests  9 passed | 19 skipped (28)
+
+pnpm -C apps/api exec vitest run tests/economy-simulation.test.ts --no-file-parallelism
+Test Files  1 passed (1)
+Tests  28 passed (28)
+
+pnpm sim:economy -- --json | JSON.parse(...)
+beginner,mid,late true
+
+git diff --check
+exit 0
+```

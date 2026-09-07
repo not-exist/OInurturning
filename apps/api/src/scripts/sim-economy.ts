@@ -46,15 +46,22 @@ export async function run(argv: readonly string[] = [], options: RunOptions = {}
   const itemsPath = path.join(DATA_DIR, 'items.yaml');
   const stagesPath = path.join(DATA_DIR, 'stages.yaml');
   try {
-    const economy = economyConfigSchema.parse(loadData(economyPath));
+    let economy;
+    try { economy = economyConfigSchema.parse(loadData(economyPath)); }
+    catch (error) { throw new Error(`${economyPath}: ${error instanceof Error ? error.message : String(error)}`); }
     if (economy.simulation === undefined) throw new Error(`${economyPath}: simulation is required`);
-    const items = itemsFileSchema.parse(loadData(itemsPath)).items;
-    const stages = stagesConfigSchema.parse(loadData(stagesPath));
+    if (economy.simulation.target_profile !== 'mid') throw new Error(`${economyPath}: simulation.target_profile: must be mid`);
+    let items;
+    try { items = itemsFileSchema.parse(loadData(itemsPath)).items; }
+    catch (error) { throw new Error(`${itemsPath}: ${error instanceof Error ? error.message : String(error)}`); }
+    let stages;
+    try { stages = stagesConfigSchema.parse(loadData(stagesPath)); }
+    catch (error) { throw new Error(`${stagesPath}: ${error instanceof Error ? error.message : String(error)}`); }
     const issues = runSemanticChecks({ economy, items, stages, talents: [] });
     if (issues.length > 0) {
       const issue = issues[0]!;
       const filePath: Record<string, string> = { economy: economyPath, items: itemsPath, stages: stagesPath };
-      throw new Error(`${filePath}: ${issue.path}: ${issue.message}`);
+      throw new Error(`${filePath[issue.file] ?? economyPath}: ${issue.path}: ${issue.message}`);
     }
     const report = simulateEconomy({
       economy,
@@ -62,7 +69,11 @@ export async function run(argv: readonly string[] = [], options: RunOptions = {}
       stages: Object.fromEntries(stages.stages.map((stage) => [`${stage.chapter}:${stage.stage_index}`, stage])),
     });
     console.log(argv.includes('--json') ? JSON.stringify(report, null, 2) : renderText(report));
-    return report.target.pass ? 0 : 1;
+    if (!report.target.pass) {
+      console.error(`meta.calibration_profile.target_income_expense_ratio: target gate failed (actual=${formatRatio(report.target.actual)}, expected=[${report.target.min}, ${report.target.max}])`);
+      return 1;
+    }
+    return 0;
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     return 1;
