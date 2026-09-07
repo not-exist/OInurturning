@@ -1630,7 +1630,7 @@ CI 顺序：`pnpm -r lint → typecheck → unit → integration`；集成任务
 | M2 | 模拟引擎（排名制）、八章剧情 + NPC 池 + 首通/名次奖励 + NG+ 解锁 | 同 seed 同报告哈希（golden 快照 ×N seed）；"属性↑→期望名次↑"统计性测试（大样本 seeds）；首通幂等（重打不发首通）；奖励与 stages.yaml 断言一致 |
 | M3 | 历练 41 事件、学院招募/讲课、出题题库闭环 | events.yaml 全量过 zod（41/41）；once/冷却行为测试；讲课门槛与报酬公式抽测；出题质量分布单元测 |
 | M4 | 出题对决、PVP 锦标赛全生命周期（报名→懒推进→对阵树→发奖）、管理员工具 | 对决计分规则表驱动测试（含考察出题质量/四类平局分流）；淘汰赛轮转含奇数轮空集成测；USER 打 admin 全 403 矩阵；审计留痕断言 |
-| M5 | economy 收支模拟脚本 + 数值平衡打磨 + 上线 | `scripts/sim-economy.ts` 输出中期玩家周收支落在 GAME-DESIGN §16 目标区间；接口冒烟压测（简单并发脚本）即可 |
+| M5 | economy 收支模拟脚本 + 数值平衡打磨 + 上线 | `scripts/sim-economy.ts` 输出中期玩家周收支落在 GAME-DESIGN §16 目标区间；机器读取使用 `pnpm --silent sim:economy -- --json`，避免 pnpm lifecycle banner 混入 stdout；接口冒烟压测（简单并发脚本）即可 |
 
 每个里程碑收尾产出：可运行的 compose 环境 + 通过 CI 的测试套件 + 更新 ROADMAP.md 的验收记录。
 

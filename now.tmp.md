@@ -1,14 +1,14 @@
-# OInurturning M2 完成交接
+# OInurturning M5 进行中交接
 
-更新时间：2026-09-04
+更新时间：2026-09-07
 
 ## 工作区
 
 - worktree：`/home/qzez/OInurturning`
 - branch：`m2-contest-story`
-- committed HEAD：`11572bd docs(m4): refresh reward handoff`
-- M2、M3.1–M3.6、M4.1、M4.2、T4.3、T4.4、T4.5 与 T4.6 已提交。
-- 工作树干净；未执行 merge 或 push；仓库暂未配置远端。
+- T5.1 实现基线 HEAD：`0d420bc fix(m5): scope silent economy json output`（本交接文档与最终回归断言将在后续提交中记录）。
+- M2、M3.1–M3.6、M4.1–M4.6 与 T5.1 已完成；未执行 merge 或 push。
+- 用户提供的 `session-ses_fa34.md`、`session-ses_fafa.md` 保持未跟踪且未修改。
 
 ## M2 状态
 
@@ -66,6 +66,16 @@
 - T4.5 PVP 调度器已对携带预制题的对手未解题结果发放声誉；`PVP_PROBLEM` 审计键实现同题同场幂等和单题单届 12 点上限。新增未解题收益/重放与上限测试；focused scheduler+duel 21/21、全量 35 files/286 tests、workspace typecheck/lint/build 与 Prisma 校验通过。
 - T4.6 PVP 奖励台账、冠军独占 `tag-card`、管理员奖池 PATCH、公开奖励查询与本人幂等领取已完成；默认奖励桶和首轮胜者返票已覆盖；全量 35 files/289 tests、workspace typecheck/lint/build 与 Prisma 校验通过；开发库迁移 `20260904120000_pvp_reward_grants` 已应用。
 
+## M5 状态
+
+- T5.1 YAML 驱动的确定性周经济模拟已完成，覆盖 `beginner`、`mid`、`late` 三画像。
+- `pnpm sim:economy` 输出文本报告；`pnpm --silent sim:economy -- --json` 输出机器可解析 JSON。
+- 实测：新手 `1120 / 1469 / -349 / 0.7624`；中期 `3990 / 3804 / 186 / 1.0489`；后期 `66775 / 9299 / 57476 / 7.1809`（收入/支出/净额/比率）。
+- 中期 gate `[0.90, 1.15]` 通过；下一任务为 T5.2 数值平衡回归。
+- 最终质量门：API 36 files / 319 tests，workspace typecheck/lint/build 与 `git diff --check` 全部通过。
+- Docker/浏览器手动验收继续延后到 M5 最终部署窗口。
+
 ## 下一步
 
-1. M4 完成后安排最终 Docker/浏览器手动验收和 M5。
+1. 执行 T5.2：估算训练到 IOI 的总时长，并核对进阶石全服产量与彩色天赋需求。
+2. T5.3/T5.4 完成后统一进行 Docker/浏览器手动验收。

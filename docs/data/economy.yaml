@@ -13,7 +13,7 @@
 
 meta:
   version: "0.1"
-  updated: "2026-08-26"
+  updated: "2026-09-07"
   calibration_profile:
     students: 5
     ability_level: noip          # 综合能力约 45–55
@@ -257,7 +257,7 @@ passive:
 # 体力预算假设：按 GAME-DESIGN §4「每日上线安排一轮行动」节奏，每学员每周有效行动约 5 次
 # （体力上限 5、离线持续恢复），全队周行动 ≈ 25 次，分配为：
 #   讲课 ×5（每次 2 体力，假设值，最终以 systems/gameplay.md 为准）
-#   ＋ 训练 ×10（每次 1 体力）＋ 历练 ×5 ＋ 剧情重复通关 ×5
+#   ＋ 训练 ×11（每次 1 体力）＋ 历练 ×5 ＋ 剧情重复通关 ×2
 # ----------------------------------------------------------------------
 sinks_summary:
   expense_items:                 # 支出端清单（GAME-DESIGN §16）
@@ -265,19 +265,19 @@ sinks_summary:
     - {item: 定向训练, weekly_estimate: 792, calc: "198×4 次"}
     - {item: 定向书籍消耗, weekly_estimate: 1280, calc: "绿级均价 320×4 册"}
     - {item: 专项训练, weekly_estimate: 264, calc: "132×2 次（自产预制题）"}
-    - {item: 学员池手动刷新, weekly_estimate: 150, calc: "均价 150×1 次"}
+    - {item: 学员池手动刷新, weekly_estimate: 100, calc: "当日首次付费刷新 100×1 次"}
     - {item: 招募摊销, weekly_estimate: 673, calc: "每两周招 1 名 @n=5 价 1345"}
-    - {item: 应急杂项（奶茶/药水/事件修理）, weekly_estimate: 250, calc: "经验值"}
+    - {item: 固定杂项（奶茶/药水/事件修理）, weekly_estimate: 300, calc: "simulation.fixed_weekly_expense"}
   expense_total_weekly: 3804
   income_items:                  # 收入端清单（GAME-DESIGN §16）
     - {item: 讲课（提高组×5）, weekly_estimate: 2520, calc: "300×rep1.40×溢出1.20≈504/次"}
     - {item: 历练掉钱（×5）, weekly_estimate: 600, calc: "混合均值 120/次"}
     - {item: 剧情名次奖金（NOIP 章重复×2 场）, weekly_estimate: 600, calc: "300~900/场"}
-    - {item: 被动收入（赞助或代课，部分周生效）, weekly_estimate: 200, calc: "期望摊销"}
-  income_total_weekly: 3920
+    - {item: 被动收入（代课教练×1）, weekly_estimate: 270, calc: "150×0.60×3 次"}
+  income_total_weekly: 3990
   canonical_week:
-    ratio: 1.03                  # 3920 / 3804，落于目标区间 [0.90, 1.15]
-    net_weekly: 116              # ≈ 持平略正
+    ratio: 1.0489                # 3990 / 3804，落于目标区间 [0.90, 1.15]
+    net_weekly: 186              # ≈ 持平略正
     big_ticket_cadence: 紫级书 2600 / 精能核心 3200 / 心流引擎 4800 ≈ 攒 2–6 周（视名次奖金运气）
   sensitivity_notes:
     - 弹性最大的收入项是剧情名次奖金（受每日 3 次限额与体力竞争约束，活跃玩家可显著上浮）。
