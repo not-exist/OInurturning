@@ -929,7 +929,7 @@ events:
     requirements: { min_reputation: 300 }
     description: "赞助商带着合同登门：以声誉背书换取长期资金。同时最多维持 2 份生效契约。"
     choices:
-      - text: 签下赞助契约（声誉 -30，此后每日 +300 钱 × 30 天）
+      - text: 签下赞助契约（声誉 -30，此后每日 +80–300 钱 × 14 天）
         outcomes:
           - weight: 100
             type: fixed

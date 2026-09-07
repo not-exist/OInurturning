@@ -103,6 +103,12 @@ describe('economy simulation configuration', () => {
     const parsed = economyConfigSchema.safeParse(config);
     expect(parsed.success).toBe(false);
   });
+
+  it('rejects rarity mix keys without configured adventure money ranges', () => {
+    const adventures = simulationOf(economy).profiles[0]!.adventures;
+    const issues = semantic({ adventures: { ...adventures, rarity_mix: { gray: 1, typo: 10 } } });
+    expect(issues.some((issue) => issue.path.endsWith('.adventures.rarity_mix.typo'))).toBe(true);
+  });
 });
 
 describe('pure economy simulation engine', () => {

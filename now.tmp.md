@@ -6,7 +6,8 @@
 
 - worktree：`/home/qzez/OInurturning`
 - branch：`m2-contest-story`
-- T5.1 实现基线 HEAD：`0d420bc fix(m5): scope silent economy json output`（本交接文档与最终回归断言将在后续提交中记录）。
+- committed HEAD：当前检出的 `refs/heads/m2-contest-story` tip，以 `git rev-parse HEAD` 为准（交接文件不嵌入自身尚未生成的 commit SHA）。
+- T5.1 审查基线：`a6ee4bd docs(m5): fix simulation report whitespace`；审查修复包含在当前 HEAD。
 - M2、M3.1–M3.6、M4.1–M4.6 与 T5.1 已完成；未执行 merge 或 push。
 - 用户提供的 `session-ses_fa34.md`、`session-ses_fafa.md` 保持未跟踪且未修改。
 
@@ -72,7 +73,7 @@
 - `pnpm sim:economy` 输出文本报告；`pnpm --silent sim:economy -- --json` 输出机器可解析 JSON。
 - 实测：新手 `1120 / 1469 / -349 / 0.7624`；中期 `3990 / 3804 / 186 / 1.0489`；后期 `66775 / 9299 / 57476 / 7.1809`（收入/支出/净额/比率）。
 - 中期 gate `[0.90, 1.15]` 通过；下一任务为 T5.2 数值平衡回归。
-- 最终质量门：API 36 files / 319 tests，workspace typecheck/lint/build 与 `git diff --check` 全部通过。
+- 最终质量门：API 36 files / 320 tests，workspace typecheck/lint/build 与 `git diff --check` 全部通过。
 - Docker/浏览器手动验收继续延后到 M5 最终部署窗口。
 
 ## 下一步

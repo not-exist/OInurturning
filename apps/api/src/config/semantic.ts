@@ -327,6 +327,13 @@ function checkSimulation(
   const lectureIds = new Set(lecture?.success ? lecture.data.audience_tiers.map((tier) => tier.id) : []);
   const itemById = new Map(items.map((item) => [item.id, item]));
   const stageKeys = new Set(stages?.stages.map((stage) => `${stage.chapter}:${stage.stage_index}`));
+  const adventure = economy.adventure;
+  const moneyRanges = adventure !== null && typeof adventure === 'object'
+    ? (adventure as Record<string, unknown>).money_ranges_by_rarity
+    : undefined;
+  const moneyRangeIds = new Set(
+    moneyRanges !== null && typeof moneyRanges === 'object' ? Object.keys(moneyRanges) : [],
+  );
 
   simulation.profiles.forEach((profile) => {
     const base = `simulation.profiles.${profile.id}`;
@@ -351,6 +358,15 @@ function checkSimulation(
     const total = weights.reduce((sum, weight) => sum + weight, 0);
     if (weights.some((weight) => !Number.isFinite(weight)) || !Number.isFinite(total) || total <= 0) {
       issues.push({ file: 'economy', path: `${base}.adventures.rarity_mix`, message: '历练稀有度权重必须为有限数且总和大于 0' });
+    }
+    for (const rarity of Object.keys(profile.adventures.rarity_mix)) {
+      if (!moneyRangeIds.has(rarity)) {
+        issues.push({
+          file: 'economy',
+          path: `${base}.adventures.rarity_mix.${rarity}`,
+          message: `历练稀有度没有金额区间配置：${rarity}`,
+        });
+      }
     }
   });
 }
