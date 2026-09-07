@@ -73,7 +73,7 @@
 - `pnpm sim:economy` 输出文本报告；`pnpm --silent sim:economy -- --json` 输出机器可解析 JSON。
 - 实测：新手 `1120 / 1469 / -349 / 0.7624`；中期 `3990 / 3804 / 186 / 1.0489`；后期 `66775 / 9299 / 57476 / 7.1809`（收入/支出/净额/比率）。
 - 中期 gate `[0.90, 1.15]` 通过；下一任务为 T5.2 数值平衡回归。
-- 最终质量门：API 36 files / 320 tests，workspace typecheck/lint/build 与 `git diff --check` 全部通过。
+- 最终质量门：API 36 files / 321 tests，workspace typecheck/lint/build 与 `git diff --check` 全部通过。
 - Docker/浏览器手动验收继续延后到 M5 最终部署窗口。
 
 ## 下一步

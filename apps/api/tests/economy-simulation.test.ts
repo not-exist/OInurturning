@@ -78,6 +78,12 @@ describe('economy simulation configuration', () => {
     expect(semantic({ story: { ...simulationOf(economy).profiles[0]!.story, stage_key: 'missing:1' } }).some((issue: SemanticIssue) => issue.path.includes('.story.stage_key'))).toBe(true);
   });
 
+  it('rejects priced non-book items as directed training books', () => {
+    const training = simulationOf(economy).profiles[0]!.training;
+    const issues = semantic({ training: { ...training, directed_book_item_id: 'milk-tea' } });
+    expect(issues.some((issue) => issue.path.endsWith('.training.directed_book_item_id'))).toBe(true);
+  });
+
   it('reports duplicate profile IDs semantically', () => {
     const config = structuredClone(economy);
     simulationOf(config).profiles[1]!.id = simulationOf(config).profiles[0]!.id;

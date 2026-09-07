@@ -348,8 +348,8 @@ function checkSimulation(
       issues.push({ file: 'economy', path: `${base}.lectures.tier`, message: `讲课 tier 引用不存在：${profile.lectures.tier}` });
     }
     const book = itemById.get(profile.training.directed_book_item_id);
-    if (book === undefined || book.price === null) {
-      issues.push({ file: 'economy', path: `${base}.training.directed_book_item_id`, message: `定向训练书籍不存在或无价格：${profile.training.directed_book_item_id}` });
+    if (book === undefined || book.category !== 'book' || book.price === null) {
+      issues.push({ file: 'economy', path: `${base}.training.directed_book_item_id`, message: `定向训练书籍不存在、不是书籍或无价格：${profile.training.directed_book_item_id}` });
     }
     if (stages !== undefined && !stageKeys.has(profile.story.stage_key)) {
       issues.push({ file: 'economy', path: `${base}.story.stage_key`, message: `剧情关卡 key 不存在：${profile.story.stage_key}` });

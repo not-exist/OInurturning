@@ -23,11 +23,12 @@ T5.1 已实现无数据库、无随机数的 YAML 驱动周经济模拟。真实
 - GREEN（引擎）：训练、书籍、招募、课程、历练、剧情、被动收入、零支出、排序与错误配置测试通过。
 - RED（CLI）：测试收集因 `src/scripts/sim-economy.ts` 不存在失败。
 - GREEN（CLI）：文本、JSON、YAML 路径、失败 gate 和 root command 边界测试通过。
-- 质量门 RED：首次完整 API 测试因本地 generated Prisma client 早于 M4 `PvpRewardGrant` schema 而失败 10 项；`pnpm -C apps/api generate` 后 PVP focused 13/13 通过，最终 API 全量 320/320 通过。
+- 质量门 RED：首次完整 API 测试因本地 generated Prisma client 早于 M4 `PvpRewardGrant` schema 而失败 10 项；`pnpm -C apps/api generate` 后 PVP focused 13/13 通过，最终 API 全量 321/321 通过。
 - lint RED：新增 engine/test 有 38 个 `no-explicit-any`；改为 shared schema 类型和窄化接口后 focused lint、typecheck 与模拟测试通过。
 - 配置完整性 RED：删除 `passive` 分区时引擎曾静默丢失固定收入行；改为路径明确的配置错误后，模拟测试通过。
 - 公式 RED：赞助收入测试暴露实现误用 14 天合约期作为周窗口（2660）；改为固定 7 天周窗口后，late 赞助收入为 1330。
 - 审查修复 RED：`rarity_mix` 中没有金额区间的 key 曾被静默丢弃；新增路径级 semantic 错误后纳入配置回归。
+- 自审 RED：有价非书籍道具曾可作为定向训练书引用；semantic 现在同时要求 `category: book` 和非空价格。
 
 ## 实现文件
 
@@ -42,7 +43,7 @@ T5.1 已实现无数据库、无随机数的 YAML 驱动周经济模拟。真实
 ## 质量门
 
 - `pnpm --silent sim:economy -- --json`：退出 0，mid gate PASS。
-- `pnpm -C apps/api exec vitest run --no-file-parallelism`：36 files / 320 tests 通过。
+- `pnpm -C apps/api exec vitest run --no-file-parallelism`：36 files / 321 tests 通过。
 - `pnpm typecheck`：通过。
 - `pnpm lint`：通过。
 - `pnpm build`：通过（API tsup + Web Vite production build）。
