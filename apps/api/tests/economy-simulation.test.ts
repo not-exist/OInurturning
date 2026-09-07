@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import { economyConfigSchema } from '@oinur/shared';
 import { runSemanticChecks, type SemanticIssue } from '../src/config/semantic.js';
 import { simulateEconomy } from '../src/modules/economy/simulation.js';
+import { run } from '../src/scripts/sim-economy.js';
 
 const dataPath = (file: string) => path.resolve(import.meta.dirname, '../../../docs/data', file);
 const economy = parseYaml(readFileSync(dataPath('economy.yaml'), 'utf8')) as Record<string, unknown>;
@@ -12,6 +13,10 @@ const items = parseYaml(readFileSync(dataPath('items.yaml'), 'utf8')) as { items
 const problems = parseYaml(readFileSync(dataPath('problems.yaml'), 'utf8')) as { templates: unknown[] };
 const stages = parseYaml(readFileSync(dataPath('stages.yaml'), 'utf8')) as unknown;
 const talents = parseYaml(readFileSync(dataPath('talents.yaml'), 'utf8')) as { talents: unknown[] };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('economy simulation configuration', () => {
   it('parses the approved profiles in economy.yaml', () => {
@@ -154,5 +159,72 @@ describe('pure economy simulation engine', () => {
     const malformed = structuredClone(parsedEconomy) as any;
     delete malformed.meta.calibration_profile.target_income_expense_ratio;
     expect(() => simulateEconomy({ economy: malformed, items: itemMap as any, stages: stageMap as any })).toThrow(/meta\.calibration_profile\.target_income_expense_ratio/);
+  });
+});
+
+describe('economy simulation CLI', () => {
+  const captureOutput = () => {
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((message: string) => lines.push(message));
+    vi.spyOn(console, 'error').mockImplementation((message: string) => lines.push(message));
+    return lines;
+  };
+
+  it('renders all profiles and a passing target in text output', async () => {
+    const lines = captureOutput();
+
+    const exitCode = await run([]);
+
+    expect(exitCode).toBe(0);
+    expect(lines.join('\n')).toContain('beginner');
+    expect(lines.join('\n')).toContain('mid');
+    expect(lines.join('\n')).toContain('late');
+    expect(lines.join('\n')).toContain('PASS');
+  });
+
+  it('renders stable JSON output', async () => {
+    const lines = captureOutput();
+
+    const exitCode = await run(['--json']);
+    const json = JSON.parse(lines.join('\n'));
+
+    expect(exitCode).toBe(0);
+    expect(json.profiles.map((profile: { id: string }) => profile.id)).toEqual(['beginner', 'mid', 'late']);
+    expect(json.target.pass).toBe(true);
+  });
+
+  it('reports the data path when economy simulation data is malformed', async () => {
+    const lines = captureOutput();
+    const malformed = structuredClone(economy);
+    delete malformed.simulation;
+
+    const exitCode = await run([], {
+      loadData: (file) => file.endsWith('economy.yaml') ? malformed : parseYaml(readFileSync(file, 'utf8')),
+    });
+
+    expect(exitCode).toBe(1);
+    expect(lines.join('\n')).toContain('economy.yaml');
+  });
+
+  it('renders null rather than Infinity for zero-expense profiles', async () => {
+    const lines = captureOutput();
+    const zeroExpense = structuredClone(economy) as any;
+    for (const profile of zeroExpense.simulation.profiles) {
+      profile.training.basic_sessions = 0;
+      profile.training.directed_sessions = 0;
+      profile.training.specialized_sessions = 0;
+      profile.recruitment.recruits_per_week = 0;
+      profile.recruitment.manual_refreshes_per_week = 0;
+      profile.fixed_weekly_expense = 0;
+    }
+
+    const exitCode = await run(['--json'], {
+      loadData: (file) => file.endsWith('economy.yaml') ? zeroExpense : parseYaml(readFileSync(file, 'utf8')),
+    });
+    const json = JSON.parse(lines.join('\n'));
+
+    expect(exitCode).toBe(1);
+    expect(json.profiles.every((profile: { ratio: number | null }) => profile.ratio === null)).toBe(true);
+    expect(lines.join('\n')).not.toContain('Infinity');
   });
 });
