@@ -169,7 +169,7 @@ git commit -m "feat(m5): add deterministic economy simulation engine"
 **Interfaces:**
 - `apps/api/src/scripts/sim-economy.ts` loads `docs/data/economy.yaml`, `items.yaml`, and `stages.yaml`, invokes `simulateEconomy`, and exports `run(argv?: readonly string[]): Promise<number>` for testability.
 - `scripts/sim-economy.ts` is a thin `tsx` entrypoint that imports the API script and exits with its returned status.
-- `pnpm sim:economy` runs the root entrypoint; `pnpm sim:economy -- --json` emits stable JSON.
+- `pnpm sim:economy` runs the root entrypoint; `pnpm --silent sim:economy -- --json` emits JSON-only stdout suitable for machine parsing.
 
 - [ ] **Step 1: Write failing CLI tests**
 
@@ -199,7 +199,7 @@ Render text with fixed sections and keys, then render `JSON.stringify(report, nu
 
 Run: `pnpm -C apps/api exec vitest run tests/economy-simulation.test.ts --no-file-parallelism -t "CLI"`
 
-Then run: `pnpm sim:economy` and `pnpm sim:economy -- --json`
+Then run: `pnpm sim:economy` and `pnpm --silent sim:economy -- --json`
 
 Expected: focused tests pass, text output contains all three profiles and `PASS`, JSON parses successfully, and both commands exit 0.
 
@@ -240,7 +240,7 @@ expect(report.target.actual).toBeLessThanOrEqual(report.target.max);
 Run in this order:
 
 ```bash
-pnpm sim:economy -- --json
+pnpm --silent sim:economy -- --json
 pnpm -C apps/api exec vitest run --no-file-parallelism
 pnpm typecheck
 pnpm lint

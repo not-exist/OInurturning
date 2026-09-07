@@ -194,12 +194,20 @@ describe('economy simulation CLI', () => {
     expect(json.target.pass).toBe(true);
   });
 
-  it('emits parseable JSON from the root pnpm command', () => {
+  it('emits parseable JSON from the silent root pnpm command', () => {
     const root = path.resolve(import.meta.dirname, '../../..');
-    const child = spawnSync('pnpm', ['sim:economy', '--', '--json'], { cwd: root, encoding: 'utf8' });
+    const child = spawnSync('pnpm', ['--silent', 'sim:economy', '--', '--json'], { cwd: root, encoding: 'utf8' });
 
     expect(child.status).toBe(0);
     expect(JSON.parse(child.stdout).target.pass).toBe(true);
+  });
+
+  it('keeps pnpm diagnostics for an unknown root script', () => {
+    const root = path.resolve(import.meta.dirname, '../../..');
+    const child = spawnSync('pnpm', ['run', 'this-script-does-not-exist'], { cwd: root, encoding: 'utf8' });
+
+    expect(child.status).toBe(1);
+    expect(`${child.stdout}${child.stderr}`).not.toBe('');
   });
 
   it('reports the data path when economy simulation data is malformed', async () => {

@@ -86,3 +86,33 @@ beginner,mid,late true
 git diff --check
 exit 0
 ```
+
+## Review Fix Round 2: Blocked
+
+The requested contracts are incompatible with pnpm 10.14.0 project configuration:
+
+- Removing the project-wide `reporter: silent` restores `pnpm run this-script-does-not-exist` diagnostics: exit `1`, stdout `117` bytes, stderr `0` bytes.
+- With that setting removed, the required `pnpm sim:economy -- --json` exits `0` but stdout begins with pnpm's lifecycle banner:
+
+```text
+> oinurturning@ sim:economy /home/qzez/OInurturning
+> pnpm -C apps/api exec tsx ../../scripts/sim-economy.ts -- --json
+```
+
+Consequently `JSON.parse(stdout)` fails with `Unexpected token '>'` before it reaches the CLI JSON.
+
+Experiments: `pnpm --loglevel error|warn|silent sim:economy -- --json` each still emitted `3776` stdout bytes including the lifecycle banner. `pnpm --silent` does suppress it, but requires changing the mandated caller command. Project `reporter: silent` is the only tested configuration that makes the exact command JSON-only, and it also suppresses unknown-script diagnostics entirely, so it was removed.
+
+Added paired child-process coverage. The unknown-script diagnostic assertion passes; the exact-command JSON assertion fails solely on the pnpm banner. No fix-round-2 commit was made because committing this state would intentionally leave the required focused suite failing.
+
+## Review Fix Round 2: Ruling Applied
+
+The controller ruled that machine-readable root invocation is `pnpm --silent sim:economy -- --json`. This is the only scoped pnpm 10.14.0 interface that preserves JSON-only stdout without suppressing diagnostics for every workspace command. The project-wide `reporter: silent` setting was removed, the root command regression now supplies `--silent`, and a paired regression confirms an unknown pnpm script still emits diagnostics.
+
+Verification:
+
+```text
+pnpm -C apps/api exec vitest run tests/economy-simulation.test.ts --no-file-parallelism -t "CLI"
+Test Files  1 passed (1)
+Tests  10 passed | 19 skipped (29)
+```
