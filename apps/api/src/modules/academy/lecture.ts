@@ -47,9 +47,11 @@ function lectureConfig(): LectureConfig {
 
 function tierConfig(tier: string) {
   const tierId = tier as LectureTierId;
-  const tierData = lectureConfig().audience_tiers.find((candidate) => candidate.id === tierId);
+  // 单次解析后复用同一数组：safeParse 每次返回新对象，两次调用间 indexOf（引用比较）恒为 -1
+  const tiers = lectureConfig().audience_tiers;
+  const tierData = tiers.find((candidate) => candidate.id === tierId);
   if (tierData === undefined) throw new ApiError('VALIDATION_FAILED', { field: 'tier' });
-  return { tierId, tierData, ordinal: lectureConfig().audience_tiers.indexOf(tierData) + 1 };
+  return { tierId, tierData, ordinal: tiers.indexOf(tierData) + 1 };
 }
 
 function repMultiplier(reputation: number): number {

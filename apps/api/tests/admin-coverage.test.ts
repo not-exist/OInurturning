@@ -204,7 +204,8 @@ describe('admin coverage：公告/用户/审计', () => {
 
     const badLimit = await request(app).get('/api/admin/users?limit=101').set(auth);
     expect(badLimit.status).toBe(400);
-    const badQuery = await request(app).get('/api/admin/users?query[]=x').set(auth);
+    // express 默认 simple 解析器下 query[]=x 不会产出数组，用重复键构造非 string query
+    const badQuery = await request(app).get('/api/admin/users?query=a&query=b').set(auth);
     expect(badQuery.status).toBe(400);
   });
 

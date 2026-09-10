@@ -54,6 +54,15 @@ jobs:
         run: pnpm -C apps/api exec vitest run tests/journey-full.e2e.test.ts --reporter=default --reporter=github-actions 2>&1 | tee journey.log; test ${PIPESTATUS[0]} -eq 0
       - name: 浏览器 e2e
         run: pnpm e2e
+      - name: 采集服务启动日志
+        if: failure()
+        run: |
+          (for i in $(seq 1 40); do sleep 2; code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health || echo 000); echo "t=$((i*2))s health=$code" >> /tmp/api-poll.log; [ "$code" = "200" ] && break; done) &
+          timeout 90 env PORT=3000 NODE_ENV=test DATABASE_URL="$E2E_DATABASE_URL" JWT_SECRET="$E2E_JWT_SECRET" pnpm -C apps/api exec tsx src/index.ts > /tmp/api-boot.log 2>&1; echo "api-exit=$?"
+          timeout 60 pnpm -C apps/web dev > /tmp/web-boot.log 2>&1; echo "web-exit=$?"
+          { echo '### api-poll.log'; cat /tmp/api-poll.log 2>/dev/null; echo '### api-boot.log (tail 60)'; tail -n 60 /tmp/api-boot.log; echo '### web-boot.log (tail 40)'; tail -n 40 /tmp/web-boot.log; } > /tmp/boot-capture.txt
+          cat /tmp/boot-capture.txt
+          python3 -c "print('::error::服务启动采集（截断 6KB）：%0A' + open('/tmp/boot-capture.txt', errors='replace').read()[-6000:].replace(chr(10), '%0A'))"
       - name: 定位-register
         if: failure()
         run: grep -q 'JSTAGE:register' journey.log || exit 1
@@ -93,4 +102,7 @@ jobs:
             playwright-report/
             test-results/
             journey.log
+            /tmp/api-boot.log
+            /tmp/web-boot.log
+            /tmp/api-poll.log
           retention-days: 7

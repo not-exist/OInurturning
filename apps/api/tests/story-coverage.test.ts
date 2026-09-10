@@ -118,9 +118,12 @@ async function clearStage(
   studentId: number,
   ngLevel = 0,
 ): Promise<EnterResult> {
+  // 每次调用换新幂等键命名空间：同一用例内多次 clearStage 不可复用键（否则第二次命中 replay）
+  seq += 1;
+  const tag = seq;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await refill(studentId);
-    const res = await enter(token, stageKey, studentId, `clear-${stageKey}-ng${ngLevel}-${attempt}-${seq}`, ngLevel);
+    const res = await enter(token, stageKey, studentId, `clear-${stageKey}-ng${ngLevel}-${attempt}-${tag}`, ngLevel);
     expect(res.status).toBe(200);
     const data = unwrapOk<EnterResult>(res);
     if (data.record.report.pass) return data;
