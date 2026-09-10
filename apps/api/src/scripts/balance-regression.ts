@@ -12,6 +12,7 @@ import {
   type EconomyConfig,
   type EventsConfig,
   type ItemDef,
+  type StageChapter,
   type StageConfig,
   type StagesConfig,
   type TalentDef,
@@ -65,7 +66,7 @@ interface FinalTarget {
 }
 
 function finalStages(stages: StageConfig[]): FinalTarget[] {
-  const byChapter = new Map<string, StageConfig>();
+  const byChapter = new Map<StageChapter, StageConfig>();
   for (const stage of stages) {
     const prev = byChapter.get(stage.chapter);
     if (prev === undefined || stage.stage_index > prev.stage_index)

@@ -76,7 +76,9 @@ interface AdventureChoice {
 interface AdventureView {
   id: number;
   preview: boolean;
-  choices: AdventureChoice[] | null;
+  // 无情报直抽：preview=false，分支直接挂在 event.choices（available 仅表配置支持与否，
+  // 资源门槛缺失在结算时按分支报错，由调用方换分支重试）
+  event: { choices: AdventureChoice[] | null };
 }
 interface RewardGrant {
   userId: number;

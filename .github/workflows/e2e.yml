@@ -51,7 +51,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e:typecheck
       - name: API 全链路旅程
-        run: pnpm -C apps/api exec vitest run tests/journey-full.e2e.test.ts 2>&1 | tee journey.log; test ${PIPESTATUS[0]} -eq 0
+        run: pnpm -C apps/api exec vitest run tests/journey-full.e2e.test.ts --reporter=default --reporter=github-actions 2>&1 | tee journey.log; test ${PIPESTATUS[0]} -eq 0
       - name: 浏览器 e2e
         run: pnpm e2e
       - name: 定位-register

@@ -42,18 +42,33 @@ jobs:
         run: mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
       - name: 类型检查采集
         run: pnpm -r typecheck 2>&1 | tee typecheck.log; test ${PIPESTATUS[0]} -eq 0
+      - name: 归因类型检查日志
+        if: failure()
+        run: >
+          python3 - <<'EOF'
+          import re
+          scope = '?'
+          with open('typecheck.log', errors='replace') as f, open('typecheck-attrib.log', 'w') as o:
+              for line in f:
+                  m = re.match(r'^(apps/\S+|packages/\S+)\s+\S+\$', line)
+                  if m:
+                      scope = m.group(1)
+                  if 'error TS' in line:
+                      o.write(f'{scope}|{line}')
+          EOF
+          cat typecheck-attrib.log
       - run: pnpm -r lint
       - run: pnpm -r build
-      - run: pnpm --filter @oinur/api test:unit
+      - run: pnpm --filter @oinur/api test:unit -- --reporter=default --reporter=github-actions
       - name: 定位-api-src
         if: failure()
-        run: grep -q 'apps/api/src' typecheck.log && exit 1 || exit 0
+        run: grep -q '^apps/api|' typecheck-attrib.log && grep '^apps/api|' typecheck-attrib.log | grep -q -v '|tests/' && exit 1 || exit 0
       - name: 定位-web
         if: failure()
-        run: grep -q 'apps/web' typecheck.log && exit 1 || exit 0
+        run: grep -q '^apps/web|' typecheck-attrib.log && exit 1 || exit 0
       - name: 定位-shared
         if: failure()
-        run: grep -q 'packages/shared' typecheck.log && exit 1 || exit 0
+        run: grep -q '^packages/shared|' typecheck-attrib.log && exit 1 || exit 0
       - name: 定位-auth
         if: failure()
         run: grep -q 'tests/auth-coverage' typecheck.log && exit 1 || exit 0
@@ -101,5 +116,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: typecheck-log
-          path: typecheck.log
+          path: |
+            typecheck.log
+            typecheck-attrib.log
           retention-days: 7
