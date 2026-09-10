@@ -111,7 +111,8 @@ describe('journey full (api)', () => {
     let pool = await poolOf();
     expect(pool.candidates).toHaveLength(5);
     const students: StudentView[] = [];
-    for (let round = 0; round < 8 && !students.some((s) => s.v >= 7); round += 1) {
+    // 单抽 V<7 概率约 19%（common 占 55% 且 V 上限约 11），12 轮全失败 ≈ 2e-9，可忽略
+    for (let round = 0; round < 12 && !students.some((s) => s.v >= 7); round += 1) {
       if (round > 0) {
         const refreshed = await request(app).post('/api/academy/refresh').set(auth);
         expect(refreshed.status).toBe(200);
@@ -222,24 +223,17 @@ describe('journey full (api)', () => {
     expect(lectureLogs).toHaveLength(1);
     console.log('JSTAGE:lecture');
 
-    // —— 历练：preview→接受→分支（逐个试可用分支直到结算） ——
+    // —— 历练：无情报直抽→分支（逐个试可用分支直到结算；钥匙篮+20 万资金保证必有可解分支） ——
     const drawn = unwrapOk<AdventureView>(
       await request(app)
         .post('/api/adventures/draw')
         .set(auth)
         .send({ studentId: best.id, tier: 1 }),
     );
-    expect(drawn.preview).toBe(true);
-    const accepted = unwrapOk<{ completed: boolean; adventure: AdventureView }>(
-      await request(app)
-        .post(`/api/adventures/${drawn.id}/choice`)
-        .set(auth)
-        .send({ action: 'accept' }),
-    );
-    expect(accepted.completed).toBe(false);
-    expect(accepted.adventure.choices?.length).toBeGreaterThan(0);
+    expect(drawn.preview).toBe(false);
+    expect(drawn.event.choices?.length).toBeGreaterThan(0);
     let completed = false;
-    for (const choice of accepted.adventure.choices ?? []) {
+    for (const choice of drawn.event.choices ?? []) {
       if (!choice.available) continue;
       const resolved = await request(app)
         .post(`/api/adventures/${drawn.id}/choice`)

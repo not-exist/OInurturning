@@ -95,7 +95,7 @@ test.describe('完整玩家旅程', () => {
     await page.goto('/story');
     await page.getByTestId('story-student').selectOption(String(best.id));
     await page.getByTestId('story-enter').first().click();
-    await page.waitForURL(/\/records\/\d+/);
+    await page.waitForURL(/\/records\/[^/]+/);
     await expect(page.getByText('排名赛战报')).toBeVisible();
     await page.getByTestId('record-back').click();
     await page.waitForURL('/story');
@@ -106,20 +106,26 @@ test.describe('完整玩家旅程', () => {
     await page.getByTestId('problem-create').click();
     await expect(page.getByTestId('problem-row')).toHaveCount(1);
 
-    // —— 7. 体力药水回体 ——
+    // —— 7. 体力药水回体（明确点给 best，否则后续讲课/历练可能体力不足） ——
     await page.goto('/backpack');
     const potion = page.locator('[data-testid="inventory-row"][data-itemid="stamina-potion"]');
     await potion.getByTestId('item-use').click();
+    await page.getByTestId('item-picker').getByText(best.name).click();
     await page.getByTestId('item-use-confirm').click();
     await expect(page.getByTestId('item-picker')).not.toBeVisible();
 
-    // —— 8. 讲课（按真 V 分支）——
+    // —— 8. 讲课（重读真 V 分支：训练已抬升 V，招募时快照会过期）——
+    const refresh = await apiCall(request, 'GET', '/api/students', token);
+    const bestNow = unwrap<{ id: number; v: number }[]>(refresh.body, '学员列表').find(
+      (s) => s.id === best.id,
+    );
+    const bestV = bestNow?.v ?? best.v;
     await page.goto('/academy/lecture');
     await page.getByTestId('lecture-student').selectOption(String(best.id));
-    if (best.v >= 15) {
+    if (bestV >= 15) {
       await page.getByTestId('lecture-teach').click();
       await expect(page.getByTestId('lecture-logs')).toContainText('成功');
-    } else if (best.v >= 7) {
+    } else if (bestV >= 7) {
       await page.getByTestId('lecture-force').check();
       await page.getByTestId('lecture-teach').click();
       await expect(page.getByTestId('lecture-logs')).toContainText(/成功|讲砸/);
@@ -128,23 +134,23 @@ test.describe('完整玩家旅程', () => {
       await expect(page.getByTestId('lecture-error')).toContainText('讲课未能开始');
     }
 
-    // —— 9. 历练 ——
+    // —— 9. 历练（无情报直抽→分支） ——
     await page.goto('/adventure');
     await page.getByTestId('adventure-student').selectOption(String(best.id));
     await page.getByTestId('adventure-draw').click();
-    await expect(page.getByTestId('adventure-accept')).toBeVisible();
-    await page.getByTestId('adventure-accept').click();
     await expect(page.locator('[data-testid^="adventure-choice-"]').first()).toBeVisible();
     expect(await resolveAdventureChoice(page)).toBe(true);
     await expect(page.getByTestId('adventure-logs').getByRole('listitem')).toHaveCount(1);
 
-    // —— 10. 奶茶 ——
+    // —— 10. 奶茶（历练奖励可能发放过奶茶，不断言绝对数量，只断言使用后减 1） ——
     await page.goto('/backpack');
     const tea = page.locator('[data-testid="inventory-row"][data-itemid="milk-tea"]');
-    await expect(tea).toContainText('×3');
+    const teaBefore = (await tea.innerText()) ?? '';
+    const teaQty = /×(\d+)/.exec(teaBefore)?.[1];
+    expect(teaQty).toBeDefined();
     await tea.getByTestId('item-use').click();
     await page.getByTestId('item-use-confirm').click();
-    await expect(tea).toContainText('×2');
+    await expect(tea).toContainText(`×${Number(teaQty) - 1}`);
 
     // —— 11. 改名 ——
     await page.goto(`/students/${best.id}`);

@@ -78,7 +78,8 @@ async function makeTournament(
 /** 推进直到 FINISHED（单次 advance 通常跑完全程，循环仅防赛制分支）。 */
 async function finishTournament(tournamentId: number): Promise<void> {
   for (let i = 0; i < 4; i += 1) {
-    const detail = await advancePvpTournament(tournamentId, PAST);
+    // now 须 ≥ autoStartAt（默认 OPEN=2099），否则 scheduler 判定未到开赛时间直接返回 REGISTERING
+    const detail = await advancePvpTournament(tournamentId, OPEN);
     if (detail.status === 'FINISHED') return;
   }
   throw new Error(`tournament ${tournamentId} not finished after advances`);

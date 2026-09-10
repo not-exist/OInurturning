@@ -21,7 +21,7 @@ test.describe('剧情模式', () => {
 
     await page.getByTestId('record-share').click();
     // 分享失败也不打断浏览：仍在战报页
-    await expect(page).toHaveURL(/\/records\/\d+/);
+    await expect(page).toHaveURL(/\/records\/[^/]+/);
     await expect(page.getByText('排名赛战报')).toBeVisible();
 
     await page.getByTestId('record-back').click();

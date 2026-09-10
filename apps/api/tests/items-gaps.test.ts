@@ -54,7 +54,8 @@ describe('items gaps', () => {
       request(app).post('/api/items/use').set(auth).send({ itemId: 'milk-tea', studentId: student.id }),
       request(app).post('/api/items/use').set(auth).send({ itemId: 'milk-tea', studentId: student.id }),
     ]);
-    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    // 失败方确定性走缺货分支：胜方提交删除库存行后，败方持学员锁读到行缺失 → INSUFFICIENT_RESOURCE
+    expect([a.status, b.status].sort((x, y) => x - y)).toEqual([200, 409]);
     const loser = a.status === 409 ? a : b;
     expect(unwrapErr(loser).code).toBe('INSUFFICIENT_RESOURCE');
     expect(await prisma.userItem.findUnique({ where: { userId_itemId: { userId: user.userId, itemId: 'milk-tea' } } })).toBeNull();

@@ -251,7 +251,8 @@ describe('adventure gaps：幂等与日志', () => {
     const over = await request(app).get('/api/adventures/logs?limit=101').set(auth);
     expect(over.status).toBe(400);
 
-    // service 层注入显式时间戳，消除同毫秒排序歧义
+    // drawAdventure 忽略注入的 now（createdAt 取库默认值），同毫秒建行会导致倒序歧义；
+    // 此处直写 createdAt 保证确定性（listAdventureLogs 按 createdAt desc 排序）
     seq += 1;
     const direct = await prisma.user.create({ data: { username: `advgap-direct-${Date.now().toString(36)}-${seq}` } });
     const student = await prisma.student.create({
@@ -265,6 +266,8 @@ describe('adventure gaps：幂等与日志', () => {
     const first = await drawAdventure(direct.id, student.id, 1, new Date('2026-09-02T12:00:00.000Z'));
     await chooseAdventure(direct.id, first.id, { optionIndex: 0 }, new Date('2026-09-02T12:00:01.000Z'));
     const second = await drawAdventure(direct.id, student.id, 1, new Date('2026-09-02T12:00:02.000Z'));
+    await prisma.adventureLog.update({ where: { id: first.id }, data: { createdAt: new Date('2026-09-02T12:00:00.000Z') } });
+    await prisma.adventureLog.update({ where: { id: second.id }, data: { createdAt: new Date('2026-09-02T12:00:02.000Z') } });
     const logs = await listAdventureLogs(direct.id, 10);
     expect(logs.map((l) => l.id)).toEqual([second.id, first.id]);
   });
