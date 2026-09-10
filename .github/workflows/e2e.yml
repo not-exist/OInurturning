@@ -54,6 +54,36 @@ jobs:
         run: pnpm -C apps/api exec vitest run tests/journey-full.e2e.test.ts
       - name: 浏览器 e2e
         run: pnpm e2e
+      - name: 定位-register
+        if: failure()
+        run: grep -q 'JSTAGE:register' journey.log || exit 1
+      - name: 定位-recruit
+        if: failure()
+        run: grep -q 'JSTAGE:recruit' journey.log || exit 1
+      - name: 定位-train
+        if: failure()
+        run: grep -q 'JSTAGE:train' journey.log || exit 1
+      - name: 定位-story
+        if: failure()
+        run: grep -q 'JSTAGE:story' journey.log || exit 1
+      - name: 定位-problem
+        if: failure()
+        run: grep -q 'JSTAGE:problem' journey.log || exit 1
+      - name: 定位-lecture
+        if: failure()
+        run: grep -q 'JSTAGE:lecture' journey.log || exit 1
+      - name: 定位-adventure
+        if: failure()
+        run: grep -q 'JSTAGE:adventure' journey.log || exit 1
+      - name: 定位-social
+        if: failure()
+        run: grep -q 'JSTAGE:social' journey.log || exit 1
+      - name: 定位-pvp
+        if: failure()
+        run: grep -q 'JSTAGE:pvp' journey.log || exit 1
+      - name: 定位-account
+        if: failure()
+        run: grep -q 'JSTAGE:account' journey.log || exit 1
       - name: 上传失败现场
         if: failure()
         uses: actions/upload-artifact@v4

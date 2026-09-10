@@ -91,6 +91,7 @@ describe('journey full (api)', () => {
     const auth = { Authorization: `Bearer ${player.token}` };
     const me0 = unwrapOk<{ money: number }>(await request(app).get('/api/users/me').set(auth));
     expect(me0.money).toBe(0);
+    console.log('JSTAGE:register');
 
     // —— 注资（等价运营拨款；见 e2e-seed.ts 背景） ——
     await fund(player.userId, 200000, {
@@ -126,6 +127,7 @@ describe('journey full (api)', () => {
     }
     const best = [...students].sort((a, b) => b.v - a.v)[0]!;
     expect(best.v).toBeGreaterThanOrEqual(7);
+    console.log('JSTAGE:recruit');
 
     // —— 基础训练：增益>0、扣 1 体力 ——
     const basic = unwrapOk<TrainResult>(
@@ -149,6 +151,7 @@ describe('journey full (api)', () => {
       await request(app).get('/api/items').set(auth),
     );
     expect(booksAfter.find((i) => i.itemId === 'book-ds-green')?.quantity).toBe(1);
+    console.log('JSTAGE:train');
 
     // —— 剧情首关：进关→战报结构完整 ——
     const entered = unwrapOk<{ record: { id: number } }>(
@@ -163,6 +166,7 @@ describe('journey full (api)', () => {
     expect(report.report.format).toBe('RANKING');
     expect(report.report.engineVersion).toBeTruthy();
     expect(report.report.standings.length).toBeGreaterThan(0);
+    console.log('JSTAGE:story');
 
     // —— 出题 ——
     const problem = unwrapOk<{ id: number; quality: number }>(
@@ -190,6 +194,7 @@ describe('journey full (api)', () => {
       await request(app).get('/api/problem-library').set(auth),
     );
     expect(libraryAfter.find((p) => p.id === problem.id)?.consumedAt).not.toBeNull();
+    console.log('JSTAGE:problem');
 
     // —— 体力药水：0→3 ——
     const used = await request(app)
@@ -215,6 +220,7 @@ describe('journey full (api)', () => {
       await request(app).get('/api/academy/lectures').set(auth),
     );
     expect(lectureLogs).toHaveLength(1);
+    console.log('JSTAGE:lecture');
 
     // —— 历练：preview→接受→分支（逐个试可用分支直到结算） ——
     const drawn = unwrapOk<AdventureView>(
@@ -249,6 +255,7 @@ describe('journey full (api)', () => {
       await request(app).get('/api/adventures/logs').set(auth),
     );
     expect(adventureLogs).toHaveLength(1);
+    console.log('JSTAGE:adventure');
 
     // —— 奶茶：心态 +2 ——
     const beforeTea = unwrapOk<StudentView>(
@@ -279,6 +286,7 @@ describe('journey full (api)', () => {
         .send({ name: '旅程之星' }),
     );
     expect(renamed.name).toBe('旅程之星');
+    console.log('JSTAGE:social');
 
     // —— PVP 八人赛 ——
     const admin = await register('journey-admin');
@@ -348,6 +356,7 @@ describe('journey full (api)', () => {
     expect(claimed.claimedAt).not.toBeNull();
     const moneyAfter = (await prisma.user.findUniqueOrThrow({ where: { id: champion!.userId } })).money;
     expect(moneyAfter - moneyBefore).toBe(1000);
+    console.log('JSTAGE:pvp');
 
     // —— 改密：新旧交替 ——
     const changed = await request(app)
@@ -376,5 +385,6 @@ describe('journey full (api)', () => {
       .post('/api/auth/login')
       .send({ username: player.username, password: 'pw-new-12345678' });
     expect(loginGone.status).toBe(401);
+    console.log('JSTAGE:account');
   });
 });
