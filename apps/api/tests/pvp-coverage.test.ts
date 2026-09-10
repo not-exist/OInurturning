@@ -2,6 +2,7 @@ import path from 'node:path';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
+import type { Prisma } from '@prisma/client';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
@@ -57,10 +58,19 @@ async function makePlayer(): Promise<Player> {
   return { userId, studentId: student.id, token };
 }
 
-async function makeTournament(overrides: Record<string, unknown> = {}): Promise<{ id: number }> {
+async function makeTournament(
+  overrides: { registerEndsAt?: Date; autoStartAt?: Date; prizes?: Prisma.InputJsonValue } = {},
+): Promise<{ id: number }> {
   seq += 1;
   const row = await prisma.pvpTournament.create({
-    data: { name: `覆盖杯 ${seq}`, size: 8, registerEndsAt: OPEN, autoStartAt: OPEN, prizes: {}, config: {}, ...overrides },
+    data: {
+      name: `覆盖杯 ${seq}`,
+      size: 8,
+      registerEndsAt: overrides.registerEndsAt ?? OPEN,
+      autoStartAt: overrides.autoStartAt ?? OPEN,
+      prizes: overrides.prizes ?? {},
+      config: {},
+    },
   });
   return { id: row.id };
 }

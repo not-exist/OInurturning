@@ -262,7 +262,14 @@ describe('journey full (api)', () => {
     const afterTea = unwrapOk<StudentView>(
       await request(app).get(`/api/students/${best.id}`).set(auth),
     );
-    expect(afterTea.mindset - beforeTea.mindset).toBeCloseTo(2, 5);
+    // 心态钳制在 [-10,10]：赛后心态若已近顶，+2 会被部分钳制，按分支断言
+    expect(afterTea.mindset).toBeLessThanOrEqual(10);
+    expect(afterTea.mindset).toBeGreaterThanOrEqual(beforeTea.mindset);
+    if (beforeTea.mindset <= 8) {
+      expect(afterTea.mindset - beforeTea.mindset).toBeCloseTo(2, 5);
+    } else {
+      expect(afterTea.mindset).toBe(10);
+    }
 
     // —— 改名：耗 1 张改名卡 ——
     const renamed = unwrapOk<StudentView>(

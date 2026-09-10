@@ -40,7 +40,15 @@ jobs:
       - run: pnpm -C apps/api generate
       - name: 授权测试用户
         run: mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
-      - run: pnpm -r typecheck
+      - name: 类型检查
+        run: pnpm -r typecheck 2>&1 | tee typecheck.log; test ${PIPESTATUS[0]} -eq 0
       - run: pnpm -r lint
       - run: pnpm -r build
       - run: pnpm --filter @oinur/api test:unit
+      - name: 上传类型检查日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-log
+          path: typecheck.log
+          retention-days: 7

@@ -62,4 +62,5 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            journey.log
           retention-days: 7
