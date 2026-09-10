@@ -31,7 +31,7 @@ test.describe('冒烟', () => {
     const admin = await readAdminAccount();
     await loginViaUI(page, admin.username, admin.password);
     await page.goto('/admin');
-    await expect(page.getByText('创建赛事')).toBeVisible();
-    await expect(page.getByText('发布公告')).toBeVisible();
+    await expect(page.getByText('创建赛事').first()).toBeVisible();
+    await expect(page.getByText('发布公告').first()).toBeVisible();
   });
 });
