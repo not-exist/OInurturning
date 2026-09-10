@@ -6,7 +6,8 @@ import type { APIRequestContext, Page } from '@playwright/test';
 
 const execFileAsync = promisify(execFile);
 
-export const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:3000';
+export const API_URL =
+  process.env.E2E_API_URL ?? `http://127.0.0.1:${process.env.E2E_API_PORT ?? 3000}`;
 export const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL ?? 'mysql://oinur:oinur@127.0.0.1:3306/oinur_e2e';
 export const E2E_JWT_SECRET =
@@ -200,7 +201,9 @@ export function unwrap<T>(body: unknown, what: string): T {
  */
 export function candidateVProxy(cardText: string): number {
   const num = (label: string): number => {
-    const match = new RegExp(`${label}\\s+(\\d+)`).exec(cardText);
+    // innerText 对 flex 两栏不加分隔符（"数据12"），故空白可选；
+    // 候选名来自固定名池，经核对不含属性词，不会误匹配
+    const match = new RegExp(`${label}\\s*(\\d+)`).exec(cardText);
     return match ? Number(match[1]) : 0;
   };
   const dims = ['数据', '动态', '数学', '图论', '贪心', '字符串'].map(num);

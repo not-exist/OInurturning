@@ -38,6 +38,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -C apps/api generate
+      - name: 授权测试用户
+        run: mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
       - run: pnpm -r typecheck
       - run: pnpm -r lint
       - run: pnpm -r build

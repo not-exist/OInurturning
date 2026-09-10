@@ -42,10 +42,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -C apps/api generate
-      - name: 准备 e2e 库
+      - name: 授权测试用户并创建 e2e 库
         run: |
-          mysql -h 127.0.0.1 -uoinur -poinur -e "CREATE DATABASE IF NOT EXISTS oinur_e2e;"
-          DATABASE_URL="$E2E_DATABASE_URL" pnpm -C apps/api migrate
+          mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS oinur_e2e;"
+      - name: 迁移 e2e 库
+        run: DATABASE_URL="$E2E_DATABASE_URL" pnpm -C apps/api migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e:typecheck
       - name: API 全链路旅程

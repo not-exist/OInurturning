@@ -30,9 +30,12 @@ test.describe('管理端', () => {
     await page.getByTestId('admin-user-search').fill(probe.username);
     await expect(page.getByTestId('admin-users')).toContainText(probe.username);
 
-    // 审计留痕
+    // 审计留痕（heading 的父级只是标题栏，表格在 section 内，须按 section 圈定）
     await expect(page.getByTestId('admin-audits-head')).toBeVisible();
-    const auditSection = page.getByRole('heading', { name: '审计日志' }).locator('..');
+    const auditSection = page.locator(
+      'section',
+      { has: page.getByRole('heading', { name: '审计日志' }) },
+    );
     await expect(auditSection).toContainText('TOURNAMENT_CREATE');
     await expect(auditSection).toContainText('ANNOUNCEMENT_CREATE');
   });

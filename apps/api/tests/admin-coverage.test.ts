@@ -87,7 +87,7 @@ describe('admin coverage：锦标赛', () => {
     const created = unwrapOk<{ id: number; name: string; status: string; size: number; createdBy: number }>(res);
     expect(created).toMatchObject({ name: '覆盖杯', status: 'REGISTERING', size: 16, createdBy: admin.userId });
 
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'TOURNAMENT_CREATE' } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'TOURNAMENT_CREATE', targetId: String(created.id) } });
     expect(audit.adminId).toBe(admin.userId);
     expect(audit.targetType).toBe('PVP_TOURNAMENT');
     expect(audit.targetId).toBe(String(created.id));
@@ -158,7 +158,7 @@ describe('admin coverage：锦标赛', () => {
     const res = await request(app).post(`/api/admin/pvp-tournaments/${created.id}/actions/start`).set(auth);
     expect(res.status).toBe(200);
     expect(unwrapOk<{ status: string }>(res).status).toBe('REGISTERING');
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START' } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START', targetId: String(created.id) } });
     expect(audit.payload as object).toMatchObject({ status: 'REGISTERING' });
   });
 });

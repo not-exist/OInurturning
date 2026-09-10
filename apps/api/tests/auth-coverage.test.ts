@@ -35,7 +35,8 @@ async function register(username?: string, password = 'pw-12345678'): Promise<{ 
     .post('/api/auth/register')
     .send({ username: username ?? `authcov-${Date.now().toString(36)}-${seq}`, password });
   expect(res.status).toBe(200);
-  const cookies = (res.headers['set-cookie'] ?? []) as string[];
+  const setCookie = res.headers['set-cookie'] as string | string[] | undefined;
+  const cookies = setCookie === undefined ? [] : Array.isArray(setCookie) ? setCookie : [setCookie];
   return { session: unwrapOk<Session>(res), cookies };
 }
 

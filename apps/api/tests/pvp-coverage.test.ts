@@ -315,7 +315,7 @@ describe('pvp coverage：admin 一键开赛真实路径', () => {
     expect(unwrapOk<{ status: string }>(res).status).toBe('CANCELLED');
     const refunded = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: player.userId, itemId: 'entry-ticket' } } });
     expect(refunded?.quantity).toBe(1);
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START' } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START', targetId: String(tournament.id) } });
     expect(audit.payload as object).toMatchObject({ status: 'CANCELLED' });
   });
 
@@ -333,7 +333,7 @@ describe('pvp coverage：admin 一键开赛真实路径', () => {
     expect(res.status).toBe(200);
     expect(unwrapOk<{ status: string }>(res).status).toBe('FINISHED');
     expect(await prisma.pvpMatch.count({ where: { tournamentId: tournament.id } })).toBe(7);
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START' } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START', targetId: String(tournament.id) } });
     expect(audit.adminId).toBe(admin.userId);
   });
 });
