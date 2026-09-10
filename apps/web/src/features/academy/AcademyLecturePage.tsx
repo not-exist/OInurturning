@@ -100,6 +100,7 @@ export function AcademyLecturePage(): JSX.Element {
         <label className="text-sm">
           <span className="mb-2 block text-neutral-500">主讲学员</span>
           <select
+            data-testid="lecture-student"
             className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
             value={selectedStudentId ?? ''}
             onChange={(event) => setStudentId(Number(event.target.value))}
@@ -114,6 +115,7 @@ export function AcademyLecturePage(): JSX.Element {
         <label className="text-sm">
           <span className="mb-2 block text-neutral-500">受众档位</span>
           <select
+            data-testid="lecture-tier"
             className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
             value={tier}
             onChange={(event) => {
@@ -141,6 +143,7 @@ export function AcademyLecturePage(): JSX.Element {
           </div>
           <button
             type="button"
+            data-testid="lecture-teach"
             className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
             disabled={
               selectedStudentId === undefined || selectedTier === undefined || teach.isPending
@@ -156,6 +159,7 @@ export function AcademyLecturePage(): JSX.Element {
         {canForce && (
           <label className="mt-4 flex items-center gap-2 border-t border-neutral-200 pt-3 text-sm text-amber-800">
             <input
+              data-testid="lecture-force"
               type="checkbox"
               checked={force}
               onChange={(event) => setForce(event.target.checked)}
@@ -164,7 +168,7 @@ export function AcademyLecturePage(): JSX.Element {
           </label>
         )}
         {teach.isError && (
-          <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p data-testid="lecture-error" className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {teach.error instanceof ApiCallError && teach.error.code === 'INSUFFICIENT_RESOURCE'
               ? '体力不足，稍等恢复或使用体力药水'
               : `讲课未能开始：${apiErrorMessage(teach.error)}`}
@@ -180,7 +184,7 @@ export function AcademyLecturePage(): JSX.Element {
         {logs.data.length === 0 ? (
           <p className="text-sm text-neutral-500">暂无记录。</p>
         ) : (
-          <ul className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
+          <ul data-testid="lecture-logs" className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
             {logs.data.map((entry) => (
               <li
                 key={entry.id}

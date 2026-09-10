@@ -1,0 +1,44 @@
+# 普通测试：类型检查 + lint + 构建 + API 单元/集成测试（排除 *.e2e.test.ts）。
+# e2e 类别见 e2e.yml。每次 push/PR 全量运行。
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: oinur
+          MYSQL_PASSWORD: oinur
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_test
+      JWT_SECRET: ci-jwt-secret-0123456789abcdef-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C apps/api generate
+      - run: pnpm -r typecheck
+      - run: pnpm -r lint
+      - run: pnpm -r build
+      - run: pnpm --filter @oinur/api test:unit

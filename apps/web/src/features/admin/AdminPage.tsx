@@ -65,6 +65,7 @@ export function AdminPage(): JSX.Element {
         </div>
         <input
           className="mb-3 w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm md:max-w-sm"
+          data-testid="admin-user-search"
           placeholder="按用户名搜索"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -76,7 +77,7 @@ export function AdminPage(): JSX.Element {
         <div className="mb-3 border-b border-neutral-300 pb-2">
           <h2 className="text-lg font-semibold">公告</h2>
         </div>
-        <ul className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
+        <ul data-testid="admin-announcements" className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
           {announcements.data.map((announcement) => (
             <li key={announcement.id} className="px-3 py-3 text-sm">
               <p className="font-medium">{announcement.title}</p>
@@ -130,15 +131,15 @@ function TournamentForm(): JSX.Element {
   return (
     <form className="space-y-3 border border-neutral-300 bg-white p-4" onSubmit={submit}>
       <h2 className="font-semibold">创建赛事</h2>
-      <input required maxLength={64} className="w-full rounded border px-3 py-2 text-sm" placeholder="赛事名称" value={name} onChange={(event) => setName(event.target.value)} />
+      <input data-testid="admin-t-name" required maxLength={64} className="w-full rounded border px-3 py-2 text-sm" placeholder="赛事名称" value={name} onChange={(event) => setName(event.target.value)} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="text-sm">规模<select className="mt-1 w-full rounded border px-2 py-2" value={size} onChange={(event) => setSize(Number(event.target.value) as 8 | 16 | 32)}><option value={8}>8 人</option><option value={16}>16 人</option><option value={32}>32 人</option></select></label>
-        <label className="text-sm">报名截止<input required type="datetime-local" className="mt-1 w-full rounded border px-2 py-2" value={registerEndsAt} onChange={(event) => setRegisterEndsAt(event.target.value)} /></label>
-        <label className="text-sm">自动开始<input required type="datetime-local" className="mt-1 w-full rounded border px-2 py-2" value={autoStartAt} onChange={(event) => setAutoStartAt(event.target.value)} /></label>
+        <label className="text-sm">规模<select data-testid="admin-t-size" className="mt-1 w-full rounded border px-2 py-2" value={size} onChange={(event) => setSize(Number(event.target.value) as 8 | 16 | 32)}><option value={8}>8 人</option><option value={16}>16 人</option><option value={32}>32 人</option></select></label>
+        <label className="text-sm">报名截止<input required data-testid="admin-t-register-ends" type="datetime-local" className="mt-1 w-full rounded border px-2 py-2" value={registerEndsAt} onChange={(event) => setRegisterEndsAt(event.target.value)} /></label>
+        <label className="text-sm">自动开始<input required data-testid="admin-t-auto-start" type="datetime-local" className="mt-1 w-full rounded border px-2 py-2" value={autoStartAt} onChange={(event) => setAutoStartAt(event.target.value)} /></label>
       </div>
-      <label className="block text-sm"><span className="mb-1 block text-neutral-500">奖池配置（JSON）</span><textarea className="min-h-24 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs" value={prizes} onChange={(event) => setPrizes(event.target.value)} placeholder='{"champion":{"money":1000}}' /></label>
+      <label className="block text-sm"><span className="mb-1 block text-neutral-500">奖池配置（JSON）</span><textarea data-testid="admin-t-prizes" className="min-h-24 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs" value={prizes} onChange={(event) => setPrizes(event.target.value)} placeholder='{"champion":{"money":1000}}' /></label>
       {prizeError && <p className="text-sm text-red-600">奖池必须是有效 JSON 对象。</p>}
-      <button className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50" disabled={create.isPending}>{create.isPending ? '创建中…' : '创建赛事'}</button>
+      <button className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50" data-testid="admin-t-submit" disabled={create.isPending}>{create.isPending ? '创建中…' : '创建赛事'}</button>
       {create.isError && <p className="text-sm text-red-600">赛事创建失败，请检查时间窗口。</p>}
     </form>
   );
@@ -155,9 +156,9 @@ function AnnouncementForm(): JSX.Element {
   return (
     <form className="space-y-3 border border-neutral-300 bg-white p-4" onSubmit={submit}>
       <h2 className="font-semibold">发布公告</h2>
-      <input required maxLength={128} className="w-full rounded border px-3 py-2 text-sm" placeholder="标题" value={title} onChange={(event) => setTitle(event.target.value)} />
-      <textarea required maxLength={20_000} className="min-h-24 w-full rounded border px-3 py-2 text-sm" placeholder="公告内容" value={body} onChange={(event) => setBody(event.target.value)} />
-      <button className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50" disabled={create.isPending}>{create.isPending ? '发布中…' : '发布公告'}</button>
+      <input data-testid="admin-a-title" required maxLength={128} className="w-full rounded border px-3 py-2 text-sm" placeholder="标题" value={title} onChange={(event) => setTitle(event.target.value)} />
+      <textarea data-testid="admin-a-body" required maxLength={20_000} className="min-h-24 w-full rounded border px-3 py-2 text-sm" placeholder="公告内容" value={body} onChange={(event) => setBody(event.target.value)} />
+      <button className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50" data-testid="admin-a-submit" disabled={create.isPending}>{create.isPending ? '发布中…' : '发布公告'}</button>
       {create.isError && <p className="text-sm text-red-600">公告发布失败。</p>}
     </form>
   );
@@ -165,15 +166,15 @@ function AnnouncementForm(): JSX.Element {
 
 function TournamentTable({ items }: { items: TournamentView[] }): JSX.Element {
   if (items.length === 0) return <p className="text-sm text-neutral-500">暂无赛事。</p>;
-  return <div className="overflow-x-auto"><table className="w-full min-w-[640px] border-y border-neutral-200 bg-white text-left text-sm"><thead className="bg-neutral-100 text-xs text-neutral-500"><tr><th className="px-3 py-2">名称</th><th className="px-3 py-2">规模</th><th className="px-3 py-2">状态</th><th className="px-3 py-2">报名截止</th><th className="px-3 py-2">自动开始</th></tr></thead><tbody className="divide-y divide-neutral-200">{items.map((item) => <tr key={item.id}><td className="px-3 py-3 font-medium">{item.name}</td><td className="px-3 py-3">{item.size}</td><td className="px-3 py-3">{item.status}</td><td className="px-3 py-3 text-neutral-500">{new Date(item.registerEndsAt).toLocaleString()}</td><td className="px-3 py-3 text-neutral-500">{new Date(item.autoStartAt).toLocaleString()}</td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto"><table data-testid="admin-tournaments" className="w-full min-w-[640px] border-y border-neutral-200 bg-white text-left text-sm"><thead className="bg-neutral-100 text-xs text-neutral-500"><tr><th className="px-3 py-2">名称</th><th className="px-3 py-2">规模</th><th className="px-3 py-2">状态</th><th className="px-3 py-2">报名截止</th><th className="px-3 py-2">自动开始</th></tr></thead><tbody className="divide-y divide-neutral-200">{items.map((item) => <tr key={item.id}><td className="px-3 py-3 font-medium">{item.name}</td><td className="px-3 py-3">{item.size}</td><td className="px-3 py-3">{item.status}</td><td className="px-3 py-3 text-neutral-500">{new Date(item.registerEndsAt).toLocaleString()}</td><td className="px-3 py-3 text-neutral-500">{new Date(item.autoStartAt).toLocaleString()}</td></tr>)}</tbody></table></div>;
 }
 
 function UserTable({ users }: { users: { id: number; username: string; role: string; money: number; reputation: number }[] }): JSX.Element {
   if (users.length === 0) return <p className="text-sm text-neutral-500">没有匹配用户。</p>;
-  return <div className="overflow-x-auto"><table className="w-full min-w-[520px] border-y border-neutral-200 bg-white text-left text-sm"><thead className="bg-neutral-100 text-xs text-neutral-500"><tr><th className="px-3 py-2">用户名</th><th className="px-3 py-2">角色</th><th className="px-3 py-2">金币</th><th className="px-3 py-2">声誉</th></tr></thead><tbody className="divide-y divide-neutral-200">{users.map((user) => <tr key={user.id}><td className="px-3 py-3 font-medium">{user.username}</td><td className="px-3 py-3">{user.role}</td><td className="px-3 py-3">{user.money}</td><td className="px-3 py-3">{user.reputation}</td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto"><table data-testid="admin-users" className="w-full min-w-[520px] border-y border-neutral-200 bg-white text-left text-sm"><thead className="bg-neutral-100 text-xs text-neutral-500"><tr><th className="px-3 py-2">用户名</th><th className="px-3 py-2">角色</th><th className="px-3 py-2">金币</th><th className="px-3 py-2">声誉</th></tr></thead><tbody className="divide-y divide-neutral-200">{users.map((user) => <tr key={user.id}><td className="px-3 py-3 font-medium">{user.username}</td><td className="px-3 py-3">{user.role}</td><td className="px-3 py-3">{user.money}</td><td className="px-3 py-3">{user.reputation}</td></tr>)}</tbody></table></div>;
 }
 
 function AuditTable({ items }: { items: AuditView[] }): JSX.Element {
   if (items.length === 0) return <p className="text-sm text-neutral-500">暂无审计记录。</p>;
-  return <div className="overflow-x-auto"><table className="w-full min-w-[640px] border-y border-neutral-200 bg-white text-left text-sm"><thead className="bg-neutral-100 text-xs text-neutral-500"><tr><th className="px-3 py-2">时间</th><th className="px-3 py-2">管理员</th><th className="px-3 py-2">操作</th><th className="px-3 py-2">目标</th></tr></thead><tbody className="divide-y divide-neutral-200">{items.map((item) => <tr key={item.id}><td className="px-3 py-3 text-neutral-500">{new Date(item.createdAt).toLocaleString()}</td><td className="px-3 py-3">{item.adminNameSnapshot}</td><td className="px-3 py-3 font-medium">{item.action}</td><td className="px-3 py-3 text-neutral-500">{item.targetType} {item.targetId}</td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto"><table className="w-full min-w-[640px] border-y border-neutral-200 bg-white text-left text-sm"><thead className="bg-neutral-100 text-xs text-neutral-500"><tr data-testid="admin-audits-head"><th className="px-3 py-2">时间</th><th className="px-3 py-2">管理员</th><th className="px-3 py-2">操作</th><th className="px-3 py-2">目标</th></tr></thead><tbody className="divide-y divide-neutral-200">{items.map((item) => <tr key={item.id}><td className="px-3 py-3 text-neutral-500">{new Date(item.createdAt).toLocaleString()}</td><td className="px-3 py-3">{item.adminNameSnapshot}</td><td className="px-3 py-3 font-medium">{item.action}</td><td className="px-3 py-3 text-neutral-500">{item.targetType} {item.targetId}</td></tr>)}</tbody></table></div>;
 }

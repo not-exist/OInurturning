@@ -83,6 +83,7 @@ export function StudentDetailPage(): JSX.Element {
           ← 返回学员列表
         </Link>
         <button
+          data-testid="dismiss-open"
           onClick={() => setDismissOpen(true)}
           className="rounded bg-red-600 px-3 py-1.5 text-sm text-white disabled:opacity-60"
           disabled={dismiss.isPending}
@@ -107,6 +108,7 @@ export function StudentDetailPage(): JSX.Element {
         </p>
         <div className="flex gap-2">
           <button
+            data-testid="rename-toggle"
             onClick={() => setRenameOpen((v) => !v)}
             className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-60"
             disabled={renameCards < 1}
@@ -118,7 +120,7 @@ export function StudentDetailPage(): JSX.Element {
         {renameOpen && renameCards >= 1 && <RenameForm s={s} onDone={() => setRenameOpen(false)} />}
 
         {msg && (
-          <p className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p data-testid="student-msg" className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {msg}
           </p>
         )}
@@ -233,6 +235,7 @@ function RenameForm({ s, onDone }: { s: StudentView; onDone: () => void }): JSX.
       }}
     >
       <input
+        data-testid="rename-input"
         value={name}
         onChange={(e) => setName(e.target.value)}
         minLength={2}
@@ -241,6 +244,7 @@ function RenameForm({ s, onDone }: { s: StudentView; onDone: () => void }): JSX.
       />
       <button
         className="rounded bg-neutral-900 px-3 py-1.5 text-white disabled:opacity-60"
+        data-testid="rename-save"
         disabled={rename.isPending}
       >
         保存
@@ -271,7 +275,7 @@ function DismissDialog({
           <button className="rounded border px-3 py-1.5 text-sm" onClick={onCancel}>
             取消
           </button>
-          <button className="rounded bg-red-600 px-3 py-1.5 text-sm text-white" onClick={onConfirm}>
+          <button data-testid="dismiss-confirm" className="rounded bg-red-600 px-3 py-1.5 text-sm text-white" onClick={onConfirm}>
             确认开除
           </button>
         </div>

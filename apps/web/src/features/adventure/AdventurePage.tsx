@@ -90,6 +90,7 @@ function EventCard({
           <button
             type="button"
             className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50"
+            data-testid="adventure-accept"
             disabled={pending}
             onClick={() => onPreview('accept')}
           >
@@ -98,6 +99,7 @@ function EventCard({
           <button
             type="button"
             className="rounded border border-neutral-300 px-4 py-2 text-sm disabled:opacity-50"
+            data-testid="adventure-avoid"
             disabled={pending}
             onClick={() => onPreview('avoid')}
           >
@@ -110,6 +112,7 @@ function EventCard({
             <button
               key={choice.index}
               type="button"
+              data-testid={`adventure-choice-${choice.index}`}
               disabled={!choice.available || pending}
               className="flex w-full items-center justify-between gap-3 rounded border border-neutral-300 px-3 py-3 text-left text-sm hover:border-neutral-900 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
               onClick={() => onChoice(choice.index)}
@@ -218,6 +221,7 @@ export function AdventurePage(): JSX.Element {
         <label className="text-sm">
           <span className="mb-2 block text-neutral-500">出发学员</span>
           <select
+            data-testid="adventure-student"
             className="w-full rounded border border-neutral-300 bg-white px-3 py-2 md:min-w-64"
             value={selectedStudentId ?? ''}
             onChange={(event) => setStudentId(Number(event.target.value))}
@@ -236,6 +240,7 @@ export function AdventurePage(): JSX.Element {
               <button
                 key={value}
                 type="button"
+                data-testid={`adventure-tier-${value}`}
                 aria-pressed={tier === value}
                 className={`min-w-12 rounded border px-3 py-2 text-sm ${tier === value ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white'}`}
                 onClick={() => setTier(value)}
@@ -256,6 +261,7 @@ export function AdventurePage(): JSX.Element {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
+          data-testid="adventure-draw"
           className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
           disabled={selectedStudentId === undefined || pending !== undefined || draw.isPending}
           onClick={drawEvent}
@@ -265,6 +271,7 @@ export function AdventurePage(): JSX.Element {
         <button
           type="button"
           className={`rounded border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 ${intelReady ? 'border-blue-600 text-blue-700' : 'border-neutral-300'}`}
+          data-testid="adventure-intel"
           disabled={intelReady || (intel?.quantity ?? 0) < 1 || activate.isPending}
           onClick={() =>
             activate.mutate({ itemId: 'intel-slip' }, { onSuccess: () => setIntelReady(true) })
@@ -272,8 +279,8 @@ export function AdventurePage(): JSX.Element {
         >
           {intelReady ? '情报已激活' : `激活情报 · ${intel?.quantity ?? 0}`}
         </button>
-        {drawError && <span className="text-sm text-red-600">{drawError}</span>}
-        {chooseError && <span className="text-sm text-red-600">{chooseError}</span>}
+        {drawError && <span data-testid="adventure-draw-error" className="text-sm text-red-600">{drawError}</span>}
+        {chooseError && <span data-testid="adventure-choose-error" className="text-sm text-red-600">{chooseError}</span>}
       </div>
 
       {pending && (
@@ -293,7 +300,7 @@ export function AdventurePage(): JSX.Element {
         {logs.data.length === 0 ? (
           <p className="text-sm text-neutral-500">暂无记录。</p>
         ) : (
-          <ul className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
+          <ul data-testid="adventure-logs" className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
             {logs.data.map((log) => (
               <li
                 key={log.id}

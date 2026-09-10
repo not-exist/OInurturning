@@ -97,7 +97,7 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
   const isRenameCard = item.itemId === 'rename-card';
   const needsStudent = !isRenameCard;
   return (
-    <li className="rounded border bg-white p-3">
+    <li data-testid="inventory-row" data-itemid={item.itemId} className="rounded border bg-white p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -113,6 +113,7 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
         <div className="shrink-0 text-right text-sm">
           {usable ? (
             <button
+              data-testid="item-use"
               className="rounded bg-neutral-900 px-3 py-1.5 text-xs text-white"
               onClick={onUse}
               title={needsStudent ? '需选择一名学员' : '使用'}
@@ -152,7 +153,7 @@ function StudentPicker({
 
   return (
     <div className="fixed inset-0 z-10 grid place-items-center bg-black/30 p-4">
-      <div className="w-full max-w-md rounded border bg-white p-5">
+      <div data-testid="item-picker" className="w-full max-w-md rounded border bg-white p-5">
         <h3 className="mb-2 font-semibold">为「{item.name}」选择一名学员</h3>
         {students.length === 0 ? (
           <p className="text-sm text-neutral-500">暂无可选学员，请先招募学员。</p>
@@ -177,7 +178,7 @@ function StudentPicker({
           </div>
         )}
         {msg && (
-          <p className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p data-testid="item-msg" className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {msg}
           </p>
         )}
@@ -187,6 +188,7 @@ function StudentPicker({
           </button>
           <button
             className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-60"
+            data-testid="item-use-confirm"
             disabled={students.length === 0 || selected == null || use.isPending}
             onClick={() =>
               selected != null &&

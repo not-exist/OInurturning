@@ -90,6 +90,7 @@ export function ProblemLibraryPage(): JSX.Element {
         <label className="text-sm">
           <span className="mb-2 block text-neutral-500">出题学员</span>
           <select
+            data-testid="problem-student"
             className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
             value={selectedStudentId ?? ''}
             onChange={(event) => setStudentId(Number(event.target.value))}
@@ -105,6 +106,7 @@ export function ProblemLibraryPage(): JSX.Element {
         <label className="text-sm">
           <span className="mb-2 block text-neutral-500">主考维度</span>
           <select
+            data-testid="problem-dimension"
             className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
             value={dimension}
             onChange={(event) => setDimension(event.target.value as DimensionKey)}
@@ -118,6 +120,7 @@ export function ProblemLibraryPage(): JSX.Element {
         </label>
         <button
           type="button"
+          data-testid="problem-create"
           className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
           disabled={selectedStudentId === undefined || create.isPending}
           onClick={() =>
@@ -136,7 +139,7 @@ export function ProblemLibraryPage(): JSX.Element {
         </p>
       )}
       {error && (
-        <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p data-testid="problem-error" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error instanceof ApiCallError && error.code === 'STATE_CONFLICT'
             ? '题库已满（120 道上限）或本日出题次数已达上限。'
             : error instanceof ApiCallError && error.code === 'INSUFFICIENT_RESOURCE'
@@ -148,7 +151,7 @@ export function ProblemLibraryPage(): JSX.Element {
       <section>
         <div className="mb-3 flex items-baseline justify-between border-b border-neutral-300 pb-2">
           <h2 className="text-lg font-semibold">我的预制题</h2>
-          <span className="text-xs text-neutral-500">{library.data.length}/120</span>
+          <span data-testid="problem-count" className="text-xs text-neutral-500">{library.data.length}/120</span>
         </div>
         {library.data.length === 0 ? (
           <Empty icon="🗒️" title="题库还是空的">
@@ -181,7 +184,7 @@ function ProblemRow({
   deleting: boolean;
 }): JSX.Element {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 text-sm">
+    <li data-testid="problem-row" className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 text-sm">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{problem.name}</span>
@@ -196,6 +199,7 @@ function ProblemRow({
       </div>
       <button
         type="button"
+        data-testid="problem-delete"
         className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 disabled:opacity-50"
         disabled={deleting || problem.consumedAt !== null}
         onClick={onDelete}

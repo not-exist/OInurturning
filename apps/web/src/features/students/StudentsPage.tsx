@@ -78,6 +78,7 @@ function StudentCard({ s }: { s: StudentView }): JSX.Element {
   return (
     <Link
       to={`/students/${s.id}`}
+      data-testid="student-card"
       className="block rounded border bg-white p-4 shadow-sm transition hover:shadow"
     >
       <div className="mb-2 flex items-center justify-between">

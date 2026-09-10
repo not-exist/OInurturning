@@ -36,20 +36,23 @@ export function RegisterPage(): JSX.Element {
       <h1 className="text-center text-2xl font-bold">OInurturning</h1>
       <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-3">
         <input
+          data-testid="register-username"
           className="rounded border px-3 py-2"
           placeholder="用户名"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
         <input
+          data-testid="register-password"
           className="rounded border px-3 py-2"
           type="password"
           placeholder="密码（至少 8 位）"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p data-testid="auth-error" className="text-sm text-red-600">{err}</p>}
         <button
+          data-testid="register-submit"
           className="rounded bg-neutral-900 py-2 font-medium text-white hover:bg-neutral-700"
           type="submit"
         >
