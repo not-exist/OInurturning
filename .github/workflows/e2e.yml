@@ -57,10 +57,23 @@ jobs:
       - name: 采集服务启动日志
         if: failure()
         run: |
-          (for i in $(seq 1 40); do sleep 2; code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health || echo 000); echo "t=$((i*2))s health=$code" >> /tmp/api-poll.log; [ "$code" = "200" ] && break || true; done) &
-          timeout 90 env PORT=3000 NODE_ENV=test DATABASE_URL="$E2E_DATABASE_URL" JWT_SECRET="$E2E_JWT_SECRET" pnpm -C apps/api exec tsx src/index.ts > /tmp/api-boot.log 2>&1 || echo "api-exit=$?"
-          timeout 60 pnpm -C apps/web dev > /tmp/web-boot.log 2>&1 || echo "web-exit=$?"
-          { echo '### api-poll.log'; cat /tmp/api-poll.log 2>/dev/null; echo '### api-boot.log (tail 60)'; tail -n 60 /tmp/api-boot.log; echo '### web-boot.log (tail 40)'; tail -n 40 /tmp/web-boot.log; } > /tmp/boot-capture.txt
+          cd tests/e2e
+          PORT=3000 NODE_ENV=test DATABASE_URL="$E2E_DATABASE_URL" JWT_SECRET="$E2E_JWT_SECRET" nohup pnpm -C ../../apps/api exec tsx src/index.ts > /tmp/api-boot.log 2>&1 &
+          API_PID=$!
+          nohup pnpm -C ../../apps/web dev > /tmp/web-boot.log 2>&1 &
+          WEB_PID=$!
+          cd ../..
+          for i in $(seq 1 45); do sleep 2; a=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health || echo 000); w=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5173/ || echo 000); echo "t=$((i*2))s api=$a web=$w" >> /tmp/dual-poll.log; [ "$a" = "200" ] && [ "$w" = "200" ] && break || true; done
+          echo '--- uptime/free ---' >> /tmp/dual-poll.log
+          uptime >> /tmp/dual-poll.log 2>&1 || true
+          free -m >> /tmp/dual-poll.log 2>&1 || true
+          echo '--- ps aux (tsx/vite/pnpm) ---' >> /tmp/dual-poll.log
+          ps aux | grep -E 'tsx|vite|pnpm' | grep -v grep >> /tmp/dual-poll.log || true
+          kill $API_PID $WEB_PID 2>/dev/null || true
+          sleep 2
+          pkill -f 'tsx src/index.ts' 2>/dev/null || true
+          pkill -f 'vite' 2>/dev/null || true
+          { echo '### dual-poll.log'; cat /tmp/dual-poll.log; echo '### api-boot.log (tail 50)'; tail -n 50 /tmp/api-boot.log; echo '### web-boot.log (tail 30)'; tail -n 30 /tmp/web-boot.log; } > /tmp/boot-capture.txt
           cat /tmp/boot-capture.txt
           python3 -c "print('::error::服务启动采集（截断 6KB）：%0A' + open('/tmp/boot-capture.txt', errors='replace').read()[-6000:].replace(chr(10), '%0A'))"
       - name: 定位-register
