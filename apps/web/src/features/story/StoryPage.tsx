@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import { apiErrorMessage } from '../../lib/api';
 import { useEnterStoryStage, useStoryOverview, useStudents } from '../../lib/hooks';
+import { Empty } from '../../components/ui';
 
 const CHAPTER_LABEL: Record<string, string> = {
   cspj: 'CSP-J',
@@ -22,9 +24,28 @@ export function StoryPage() {
   const navigate = useNavigate();
 
   if (overview.isPending || students.isPending)
-    return <p className="text-neutral-500">加载剧情进度…</p>;
-  if (overview.isError || students.isError)
-    return <p className="text-red-600">剧情数据加载失败，请稍后重试。</p>;
+    return (
+      <div className="flex items-center gap-2 text-neutral-500">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
+        加载剧情进度…
+      </div>
+    );
+  if (overview.isError || students.isError) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>剧情数据加载失败：{apiErrorMessage(overview.error ?? students.error)}</p>
+        <button
+          className="rounded border px-3 py-1 text-xs"
+          onClick={() => {
+            void overview.refetch();
+            void students.refetch();
+          }}
+        >
+          重试
+        </button>
+      </div>
+    );
+  }
   if (overview.data === undefined || students.data === undefined) return null;
 
   const activeStudentId = studentId ?? students.data[0]?.id;
@@ -81,13 +102,29 @@ export function StoryPage() {
             ))}
           </select>
         </label>
-        {students.data.length === 0 && (
-          <span className="text-sm text-amber-700">暂无可出战学员</span>
-        )}
         {enter.isError && (
-          <span className="text-sm text-red-600">进入关卡失败，请检查解锁状态与资源。</span>
+          <span className="text-sm text-red-600">
+            进入关卡失败：{apiErrorMessage(enter.error)}（解锁、体力与精力均需满足）
+          </span>
         )}
       </div>
+
+      {students.data.length === 0 && (
+        <Empty
+          icon="🏟️"
+          title="还没有可以出战的学员"
+          action={
+            <Link
+              to="/academy"
+              className="inline-block rounded bg-neutral-900 px-4 py-2 text-sm text-white"
+            >
+              前往高级学院招募
+            </Link>
+          }
+        >
+          招募并培养一名学员，才能踏上 CSP-J 的赛场。
+        </Empty>
+      )}
 
       <div className="space-y-8">
         {overview.data.chapters.map((chapter) => (

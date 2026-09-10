@@ -1,7 +1,7 @@
 import { useState, type JSX } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { DimensionKey, StudentView } from '@oinur/shared';
-import { ApiCallError } from '../../lib/api';
+import { apiErrorMessage } from '../../lib/api';
 import {
   DIMENSION_LABEL,
   QUALITY_LABEL,
@@ -47,8 +47,29 @@ export function StudentDetailPage(): JSX.Element {
   const [dismissOpen, setDismissOpen] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  if (q.isLoading) return <p className="text-neutral-500">加载中…</p>;
-  if (q.isError || !q.data) return <p className="text-red-600">加载失败</p>;
+  if (q.isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-neutral-500">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
+        加载学员档案…
+      </div>
+    );
+  }
+  if (q.isError || !q.data) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>学员不存在或加载失败：{apiErrorMessage(q.error)}</p>
+        <button className="rounded border px-3 py-1 text-xs" onClick={() => void q.refetch()}>
+          重试
+        </button>
+        <div>
+          <Link to="/students" className="text-sm text-neutral-500 hover:underline">
+            ← 返回学员列表
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const s = q.data;
 
   const renameCards = invQ.data?.find((i) => i.itemId === 'rename-card')?.quantity ?? 0;
@@ -73,14 +94,16 @@ export function StudentDetailPage(): JSX.Element {
       <section className="rounded border bg-white p-4">
         <div className="mb-2 flex items-center gap-2">
           <h2 className="text-lg font-bold">{s.name}</h2>
-          <span className={`rounded px-2 py-0.5 text-xs ${rarityBadge(qualityToRarity(s.qualityTier))}`}>
+          <span
+            className={`rounded px-2 py-0.5 text-xs ${rarityBadge(qualityToRarity(s.qualityTier))}`}
+          >
             {QUALITY_LABEL[s.qualityTier]}
           </span>
           <span className="text-xs text-neutral-400">{SEX_LABEL[s.sex]}</span>
         </div>
         <p className="mb-2 text-xs text-neutral-500">
-          V = {s.v} · 心态 {round(s.mindset)} · 体力 {floor(s.stamina)}/{5} · 精力 {floor(s.energy)}/
-          {s.energyMax} · 专注上限 {s.focusCap} · 体力恢复 {floor(s.staminaRegen)}
+          V = {s.v} · 心态 {round(s.mindset)} · 体力 {floor(s.stamina)}/{5} · 精力 {floor(s.energy)}
+          /{s.energyMax} · 专注上限 {s.focusCap} · 体力恢复 {floor(s.staminaRegen)}
         </p>
         <div className="flex gap-2">
           <button
@@ -94,7 +117,11 @@ export function StudentDetailPage(): JSX.Element {
         </div>
         {renameOpen && renameCards >= 1 && <RenameForm s={s} onDone={() => setRenameOpen(false)} />}
 
-        {msg && <p className="mt-2 text-sm text-red-600">{msg}</p>}
+        {msg && (
+          <p className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {msg}
+          </p>
+        )}
       </section>
 
       <section className="rounded border bg-white p-4">
@@ -121,7 +148,9 @@ export function StudentDetailPage(): JSX.Element {
                 <li key={tid} className="rounded border p-3">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{def?.name ?? tid}</span>
-                    <span className={`rounded px-2 py-0.5 text-xs ${rarityBadge(def?.rarity ?? 'GRAY')}`}>
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs ${rarityBadge(def?.rarity ?? 'GRAY')}`}
+                    >
                       {rarityText(def?.rarity ?? 'GRAY')}
                     </span>
                   </div>
@@ -141,7 +170,9 @@ export function StudentDetailPage(): JSX.Element {
           </ul>
         )}
         {talentsQ.isError && (
-          <p className="text-xs text-neutral-400">天赋详情暂不可用（后端未提供 GET /api/talents）</p>
+          <p className="text-xs text-neutral-400">
+            天赋详情暂不可用（后端未提供 GET /api/talents）
+          </p>
         )}
       </section>
 
@@ -151,7 +182,7 @@ export function StudentDetailPage(): JSX.Element {
           onCancel={() => setDismissOpen(false)}
           onConfirm={() => {
             dismiss.mutate(s.id, {
-              onError: (e) => setMsg(e instanceof ApiCallError ? '开除失败' : '开除失败'),
+              onError: (e) => setMsg(`开除失败：${apiErrorMessage(e)}`),
               onSuccess: () => {
                 setDismissOpen(false);
                 nav('/students');
@@ -164,7 +195,9 @@ export function StudentDetailPage(): JSX.Element {
   );
 }
 
-function qualityToRarity(t: StudentView['qualityTier']): 'GRAY' | 'YELLOW' | 'GREEN' | 'BLUE' | 'PURPLE' {
+function qualityToRarity(
+  t: StudentView['qualityTier'],
+): 'GRAY' | 'YELLOW' | 'GREEN' | 'BLUE' | 'PURPLE' {
   switch (t) {
     case 'COMMON':
       return 'GRAY';
@@ -194,7 +227,7 @@ function RenameForm({ s, onDone }: { s: StudentView; onDone: () => void }): JSX.
             onSuccess: () => {
               onDone();
             },
-            onError: (err) => setMsg(err instanceof ApiCallError ? '改名失败' : '改名失败'),
+            onError: (err) => setMsg(`改名失败：${apiErrorMessage(err)}`),
           },
         );
       }}
@@ -206,7 +239,10 @@ function RenameForm({ s, onDone }: { s: StudentView; onDone: () => void }): JSX.
         maxLength={12}
         className="flex-1 rounded border px-3 py-1.5"
       />
-      <button className="rounded bg-neutral-900 px-3 py-1.5 text-white disabled:opacity-60" disabled={rename.isPending}>
+      <button
+        className="rounded bg-neutral-900 px-3 py-1.5 text-white disabled:opacity-60"
+        disabled={rename.isPending}
+      >
         保存
       </button>
       {msg && <span className="text-red-600">{msg}</span>}
@@ -228,7 +264,8 @@ function DismissDialog({
       <div className="w-full max-w-md rounded border bg-white p-5">
         <h3 className="mb-2 font-semibold">确认开除 {s.name}？</h3>
         <p className="text-sm text-neutral-600">
-          开除后该学员将被解雇并无法找回。扣除声誉 {dismissPenalty(s.qualityTier)} 点，并有 35% 概率返还 1 张改名卡。
+          开除后该学员将被解雇并无法找回。扣除声誉 {dismissPenalty(s.qualityTier)} 点，并有 35%
+          概率返还 1 张改名卡。
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <button className="rounded border px-3 py-1.5 text-sm" onClick={onCancel}>

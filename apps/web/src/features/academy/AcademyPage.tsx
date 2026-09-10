@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
-import { ApiCallError } from '../../lib/api';
+import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import {
   QUALITY_LABEL,
   SEX_LABEL,
@@ -10,6 +10,7 @@ import {
   useRefreshPool,
 } from '../../lib/hooks';
 import type { CandidatePayload, PoolView } from '../../lib/hooks';
+import { Empty } from '../../components/ui';
 
 const FREE_REFRESH_HOURS = 24; // 免费刷新间隔（economy.yaml；服务器权威，此处仅展示倒计时）
 const HOUR_MS = 3_600_000;
@@ -25,8 +26,24 @@ function fmtRemaining(ms: number): string {
 
 export function AcademyPage(): JSX.Element {
   const q = useAcademyPool();
-  if (q.isLoading) return <p className="text-neutral-500">加载中…</p>;
-  if (q.isError || !q.data) return <p className="text-red-600">加载失败</p>;
+  if (q.isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-neutral-500">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
+        正在刷新招募候选池…
+      </div>
+    );
+  }
+  if (q.isError || !q.data) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>招募池加载失败：{apiErrorMessage(q.error)}</p>
+        <button className="rounded border px-3 py-1 text-xs" onClick={() => void q.refetch()}>
+          重试
+        </button>
+      </div>
+    );
+  }
   return <AcademyBody pool={q.data} />;
 }
 
@@ -63,10 +80,16 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
         </div>
       </div>
 
-      {msg && <p className="text-sm text-red-600">{msg}</p>}
+      {msg && (
+        <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {msg}
+        </p>
+      )}
 
       {pool.candidates.length === 0 ? (
-        <p className="text-neutral-500">候选池已空，可稍后免费刷新或立即手动刷新。</p>
+        <Empty icon="🧑‍💻" title="候选池暂时没有学员">
+          可以稍后等免费刷新，或立即花金币手动刷新。
+        </Empty>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {pool.candidates.map((c) => (
@@ -154,9 +177,6 @@ function qualityBadge(t: CandidatePayload['qualityTier']): string {
 }
 
 function errText(e: unknown): string {
-  if (e instanceof ApiCallError) {
-    if (e.code === 'INSUFFICIENT_RESOURCE') return '金币不足';
-    return e.code;
-  }
-  return '操作失败';
+  if (e instanceof ApiCallError && e.code === 'INSUFFICIENT_RESOURCE') return '金币不足';
+  return apiErrorMessage(e);
 }

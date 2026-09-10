@@ -43,7 +43,10 @@ export type DimColumn = 'ds' | 'dp' | 'math' | 'graph' | 'greedy' | 'str';
  * 维度索引表：请求/题库 dominantDim 用大写键（DIMENSIONS），映射到
  * Student 列名（string 维记作 str）、六维书 subject 键与 meta 键后缀（student.md 字段口径 M1-R4）。
  */
-export const DIM_META: Record<DimensionKey, { column: DimColumn; bookSubject: string; metaKey: string }> = {
+export const DIM_META: Record<
+  DimensionKey,
+  { column: DimColumn; bookSubject: string; metaKey: string }
+> = {
   DS: { column: 'ds', bookSubject: 'ds', metaKey: 'training_ds' },
   DP: { column: 'dp', bookSubject: 'dp', metaKey: 'training_dp' },
   MATH: { column: 'math', bookSubject: 'math', metaKey: 'training_math' },
@@ -68,12 +71,16 @@ export function computeDelta(o: {
 }
 
 /** 单次训练费用：round(money_base × (1 + coeff×(N−1)))（economy.yaml；N=在册学员数） */
-export function computeCost(o: { moneyBase: number; coeff: number; ownedStudents: number }): number {
+export function computeCost(o: {
+  moneyBase: number;
+  coeff: number;
+  ownedStudents: number;
+}): number {
   return Math.round(o.moneyBase * (1 + o.coeff * (o.ownedStudents - 1)));
 }
 
 /** 附带成长「额外 +1」概率表（student.md §4.5）：基础/定向/专项三列 */
-const SECONDARY_PROB: Record<'code' | 'thinking', Record<TrainingKind, number>> = {
+export const SECONDARY_PROB: Record<'code' | 'thinking', Record<TrainingKind, number>> = {
   code: { basic: 0.2, directed: 0.35, specialized: 0.3 },
   thinking: { basic: 0.2, directed: 0.35, specialized: 0.4 },
 };
@@ -86,10 +93,12 @@ const ULTRA_RARE: { stat: RareGainStat; prob: number; column: NumericGainColumn;
   { stat: 'stamina_regen', prob: 0.005, column: 'staminaRegen', cap: 100 },
 ];
 
-export type RareGainStat = 'code' | 'thinking' | 'setting' | 'mindset' | 'focus_cap' | 'stamina_regen';
+export type RareGainStat =
+  'code' | 'thinking' | 'setting' | 'mindset' | 'focus_cap' | 'stamina_regen';
 
 /** 附带成长可写入的数值列集合（全部为 Student 的 number 属性） */
-export type NumericGainColumn = 'code' | 'thinking' | 'setting' | 'mindset' | 'focusCap' | 'staminaRegen';
+export type NumericGainColumn =
+  'code' | 'thinking' | 'setting' | 'mindset' | 'focusCap' | 'staminaRegen';
 
 export interface RareGain {
   stat: RareGainStat;
@@ -129,7 +138,10 @@ export function computeSecondaryGains(o: {
     const gain = (1 - s.code / 100) ** 2;
     const next = clamp(s.code + gain, 0, 100);
     const amount = next - s.code;
-    if (amount > 0) { patch.code = next; rareGains.push({ stat: 'code', amount }); }
+    if (amount > 0) {
+      patch.code = next;
+      rareGains.push({ stat: 'code', amount });
+    }
   }
 
   const thinkProb = SECONDARY_PROB.thinking[type] * (1 + (meta.training_thinking ?? 0) / 100);
@@ -137,7 +149,10 @@ export function computeSecondaryGains(o: {
     const gain = (1 - s.thinking / 100) ** 2;
     const next = clamp(s.thinking + gain, 0, 100);
     const amount = next - s.thinking;
-    if (amount > 0) { patch.thinking = next; rareGains.push({ stat: 'thinking', amount }); }
+    if (amount > 0) {
+      patch.thinking = next;
+      rareGains.push({ stat: 'thinking', amount });
+    }
   }
 
   for (const { stat, prob, column, cap } of ULTRA_RARE) {

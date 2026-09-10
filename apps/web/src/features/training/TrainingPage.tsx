@@ -1,6 +1,7 @@
 import { useState, type JSX } from 'react';
+import { Link } from 'react-router';
 import type { DimensionKey, StudentView } from '@oinur/shared';
-import { ApiCallError } from '../../lib/api';
+import { apiErrorMessage } from '../../lib/api';
 import {
   DIMENSION_LABEL,
   QUALITY_LABEL,
@@ -16,6 +17,7 @@ import {
   useStudents,
 } from '../../lib/hooks';
 import type { ProblemView, RareGain, TrainingResult } from '../../lib/hooks';
+import { Empty } from '../../components/ui';
 
 type Tab = 'basic' | 'directed' | 'specialized';
 
@@ -54,8 +56,27 @@ export function TrainingPage(): JSX.Element {
   const [msg, setMsg] = useState<string | null>(null);
   const [result, setResult] = useState<(TrainingResult & { studentName: string }) | null>(null);
 
-  if (studentsQ.isLoading) return <p className="text-neutral-500">加载中…</p>;
-  if (studentsQ.isError || !studentsQ.data) return <p className="text-red-600">加载失败</p>;
+  if (studentsQ.isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-neutral-500">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
+        加载学员中…
+      </div>
+    );
+  }
+  if (studentsQ.isError || !studentsQ.data) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>学员数据加载失败：{apiErrorMessage(studentsQ.error)}</p>
+        <button
+          className="rounded border px-3 py-1 text-xs"
+          onClick={() => void studentsQ.refetch()}
+        >
+          重试
+        </button>
+      </div>
+    );
+  }
   const students = studentsQ.data;
   const chosen = students.find((s) => s.id === studentId) ?? null;
 
@@ -108,7 +129,20 @@ export function TrainingPage(): JSX.Element {
       <section className="rounded border bg-white p-4">
         <h2 className="mb-2 text-sm font-semibold text-neutral-500">选择学员</h2>
         {students.length === 0 ? (
-          <p className="text-sm text-neutral-500">暂无在册学员。</p>
+          <Empty
+            icon="🎓"
+            title="还没有学员"
+            action={
+              <Link
+                to="/academy"
+                className="inline-block rounded bg-neutral-900 px-4 py-2 text-sm text-white"
+              >
+                前往高级学院招募
+              </Link>
+            }
+          >
+            先招募一名学员，再开始针对性训练吧。
+          </Empty>
         ) : (
           <div className="flex flex-wrap gap-2">
             {students.map((s) => (
@@ -116,7 +150,9 @@ export function TrainingPage(): JSX.Element {
                 key={s.id}
                 onClick={() => setStudentId(s.id)}
                 className={`rounded border px-3 py-1.5 text-sm ${
-                  studentId === s.id ? 'border-neutral-900 bg-neutral-900 text-white' : 'hover:bg-neutral-100'
+                  studentId === s.id
+                    ? 'border-neutral-900 bg-neutral-900 text-white'
+                    : 'hover:bg-neutral-100'
                 }`}
               >
                 {s.name}
@@ -144,7 +180,9 @@ export function TrainingPage(): JSX.Element {
 
           {tab === 'basic' && (
             <div className="space-y-3">
-              <p className="text-sm text-neutral-500">基础训练：随机提升一维，消耗 1 体力与训练费。</p>
+              <p className="text-sm text-neutral-500">
+                基础训练：随机提升一维，消耗 1 体力与训练费。
+              </p>
               <button
                 className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
                 disabled={pending || Math.floor(chosen.stamina) < 1}
@@ -157,7 +195,9 @@ export function TrainingPage(): JSX.Element {
 
           {tab === 'directed' && (
             <div className="space-y-3">
-              <p className="text-sm text-neutral-500">定向训练：自选一维，消耗对应六维书×1 + 1 体力 + 训练费。</p>
+              <p className="text-sm text-neutral-500">
+                定向训练：自选一维，消耗对应六维书×1 + 1 体力 + 训练费。
+              </p>
               <div className="flex flex-wrap gap-2">
                 {(Object.keys(DIMENSION_LABEL) as DimensionKey[]).map((d) => (
                   <button
@@ -167,7 +207,9 @@ export function TrainingPage(): JSX.Element {
                       setBookItemId('');
                     }}
                     className={`rounded border px-3 py-1.5 text-sm ${
-                      dim === d ? 'border-neutral-900 bg-neutral-900 text-white' : 'hover:bg-neutral-100'
+                      dim === d
+                        ? 'border-neutral-900 bg-neutral-900 text-white'
+                        : 'hover:bg-neutral-100'
                     }`}
                   >
                     {DIMENSION_LABEL[d]}
@@ -201,13 +243,19 @@ export function TrainingPage(): JSX.Element {
 
           {tab === 'specialized' && (
             <div className="space-y-3">
-              <p className="text-sm text-neutral-500">专项训练：选题，消耗预制题×1 + 1 体力 + 训练费。</p>
+              <p className="text-sm text-neutral-500">
+                专项训练：选题，消耗预制题×1 + 1 体力 + 训练费。
+              </p>
               {problems.isError ? (
-                <p className="text-sm text-neutral-400">题库接口暂不可用（后端未提供 GET /api/problems）。</p>
+                <p className="text-sm text-neutral-400">
+                  题库接口暂不可用（后端未提供 GET /api/problems）。
+                </p>
               ) : problems.isLoading ? (
                 <p className="text-sm text-neutral-400">加载题库…</p>
               ) : selectableProblems.length === 0 ? (
-                <p className="text-sm text-neutral-400">暂无可用预制题（需先用出题功能或获取样例题）。</p>
+                <p className="text-sm text-neutral-400">
+                  暂无可用预制题（需先用出题功能或获取样例题）。
+                </p>
               ) : (
                 <div className="space-y-2">
                   {selectableProblems.map((p) => (
@@ -230,7 +278,11 @@ export function TrainingPage(): JSX.Element {
             </div>
           )}
 
-          {msg && <p className="mt-2 text-sm text-red-600">{msg}</p>}
+          {msg && (
+            <div className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {msg}
+            </div>
+          )}
         </section>
       )}
 
@@ -238,8 +290,8 @@ export function TrainingPage(): JSX.Element {
         <section className="rounded border border-green-200 bg-green-50 p-4">
           <h3 className="mb-1 font-semibold text-green-800">训练完成</h3>
           <p className="text-sm text-green-800">
-            {result.studentName}：{DIMENSION_LABEL[result.dim]} +{roundDelta(result.delta)} · 消耗 {result.cost} 金
-            · 剩余体力 {Math.floor(result.staminaAfter)}/5
+            {result.studentName}：{DIMENSION_LABEL[result.dim]} +{roundDelta(result.delta)} · 消耗{' '}
+            {result.cost} 金 · 剩余体力 {Math.floor(result.staminaAfter)}/5
           </p>
           {result.rareGains.length > 0 && (
             <ul className="mt-1 space-y-0.5 text-sm text-green-700">
@@ -274,9 +326,17 @@ function ProblemRow({
         selected ? 'border-neutral-900 bg-neutral-50' : 'hover:bg-neutral-50'
       }`}
     >
-      <input type="radio" name="problem" className="accent-neutral-900" checked={selected} onChange={onSelect} />
+      <input
+        type="radio"
+        name="problem"
+        className="accent-neutral-900"
+        checked={selected}
+        onChange={onSelect}
+      />
       <span className="font-medium">{p.name}</span>
-      <span className={`rounded px-1.5 py-0.5 text-xs ${rarityBadge(p.rarity)}`}>{rarityText(p.rarity)}</span>
+      <span className={`rounded px-1.5 py-0.5 text-xs ${rarityBadge(p.rarity)}`}>
+        {rarityText(p.rarity)}
+      </span>
       <span className="text-xs text-neutral-500">{DIMENSION_LABEL[p.dominantDim]}</span>
       <span className="text-xs text-neutral-400">Q {p.quality}</span>
     </label>
@@ -304,6 +364,5 @@ function roundDelta(v: number): number {
 }
 
 function errText(e: unknown): string {
-  if (e instanceof ApiCallError) return e.code;
-  return '训练失败';
+  return apiErrorMessage(e);
 }

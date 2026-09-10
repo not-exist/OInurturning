@@ -1,6 +1,6 @@
 import { useState, type JSX } from 'react';
 import type { StudentView } from '@oinur/shared';
-import { ApiCallError } from '../../lib/api';
+import { apiErrorMessage } from '../../lib/api';
 import {
   CATEGORY_LABEL,
   rarityBadge,
@@ -11,6 +11,7 @@ import {
 } from '../../lib/hooks';
 import type { ItemView } from '../../lib/hooks';
 import { Link } from 'react-router';
+import { Empty, InlineLoader } from '../../components/ui';
 
 const CATEGORY_ORDER = ['nurture', 'book', 'functional', 'contest', 'quest', 'material'];
 
@@ -38,8 +39,17 @@ export function InventoryPage(): JSX.Element {
   const students = useStudents();
   const [picker, setPicker] = useState<ItemView | null>(null);
 
-  if (inv.isLoading) return <p className="text-neutral-500">加载中…</p>;
-  if (inv.isError || !inv.data) return <p className="text-red-600">加载失败</p>;
+  if (inv.isLoading) return <InlineLoader>加载背包中…</InlineLoader>;
+  if (inv.isError || !inv.data) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>背包加载失败：{apiErrorMessage(inv.error)}</p>
+        <button className="rounded border px-3 py-1 text-xs" onClick={() => void inv.refetch()}>
+          重试
+        </button>
+      </div>
+    );
+  }
   const items = inv.data;
 
   const groups = CATEGORY_ORDER.map((cat) => ({
@@ -51,9 +61,9 @@ export function InventoryPage(): JSX.Element {
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">背包</h1>
       {items.length === 0 ? (
-        <p className="text-neutral-500">背包空空如也。</p>
-      ) : groups.length === 0 ? (
-        <p className="text-neutral-500">暂无道具。</p>
+        <Empty icon="🎒" title="背包空空如也">
+          目前还没有任何道具。参加剧情比赛、历练或前往高级学院讲课，都会让背包充实起来。
+        </Empty>
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
@@ -166,7 +176,11 @@ function StudentPicker({
             ))}
           </div>
         )}
-        {msg && <p className="mt-2 text-sm text-red-600">{msg}</p>}
+        {msg && (
+          <p className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {msg}
+          </p>
+        )}
         <div className="mt-4 flex justify-end gap-2">
           <button className="rounded border px-3 py-1.5 text-sm" onClick={onClose}>
             取消
@@ -183,7 +197,7 @@ function StudentPicker({
                     setMsg(null);
                     onClose();
                   },
-                  onError: (e) => setMsg(e instanceof ApiCallError ? '使用失败' : '使用失败'),
+                  onError: (e) => setMsg(apiErrorMessage(e)),
                 },
               )
             }

@@ -6,6 +6,8 @@ import path from 'node:path';
 import { requestId } from './middlewares/requestId.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { ApiError } from './lib/errors.js';
+import { env } from './config/env.js';
+import { logger } from './lib/logger.js';
 import { getConfig, importConfigs } from './config/loader.js';
 import { academyRouter } from './modules/academy/router.js';
 import { authRouter } from './modules/auth/router.js';
@@ -34,6 +36,28 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use(express.json({ limit: '256kb' }));
   app.use(requestId);
 
+  // HTTP 访问日志（T5.4）：方法/路径/状态码/耗时/requestId，不记录请求体与头（天然免 redact）；
+  // 测试环境不刷屏。pino-http 不引入，保持最小依赖面（TECH-DESIGN 取舍 P5 一致）。
+  if (env.NODE_ENV !== 'test') {
+    app.use((req, res, next) => {
+      const startedAt = process.hrtime.bigint();
+      res.on('finish', () => {
+        const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+        logger.info(
+          {
+            method: req.method,
+            url: req.originalUrl,
+            statusCode: res.statusCode,
+            durationMs: Math.round(durationMs * 10) / 10,
+            requestId: req.requestId,
+          },
+          'http request',
+        );
+      });
+      next();
+    });
+  }
+
   app.get('/api/health', (_req, res) => {
     const body: ApiEnvelope<{ uptime: number; serverTime: string; configVersion: string | null }> =
       {
@@ -53,17 +77,19 @@ export function createApp(opts: AppOptions = {}): express.Express {
   // 命中限流时走统一错误信封（RATE_LIMITED），而非框架默认纯文本
   const limitedHandler: express.RequestHandler = (_req, _res, next) =>
     next(new ApiError('RATE_LIMITED'));
+  // 限流参数可经 env 调整（T5.4）：RATE_LIMIT_GLOBAL_MAX/AUTH_MAX 及各自窗口，
+  // 缺省即基线 300 req/min、auth 10 req/15min
   const authLimiter = rateLimit({
-    windowMs: 15 * 60_000,
-    limit: 10,
+    windowMs: env.RATE_LIMIT_AUTH_WINDOW_MS,
+    limit: env.RATE_LIMIT_AUTH_MAX,
     standardHeaders: true,
     legacyHeaders: false,
     skip,
     handler: limitedHandler,
   });
   const globalLimiter = rateLimit({
-    windowMs: 60_000,
-    limit: 300,
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    limit: env.RATE_LIMIT_GLOBAL_MAX,
     standardHeaders: true,
     legacyHeaders: false,
     skip,
