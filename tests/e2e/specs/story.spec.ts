@@ -13,7 +13,8 @@ test.describe('剧情模式', () => {
     await expect(page.getByTestId('story-enter').first()).toBeEnabled();
     await page.getByTestId('story-enter').first().click();
 
-    await page.waitForURL(/\/records\/\d+/);
+    // 战报 id 为 cuid 字符串（非数字），用 [^/]+ 匹配
+    await page.waitForURL(/\/records\/[^/]+/);
     await expect(page.getByText('排名赛战报')).toBeVisible();
     // 通过与否皆为合法结算：只断言报告结构完整
     await expect(page.getByText('结算')).toBeVisible();
