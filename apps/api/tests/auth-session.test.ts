@@ -103,7 +103,7 @@ describe('改密后的全局失效', () => {
 });
 
 describe('注销', () => {
-  it('POST /api/auth/deactivate：删除账号、token 失效、用户名可复用', async () => {
+  it('POST /api/auth/deactivate：软删账号、token 失效、用户名不可复用', async () => {
     const { token } = await registerAndGetCookies();
     const del = await request(app)
       .post('/api/auth/deactivate')
@@ -114,8 +114,10 @@ describe('注销', () => {
     const me = await request(app).get('/api/users/me').set('Authorization', `Bearer ${token}`);
     expect(me.status).toBe(401);
 
+    // 软删后用户名保持占用：重新注册同用户名 → ALREADY_EXISTS
     const reuse = await request(app).post('/api/auth/register').send(U);
-    expect(reuse.status).toBe(200);
+    expect(reuse.status).toBe(409);
+    expect(unwrapErr(reuse).code).toBe('ALREADY_EXISTS');
   });
 
   it('密码确认不符 → INVALID_CREDENTIALS，账号保留', async () => {

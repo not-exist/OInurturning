@@ -51,6 +51,7 @@ model User {
   badges        Json      @default("[]")
   tokenVersion  Int       @default(0)
   bannedAt      DateTime?
+  deletedAt     DateTime? // 软删标记：注销账户后保留业务数据，登录/refresh/鉴权均拦截（auth §注销）
   lastLoginAt   DateTime?
   lastSettledAt DateTime  @default(now())
   adventureIntelReady Boolean @default(false)

@@ -1,5 +1,11 @@
 import { Prisma, type PvpMatch, type PvpRegistration, type PvpTournament } from '@prisma/client';
-import type { DuelInput, ParticipantSnapshot, QuestionSnapshot } from '@oinur/shared';
+import {
+  frozenSolveHooksSchema,
+  type DuelInput,
+  type ParticipantSnapshot,
+  type QuestionSnapshot,
+  type QuestionTraitSnapshot,
+} from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { getConfig } from '../../config/loader.js';
@@ -87,6 +93,21 @@ function participant(row: Registration, side: 'HOME' | 'AWAY'): ParticipantSnaps
   return { ...source, side, userId: row.userId, studentId: source.studentId };
 }
 
+/**
+ * 将预制题的 traitId 解析为可被求解内核消费的特性快照（对齐 story.service 的 instantiateTraits）。
+ * 特性已从配置软弃用/缺失时保守返回空数组（不生效），绝不抛错中断赛事。
+ */
+function premadeTraitSnapshots(traitId: string | null): QuestionTraitSnapshot[] {
+  if (traitId === null) return [];
+  const trait = getConfig()?.problemTraits[traitId];
+  if (trait === undefined) return [];
+  const hook = frozenSolveHooksSchema.parse({
+    ...trait.hooks,
+    ...(trait.condition === undefined ? {} : { condition: trait.condition }),
+  });
+  return [{ traitId: trait.id, severity: trait.severity, hooks: [hook] }];
+}
+
 function questionFor(
   snapshot: { id: number; name: string; dominantDim: string; quality: number; traitId: string | null },
   tournamentId: number,
@@ -111,7 +132,7 @@ function questionFor(
     quality: snapshot.quality,
     timeLimitMin: 30,
     partialScores: false,
-    traits: snapshot.traitId === null ? [] : [],
+    traits: premadeTraitSnapshots(snapshot.traitId),
     source: 'PREMADE',
     premadeEntryId: snapshot.id,
   };

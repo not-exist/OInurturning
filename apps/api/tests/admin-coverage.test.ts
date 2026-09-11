@@ -228,3 +228,51 @@ describe('admin coverage：公告/用户/审计', () => {
     expect(badLimit.status).toBe(400);
   });
 });
+
+describe('admin coverage：封禁/解封', () => {
+  it('封禁即时拦截 + 审计落盘；解封恢复访问', async () => {
+    const admin = await registerAdmin();
+    const victim = await register();
+    const auth = { Authorization: `Bearer ${admin.token}` };
+
+    const ban = await request(app).post(`/api/admin/users/${victim.userId}/ban`).set(auth);
+    expect(ban.status).toBe(200);
+    const banned = unwrapOk<{ bannedAt: string | null }>(ban);
+    expect(banned.bannedAt).toEqual(expect.any(String));
+
+    // 封禁即时生效：旧 token 访问被拒
+    const me = await request(app).get('/api/users/me').set('Authorization', `Bearer ${victim.token}`);
+    expect(me.status).toBe(401);
+    expect(unwrapErr(me).code).toBe('UNAUTHENTICATED');
+
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'USER_BAN', targetId: String(victim.userId) } });
+    expect(audit.adminId).toBe(admin.userId);
+    expect(audit.targetType).toBe('USER');
+
+    const unban = await request(app).post(`/api/admin/users/${victim.userId}/unban`).set(auth);
+    expect(unban.status).toBe(200);
+    expect(unwrapOk<{ bannedAt: string | null }>(unban).bannedAt).toBeNull();
+
+    const meAfter = await request(app).get('/api/users/me').set('Authorization', `Bearer ${victim.token}`);
+    expect(meAfter.status).toBe(200);
+  });
+
+  it('保护性约束：不可封禁 ADMIN、未知用户 404、越权参数 404', async () => {
+    const admin = await registerAdmin();
+    const otherAdmin = await registerAdmin();
+    const auth = { Authorization: `Bearer ${admin.token}` };
+
+    const banAdmin = await request(app).post(`/api/admin/users/${otherAdmin.userId}/ban`).set(auth);
+    expect(banAdmin.status).toBe(403);
+    expect(unwrapErr(banAdmin).code).toBe('FORBIDDEN');
+
+    const selfBan = await request(app).post(`/api/admin/users/${admin.userId}/ban`).set(auth);
+    expect(selfBan.status).toBe(403);
+
+    const missing = await request(app).post('/api/admin/users/999999/ban').set(auth);
+    expect(missing.status).toBe(404);
+
+    const badId = await request(app).post('/api/admin/users/0/ban').set(auth);
+    expect(badId.status).toBe(404);
+  });
+});

@@ -103,6 +103,26 @@ adminRouter.get('/audits', async (req, res, next) => {
   }
 });
 
+adminRouter.post('/users/:id/ban', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'user', id: req.params.id });
+    res.json({ ok: true, data: await service.setUserBan(req.user!.id, id, true) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post('/users/:id/unban', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'user', id: req.params.id });
+    res.json({ ok: true, data: await service.setUserBan(req.user!.id, id, false) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 adminRouter.post('/pvp-tournaments/:id/actions/start', async (req, res, next) => {
   try {
     const id = Number(req.params.id);

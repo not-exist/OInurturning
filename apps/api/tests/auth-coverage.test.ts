@@ -127,7 +127,7 @@ describe('auth coverage：改密/登出/注销/封禁', () => {
     expect(unwrapErr(refresh).code).toBe('UNAUTHENTICATED');
   });
 
-  it('注销级联：学员/道具/招募池同删，登录彻底失败', async () => {
+  it('注销＝软删：业务数据保留、deletedAt 落库、登录与旧 token 彻底失效', async () => {
     const { session } = await register();
     const student = await prisma.student.create({
       data: {
@@ -142,12 +142,21 @@ describe('auth coverage：改密/登出/注销/封禁', () => {
 
     const res = await request(app).post('/api/auth/deactivate').set('Authorization', `Bearer ${session.accessToken}`).send({ password: 'pw-12345678' });
     expect(res.status).toBe(200);
-    expect(await prisma.user.findUnique({ where: { id: session.me.id } })).toBeNull();
-    expect(await prisma.student.findUnique({ where: { id: student.id } })).toBeNull();
-    expect(await prisma.userItem.findMany({ where: { userId: session.me.id } })).toEqual([]);
-    expect(await prisma.recruitPool.findUnique({ where: { userId: session.me.id } })).toBeNull();
+    // 软删：行仍在、deletedAt 落库；学员/道具/招募池等业务数据全部保留
+    const userAfter = await prisma.user.findUnique({ where: { id: session.me.id } });
+    expect(userAfter).not.toBeNull();
+    expect(userAfter?.deletedAt).not.toBeNull();
+    expect(await prisma.student.findUnique({ where: { id: student.id } })).not.toBeNull();
+    expect(await prisma.userItem.findMany({ where: { userId: session.me.id } })).toHaveLength(1);
+    expect(await prisma.recruitPool.findUnique({ where: { userId: session.me.id } })).not.toBeNull();
+
+    // 旧 access token 立即失效（requireAuth 读库拦截 deletedAt）
+    const me = await request(app).get('/api/users/me').set('Authorization', `Bearer ${session.accessToken}`);
+    expect(me.status).toBe(401);
+    // 登录彻底失败（不泄露已注销状态，仍走 INVALID_CREDENTIALS）
     const login = await request(app).post('/api/auth/login').send({ username: session.me.username, password: 'pw-12345678' });
     expect(login.status).toBe(401);
+    expect(unwrapErr(login).code).toBe('INVALID_CREDENTIALS');
   });
 
   it('封禁用户：持旧 token 访问被拒', async () => {

@@ -88,6 +88,30 @@ describe('PVP scheduler', () => {
     expect(input.home.abilities.DS).toBe(35);
   });
 
+  it('resolves premade problem traits into the match snapshot', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Traits', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
+    const players = [];
+    for (let index = 0; index < 8; index += 1) {
+      const player = await entrant();
+      players.push(player);
+      const problem = index === 0
+        ? await prisma.problemLibraryEntry.create({ data: { userId: player.userId, authorStudentId: player.studentId, name: 'Traited problem', dominantDim: 'DS', rarity: 'green', quality: 60, traitId: 'wide-data' } })
+        : null;
+      await registerPvp(player.userId, tournament.id, player.studentId, problem === null ? [] : [problem.id], PAST);
+    }
+    await advancePvpTournament(tournament.id, PAST);
+    const record = await prisma.contestRecord.findFirstOrThrow({ where: { type: 'PVP', userId: players[0]!.userId } });
+    const input = record.inputSnapshot as { questions: Array<{ premadeEntryId?: number; traits: Array<{ traitId: string; severity: string; hooks: Array<{ partial_override?: string; tle_prob_add?: number }> }> }> };
+    const premade = input.questions.find((question) => question.premadeEntryId !== undefined);
+    expect(premade).toBeDefined();
+    expect(premade!.traits).toHaveLength(1);
+    expect(premade!.traits[0]!.traitId).toBe('wide-data');
+    expect(premade!.traits[0]!.severity).toBe('red');
+    expect(premade!.traits[0]!.hooks).toHaveLength(1);
+    expect(premade!.traits[0]!.hooks[0]!.partial_override).toBe('none');
+    expect(premade!.traits[0]!.hooks[0]!.tle_prob_add).toBeCloseTo(0.05);
+  });
+
   it('serializes concurrent advances without duplicate matches or records', async () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Concurrent', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     for (let index = 0; index < 8; index += 1) {

@@ -70,7 +70,7 @@ authRouter.post('/refresh', async (req, res, next) => {
     if (!raw) throw new ApiError('UNAUTHENTICATED');
     const claims = verifyRefresh(decodeURIComponent(raw));
     const user = await prisma.user.findUnique({ where: { id: claims.uid } });
-    if (!user || !user.passwordHash || user.bannedAt || user.tokenVersion !== claims.tv)
+    if (!user || !user.passwordHash || user.bannedAt || user.deletedAt || user.tokenVersion !== claims.tv)
       throw new ApiError('UNAUTHENTICATED');
     const s = svc.sessionFor(user);
     res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken));
