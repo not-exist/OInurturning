@@ -169,6 +169,7 @@ export interface UserAdminView {
   money: number;
   reputation: number;
   bannedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
 }
 
@@ -708,6 +709,20 @@ export function useAdminUsers(query: string) {
   return useQuery({
     queryKey: ['admin-users', query],
     queryFn: () => apiFetch<UserAdminView[]>(`/api/admin/users?query=${encodeURIComponent(query)}`),
+  });
+}
+
+export function useSetUserBan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, banned }: { userId: number; banned: boolean }) =>
+      apiFetch<UserAdminView>(`/api/admin/users/${userId}/${banned ? 'ban' : 'unban'}`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] });
+      qc.invalidateQueries({ queryKey: ['admin-audits'] });
+    },
   });
 }
 

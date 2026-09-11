@@ -24,9 +24,9 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
       }
       const user = await prisma.user.findUnique({
         where: { id: claims.uid },
-        select: { id: true, role: true, tokenVersion: true, bannedAt: true },
+        select: { id: true, role: true, tokenVersion: true, bannedAt: true, deletedAt: true },
       });
-      if (!user || user.bannedAt || user.tokenVersion !== claims.tv) throw new ApiError('UNAUTHENTICATED');
+      if (!user || user.bannedAt || user.deletedAt || user.tokenVersion !== claims.tv) throw new ApiError('UNAUTHENTICATED');
       req.user = { id: user.id, role: user.role, tokenVersion: user.tokenVersion };
       next();
     } catch (e) { next(e); }

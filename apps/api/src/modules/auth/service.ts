@@ -64,7 +64,8 @@ export async function register(input: { username: string; password: string }) {
 export async function login(input: { username: string; password: string }) {
   const user = await prisma.user.findUnique({ where: { username: input.username } });
   const ok = await bcrypt.compare(input.password, user?.passwordHash ?? DUMMY_HASH);
-  if (!user || !user.passwordHash || !ok) throw new ApiError('INVALID_CREDENTIALS');
+  // 软删账号视为不存在（不泄露「已注销」状态，且仍执行等耗时 bcrypt 保持侧信道均衡）
+  if (!user || !user.passwordHash || user.deletedAt || !ok) throw new ApiError('INVALID_CREDENTIALS');
   const updated = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   return sessionFor(updated);
 }
@@ -80,8 +81,10 @@ export async function changePassword(userId: number, oldPassword: string, newPas
 }
 
 export async function deactivate(userId: number): Promise<void> {
-  // M0：仅删 User 行；其余业务表落地后靠 schema 级联硬删（TECH-DESIGN §9.6）
-  await prisma.user.delete({ where: { id: userId } });
+  // 注销＝软删：仅标记 deletedAt，保留全部业务数据（学员/战报/声誉日志/审计快照等）
+  // 以满足引用完整性与审计需求；登录/refresh/requireAuth 均以 deletedAt 拦截，等效账号失效，
+  // 用户名保持占用不可复用（唯一索引仍指向该行）。
+  await prisma.user.update({ where: { id: userId }, data: { deletedAt: new Date() } });
 }
 
 export async function bumpTokenVersionAndLogout(userId: number): Promise<void> {

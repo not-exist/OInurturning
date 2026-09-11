@@ -6,8 +6,10 @@ import {
   useAdminUsers,
   useCreateAnnouncement,
   useCreateTournament,
+  useSetUserBan,
   type AuditView,
   type TournamentView,
+  type UserAdminView,
 } from '../../lib/hooks';
 
 function futureDate(hours: number): string {
@@ -169,9 +171,70 @@ function TournamentTable({ items }: { items: TournamentView[] }): JSX.Element {
   return <div className="overflow-x-auto"><table data-testid="admin-tournaments" className="w-full min-w-[640px] border-y border-neutral-200 bg-white text-left text-sm"><thead className="bg-neutral-100 text-xs text-neutral-500"><tr><th className="px-3 py-2">名称</th><th className="px-3 py-2">规模</th><th className="px-3 py-2">状态</th><th className="px-3 py-2">报名截止</th><th className="px-3 py-2">自动开始</th></tr></thead><tbody className="divide-y divide-neutral-200">{items.map((item) => <tr key={item.id}><td className="px-3 py-3 font-medium">{item.name}</td><td className="px-3 py-3">{item.size}</td><td className="px-3 py-3">{item.status}</td><td className="px-3 py-3 text-neutral-500">{new Date(item.registerEndsAt).toLocaleString()}</td><td className="px-3 py-3 text-neutral-500">{new Date(item.autoStartAt).toLocaleString()}</td></tr>)}</tbody></table></div>;
 }
 
-function UserTable({ users }: { users: { id: number; username: string; role: string; money: number; reputation: number }[] }): JSX.Element {
+function UserTable({ users }: { users: UserAdminView[] }): JSX.Element {
+  const setBan = useSetUserBan();
   if (users.length === 0) return <p className="text-sm text-neutral-500">没有匹配用户。</p>;
-  return <div className="overflow-x-auto"><table data-testid="admin-users" className="w-full min-w-[520px] border-y border-neutral-200 bg-white text-left text-sm"><thead className="bg-neutral-100 text-xs text-neutral-500"><tr><th className="px-3 py-2">用户名</th><th className="px-3 py-2">角色</th><th className="px-3 py-2">金币</th><th className="px-3 py-2">声誉</th></tr></thead><tbody className="divide-y divide-neutral-200">{users.map((user) => <tr key={user.id}><td className="px-3 py-3 font-medium">{user.username}</td><td className="px-3 py-3">{user.role}</td><td className="px-3 py-3">{user.money}</td><td className="px-3 py-3">{user.reputation}</td></tr>)}</tbody></table></div>;
+  return (
+    <div className="overflow-x-auto">
+      <table
+        data-testid="admin-users"
+        className="w-full min-w-[640px] border-y border-neutral-200 bg-white text-left text-sm"
+      >
+        <thead className="bg-neutral-100 text-xs text-neutral-500">
+          <tr>
+            <th className="px-3 py-2">用户名</th>
+            <th className="px-3 py-2">角色</th>
+            <th className="px-3 py-2">金币</th>
+            <th className="px-3 py-2">声誉</th>
+            <th className="px-3 py-2">状态</th>
+            <th className="px-3 py-2">操作</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-neutral-200">
+          {users.map((user) => {
+            const status = user.deletedAt
+              ? '已注销'
+              : user.bannedAt
+                ? '已封禁'
+                : '正常';
+            return (
+              <tr key={user.id}>
+                <td className="px-3 py-3 font-medium">{user.username}</td>
+                <td className="px-3 py-3">{user.role}</td>
+                <td className="px-3 py-3">{user.money}</td>
+                <td className="px-3 py-3">{user.reputation}</td>
+                <td className="px-3 py-3 text-neutral-500">{status}</td>
+                <td className="px-3 py-3">
+                  {user.role === 'ADMIN' ? (
+                    <span className="text-xs text-neutral-400">—</span>
+                  ) : user.bannedAt ? (
+                    <button
+                      data-testid={`admin-unban-${user.id}`}
+                      className="rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 disabled:opacity-50"
+                      disabled={setBan.isPending}
+                      onClick={() => setBan.mutate({ userId: user.id, banned: false })}
+                    >
+                      解封
+                    </button>
+                  ) : (
+                    <button
+                      data-testid={`admin-ban-${user.id}`}
+                      className="rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 disabled:opacity-50"
+                      disabled={setBan.isPending}
+                      onClick={() => setBan.mutate({ userId: user.id, banned: true })}
+                    >
+                      封禁
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {setBan.isError && <p className="mt-2 text-sm text-red-600">封禁/解封操作失败，请刷新后重试。</p>}
+    </div>
+  );
 }
 
 function AuditTable({ items }: { items: AuditView[] }): JSX.Element {

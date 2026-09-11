@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { registerUser, loginViaUI, readAdminAccount, uniqueName } from '../fixtures';
+import { API_URL, registerUser, loginViaUI, readAdminAccount, uniqueName } from '../fixtures';
 
 /** 管理端：建赛/公告/用户查询/审计；普通玩家不可见。 */
 test.describe('管理端', () => {
@@ -38,6 +38,31 @@ test.describe('管理端', () => {
     );
     await expect(auditSection).toContainText('TOURNAMENT_CREATE');
     await expect(auditSection).toContainText('ANNOUNCEMENT_CREATE');
+  });
+
+  test('管理员可封禁/解封用户，封禁后用户 token 失效', async ({ page, request }) => {
+    const probe = await registerUser(request, 'adm-ban');
+    const admin = await readAdminAccount();
+    await loginViaUI(page, admin.username, admin.password);
+    await page.goto('/admin');
+
+    // 封禁
+    await page.getByTestId('admin-user-search').fill(probe.username);
+    await page.getByTestId(`admin-ban-${probe.userId}`).click();
+    await expect(page.getByTestId('admin-users')).toContainText('已封禁');
+    // 封禁即时生效：旧 access token 访问被拒
+    const me = await request.get(`${API_URL}/api/users/me`, {
+      headers: { Authorization: `Bearer ${probe.accessToken}` },
+    });
+    expect(me.status()).toBe(401);
+
+    // 解封
+    await page.getByTestId(`admin-unban-${probe.userId}`).click();
+    await expect(page.getByTestId('admin-users')).toContainText('正常');
+    const meAfter = await request.get(`${API_URL}/api/users/me`, {
+      headers: { Authorization: `Bearer ${probe.accessToken}` },
+    });
+    expect(meAfter.status()).toBe(200);
   });
 
   test('普通玩家访问管理端显示加载失败且无管理端入口', async ({

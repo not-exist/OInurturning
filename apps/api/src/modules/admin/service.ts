@@ -40,6 +40,7 @@ export interface UserAdminView {
   money: number;
   reputation: number;
   bannedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
 }
 
@@ -191,9 +192,45 @@ export async function searchUsers(query: string | undefined, limit = 50): Promis
     where: query === undefined ? undefined : { username: { contains: query } },
     orderBy: { id: 'desc' },
     take: limit,
-    select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, createdAt: true },
+    select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, deletedAt: true, createdAt: true },
   });
-  return rows.map((row) => ({ ...row, bannedAt: row.bannedAt?.toISOString() ?? null, createdAt: row.createdAt.toISOString() }));
+  return rows.map((row) => ({
+    ...row,
+    bannedAt: row.bannedAt?.toISOString() ?? null,
+    deletedAt: row.deletedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+/**
+ * 封禁/解封用户（M5 补：此前 bannedAt 只在鉴权层读取、无操作入口）。
+ * 封禁即时生效（requireAuth/refresh 每次请求读库拦截），无需 bump tokenVersion。
+ * 保护性约束：ADMIN 账号（含自己）不可被封禁，避免管理员互相锁死。
+ */
+export async function setUserBan(
+  adminId: number,
+  targetId: number,
+  banned: boolean,
+): Promise<UserAdminView> {
+  return prisma.$transaction(async (tx) => {
+    const target = await tx.user.findUnique({ where: { id: targetId } });
+    if (target === null) throw new ApiError('NOT_FOUND', { resource: 'user', id: targetId });
+    if (target.role === 'ADMIN') {
+      throw new ApiError('FORBIDDEN', { resource: 'user', id: targetId, reason: 'cannot ban an admin' });
+    }
+    const row = await tx.user.update({
+      where: { id: targetId },
+      data: { bannedAt: banned ? new Date() : null },
+      select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, deletedAt: true, createdAt: true },
+    });
+    await audit(tx, adminId, banned ? 'USER_BAN' : 'USER_UNBAN', 'USER', String(targetId), { banned });
+    return {
+      ...row,
+      bannedAt: row.bannedAt?.toISOString() ?? null,
+      deletedAt: row.deletedAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+    };
+  });
 }
 
 export async function listAudits(limit = 100): Promise<AuditView[]> {
