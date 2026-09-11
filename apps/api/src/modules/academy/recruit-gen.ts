@@ -55,22 +55,44 @@ interface QualityAttrTable {
   staminaRegen: AttrSpec;
 }
 
-const ATTR_TABLE: Record<GenQuality, QualityAttrTable> = {
+/** §3.3 基础属性期望值表（E±δ，整数均匀掷点，区间截断 [1,100]）。
+ *  导出供 T5.2 数值回归（balance-regression）读取招募基线期望，保证单一事实源。 */
+export const ATTR_TABLE: Record<GenQuality, QualityAttrTable> = {
   common: {
-    dim: { e: 8, d: 4 }, code: { e: 7, d: 3 }, thinking: { e: 8, d: 4 }, setting: { e: 3, d: 2 },
-    focusCap: { e: 45, d: 5 }, energyMax: { e: 55, d: 5 }, staminaRegen: { e: 48, d: 3 },
+    dim: { e: 8, d: 4 },
+    code: { e: 7, d: 3 },
+    thinking: { e: 8, d: 4 },
+    setting: { e: 3, d: 2 },
+    focusCap: { e: 45, d: 5 },
+    energyMax: { e: 55, d: 5 },
+    staminaRegen: { e: 48, d: 3 },
   },
   good: {
-    dim: { e: 14, d: 5 }, code: { e: 13, d: 4 }, thinking: { e: 15, d: 5 }, setting: { e: 6, d: 3 },
-    focusCap: { e: 50, d: 5 }, energyMax: { e: 62, d: 5 }, staminaRegen: { e: 50, d: 3 },
+    dim: { e: 14, d: 5 },
+    code: { e: 13, d: 4 },
+    thinking: { e: 15, d: 5 },
+    setting: { e: 6, d: 3 },
+    focusCap: { e: 50, d: 5 },
+    energyMax: { e: 62, d: 5 },
+    staminaRegen: { e: 50, d: 3 },
   },
   elite: {
-    dim: { e: 22, d: 6 }, code: { e: 20, d: 5 }, thinking: { e: 24, d: 6 }, setting: { e: 10, d: 4 },
-    focusCap: { e: 58, d: 6 }, energyMax: { e: 70, d: 5 }, staminaRegen: { e: 52, d: 3 },
+    dim: { e: 22, d: 6 },
+    code: { e: 20, d: 5 },
+    thinking: { e: 24, d: 6 },
+    setting: { e: 10, d: 4 },
+    focusCap: { e: 58, d: 6 },
+    energyMax: { e: 70, d: 5 },
+    staminaRegen: { e: 52, d: 3 },
   },
   genius: {
-    dim: { e: 32, d: 8 }, code: { e: 28, d: 7 }, thinking: { e: 35, d: 8 }, setting: { e: 16, d: 5 },
-    focusCap: { e: 66, d: 6 }, energyMax: { e: 78, d: 6 }, staminaRegen: { e: 54, d: 3 },
+    dim: { e: 32, d: 8 },
+    code: { e: 28, d: 7 },
+    thinking: { e: 35, d: 8 },
+    setting: { e: 16, d: 5 },
+    focusCap: { e: 66, d: 6 },
+    energyMax: { e: 78, d: 6 },
+    staminaRegen: { e: 54, d: 3 },
   },
 };
 
@@ -195,7 +217,10 @@ function drawTalent(
     return w > 0 && pool.length > 0 ? [{ rarity: r, w, pool }] : [];
   });
   if (entries.length === 0) return null;
-  const i = weightedIndex(rng, entries.map((e) => e.w));
+  const i = weightedIndex(
+    rng,
+    entries.map((e) => e.w),
+  );
   const pool = entries[i]!.pool;
   return pool[Math.floor(rng() * pool.length)]!;
 }
@@ -236,10 +261,15 @@ export function recruitPrice(
 
 /** 当日第 k 次手动刷新（k 从 0 计）：round(refresh_base × refresh_growth^k)，封顶 daily_price_cap */
 export function refreshPrice(
-  manualRefresh: Pick<EconomyRecruitment['manual_refresh'], 'refresh_base' | 'refresh_growth' | 'daily_price_cap'>,
+  manualRefresh: Pick<
+    EconomyRecruitment['manual_refresh'],
+    'refresh_base' | 'refresh_growth' | 'daily_price_cap'
+  >,
   refreshesDoneToday: number,
 ): number {
-  const raw = Math.round(manualRefresh.refresh_base * manualRefresh.refresh_growth ** refreshesDoneToday);
+  const raw = Math.round(
+    manualRefresh.refresh_base * manualRefresh.refresh_growth ** refreshesDoneToday,
+  );
   return Math.min(raw, manualRefresh.daily_price_cap);
 }
 

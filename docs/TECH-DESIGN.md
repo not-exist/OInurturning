@@ -1458,13 +1458,13 @@ API client：薄 fetch 封装（自动带 Bearer、解信封、401 时静默 ref
 - **helmet**（API）：默认全部中间件；API 只出 JSON，CSP 由 nginx 在静态层负责。
 - **nginx 响应头**：`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: strict-origin-when-cross-origin`、CSP `default-src 'self'; img-src 'self' data:`（Vite 产物无内联脚本；样式允许 `'unsafe-inline'` 以兼容框架注入，后续可收紧）。
 - **CORS**：生产同源部署（nginx 反代），**不发 CORS 头即是最严策略**；仅开发环境为 vite dev server（默认 `http://localhost:5173`）开白名单，来源取 `WEB_ORIGIN` env。
-- **express-rate-limit**（内存桶，单实例前提）：
+- **express-rate-limit**（内存桶，单实例前提；M5 T5.4 起阈值可经 env 覆盖，缺省即下表基线，见 `.env.example` / `docs/OPERATIONS.md §5`）：
 
-| 维度 | 建议值 |
-|---|---|
-| 全局 | 300 req/min/IP |
-| `/api/auth/*`（登录/注册/刷新） | 10 req/15min/IP（爆破缓解） |
-| 登录后变更类端点合计 | 60 req/min/user |
+| 维度 | 基线值 | env 覆盖 |
+|---|---|---|
+| 全局 | 300 req/min/IP | `RATE_LIMIT_GLOBAL_MAX` + `RATE_LIMIT_WINDOW_MS` |
+| `/api/auth/*`（登录/注册/刷新） | 10 req/15min/IP（爆破缓解） | `RATE_LIMIT_AUTH_MAX` + `RATE_LIMIT_AUTH_WINDOW_MS` |
+| 登录后变更类端点合计 | 60 req/min/user（预留；当前由全局桶覆盖） | — |
 
 ### 9.4 权限模型
 
@@ -1584,20 +1584,25 @@ server {
 | CONFIG_DIR | 否 | /app/config（容器）/ ../docs/data（本地） | yaml 配置目录 |
 | LOG_LEVEL | 否 | info | pino 日志级别 |
 | WEB_ORIGIN | 仅 dev | http://localhost:5173 | 开发期 CORS 白名单 |
+| RATE_LIMIT_GLOBAL_MAX / RATE_LIMIT_WINDOW_MS | 否 | 300 / 60000 | 全局限流阈值与窗口（§9.3） |
+| RATE_LIMIT_AUTH_MAX / RATE_LIMIT_AUTH_WINDOW_MS | 否 | 10 / 900000 | auth 端点限流阈值与窗口（§9.3） |
 | MYSQL_DATABASE / MYSQL_USER / MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD | 是（compose） | — | MySQL 初始化 |
 
 ### 10.3 备份策略
 
-宿主机 crontab 两行（每日 04:00 全量 dump + 14 天滚动清理）：
+**canonical 实现为 `deploy/backup.sh`**（M5 T5.4 落地）：宿主机单脚本每日全量 dump + 滚动清理 + 非 0 退出不落盘；凭据从容器环境读取、宿主机不落明文。等价的原始 crontab 两行（每日 04:00 dump + 清理）：
 
 ```cron
+0 4 * * * deploy/backup.sh >> /var/log/oinur-backup.log 2>&1
+# 或手工等价：
 0 4 * * * docker exec oinur-mysql sh -c 'mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --single-transaction --quick "$MYSQL_DATABASE"' | gzip > /var/backups/oinur/oinur-$(date +\%Y\%m\%d).sql.gz
 30 4 * * * find /var/backups/oinur -name '*.sql.gz' -mtime +14 -delete
 ```
 
 - `--single-transaction` 基于 InnoDB MVCC 取一致性快照，不锁业务表；
 - 恢复演练命令（建议每月手动跑一次到临时库验证）：`gunzip < oinur-xxx.sql.gz | docker exec -i oinur-mysql sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'`；
-- 有条件时用 rclone/rsync 把 /var/backups/oinur 同步到异机，一行即可。
+- 有条件时用 rclone/rsync 把 /var/backups/oinur 同步到异机，一行即可；
+- 完整运维流程（备份/恢复/首次上线顺序/检查单）见 `docs/OPERATIONS.md`。
 
 ### 10.4 日志与监控（最简方案）
 

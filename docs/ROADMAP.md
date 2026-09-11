@@ -123,11 +123,36 @@
 | 任务 | 内容 | 验收标准 |
 |---|---|---|
 | [x] T5.1 | 收支模拟脚本：模拟「新手周/中期周/后期周」三类玩家行为画像，输出收入/支出报表 | 中期周收支比落在 [0.9, 1.15] |
-| T5.2 | 数值平衡回归：训练耗时到 IOI 的总时长估算、进阶石全服产量 vs 彩天赋需求 | 达成 GAME-DESIGN §7.3 稀缺目标 |
-| T5.3 | 打磨：空态/加载/错误提示全覆盖、移动端适配复查、战报分享文案 | 人工走查清单 |
-| T5.4 | 上线检查单：备份 cron（mysqldump）、日志滚动、限流参数、JWT_SECRET 强随机、管理员账号初始化 | 检查单全绿 |
+| [x] T5.2 | 数值平衡回归：训练耗时到 IOI 的总时长估算、进阶石全服产量 vs 彩天赋需求 | 达成 GAME-DESIGN §7.3 稀缺目标 |
+| [x] T5.3 | 打磨：空态/加载/错误提示全覆盖、移动端适配复查、战报分享文案 | 人工走查清单（浏览器走查留部署窗口） |
+| [x] T5.4 | 上线检查单：备份 cron（mysqldump）、日志滚动、限流参数、JWT_SECRET 强随机、管理员账号初始化 | 检查单全绿（Docker/浏览器项留部署窗口） |
 
 > **T5.1 实测记录（2026-09-07）**：`pnpm --silent sim:economy -- --json` 读取真实 YAML 后，新手周收入/支出/净额为 `1120 / 1469 / -349`（比率 `0.7624`），中期周为 `3990 / 3804 / 186`（比率 `1.0489`），后期周为 `66775 / 9299 / 57476`（比率 `7.1809`）。中期画像落在 YAML 声明的 `[0.90, 1.15]`，gate 为 PASS；Docker/浏览器手动验收按约定留到 M5 最终部署窗口。
+
+> **T5.2 实测记录（2026-09-09）**：新增 DB-free 确定性 CLI `pnpm bal:regress [--json]`（`apps/api/src/modules/economy/progression.ts` 纯引擎 + `scripts/balance-regression.ts` 入口 + 11 例 DB-free 用例）。数值全部读 `docs/data/*.yaml` 与训练常量单点源（training/gains.ts、recruit-gen ATTR_TABLE），无随机、无 DB。输出两段回归：
+>
+> 1. **训练耗时到 IOI 总时长**（无天赋/道具纯训练基线，招募基线=§3.3 期望；目标=各章正赛 `recommended_level`，即 §6.2 锚点逐关落地）：
+>    - 早期健康：common→CSP-J 正赛 ≈55 次会话（mid 混合）；elite/genius 出生 V≥19 直接达标；
+>    - 中期：NOI 正赛（V87）≈2.0k 次 ≈200 天（70 次/周重度）；CTS（V94）≈5.0k 次 ≈1.4 年；
+>    - **终局风险点**：IOI 正赛（V97）≈1.13 万次 ≈3.1 现实年（重度）/ ≈20 年（11 次/周轻量）；且 common 与 genius 四档差异 <2%——瓶颈是 code/thinking 的附带成长（20–40%/次）与 V97≈三组件贴顶的渐近线，而非六维训练。一周目全通（含 IOI）是 NG+ 每层 5 石解锁前提，该时长直接威胁 §7.3 供给实现；已记录为 warn，建议部署窗口前用真实模拟引擎校准 `stages.yaml` ioi 正赛门槛（现 recommended_level 97 / NPC mean 97）。本工具以 recommended_level 作 V 阈值代理，未跑真实引擎对决。
+> 2. **进阶石全服产量 vs 彩天赋需求**：一周目正赛里程碑 10 颗（省选1/NOI2/CTT3/IOI 传说礼盒内含4）+ NG+1..3 全通 ×5 = **25 颗 = GAME-DESIGN §7.3 目标线，PASS**；消耗表（items.yaml）1/2/3/5/8：灰→彩整链 19、绿→彩整链 16（仅 memo/guess 两家族可升阶冲彩，turing-colorful family=null 走随机渠道）、单次紫→彩 8，均落在 25 颗内；边际供给 C2 图灵之遗 ≈1.05 石/全服周、PVP 默认 3 石/届（管理员节制），另有个体检定型边际「传奇题卷」（紫色试炼、cooldown 4 天、双检定 DC70 全过 → +1 石，未计入确定性口径），彩天赋保持全服稀缺。**账本层面达成 §7.3，无需改动 YAML**；`sim:economy` 复跑中期比率 1.0489（PASS）不受影响。
+>
+> 质量门：新增文件 lint ✅（eslint）、DB-free 用例语法 ✅、CLI 全量 64 行成长矩阵 + 账本实测 ✅（1.4s）；全量 `typecheck/test/build` 需在开发库环境复跑（T5.2 工具本身不依赖 DB）。完整矩阵与数据见 `.superpowers/sdd/2026-09-06-m5/task-5.2-report.md`。
+
+> **T5.3 实测记录（2026-09-09，前端打磨，浏览器走查留部署窗口）**：
+> - **共用件**：新增 `components/ui.tsx`（Empty 空态卡 / InlineLoader 加载条 / ActionLink）、`api.ts → apiErrorMessage()`（后端错误码 → 中文人话，覆盖 INSUFFICIENT_RESOURCE/STATE_CONFLICT/VALIDATION_FAILED 等 11 码）。
+> - **空态/加载/错误全覆盖**：学员列表、学员详情、训练中心、背包、高级学院、讲课、出题题库、历练、剧情、PVP 全部页面的加载态带 spinner、失败态显示 apiErrorMessage 并带**重试按钮**（refetch）、空态换成带引导 CTA 的 Empty（无学员 → 去招募等）；操作失败（训练/改名/开除/用道具/招募/讲课/出题/领取等）统一为红底提示并人话化。顺带修复一个真实 bug：**PVP 页在「暂无赛事」时 detail/bracket/rewards 查询禁用仍被判 loading → 永久 spinner**，现按「是否选中赛事」门控。
+> - **战报分享**：`/records/:id` 新增「分享战报」——生成纯文本战报摘要（标题/赛事与时间/我方名次与总分或对决比分与逐局/AC 统计/奖励/Engine·RNG·Seed·Snapshot/完整战报链接），走 `navigator.share`，不支持则复制到剪贴板并提示；奖励行由裸 id 改为「首通奖金/里程碑/名次奖金」文案；战报返回按钮按记录类型路由（STORY→剧情 / ADVENTURE→历练 / PVP→PVP）。
+> - **移动端复查**：布局依赖 md 断点横向导航、表格均已包 `overflow-x-auto`（排名/对决/时间线），按钮/选择器 flex-wrap，本轮未发现 360px 级硬伤；最终视觉走查与 Docker 冒烟按约定留部署窗口。
+> - 质量门：`tsc -b` ✅、eslint ✅、`vite build` ✅（106 modules）。注：涉及文件同时按仓库 `.prettierrc` 统一格式（原文件未全量过 prettier，属噪音性格式化，已随本任务一并提交）。细节见 `.superpowers/sdd/2026-09-06-m5/task-5.3-report.md`。
+
+> **T5.4 实测记录（2026-09-09，上线检查单，Docker/浏览器冒烟留最终部署窗口）**：
+> - **备份 cron**：新增宿主机脚本 `deploy/backup.sh`（替代 TECH-DESIGN §10.3 原始 crontab 两行，语义一致）：`docker exec` 容器内 mysqldump（`--single-transaction --quick`，凭据取容器环境变量、宿主机不落明文）+ gzip 命名 `oinur-YYYYMMDD-HHMMSS.sql.gz`，退出码非 0 不落盘不清理，默认保留 14 天；支持 `OINUR_MYSQL_CONTAINER/BACKUP_DIR/RETENTION_DAYS` 覆盖。crontab 示例：`0 4 * * * deploy/backup.sh >> /var/log/oinur-backup.log 2>&1`。`sh -n` ✅。运行文档与恢复演练/异机 rsync 见新增 `docs/OPERATIONS.md`。
+> - **日志滚动**：compose `json-file` 轮转原已配置（api 20m×5、mysql/web 10m×3，`docker inspect` 可验）；本轮补 **HTTP 访问日志**：非 test 环境按请求输出 pino 行（method/url/statusCode/durationMs/requestId），不记 body/头，天然免 redact；统一错误信封不变。
+> - **限流参数**：阈值全部 **env 可调**（`RATE_LIMIT_GLOBAL_MAX`/`RATE_LIMIT_AUTH_MAX` + 各自 `*_WINDOW_MS`，缺省即基线 300 req/min、auth 10 req/15min），zod 校验正整数，命中仍返回统一 `RATE_LIMITED` 信封；已写入 `.env.example` 注释与 TECH-DESIGN §9.3/§10.2、OPERATIONS.md §5。
+> - **JWT_SECRET 强随机**：新增 `scripts/gen-secret.mjs`（`randomBytes(48)`→base64）+ 根脚本 `pnpm secret`；`env.ts` 生产护栏：`NODE_ENV=production` 下若 JWT_SECRET 命中占位模式（`^change-me` 或含 `xxxxxxx`）直接报错退出（exit 1），杜绝 .env.example 值带病上线。
+> - **管理员账号初始化**：新增 `set-admin.ts` CLI（根脚本 `pnpm admin:set promote|create <username> [password]`；底层 `pnpm -C apps/api admin:set`）。promote 幂等、提升时 `tokenVersion+1` 使旧会话失效；create 走 bcrypt(env.BCRYPT_COST) 直接建 ADMIN；两者均写 `AdminAuditLog`（action=`ADMIN_BOOTSTRAP`、adminId=null、snapshot=system），审计不绕过，无需新迁移（User.role/tokenVersion、AdminAuditLog 均已存在）。
+> - 质量门：新增/改动文件 eslint ✅、esbuild 语法/依赖解析 ✅、`git diff --check` ✅、prettier ✅、`sh -n` ✅。全量 `typecheck/test/build` 依赖 prisma generate（沙箱无法下载引擎二进制），按约定留联网/开发库环境复跑；检查单 #1-#3/#11 及浏览器走查留最终部署窗口。细节见 `.superpowers/sdd/2026-09-06-m5/task-5.4-report.md`。
 
 ## 横切约定
 

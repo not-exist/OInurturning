@@ -79,28 +79,38 @@
   - 新手周：1120/1469/-349（0.76）
   - 中期周：3990/3804/186（1.05）← gate PASS
   - 后期周：66775/9299/57476（7.18）
-- **T5.2** ⬜ 数值平衡回归（下一步）
-- **T5.3** ⬜ 打磨：空态/加载/错误提示、移动端、战报分享
-- **T5.4** ⬜ 上线检查单：备份、日志、限流、JWT、管理员初始化
+- **T5.2** ✅ 数值平衡回归完成（2026-09-09，新增 `pnpm bal:regress` DB-free CLI + 11 用例）
+  - 进阶石账本：一周目 10 + NG+1..3 ×5 = **25 = §7.3 目标 PASS**；绿→彩链 16（memo/guess）、灰链 19、紫→彩 8 均覆盖；C2 事件 ≈1.05 石/全服周、PVP 3 石/届为边际 → 无需改 YAML
+  - 训练耗时：genius 到 IOI 正赛（V97）≈1.13 万次 ≈3.1 现实年（70 次/周）——**warn**：瓶颈为 code/thinking 附带成长与贴顶渐近线；一周目全通（NG+ 前提）时长存疑，待部署窗口前用真实引擎校准 ioi 正赛门槛
+- **T5.3** ✅ 打磨完成（2026-09-09）
+  - 共用空态 Empty/加载条/错误码中文化 apiErrorMessage；11 个主页面全部加载/失败（带重试）/空态覆盖
+  - 战报分享：纯文本摘要 + navigator.share/剪贴板 + 按记录类型返回路由
+  - 修复 PVP 无赛事时永久 spinner 的真实 bug；移动端复查无 360px 硬伤
+  - 浏览器视觉走查与 Docker 冒烟按约定留部署窗口
+- **T5.4** ✅ 上线检查单完成（2026-09-09）
+  - 备份：`deploy/backup.sh`（docker exec mysqldump --single-transaction + gzip 落盘、非 0 不落盘、14 天滚动）；crontab 一行即可
+  - 日志：compose json-file 轮转原已具备；补 HTTP 访问日志（pino，method/status/duration/requestId）
+  - 限流：阈值 env 可调（`RATE_LIMIT_GLOBAL_MAX`/`RATE_LIMIT_AUTH_MAX` + 窗口），缺省即基线
+  - JWT：`scripts/gen-secret.mjs`（`pnpm secret`）；production 占位值护栏（exit 1）
+  - 管理员：`pnpm admin:set promote|create`，tokenVersion 失效旧会话 + AdminAuditLog(ADMIN_BOOTSTRAP) 审计
+  - 运维文档 `docs/OPERATIONS.md`（检查单/备份恢复/首登顺序/常见操作）
+  - Docker/浏览器冒烟按约定留最终部署窗口
 
 ---
 
-## 当前状态（2026-09-08）
+## 当前状态（2026-09-09）
 
 ### 仓库状态
 
-- **当前分支**：`main`（已合并 m2-contest-story 的 48 commits）
-- **剩余分支**：`main`、`m0-skeleton`、`m1-students`
+- **当前分支**：`arena/01a08546-oinurturning`（M5 收尾中；历史主线已并入）
 - **Worktree**：已全部清理
-- **测试**：36 files / 321 tests
-- **质量门**：typecheck ✅ / lint ✅ / build ✅ / `git diff --check` ✅
+- **质量门**：web `tsc -b` ✅ / eslint ✅ / `vite build` ✅；API 代码级 eslint ✅（全量 typecheck/test 需 prisma generate，沙箱无法下载引擎二进制，留联网环境复跑）
+- **测试**：36 files / 321 tests（库环境复跑项）
 
 ### 待办优先级
 
-1. **T5.2** — 数值平衡回归（训练到 IOI 总时长估算、进阶石产量 vs 彩天赋需求）
-2. **T5.3** — UI 打磨（空态/加载/错误提示、移动端适配、战报分享）
-3. **T5.4** — 上线检查单（备份 cron、日志滚动、限流参数、JWT_SECRET、管理员初始化）
-4. **部署验收** — Docker/浏览器手动验收（延后到最终部署窗口）
+1. **部署验收** — Docker 冒烟 + 浏览器走查 + 检查单 #1-#3/#11（备份实跑、恢复演练、容器启停）→ 最终部署窗口执行（按 OPERATIONS.md §1）
+2. **T5.2/T5.3 遗留建议** — 部署窗口前用真实模拟引擎校准 `stages.yaml` ioi 正赛门槛；浏览器视觉走查各页空态/加载/错误与分享按钮
 
 ---
 

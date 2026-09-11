@@ -1,6 +1,6 @@
 import { useState, type JSX } from 'react';
 import type { StudentView } from '@oinur/shared';
-import { ApiCallError } from '../../lib/api';
+import { apiErrorMessage } from '../../lib/api';
 import {
   CATEGORY_LABEL,
   rarityBadge,
@@ -11,6 +11,7 @@ import {
 } from '../../lib/hooks';
 import type { ItemView } from '../../lib/hooks';
 import { Link } from 'react-router';
+import { Empty, InlineLoader } from '../../components/ui';
 
 const CATEGORY_ORDER = ['nurture', 'book', 'functional', 'contest', 'quest', 'material'];
 
@@ -38,8 +39,17 @@ export function InventoryPage(): JSX.Element {
   const students = useStudents();
   const [picker, setPicker] = useState<ItemView | null>(null);
 
-  if (inv.isLoading) return <p className="text-neutral-500">加载中…</p>;
-  if (inv.isError || !inv.data) return <p className="text-red-600">加载失败</p>;
+  if (inv.isLoading) return <InlineLoader>加载背包中…</InlineLoader>;
+  if (inv.isError || !inv.data) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>背包加载失败：{apiErrorMessage(inv.error)}</p>
+        <button className="rounded border px-3 py-1 text-xs" onClick={() => void inv.refetch()}>
+          重试
+        </button>
+      </div>
+    );
+  }
   const items = inv.data;
 
   const groups = CATEGORY_ORDER.map((cat) => ({
@@ -51,9 +61,9 @@ export function InventoryPage(): JSX.Element {
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">背包</h1>
       {items.length === 0 ? (
-        <p className="text-neutral-500">背包空空如也。</p>
-      ) : groups.length === 0 ? (
-        <p className="text-neutral-500">暂无道具。</p>
+        <Empty icon="🎒" title="背包空空如也">
+          目前还没有任何道具。参加剧情比赛、历练或前往高级学院讲课，都会让背包充实起来。
+        </Empty>
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
@@ -87,7 +97,7 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
   const isRenameCard = item.itemId === 'rename-card';
   const needsStudent = !isRenameCard;
   return (
-    <li className="rounded border bg-white p-3">
+    <li data-testid="inventory-row" data-itemid={item.itemId} className="rounded border bg-white p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -103,6 +113,7 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
         <div className="shrink-0 text-right text-sm">
           {usable ? (
             <button
+              data-testid="item-use"
               className="rounded bg-neutral-900 px-3 py-1.5 text-xs text-white"
               onClick={onUse}
               title={needsStudent ? '需选择一名学员' : '使用'}
@@ -142,7 +153,7 @@ function StudentPicker({
 
   return (
     <div className="fixed inset-0 z-10 grid place-items-center bg-black/30 p-4">
-      <div className="w-full max-w-md rounded border bg-white p-5">
+      <div data-testid="item-picker" className="w-full max-w-md rounded border bg-white p-5">
         <h3 className="mb-2 font-semibold">为「{item.name}」选择一名学员</h3>
         {students.length === 0 ? (
           <p className="text-sm text-neutral-500">暂无可选学员，请先招募学员。</p>
@@ -166,13 +177,18 @@ function StudentPicker({
             ))}
           </div>
         )}
-        {msg && <p className="mt-2 text-sm text-red-600">{msg}</p>}
+        {msg && (
+          <p data-testid="item-msg" className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {msg}
+          </p>
+        )}
         <div className="mt-4 flex justify-end gap-2">
           <button className="rounded border px-3 py-1.5 text-sm" onClick={onClose}>
             取消
           </button>
           <button
             className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-60"
+            data-testid="item-use-confirm"
             disabled={students.length === 0 || selected == null || use.isPending}
             onClick={() =>
               selected != null &&
@@ -183,7 +199,7 @@ function StudentPicker({
                     setMsg(null);
                     onClose();
                   },
-                  onError: (e) => setMsg(e instanceof ApiCallError ? '使用失败' : '使用失败'),
+                  onError: (e) => setMsg(apiErrorMessage(e)),
                 },
               )
             }

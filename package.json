@@ -2,7 +2,9 @@
   "name": "oinurturning",
   "private": true,
   "packageManager": "pnpm@10.14.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm -r --parallel --filter './apps/*' dev",
     "build": "pnpm -r build",
@@ -12,9 +14,17 @@
     "format": "prettier --write .",
     "db:up": "docker compose up -d && until docker compose exec mysql mysqladmin ping -h 127.0.0.1 -uoinur -poinur --silent >/dev/null 2>&1; do sleep 1; done && echo mysql-ready",
     "db:migrate": "pnpm -C apps/api migrate",
-    "sim:economy": "pnpm -C apps/api exec tsx ../../scripts/sim-economy.ts"
+    "sim:economy": "pnpm -C apps/api exec tsx ../../scripts/sim-economy.ts",
+    "bal:regress": "pnpm -C apps/api exec tsx ../../scripts/balance-regression.ts",
+    "secret": "node scripts/gen-secret.mjs",
+    "admin:set": "pnpm -C apps/api admin:set",
+    "e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "e2e:typecheck": "tsc --noEmit -p tests/e2e/tsconfig.json",
+    "e2e:seed": "pnpm -C apps/api e2e:seed"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.15.0",
     "eslint": "^9.30.0",
     "prettier": "^3.6.0",
     "typescript-eslint": "^8.35.0",

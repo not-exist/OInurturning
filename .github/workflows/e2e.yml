@@ -1,0 +1,121 @@
+# e2e 测试：API 全链路旅程（supertest）+ 浏览器 e2e（Playwright）。
+# 每次 push/PR 全量运行。Playwright 用自带 webServer 拉起 API（oinur_e2e 库）与 web。
+name: e2e
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: oinur
+          MYSQL_PASSWORD: oinur
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      # API 旅程库：vitest global-setup 硬编码重建 oinur_test，DATABASE_URL 须指向它
+      DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_test
+      JWT_SECRET: ci-jwt-secret-0123456789abcdef-e2e-only
+      # Playwright 链路库：API 服务器 + e2e:seed 共用
+      E2E_DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_e2e
+      E2E_JWT_SECRET: ci-e2e-jwt-secret-0123456789abcdef-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C apps/api generate
+      - name: 授权测试用户并创建 e2e 库
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS oinur_e2e;"
+      - name: 迁移 e2e 库
+        run: DATABASE_URL="$E2E_DATABASE_URL" pnpm -C apps/api migrate
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e:typecheck
+      - name: API 全链路旅程
+        run: pnpm -C apps/api exec vitest run tests/journey-full.e2e.test.ts --reporter=default --reporter=github-actions 2>&1 | tee journey.log; test ${PIPESTATUS[0]} -eq 0
+      - name: 浏览器 e2e
+        run: pnpm e2e
+      - name: 采集服务启动日志
+        if: failure()
+        run: |
+          cd tests/e2e
+          PORT=3000 NODE_ENV=test DATABASE_URL="$E2E_DATABASE_URL" JWT_SECRET="$E2E_JWT_SECRET" nohup pnpm -C ../../apps/api exec tsx src/index.ts > /tmp/api-boot.log 2>&1 &
+          API_PID=$!
+          nohup pnpm -C ../../apps/web dev > /tmp/web-boot.log 2>&1 &
+          WEB_PID=$!
+          cd ../..
+          for i in $(seq 1 45); do sleep 2; a=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health || echo 000); w=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5173/ || echo 000); echo "t=$((i*2))s api=$a web=$w" >> /tmp/dual-poll.log; [ "$a" = "200" ] && [ "$w" = "200" ] && break || true; done
+          echo '--- uptime/free ---' >> /tmp/dual-poll.log
+          uptime >> /tmp/dual-poll.log 2>&1 || true
+          free -m >> /tmp/dual-poll.log 2>&1 || true
+          echo '--- ps aux (tsx/vite/pnpm) ---' >> /tmp/dual-poll.log
+          ps aux | grep -E 'tsx|vite|pnpm' | grep -v grep >> /tmp/dual-poll.log || true
+          kill $API_PID $WEB_PID 2>/dev/null || true
+          sleep 2
+          pkill -f 'tsx src/index.ts' 2>/dev/null || true
+          pkill -f 'vite' 2>/dev/null || true
+          { echo '### dual-poll.log'; cat /tmp/dual-poll.log; echo '### api-boot.log (tail 50)'; tail -n 50 /tmp/api-boot.log; echo '### web-boot.log (tail 30)'; tail -n 30 /tmp/web-boot.log; } > /tmp/boot-capture.txt
+          cat /tmp/boot-capture.txt
+          python3 -c "print('::error::服务启动采集（截断 6KB）：%0A' + open('/tmp/boot-capture.txt', errors='replace').read()[-6000:].replace(chr(10), '%0A'))"
+      - name: 定位-register
+        if: failure()
+        run: grep -q 'JSTAGE:register' journey.log || exit 1
+      - name: 定位-recruit
+        if: failure()
+        run: grep -q 'JSTAGE:recruit' journey.log || exit 1
+      - name: 定位-train
+        if: failure()
+        run: grep -q 'JSTAGE:train' journey.log || exit 1
+      - name: 定位-story
+        if: failure()
+        run: grep -q 'JSTAGE:story' journey.log || exit 1
+      - name: 定位-problem
+        if: failure()
+        run: grep -q 'JSTAGE:problem' journey.log || exit 1
+      - name: 定位-lecture
+        if: failure()
+        run: grep -q 'JSTAGE:lecture' journey.log || exit 1
+      - name: 定位-adventure
+        if: failure()
+        run: grep -q 'JSTAGE:adventure' journey.log || exit 1
+      - name: 定位-social
+        if: failure()
+        run: grep -q 'JSTAGE:social' journey.log || exit 1
+      - name: 定位-pvp
+        if: failure()
+        run: grep -q 'JSTAGE:pvp' journey.log || exit 1
+      - name: 定位-account
+        if: failure()
+        run: grep -q 'JSTAGE:account' journey.log || exit 1
+      - name: 上传失败现场
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            journey.log
+            /tmp/api-boot.log
+            /tmp/web-boot.log
+            /tmp/api-poll.log
+          retention-days: 7

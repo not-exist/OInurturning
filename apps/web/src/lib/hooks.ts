@@ -624,8 +624,7 @@ export function useCreateProblem() {
 export function useDeleteProblem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) =>
-      apiFetch<null>(`/api/problem-library/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: number) => apiFetch<null>(`/api/problem-library/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['problem-library'] });
       qc.invalidateQueries({ queryKey: ['problems'] });
@@ -665,7 +664,13 @@ export function useCreateTournament() {
 export function useUpdateTournamentPrizes() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ tournamentId, prizes }: { tournamentId: number; prizes: Record<string, unknown> }) =>
+    mutationFn: ({
+      tournamentId,
+      prizes,
+    }: {
+      tournamentId: number;
+      prizes: Record<string, unknown>;
+    }) =>
       apiFetch<TournamentView>(`/api/admin/pvp-tournaments/${tournamentId}`, {
         method: 'PATCH',
         body: JSON.stringify({ prizes }),
@@ -723,28 +728,44 @@ export function usePvpTournaments() {
 export function usePvpRegistration(tournamentId: number | undefined) {
   return useQuery({
     queryKey: ['pvp-registration', tournamentId],
-    queryFn: () => apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/registration`),
+    queryFn: () =>
+      apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/registration`),
     enabled: tournamentId !== undefined,
     retry: false,
   });
 }
 
 export function usePvpTournamentDetail(tournamentId: number | undefined) {
-  return useQuery({ queryKey: ['pvp-detail', tournamentId], queryFn: () => apiFetch<PvpTournamentDetailView>(`/api/pvp/tournaments/${tournamentId}`), enabled: tournamentId !== undefined });
+  return useQuery({
+    queryKey: ['pvp-detail', tournamentId],
+    queryFn: () => apiFetch<PvpTournamentDetailView>(`/api/pvp/tournaments/${tournamentId}`),
+    enabled: tournamentId !== undefined,
+  });
 }
 
 export function usePvpBracket(tournamentId: number | undefined) {
-  return useQuery({ queryKey: ['pvp-bracket', tournamentId], queryFn: () => apiFetch<PvpMatchView[]>(`/api/pvp/tournaments/${tournamentId}/bracket`), enabled: tournamentId !== undefined });
+  return useQuery({
+    queryKey: ['pvp-bracket', tournamentId],
+    queryFn: () => apiFetch<PvpMatchView[]>(`/api/pvp/tournaments/${tournamentId}/bracket`),
+    enabled: tournamentId !== undefined,
+  });
 }
 
 export function usePvpRewards(tournamentId: number | undefined) {
-  return useQuery({ queryKey: ['pvp-rewards', tournamentId], queryFn: () => apiFetch<PvpRewardGrantView[]>(`/api/pvp/tournaments/${tournamentId}/rewards`), enabled: tournamentId !== undefined });
+  return useQuery({
+    queryKey: ['pvp-rewards', tournamentId],
+    queryFn: () => apiFetch<PvpRewardGrantView[]>(`/api/pvp/tournaments/${tournamentId}/rewards`),
+    enabled: tournamentId !== undefined,
+  });
 }
 
 export function useClaimPvpReward() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (tournamentId: number) => apiFetch<PvpRewardGrantView>(`/api/pvp/tournaments/${tournamentId}/rewards/claim`, { method: 'POST' }),
+    mutationFn: (tournamentId: number) =>
+      apiFetch<PvpRewardGrantView>(`/api/pvp/tournaments/${tournamentId}/rewards/claim`, {
+        method: 'POST',
+      }),
     onSuccess: (_, tournamentId) => {
       qc.invalidateQueries({ queryKey: ['pvp-rewards', tournamentId] });
       qc.invalidateQueries({ queryKey: ['items'] });
@@ -756,7 +777,15 @@ export function useClaimPvpReward() {
 export function useRegisterPvp() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ tournamentId, studentId, problemEntryIds }: { tournamentId: number; studentId: number; problemEntryIds: number[] }) =>
+    mutationFn: ({
+      tournamentId,
+      studentId,
+      problemEntryIds,
+    }: {
+      tournamentId: number;
+      studentId: number;
+      problemEntryIds: number[];
+    }) =>
       apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/register`, {
         method: 'POST',
         body: JSON.stringify({ studentId, problemEntryIds }),

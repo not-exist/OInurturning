@@ -1,5 +1,6 @@
 import { useState, type JSX } from 'react';
-import { ApiCallError } from '../../lib/api';
+import { Link } from 'react-router';
+import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import {
   useLectureLogs,
   useLectureTiers,
@@ -7,6 +8,7 @@ import {
   useTeachLecture,
   type LectureTierId,
 } from '../../lib/hooks';
+import { Empty } from '../../components/ui';
 
 const TIER_LABEL: Record<LectureTierId, string> = {
   beginner: '入门组',
@@ -25,9 +27,37 @@ export function AcademyLecturePage(): JSX.Element {
   const [tier, setTier] = useState<LectureTierId>('beginner');
   const [force, setForce] = useState(false);
 
-  if (students.isPending || tiers.isPending || logs.isPending) return <p className="text-neutral-500">加载讲课数据…</p>;
-  if (students.isError || tiers.isError || logs.isError || !students.data || !tiers.data || !logs.data) {
-    return <p className="text-red-600">讲课数据加载失败，请稍后重试。</p>;
+  if (students.isPending || tiers.isPending || logs.isPending) {
+    return (
+      <div className="flex items-center gap-2 text-neutral-500">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
+        加载讲课数据…
+      </div>
+    );
+  }
+  if (
+    students.isError ||
+    tiers.isError ||
+    logs.isError ||
+    !students.data ||
+    !tiers.data ||
+    !logs.data
+  ) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>讲课数据加载失败：{apiErrorMessage(students.error ?? tiers.error ?? logs.error)}</p>
+        <button
+          className="rounded border px-3 py-1 text-xs"
+          onClick={() => {
+            void students.refetch();
+            void tiers.refetch();
+            void logs.refetch();
+          }}
+        >
+          重试
+        </button>
+      </div>
+    );
   }
 
   const selectedStudentId = studentId ?? students.data[0]?.id;
@@ -42,15 +72,35 @@ export function AcademyLecturePage(): JSX.Element {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="border-b border-neutral-300 pb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Academy Lecture</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+          Academy Lecture
+        </p>
         <h1 className="mt-1 text-2xl font-semibold">讲课</h1>
         <p className="mt-2 text-sm text-neutral-500">用学员的综合能力承接不同层级的训练营课程。</p>
       </div>
+
+      {students.data.length === 0 && (
+        <Empty
+          icon="🏫"
+          title="还没有可以讲课的学员"
+          action={
+            <Link
+              to="/academy"
+              className="inline-block rounded bg-neutral-900 px-4 py-2 text-sm text-white"
+            >
+              前往高级学院招募
+            </Link>
+          }
+        >
+          学员要练出足够的综合能力（V），才能站上更高档位的讲台。
+        </Empty>
+      )}
 
       <section className="grid gap-4 border-b border-neutral-200 pb-5 md:grid-cols-2">
         <label className="text-sm">
           <span className="mb-2 block text-neutral-500">主讲学员</span>
           <select
+            data-testid="lecture-student"
             className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
             value={selectedStudentId ?? ''}
             onChange={(event) => setStudentId(Number(event.target.value))}
@@ -65,6 +115,7 @@ export function AcademyLecturePage(): JSX.Element {
         <label className="text-sm">
           <span className="mb-2 block text-neutral-500">受众档位</span>
           <select
+            data-testid="lecture-tier"
             className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
             value={tier}
             onChange={(event) => {
@@ -86,13 +137,17 @@ export function AcademyLecturePage(): JSX.Element {
           <div className="text-sm">
             <span className="font-medium">{selectedStudent?.name ?? '暂无学员'}</span>
             <span className="ml-3 text-neutral-500">
-              当前 V {selectedStudent?.v ?? '-'} · 目标门槛 V {selectedTier?.threshold ?? '-'} · 体力消耗 2
+              当前 V {selectedStudent?.v ?? '-'} · 目标门槛 V {selectedTier?.threshold ?? '-'} ·
+              体力消耗 2
             </span>
           </div>
           <button
             type="button"
+            data-testid="lecture-teach"
             className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-            disabled={selectedStudentId === undefined || selectedTier === undefined || teach.isPending}
+            disabled={
+              selectedStudentId === undefined || selectedTier === undefined || teach.isPending
+            }
             onClick={() =>
               selectedStudentId !== undefined &&
               teach.mutate({ studentId: selectedStudentId, tier, force: force && canForce })
@@ -103,15 +158,20 @@ export function AcademyLecturePage(): JSX.Element {
         </div>
         {canForce && (
           <label className="mt-4 flex items-center gap-2 border-t border-neutral-200 pt-3 text-sm text-amber-800">
-            <input type="checkbox" checked={force} onChange={(event) => setForce(event.target.checked)} />
+            <input
+              data-testid="lecture-force"
+              type="checkbox"
+              checked={force}
+              onChange={(event) => setForce(event.target.checked)}
+            />
             强接此档位，接受讲砸或折扣结算风险
           </label>
         )}
         {teach.isError && (
-          <p className="mt-3 text-sm text-red-600">
+          <p data-testid="lecture-error" className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {teach.error instanceof ApiCallError && teach.error.code === 'INSUFFICIENT_RESOURCE'
-              ? '体力不足'
-              : '讲课未能开始，请检查门槛、额度和体力。'}
+              ? '体力不足，稍等恢复或使用体力药水'
+              : `讲课未能开始：${apiErrorMessage(teach.error)}`}
           </p>
         )}
       </section>
@@ -124,18 +184,25 @@ export function AcademyLecturePage(): JSX.Element {
         {logs.data.length === 0 ? (
           <p className="text-sm text-neutral-500">暂无记录。</p>
         ) : (
-          <ul className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
+          <ul data-testid="lecture-logs" className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
             {logs.data.map((entry) => (
-              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 text-sm">
+              <li
+                key={entry.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 text-sm"
+              >
                 <div>
                   <span className="font-medium">{TIER_LABEL[entry.tier]}</span>
                   <span className="ml-2 text-xs text-neutral-500">V {entry.teachingValue}</span>
                 </div>
                 <div className="text-right text-xs">
                   <span className={entry.success ? 'text-green-700' : 'text-red-700'}>
-                    {entry.success ? '成功' : '讲砸'} · 钱 {entry.money >= 0 ? '+' : ''}{entry.money} · 声誉 {entry.reputation >= 0 ? '+' : ''}{entry.reputation}
+                    {entry.success ? '成功' : '讲砸'} · 钱 {entry.money >= 0 ? '+' : ''}
+                    {entry.money} · 声誉 {entry.reputation >= 0 ? '+' : ''}
+                    {entry.reputation}
                   </span>
-                  <time className="ml-3 text-neutral-500">{new Date(entry.createdAt).toLocaleString()}</time>
+                  <time className="ml-3 text-neutral-500">
+                    {new Date(entry.createdAt).toLocaleString()}
+                  </time>
                 </div>
               </li>
             ))}

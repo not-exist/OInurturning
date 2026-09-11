@@ -1,0 +1,122 @@
+# 普通测试：类型检查 + lint + 构建 + API 单元/集成测试（排除 *.e2e.test.ts）。
+# e2e 类别见 e2e.yml。每次 push/PR 全量运行。
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: oinur
+          MYSQL_PASSWORD: oinur
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_test
+      JWT_SECRET: ci-jwt-secret-0123456789abcdef-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C apps/api generate
+      - name: 授权测试用户
+        run: mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
+      - name: 类型检查采集
+        run: pnpm -r typecheck 2>&1 | tee typecheck.log; test ${PIPESTATUS[0]} -eq 0
+      - name: 归因类型检查日志
+        if: failure()
+        run: >
+          python3 - <<'EOF'
+          import re
+          scope = '?'
+          with open('typecheck.log', errors='replace') as f, open('typecheck-attrib.log', 'w') as o:
+              for line in f:
+                  m = re.match(r'^(apps/\S+|packages/\S+)\s+\S+\$', line)
+                  if m:
+                      scope = m.group(1)
+                  if 'error TS' in line:
+                      o.write(f'{scope}|{line}')
+          EOF
+          cat typecheck-attrib.log
+      - run: pnpm -r lint
+      - run: pnpm -r build
+      - run: pnpm --filter @oinur/api test:unit -- --reporter=default --reporter=github-actions
+      - name: 定位-api-src
+        if: failure()
+        run: grep -q '^apps/api|' typecheck-attrib.log && grep '^apps/api|' typecheck-attrib.log | grep -q -v '|tests/' && exit 1 || exit 0
+      - name: 定位-web
+        if: failure()
+        run: grep -q '^apps/web|' typecheck-attrib.log && exit 1 || exit 0
+      - name: 定位-shared
+        if: failure()
+        run: grep -q '^packages/shared|' typecheck-attrib.log && exit 1 || exit 0
+      - name: 定位-auth
+        if: failure()
+        run: grep -q 'tests/auth-coverage' typecheck.log && exit 1 || exit 0
+      - name: 定位-pvp
+        if: failure()
+        run: grep -q 'tests/pvp-coverage' typecheck.log && exit 1 || exit 0
+      - name: 定位-story
+        if: failure()
+        run: grep -q 'tests/story-coverage' typecheck.log && exit 1 || exit 0
+      - name: 定位-adventure
+        if: failure()
+        run: grep -q 'tests/adventure-gaps' typecheck.log && exit 1 || exit 0
+      - name: 定位-academy
+        if: failure()
+        run: grep -q 'tests/academy-gaps' typecheck.log && exit 1 || exit 0
+      - name: 定位-lecture
+        if: failure()
+        run: grep -q 'tests/lecture-gaps' typecheck.log && exit 1 || exit 0
+      - name: 定位-problems
+        if: failure()
+        run: grep -q 'tests/problems-gaps' typecheck.log && exit 1 || exit 0
+      - name: 定位-items
+        if: failure()
+        run: grep -q 'tests/items-gaps' typecheck.log && exit 1 || exit 0
+      - name: 定位-students
+        if: failure()
+        run: grep -q 'tests/students-gaps' typecheck.log && exit 1 || exit 0
+      - name: 定位-training
+        if: failure()
+        run: grep -q 'tests/training-gaps' typecheck.log && exit 1 || exit 0
+      - name: 定位-infra
+        if: failure()
+        run: grep -q 'tests/infra-coverage' typecheck.log && exit 1 || exit 0
+      - name: 定位-admin
+        if: failure()
+        run: grep -q 'tests/admin-coverage' typecheck.log && exit 1 || exit 0
+      - name: 定位-journey-file
+        if: failure()
+        run: grep -q 'tests/journey-full' typecheck.log && exit 1 || exit 0
+      - name: 定位-其他测试
+        if: failure()
+        run: grep 'tests/' typecheck.log | grep -v -E 'auth|pvp|story|adventure|academy|lecture|problems|items|students|training|infra|admin|journey-file' | grep -q . && exit 1 || exit 0
+      - name: 上传类型检查日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-log
+          path: |
+            typecheck.log
+            typecheck-attrib.log
+          retention-days: 7

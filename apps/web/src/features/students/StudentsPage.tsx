@@ -1,7 +1,9 @@
 import { Link } from 'react-router';
 import type { JSX } from 'react';
 import type { DimensionKey, StudentView } from '@oinur/shared';
+import { apiErrorMessage } from '../../lib/api';
 import { DIMENSION_LABEL, QUALITY_LABEL, floor, round, useStudents } from '../../lib/hooks';
+import { ActionLink, Empty } from '../../components/ui';
 
 const DIMS: Record<DimensionKey, keyof StudentView> = {
   DS: 'ds',
@@ -30,15 +32,37 @@ function StatBar({ label, value }: { label: string; value: number }): JSX.Elemen
 export function StudentsPage(): JSX.Element {
   const q = useStudents();
 
-  if (q.isLoading) return <p className="text-neutral-500">加载中…</p>;
-  if (q.isError || !q.data) return <p className="text-red-600">加载失败</p>;
+  if (q.isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-neutral-500">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
+        加载学员中…
+      </div>
+    );
+  }
+  if (q.isError || !q.data) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>学员数据加载失败：{apiErrorMessage(q.error)}</p>
+        <button className="rounded border px-3 py-1 text-xs" onClick={() => void q.refetch()}>
+          重试
+        </button>
+      </div>
+    );
+  }
   const students = q.data;
 
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">学员管理</h1>
       {students.length === 0 ? (
-        <p className="text-neutral-500">暂无学员，请前往「高级学院」招募。</p>
+        <Empty
+          icon="🎓"
+          title="名下还没有学员"
+          action={<ActionLink to="/academy">前往高级学院招募</ActionLink>}
+        >
+          招募第一名学员，从 CSP-J 起步冲击 IOI。
+        </Empty>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {students.map((s) => (
@@ -54,6 +78,7 @@ function StudentCard({ s }: { s: StudentView }): JSX.Element {
   return (
     <Link
       to={`/students/${s.id}`}
+      data-testid="student-card"
       className="block rounded border bg-white p-4 shadow-sm transition hover:shadow"
     >
       <div className="mb-2 flex items-center justify-between">
