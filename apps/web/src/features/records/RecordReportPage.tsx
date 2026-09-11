@@ -66,6 +66,7 @@ export function RecordReportPage(): JSX.Element {
           {copied && <span className="text-xs text-green-700">分享文案已复制 ✓</span>}
           <button
             type="button"
+            data-testid="record-share"
             className="rounded bg-neutral-900 px-3 py-2 text-sm text-white disabled:opacity-60"
             onClick={() => void share()}
           >
@@ -73,6 +74,7 @@ export function RecordReportPage(): JSX.Element {
           </button>
           <button
             type="button"
+            data-testid="record-back"
             className="rounded border border-neutral-300 bg-white px-3 py-2 text-sm"
             onClick={() => navigate(back.to)}
           >

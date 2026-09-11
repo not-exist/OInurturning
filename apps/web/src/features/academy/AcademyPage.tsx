@@ -73,6 +73,7 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
             className="rounded bg-neutral-900 px-3 py-1.5 text-white disabled:opacity-60"
             disabled={refresh.isPending}
             onClick={() => refresh.mutate(undefined, { onError: (e) => setMsg(errText(e)) })}
+            data-testid="refresh-pool"
             title="手动刷新消耗金币"
           >
             刷新（{pool.refreshPrice} 金）
@@ -81,7 +82,7 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
       </div>
 
       {msg && (
-        <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p data-testid="pool-msg" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {msg}
         </p>
       )}
@@ -110,7 +111,7 @@ function CandidateCard({
 }): JSX.Element {
   const recruit = useRecruit();
   return (
-    <div className="rounded border bg-white p-4 shadow-sm">
+    <div data-testid="candidate-card" data-tempid={c.tempId} className="rounded border bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <span className="font-semibold">
           {c.name} <span className="text-xs text-neutral-400">{SEX_LABEL[c.sex]}</span>
@@ -132,6 +133,7 @@ function CandidateCard({
         天赋：{c.talents.length > 0 ? c.talents.map((t) => t.talentId).join(', ') : '无'}
       </p>
       <button
+        data-testid="recruit-btn"
         className="w-full rounded bg-neutral-900 px-3 py-2 text-sm text-white disabled:opacity-60"
         disabled={recruit.isPending}
         onClick={() =>

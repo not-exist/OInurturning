@@ -74,6 +74,7 @@ export function StoryPage() {
         <label className="flex items-center gap-2 text-sm">
           <span className="text-neutral-500">挑战层</span>
           <select
+            data-testid="story-ng"
             className="rounded border border-neutral-300 bg-white px-3 py-2"
             value={ngLevel}
             onChange={(event) => setNgLevel(Number(event.target.value))}
@@ -91,6 +92,7 @@ export function StoryPage() {
         <label className="flex items-center gap-2 text-sm">
           <span className="text-neutral-500">出战学员</span>
           <select
+            data-testid="story-student"
             className="rounded border border-neutral-300 bg-white px-3 py-2"
             value={activeStudentId ?? ''}
             onChange={(event) => setStudentId(Number(event.target.value))}
@@ -103,7 +105,7 @@ export function StoryPage() {
           </select>
         </label>
         {enter.isError && (
-          <span className="text-sm text-red-600">
+          <span data-testid="story-error" className="text-sm text-red-600">
             进入关卡失败：{apiErrorMessage(enter.error)}（解锁、体力与精力均需满足）
           </span>
         )}
@@ -169,6 +171,7 @@ export function StoryPage() {
                   <button
                     type="button"
                     className="rounded bg-neutral-900 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                    data-testid="story-enter"
                     disabled={!stage.unlocked || activeStudentId === undefined || enter.isPending}
                     onClick={() => enterStage(stage.stageKey)}
                   >

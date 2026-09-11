@@ -39,7 +39,7 @@ export function Layout() {
         <span className="font-bold">OInurturning</span>
         <div className="flex items-center gap-3 text-sm">
           {me && <span className="text-neutral-500">{me.username}</span>}
-          <button onClick={() => void logout()} className="underline">
+          <button data-testid="logout-btn" onClick={() => void logout()} className="underline">
             登出
           </button>
         </div>

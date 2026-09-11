@@ -126,6 +126,7 @@ export function PvpPage(): JSX.Element {
           <label className="block max-w-xl text-sm">
             <span className="mb-2 block text-neutral-500">选择赛事</span>
             <select
+              data-testid="pvp-select"
               className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
               value={selectedTournamentId ?? ''}
               onChange={(event) => {
@@ -228,6 +229,7 @@ function RewardGrants({
             ) : grant.claimable ? (
               <button
                 type="button"
+                data-testid="pvp-claim"
                 className="rounded bg-neutral-900 px-3 py-2 text-xs text-white disabled:opacity-50"
                 disabled={pending}
                 onClick={onClaim}
@@ -309,6 +311,7 @@ function RegistrationForm({
       <label className="block text-sm">
         <span className="mb-2 block text-neutral-500">出战学员</span>
         <select
+          data-testid="pvp-student"
           className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
           value={studentId ?? ''}
           onChange={(event) => onStudentChange(Number(event.target.value))}
@@ -329,6 +332,7 @@ function RegistrationForm({
               className="flex items-center gap-2 rounded border border-neutral-200 px-3 py-2 text-sm"
             >
               <input
+                data-testid={`pvp-problem-${problem.id}`}
                 type="checkbox"
                 checked={problemIds.includes(problem.id)}
                 disabled={!problemIds.includes(problem.id) && problemIds.length >= 2}
@@ -349,6 +353,7 @@ function RegistrationForm({
       </fieldset>
       <button
         type="button"
+        data-testid="pvp-register"
         className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50"
         disabled={studentId === undefined || pending}
         onClick={onSubmit}
@@ -356,7 +361,7 @@ function RegistrationForm({
         {pending ? '报名中…' : '提交报名'}
       </button>
       {error !== undefined && error !== null && (
-        <p className="text-sm text-red-600">
+        <p data-testid="pvp-error" className="text-sm text-red-600">
           {error instanceof ApiCallError && error.code === 'INSUFFICIENT_RESOURCE'
             ? '报名券不足。'
             : '报名失败，请检查资格与截止时间。'}
@@ -369,7 +374,7 @@ function RegistrationForm({
 function RegistrationView({ registration }: { registration: PvpRegistrationView }): JSX.Element {
   return (
     <div className="mt-5 border-t border-neutral-200 pt-4 text-sm">
-      <p className="font-medium text-green-700">已报名，快照已锁定</p>
+      <p data-testid="pvp-registered" className="font-medium text-green-700">已报名，快照已锁定</p>
       <p className="mt-2 text-neutral-600">
         出战：{registration.roster.map((student) => student.displayName).join('、')}
       </p>

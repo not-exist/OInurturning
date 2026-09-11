@@ -148,6 +148,7 @@ export function TrainingPage(): JSX.Element {
             {students.map((s) => (
               <button
                 key={s.id}
+                data-testid="train-student"
                 onClick={() => setStudentId(s.id)}
                 className={`rounded border px-3 py-1.5 text-sm ${
                   studentId === s.id
@@ -170,6 +171,7 @@ export function TrainingPage(): JSX.Element {
             {(['basic', 'directed', 'specialized'] as Tab[]).map((t) => (
               <button
                 key={t}
+                data-testid={`train-tab-${t}`}
                 onClick={() => setTab(t)}
                 className={`flex-1 rounded px-3 py-1.5 ${tab === t ? 'bg-white shadow' : ''}`}
               >
@@ -185,6 +187,7 @@ export function TrainingPage(): JSX.Element {
               </p>
               <button
                 className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
+                data-testid="train-run"
                 disabled={pending || Math.floor(chosen.stamina) < 1}
                 onClick={runBasic}
               >
@@ -202,6 +205,7 @@ export function TrainingPage(): JSX.Element {
                 {(Object.keys(DIMENSION_LABEL) as DimensionKey[]).map((d) => (
                   <button
                     key={d}
+                    data-testid={`train-dim-${d}`}
                     onClick={() => {
                       setDim(d);
                       setBookItemId('');
@@ -219,6 +223,7 @@ export function TrainingPage(): JSX.Element {
               <div>
                 <p className="mb-1 text-xs text-neutral-500">选择书籍（默认基础手册 {dim}）</p>
                 <select
+                  data-testid="train-book"
                   className="rounded border px-3 py-1.5 text-sm"
                   value={bookItemId}
                   onChange={(e) => setBookItemId(e.target.value)}
@@ -233,6 +238,7 @@ export function TrainingPage(): JSX.Element {
               </div>
               <button
                 className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
+                data-testid="train-run"
                 disabled={pending || Math.floor(chosen.stamina) < 1}
                 onClick={runDirected}
               >
@@ -270,6 +276,7 @@ export function TrainingPage(): JSX.Element {
               )}
               <button
                 className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
+                data-testid="train-run"
                 disabled={pending || problemId == null || Math.floor(chosen.stamina) < 1}
                 onClick={runSpecialized}
               >
@@ -279,7 +286,7 @@ export function TrainingPage(): JSX.Element {
           )}
 
           {msg && (
-            <div className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div data-testid="train-msg" className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {msg}
             </div>
           )}
@@ -287,7 +294,7 @@ export function TrainingPage(): JSX.Element {
       )}
 
       {result && (
-        <section className="rounded border border-green-200 bg-green-50 p-4">
+        <section data-testid="train-result" className="rounded border border-green-200 bg-green-50 p-4">
           <h3 className="mb-1 font-semibold text-green-800">训练完成</h3>
           <p className="text-sm text-green-800">
             {result.studentName}：{DIMENSION_LABEL[result.dim]} +{roundDelta(result.delta)} · 消耗{' '}

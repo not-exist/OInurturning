@@ -49,7 +49,7 @@ export function SettingsPage(): JSX.Element {
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <section className="rounded border bg-white p-4">
+      <section data-testid="settings-me" className="rounded border bg-white p-4">
         <h2 className="mb-3 font-semibold">账户信息</h2>
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
           <dt className="text-neutral-500">用户 ID</dt>
@@ -71,6 +71,7 @@ export function SettingsPage(): JSX.Element {
         <h2 className="mb-3 font-semibold">修改密码</h2>
         <form onSubmit={onChange} className="space-y-2 text-sm">
           <input
+            data-testid="pwd-old"
             name="oldPassword"
             type="password"
             required
@@ -78,6 +79,7 @@ export function SettingsPage(): JSX.Element {
             className="w-full rounded border px-3 py-2"
           />
           <input
+            data-testid="pwd-new"
             name="newPassword"
             type="password"
             required
@@ -87,13 +89,14 @@ export function SettingsPage(): JSX.Element {
             className="w-full rounded border px-3 py-2"
           />
           <input
+            data-testid="pwd-confirm"
             name="confirm"
             type="password"
             required
             placeholder="确认新密码"
             className="w-full rounded border px-3 py-2"
           />
-          <button className="rounded bg-neutral-900 px-4 py-2 text-white">保存</button>
+          <button data-testid="pwd-save" className="rounded bg-neutral-900 px-4 py-2 text-white">保存</button>
         </form>
       </section>
 
@@ -108,17 +111,18 @@ export function SettingsPage(): JSX.Element {
           className="flex gap-2 text-sm"
         >
           <input
+            data-testid="deactivate-password"
             name="password"
             type="password"
             required
             placeholder="输入密码确认注销"
             className="flex-1 rounded border px-3 py-2"
           />
-          <button className="rounded bg-red-600 px-4 py-2 text-white">注销账户</button>
+          <button data-testid="deactivate-submit" className="rounded bg-red-600 px-4 py-2 text-white">注销账户</button>
         </form>
       </section>
 
-      {msg && <p className="text-sm text-red-600">{msg}</p>}
+      {msg && <p data-testid="settings-msg" className="text-sm text-red-600">{msg}</p>}
     </div>
   );
 }

@@ -12,6 +12,8 @@
     "migrate": "prisma migrate deploy",
     "generate": "prisma generate",
     "test": "vitest run",
+    "test:unit": "vitest run --exclude=\"**/*.e2e.test.ts\"",
+    "e2e:seed": "node --import tsx src/scripts/e2e-seed.ts",
     "lint": "eslint src/ tests/",
     "typecheck": "tsc --noEmit"
   },
