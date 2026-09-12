@@ -1,7 +1,7 @@
 # OInurturning 运维手册（M5 T5.4 上线检查单）
 
 > 版本：v0.1（2026-09-09）｜配套：`deploy/`（compose/Dockerfile/backup.sh）、`.env.example`、TECH-DESIGN §9/§10。
-> 本文是**上线执行文档**：给出每项检查的可执行命令与通过标准；浏览器/Docker 冒烟见 ROADMAP 部署窗口约定。
+> 本文是**上线执行文档**：给出每项检查的可执行命令与通过标准；浏览器/Docker 冒烟需在部署窗口执行。
 
 ---
 
@@ -41,7 +41,7 @@ docker compose ps          # 三容器 healthy/Up
 | 12 | 安全响应头 | nginx 四头齐全（nosniff/XFO DENY/Referrer-Policy/CSP） | `curl -sI localhost/ \| grep -i 'x-content\|x-frame\|referrer\|content-security'` |
 | 13 | 上传/体积限制 | nginx `client_max_body_size 1m`、express json 256kb | nginx.conf / index.ts |
 | 14 | 探活与重启 | 三容器 `restart: unless-stopped` | `docker compose ps` |
-| 15 | 浏览器冒烟 | 注册→登录→各主页面/战报走查通过 | 部署窗口人工走查（ROADMAP） |
+| 15 | 浏览器冒烟 | 注册→登录→各主页面/战报走查通过 | 部署窗口人工走查 |
 
 ## 2. 首次上线顺序
 

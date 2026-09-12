@@ -1,7 +1,7 @@
 # OInurturning 技术架构设计（TECH-DESIGN）
 
 > 版本：v0.1（2026-08-26）
-> 上游依据：`docs/GAME-DESIGN.md` v0.1（唯一权威规格，下称 GAME-DESIGN）及根目录 `InitPlan` 背景草案。本文落实其 §17 技术要点、支撑 §1–§16 全部玩法系统，并为 §18 里程碑给出验证策略。
+> 上游依据：`docs/GAME-DESIGN.md` v0.1（唯一权威规格，下称 GAME-DESIGN）及早期策划背景草案。本文落实其 §17 技术要点、支撑 §1–§16 全部玩法系统，并为 §18 里程碑给出验证策略。
 > 约定：正文中文、标识符英文；**一切玩法数值一律以 `docs/data/*.yaml` 与 `docs/systems/*.md` 为准，本文只引用配置键名、不复述数值**。技术侧常量（bcrypt cost、JWT TTL 等）不属于玩法数值，在本文给出建议值。
 
 ## 目录
@@ -71,11 +71,9 @@ OInurturning/
 ├── tsconfig.base.json            # 全仓共享 TS 编译选项（strict、NodeNext 等）
 ├── .env.example                  # 环境变量模板（对应 §10.2 清单）
 ├── docker-compose.yml            # 本地开发编排（mysql only，api/web 跑在本机）
-├── InitPlan                      # 原始策划草案（存档，不再演进）
 ├── docs/
 │   ├── GAME-DESIGN.md            # 游戏规划总纲（唯一权威规格）
 │   ├── TECH-DESIGN.md            # 本文
-│   ├── ROADMAP.md                # 开发里程碑排期（规划中）
 │   ├── systems/*.md              # 分系统细则（公式常数、模拟规则等）
 │   └── data/*.yaml               # 运行时配置源：talents/items/problems/events/stages/economy
 ├── apps/
@@ -1649,7 +1647,7 @@ CI 顺序：`pnpm -r lint → typecheck → unit → integration`；集成任务
 | M4 | 出题对决、PVP 锦标赛全生命周期（报名→懒推进→对阵树→发奖）、管理员工具 | 对决计分规则表驱动测试（含考察出题质量/四类平局分流）；淘汰赛轮转含奇数轮空集成测；USER 打 admin 全 403 矩阵；审计留痕断言 |
 | M5 | economy 收支模拟脚本 + 数值平衡打磨 + 上线 | `scripts/sim-economy.ts` 输出中期玩家周收支落在 GAME-DESIGN §16 目标区间；机器读取使用 `pnpm --silent sim:economy -- --json`，避免 pnpm lifecycle banner 混入 stdout；接口冒烟压测（简单并发脚本）即可 |
 
-每个里程碑收尾产出：可运行的 compose 环境 + 通过 CI 的测试套件 + 更新 ROADMAP.md 的验收记录。
+每个里程碑收尾产出：可运行的 compose 环境 + 通过 CI 的测试套件 + 更新相关设计与运维文档的验收记录。
 
 ---
 
