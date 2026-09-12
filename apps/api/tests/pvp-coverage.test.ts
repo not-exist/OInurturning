@@ -228,7 +228,7 @@ describe('pvp coverage：奖励与认领 HTTP', () => {
     expect(after.money - before.money).toBe(500);
     expect(after.reputation - before.reputation).toBe(10);
     const tea = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: winner.userId, itemId: 'milk-tea' } } });
-    expect(tea?.quantity).toBe(2);
+    expect(tea?.quantity).toBe(4); // 开局包×2 + 奖品×2
     const log = await prisma.reputationLog.findFirstOrThrow({ where: { userId: winner.userId, reason: { startsWith: `PVP_PRIZE:${tournament.id}:` } } });
     expect(log.delta).toBe(10);
   });

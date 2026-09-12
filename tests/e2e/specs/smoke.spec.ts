@@ -3,20 +3,20 @@ import { registerUser, loginViaUI, readAdminAccount } from '../fixtures';
 
 /** 冒烟：新用户遍历全部页面无崩溃、无加载失败；管理员页可开。 */
 test.describe('冒烟', () => {
-  test('新用户所有页面均可渲染（空态）', async ({ page, request }) => {
+  test('新用户所有页面均可渲染（开局包态）', async ({ page, request }) => {
     const account = await registerUser(request, 'smoke');
     await loginViaUI(page, account.username, account.password);
 
     const routes: [string, string][] = [
       ['/', '欢迎回来，教练'],
-      ['/students', '名下还没有学员'],
-      ['/training', '还没有学员'],
-      ['/backpack', '背包空空如也'],
+      ['/students', '学员管理'],
+      ['/training', '选择学员'],
+      ['/backpack', '背包'],
       ['/academy', '高级学院'],
-      ['/academy/lecture', '还没有可以讲课的学员'],
-      ['/problem-library', '还没有可以出题的学员'],
-      ['/adventure', '还没有可以历练的学员'],
-      ['/story', '还没有可以出战的学员'],
+      ['/academy/lecture', '讲课'],
+      ['/problem-library', '出题题库'],
+      ['/adventure', '历练'],
+      ['/story', '剧情模式'],
       ['/pvp', 'PVP 锦标赛'],
       ['/settings', '账户信息'],
     ];

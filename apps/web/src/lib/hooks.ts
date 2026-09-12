@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   ContestRecordView,
   DimensionKey,
+  MeView,
   QualityTier,
   Rarity,
   StudentView,
@@ -76,6 +78,8 @@ export interface TrainingResult {
   rareGains: RareGain[];
   cost: number;
   staminaAfter: number;
+  /** 同一事务内落库的训练记录 id（GET /api/training/logs 可查） */
+  logId: number;
 }
 
 export interface AdventureChoiceView {
@@ -368,6 +372,165 @@ export function round(v: number): number {
   return Math.round(v);
 }
 
+/** 当前时间的 tick（倒计时展示用，缺省每秒刷新） */
+export function useNow(intervalMs = 1000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(t);
+  }, [intervalMs]);
+  return now;
+}
+
+// ---------------------------------------------------------------------------
+// 当前用户与总览
+// ---------------------------------------------------------------------------
+
+/** 当前用户快照（顶栏钱/声誉展示用；各 mutation 成功后统一失效 ['me']） */
+export function useMe() {
+  return useQuery({
+    queryKey: ['me'],
+    queryFn: () => apiFetch<MeView>('/api/users/me'),
+  });
+}
+
+export type ChecklistStepId = 'train' | 'lecture' | 'adventure' | 'story' | 'recruit3';
+
+export interface ChecklistStepView {
+  id: ChecklistStepId;
+  label: string;
+  hint: string;
+  done: boolean;
+}
+
+export interface ChecklistView {
+  steps: ChecklistStepView[];
+  doneCount: number;
+  total: number;
+  claimed: boolean;
+  rewardBadge: string;
+}
+
+export interface OverviewStoryView {
+  clearedStages: number;
+  totalStages: number;
+  nextStage: { stageKey: string; name: string; chapter: string } | null;
+}
+
+export interface OverviewPoolView {
+  count: number;
+  refreshPrice: number;
+  freeRefreshAt: string;
+}
+
+export interface ContestRecordSummary {
+  id: string;
+  type: string;
+  format: string;
+  stageKey: string | null;
+  ngLevel: number | null;
+  createdAt: string;
+}
+
+export interface OverviewRecentView {
+  training: TrainingLogView[];
+  lectures: LectureResultView[];
+  adventures: AdventureLogView[];
+  contests: ContestRecordSummary[];
+}
+
+export interface OverviewView {
+  me: { money: number; reputation: number; onboardedAt: string | null };
+  students: { total: number; items: StudentView[] };
+  story: OverviewStoryView;
+  pool: OverviewPoolView;
+  recent: OverviewRecentView;
+  announcements: AnnouncementView[];
+  checklist: ChecklistView;
+}
+
+export function useOverview() {
+  return useQuery({
+    queryKey: ['overview'],
+    queryFn: () => apiFetch<OverviewView>('/api/overview'),
+  });
+}
+
+export function useClaimChecklist() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ claimed: boolean; already: boolean; badge: string }>(
+        '/api/overview/checklist/claim',
+        { method: 'POST' },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 训练记录
+// ---------------------------------------------------------------------------
+
+export interface TrainingLogView {
+  id: number;
+  studentId: number | null;
+  studentName: string;
+  kind: 'basic' | 'directed' | 'specialized';
+  dim: DimensionKey;
+  delta: number;
+  rareGains: RareGain[];
+  cost: number;
+  staminaAfter: number;
+  bookItemId: string | null;
+  problemId: number | null;
+  createdAt: string;
+}
+
+export interface TrainingLogPage {
+  items: TrainingLogView[];
+  nextCursor: number | null;
+}
+
+export interface TrainingLogFilters {
+  studentId?: number;
+  kind?: 'basic' | 'directed' | 'specialized';
+  limit?: number;
+  cursor?: number;
+}
+
+export const TRAINING_KIND_LABEL: Record<TrainingLogView['kind'], string> = {
+  basic: '基础',
+  directed: '定向',
+  specialized: '专项',
+};
+
+export function useTrainingLogs(filters: TrainingLogFilters = {}) {
+  return useQuery({
+    queryKey: [
+      'training-logs',
+      filters.studentId ?? null,
+      filters.kind ?? null,
+      filters.limit ?? null,
+      filters.cursor ?? null,
+    ],
+    // 翻页时保留上一页，LogsList 自行拼接累积
+    placeholderData: (prev) => prev,
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (filters.studentId !== undefined) p.set('studentId', String(filters.studentId));
+      if (filters.kind !== undefined) p.set('kind', filters.kind);
+      if (filters.limit !== undefined) p.set('limit', String(filters.limit));
+      if (filters.cursor !== undefined) p.set('cursor', String(filters.cursor));
+      const q = p.toString();
+      return apiFetch<TrainingLogPage>(`/api/training/logs${q ? `?${q}` : ''}`);
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 学员
 // ---------------------------------------------------------------------------
@@ -399,6 +562,7 @@ export function useRenameStudent() {
       qc.invalidateQueries({ queryKey: ['student', s.id] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -413,6 +577,7 @@ export function useDismissStudent() {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -444,6 +609,7 @@ export function useRefreshPool() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['academy'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -460,6 +626,7 @@ export function useRecruit() {
       qc.invalidateQueries({ queryKey: ['academy'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -499,6 +666,7 @@ export function useTeachLecture() {
       qc.invalidateQueries({ queryKey: ['lecture-logs'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -525,6 +693,8 @@ export function useUseItem() {
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['items'] });
       qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
       if ('id' in result) qc.invalidateQueries({ queryKey: ['student', result.id] });
     },
   });
@@ -549,6 +719,8 @@ export function useDrawAdventure() {
       qc.invalidateQueries({ queryKey: ['adventure-logs'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -575,6 +747,8 @@ export function useChooseAdventure() {
       qc.invalidateQueries({ queryKey: ['adventure-logs'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -618,6 +792,7 @@ export function useCreateProblem() {
       qc.invalidateQueries({ queryKey: ['problems'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -785,6 +960,7 @@ export function useClaimPvpReward() {
       qc.invalidateQueries({ queryKey: ['pvp-rewards', tournamentId] });
       qc.invalidateQueries({ queryKey: ['items'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }
@@ -824,6 +1000,8 @@ export function useBasicTrain() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['training-logs'] });
     },
   });
 }
@@ -840,6 +1018,8 @@ export function useDirectedTrain() {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['items'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['training-logs'] });
     },
   });
 }
@@ -856,6 +1036,8 @@ export function useSpecializedTrain() {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['problems'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['training-logs'] });
     },
   });
 }
@@ -937,6 +1119,7 @@ export function useEnterStoryStage() {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['items'] });
       qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
       return result;
     },
   });

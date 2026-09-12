@@ -11,7 +11,8 @@ test.describe('学员管理', () => {
 
     await page.goto('/students');
     const cards = page.getByTestId('student-card');
-    await expect(cards).toHaveCount(1);
+    // 开局包自带 2 学员 + 本测招募 1 人
+    await expect(cards).toHaveCount(3);
     const text = (await cards.first().innerText()) ?? '';
     expect(parseV(text)).not.toBeNull();
 
@@ -53,11 +54,15 @@ test.describe('学员管理', () => {
     const secondId = await recruitStudent(request, account.accessToken);
     await loginViaUI(page, account.username, account.password);
 
+    // 开局包人数会变：记相对值，开除后应减一
+    await page.goto('/students');
+    const before = await page.getByTestId('student-card').count();
+
     await page.goto(`/students/${secondId}`);
     await page.getByTestId('dismiss-open').click();
     await expect(page.getByTestId('dismiss-confirm')).toBeVisible();
     await page.getByTestId('dismiss-confirm').click();
     await page.waitForURL('/students');
-    await expect(page.getByTestId('student-card')).toHaveCount(1);
+    await expect(page.getByTestId('student-card')).toHaveCount(before - 1);
   });
 });

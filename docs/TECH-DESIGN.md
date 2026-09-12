@@ -1157,6 +1157,14 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | 47 | POST /api/admin/config/reload | 管理 | — | 重跑 §4 导入管线并热替换内存缓存 | 运维换配置 |
 | 48 | GET /api/health | 公开 | — | { ok, uptime, configVersion }；供容器 healthcheck | 运维探活 |
 
+**总览与训练记录**
+
+| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
+|---|---|---|---|---|---|
+| 49 | GET /api/overview | 登录 | — | 钱包/学员 TOP5/剧情进度/招募池/最近动态/公告/checklist 聚合 | 总览页 |
+| 50 | POST /api/overview/checklist/claim | 登录 | — | 5 步全完成颁发 rookie-done 徽章；事务内重算，重复领取幂等 200（already） | 开局任务领奖 |
+| 51 | GET /api/training/logs | 登录 | ?studentId=&kind=&limit=&cursor=（id 倒序游标） | TrainingLog 分页（含学员名快照/用书/选题） | 训练记录 |
+
 ---
 ## 6. 行动时钟与懒结算
 

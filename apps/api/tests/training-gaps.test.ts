@@ -101,6 +101,7 @@ describe('training gaps', () => {
 
   it('费用锚点：directed N=3 → 174，实扣一致', async () => {
     const user = await register();
+    await prisma.student.deleteMany({ where: { userId: user.userId } }); // 清开局包 2 学员，还原 N=3
     const students = [await makeStudent(user.userId), await makeStudent(user.userId), await makeStudent(user.userId)];
     await prisma.userItem.create({ data: { userId: user.userId, itemId: 'book-ds-green', quantity: 1 } });
     const before = (await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })).money;

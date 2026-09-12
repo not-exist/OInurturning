@@ -21,6 +21,21 @@ const SpecializedBodySchema = z.object({
   problemId: z.number().int().positive(),
 });
 
+const LogsQuerySchema = z.object({
+  studentId: z.coerce.number().int().positive().optional(),
+  kind: z.enum(['basic', 'directed', 'specialized']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.coerce.number().int().positive().optional(),
+});
+
+trainingRouter.get('/logs', requireAuth, async (req, res, next) => {
+  try {
+    const parsed = LogsQuerySchema.safeParse(req.query);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    res.json({ ok: true, data: await svc.listTrainingLogs(req.user!.id, parsed.data) });
+  } catch (e) { next(e); }
+});
+
 trainingRouter.post('/basic', requireAuth, async (req, res, next) => {
   try {
     const parsed = StudentIdSchema.safeParse(req.body);

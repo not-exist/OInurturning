@@ -118,6 +118,7 @@ describe('POST /api/items/use 正例', () => {
 
   it('milk-tea：心态 +2（首个无日限），日限 2 杯', async () => {
     const u = await createAuthedUser();
+    await prisma.userItem.deleteMany({ where: { userId: u.userId } }); // 清开局包库存（自带奶茶×2）
     const id = await createStudent(u.userId, { mindset: 2 });
     await giveItem(u.userId, 'milk-tea', 3);
 
@@ -319,6 +320,7 @@ describe('POST /api/items/use 限制类反例', () => {
 
   it('milk-tea 日限跨 04:00 日界重置（counters.milkTeaKey 比对）', async () => {
     const u = await createAuthedUser();
+    await prisma.userItem.deleteMany({ where: { userId: u.userId } }); // 清开局包库存（自带奶茶×2）
     // 用晚于 04:00 的时刻构造，从而 dayKey 稳定；本轮使用后直接断言计数与键
     const id = await createStudent(u.userId, { mindset: 0, counters: { milkTea: 2, milkTeaKey: '1900-01-01' } });
     await giveItem(u.userId, 'milk-tea', 1);

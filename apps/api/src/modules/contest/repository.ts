@@ -157,6 +157,37 @@ export async function getStoryProgress(
   return row === null ? null : toProgressView(row);
 }
 
+/** 总览「最近动态」用的战报摘要（瘦身：不含 report/inputSnapshot 大 JSON） */
+export interface ContestRecordSummary {
+  id: string;
+  type: ContestRecordType;
+  format: ContestFormat;
+  stageKey: string | null;
+  ngLevel: number | null;
+  createdAt: string;
+}
+
+export async function listRecentContestRecords(
+  userId: number,
+  limit = 5,
+  db: DbClient = prisma,
+): Promise<ContestRecordSummary[]> {
+  const rows = await db.contestRecord.findMany({
+    where: { userId },
+    select: { id: true, type: true, format: true, stageKey: true, ngLevel: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(Math.max(limit, 1), 20),
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    type: row.type as ContestRecordType,
+    format: row.format as ContestFormat,
+    stageKey: row.stageKey,
+    ngLevel: row.ngLevel,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
 export async function upsertStoryProgress(
   input: UpsertStoryProgressInput,
   db: DbClient = prisma,

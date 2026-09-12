@@ -194,6 +194,7 @@ describe('adventure gaps：选项门槛', () => {
   it('cost_money 缺钱 → 409；足额 → 净收支到账', async () => {
     await useEvents(eventYaml('evt-gap-cost', 'G3', COST_CHOICES));
     const user = await register();
+    await prisma.user.update({ where: { id: user.userId }, data: { money: 0 } }); // 开局包 1000 金归零，还原缺钱前置
     const student = await makeStudent(user.userId);
     const auth = { Authorization: `Bearer ${user.token}` };
     const drawn = unwrapOk<{ id: number }>(
@@ -228,6 +229,7 @@ describe('adventure gaps：选项门槛', () => {
 describe('adventure gaps：幂等与日志', () => {
   it('RESOLVED 后重选 → 幂等 completed，不重发奖励', async () => {
     const user = await register();
+    await prisma.user.update({ where: { id: user.userId }, data: { money: 0 } }); // 开局包 1000 金归零（+10 奖励绝对断言口径）
     const student = await makeStudent(user.userId);
     const auth = { Authorization: `Bearer ${user.token}` };
     const drawn = unwrapOk<{ id: number }>(

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './styles/app.css';
 import { RequireAuth } from './app/guards';
 import { Layout } from './app/App';
+import { OverviewPage } from './features/overview/OverviewPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { SettingsPage } from './features/settings/SettingsPage';
@@ -32,10 +33,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/register" element={<RegisterPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<Layout />}>
-              <Route
-                path="/"
-                element={<p className="text-neutral-500">欢迎回来，教练。请从左侧选择功能。</p>}
-              />
+              <Route path="/" element={<OverviewPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/students" element={<StudentsPage />} />
               <Route path="/students/:id" element={<StudentDetailPage />} />

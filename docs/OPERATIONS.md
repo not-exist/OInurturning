@@ -122,3 +122,20 @@ docker compose restart api     # 只重启 api（配置 yaml 改动后）
 docker compose down            # 停（不删卷；删数据用 down -v，谨慎）
 docker compose exec mysql sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'
 ```
+
+## 9. 开局包回填（存量裸号）
+
+开局包上线前已存在的账号（`onboardedAt` 为空）不会自动获得钱/声誉/学员/道具/招募池，用回填脚本补发（与注册同一发放函数，口径一致）：
+
+```bash
+# 先 dry-run 看影响面（只读，不写库）
+pnpm -C apps/api onboarding:backfill --dry-run
+
+# 正式回填（可加 --limit N 分批；缺省 10000）
+pnpm -C apps/api onboarding:backfill
+pnpm -C apps/api onboarding:backfill --limit 500
+```
+
+- 目标：`onboardedAt` 为空且未注销（`deletedAt` 为空）的用户；已发放/已注销自动跳过；
+- 幂等：按 `onboardedAt` 标记，重复执行不翻倍（钱/声誉走 increment、道具走 upsert-increment）；
+- 逐用户独立事务：单用户失败记日志继续，不影响其他用户，事后重跑即可补齐。

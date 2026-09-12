@@ -52,6 +52,7 @@ model User {
   tokenVersion  Int       @default(0)
   bannedAt      DateTime?
   deletedAt     DateTime? // 软删标记：注销账户后保留业务数据，登录/refresh/鉴权均拦截（auth §注销）
+  onboardedAt   DateTime? // 开局包发放标记：注册事务/回填脚本发放后落库，重复发放幂等键
   lastLoginAt   DateTime?
   lastSettledAt DateTime  @default(now())
   adventureIntelReady Boolean @default(false)
@@ -72,6 +73,7 @@ model User {
   announcements AdminAnnouncement[]
   pvpRegistrations PvpRegistration[]
   pvpRewardGrants PvpRewardGrant[]
+  trainingLogs TrainingLog[]
 
   @@map("users")
 }
@@ -167,6 +169,38 @@ model LectureLog {
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, studentId, createdAt])
+}
+
+enum TrainingKind {
+  BASIC
+  DIRECTED
+  SPECIALIZED
+}
+
+// 训练记录：每次训练在同一事务内落一行，与学员/道具/金钱变更同成功同回滚。
+// 学员被开除后记录保留（studentId 置空，studentName 快照可读）；problemId 为快照（无 FK，
+// 题库行可删）；rareGains 为 RareGain[]（stat/amount）。读路径：GET /api/training/logs
+// （studentId/kind 过滤 + id 游标分页）与总览 recent.training。
+model TrainingLog {
+  id           Int          @id @default(autoincrement())
+  userId       Int
+  studentId    Int?
+  studentName  String       @db.VarChar(24)
+  kind         TrainingKind
+  dim          String       @db.VarChar(8)
+  delta        Float
+  rareGains    Json         @default("[]")
+  cost         Int
+  staminaAfter Float
+  bookItemId   String?      @db.VarChar(64)
+  problemId    Int?
+  createdAt    DateTime     @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([userId, studentId, createdAt])
@@ -403,6 +437,7 @@ model Student {
   adventures       AdventureLog[]
   lectureLogs      LectureLog[]
   authoredProblems ProblemLibraryEntry[] @relation("ProblemAuthor")
+  trainingLogs     TrainingLog[]
 
   @@index([userId, status])
 }

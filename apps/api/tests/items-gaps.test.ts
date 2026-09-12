@@ -47,6 +47,7 @@ async function makeStudent(userId: number): Promise<{ id: number }> {
 describe('items gaps', () => {
   it('并发使用最后一件 → 恰其一成功，库存归零删行', async () => {
     const user = await register();
+    await prisma.userItem.deleteMany({ where: { userId: user.userId } }); // 清开局包库存（自带奶茶×2）
     const student = await makeStudent(user.userId);
     await prisma.userItem.create({ data: { userId: user.userId, itemId: 'milk-tea', quantity: 1 } });
     const auth = { Authorization: `Bearer ${user.token}` };
@@ -85,6 +86,7 @@ describe('items gaps', () => {
 
   it('空背包 → []；不可购买道具 price 为 null', async () => {
     const user = await register();
+    await prisma.userItem.deleteMany({ where: { userId: user.userId } }); // 清开局包库存，还原空背包前置
     const empty = unwrapOk<unknown[]>(
       await request(app).get('/api/items').set('Authorization', `Bearer ${user.token}`),
     );
@@ -98,6 +100,7 @@ describe('items gaps', () => {
 
   it('效果失败不扣道具：超日限后库存不变', async () => {
     const user = await register();
+    await prisma.userItem.deleteMany({ where: { userId: user.userId } }); // 清开局包库存（自带奶茶×2）
     const student = await makeStudent(user.userId);
     await prisma.userItem.create({ data: { userId: user.userId, itemId: 'milk-tea', quantity: 3 } });
     const auth = { Authorization: `Bearer ${user.token}` };

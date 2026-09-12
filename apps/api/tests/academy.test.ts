@@ -207,7 +207,7 @@ async function getPool(token: string): Promise<PoolViewBody> {
 describe('GET /api/academy/pool', () => {
   beforeEach(resetUsers);
 
-  it('首次访问建池：5 候选含 hint/attrs/talents/price；24h 内再访问不重生成', async () => {
+  it('注册预建池：5 候选含 hint/attrs/talents/price；24h 内再访问不重生成', async () => {
     const u = await createAuthedUser(0);
     const first = await getPool(u.token);
     expect(first.candidates).toHaveLength(5);
@@ -337,10 +337,10 @@ describe('POST /api/academy/recruit', () => {
     expect(after.candidates.find((c) => c.tempId === target.tempId)).toBeUndefined();
   });
 
-  it('已有 1 名在册学员时按 N=1 重算价（round(300×1.35)×mult）', async () => {
+  it('已有 3 名在册学员时按 N=3 重算价（round(300×1.35³)×mult）', async () => {
     const u = await createAuthedUser(10_000);
     const pool = await getPool(u.token);
-    // 先招一名 → N 变 1
+    // 先招一名 → N 变 3（开局包 2 + 新招 1）
     await request(app)
       .post('/api/academy/recruit')
       .set(auth(u.token))
@@ -349,7 +349,7 @@ describe('POST /api/academy/recruit', () => {
 
     const second = pool.candidates[1]!;
     const mult = { COMMON: 1.0, GOOD: 1.5, ELITE: 2.5, GENIUS: 5.0 }[second.qualityTier];
-    const expected = Math.round(405 * mult);
+    const expected = Math.round(738 * mult); // round(300×1.35³)=738
     const res = await request(app)
       .post('/api/academy/recruit')
       .set(auth(u.token))
@@ -368,7 +368,8 @@ describe('POST /api/academy/recruit', () => {
       .send({ tempId: pool.candidates[0]!.tempId });
     expect(res.status).toBe(409);
     expect(unwrapErr(res).code).toBe('INSUFFICIENT_RESOURCE');
-    expect(await prisma.student.count({ where: { userId: u.userId } })).toBe(0);
+    // 开局包 2 学员保留（招募失败不建第 3 人）
+    expect(await prisma.student.count({ where: { userId: u.userId } })).toBe(2);
     expect((await getPool(u.token)).candidates).toHaveLength(5);
   });
 

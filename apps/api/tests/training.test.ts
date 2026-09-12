@@ -158,13 +158,13 @@ describe('POST /api/training/basic', () => {
     const r = unwrapOk<HttpResult>(res);
     expect(DIM_KEYS).toContain(r.dim);
     expect(r.delta).toBeCloseTo(1.296, 6);
-    expect(r.cost).toBe(60); // N=1
+    expect(r.cost).toBe(70); // N=3（开局包 2 + 新建 1）：round(60×1.16)=70
     expect(r.staminaAfter).toBe(4); // 5 − 1
 
     const row = await studentRow(id);
     // 命中维：cur=10 +1.296 = 11.296
     expect(row[DIM_META[r.dim].column]).toBeCloseTo(11.296, 6);
-    expect(await userMoney(u.userId)).toBe(1000 - 60);
+    expect(await userMoney(u.userId)).toBe(1000 - 70);
   });
 
   it('体力 0 → 409 STATE_CONFLICT，不扣钱', async () => {
@@ -186,14 +186,14 @@ describe('POST /api/training/basic', () => {
     expect(unwrapErr(res).code).toBe('INSUFFICIENT_RESOURCE');
   });
 
-  it('费用 N=5 时 basic=79', async () => {
+  it('费用 N=7 时 basic=89', async () => {
     const u = await createAuthedUser(10000);
-    for (let i = 0; i < 4; i++) await createStudent(u.userId); // 4 + 目标 1 = 5 在册
+    for (let i = 0; i < 4; i++) await createStudent(u.userId); // 4 + 目标 1 + 开局包 2 = 7 在册
     const id = await createStudent(u.userId);
 
     const res = await request(app).post('/api/training/basic').set(auth(u.token)).send({ studentId: id });
     const r = unwrapOk<HttpResult>(res);
-    expect(r.cost).toBe(79);
+    expect(r.cost).toBe(89); // round(60×(1+0.08×6))=89
   });
 
   it('基础训练随机维种子可复现（service 层注入 mulberry32 同种子同结果）', async () => {
@@ -226,10 +226,10 @@ describe('POST /api/training/directed', () => {
     const r = unwrapOk<HttpResult>(res);
     expect(r.dim).toBe('DS');
     expect(r.delta).toBeCloseTo(2.43, 6);
-    expect(r.cost).toBe(150); // N=1
+    expect(r.cost).toBe(174); // N=3：round(150×1.16)=174
     expect((await studentRow(id)).ds).toBeCloseTo(12.43, 6);
     expect(await itemQuantity(u.userId, 'book-ds-green')).toBe(0); // 扣到 0 删行
-    expect(await userMoney(u.userId)).toBe(5000 - 150);
+    expect(await userMoney(u.userId)).toBe(5000 - 174);
   });
 
   it('缺书 → 409 INSUFFICIENT_RESOURCE，不扣钱不掉体力', async () => {
@@ -265,7 +265,7 @@ describe('POST /api/training/directed', () => {
     const r = unwrapOk<HttpResult>(res);
     expect(r.delta).toBe(0);
     expect((await studentRow(id)).ds).toBe(100);
-    expect(r.cost).toBe(150);
+    expect(r.cost).toBe(174); // N=3
     expect(await itemQuantity(u.userId, 'book-ds-green')).toBe(0); // 书仍耗
   });
 
@@ -295,11 +295,11 @@ describe('POST /api/training/specialized', () => {
     const r = unwrapOk<HttpResult>(res);
     expect(r.dim).toBe('DS');
     expect(r.delta).toBeCloseTo(3.1104, 6);
-    expect(r.cost).toBe(100); // N=1
+    expect(r.cost).toBe(116); // N=3：round(100×1.16)=116
     expect((await studentRow(id)).ds).toBeCloseTo(13.1104, 6);
     const p = await prisma.problemLibraryEntry.findUniqueOrThrow({ where: { id: pid } });
     expect(p.consumedAt).not.toBeNull();
-    expect(await userMoney(u.userId)).toBe(5000 - 100);
+    expect(await userMoney(u.userId)).toBe(5000 - 116);
   });
 
   it('题目已用 → 409 INSUFFICIENT_RESOURCE', async () => {

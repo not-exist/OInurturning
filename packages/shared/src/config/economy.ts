@@ -136,6 +136,34 @@ export const simulationConfigSchema = z
   .strict();
 export type SimulationConfig = z.infer<typeof simulationConfigSchema>;
 
+/**
+ * 新用户开局包（economy.yaml `onboarding` 分区，注册/回填的唯一数值源）。
+ * students 为固定品质序列（按序发放）；items 引用 items.yaml 的道具 id。
+ * 结构上 optional（兼容历史局部解析），但语义校验要求生产/测试配置必须 present。
+ */
+export const onboardingStudentSchema = z
+  .object({ quality: z.enum(ECONOMY_QUALITY_TIERS) })
+  .strict();
+export type OnboardingStudent = z.infer<typeof onboardingStudentSchema>;
+
+export const onboardingItemSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+    count: z.number().int().positive(),
+  })
+  .strict();
+export type OnboardingItem = z.infer<typeof onboardingItemSchema>;
+
+export const onboardingConfigSchema = z
+  .object({
+    money: z.number().int().nonnegative(),
+    reputation: z.number().int().nonnegative(),
+    students: z.array(onboardingStudentSchema).min(1).max(5),
+    items: z.array(onboardingItemSchema).max(10),
+  })
+  .strict();
+export type OnboardingConfig = z.infer<typeof onboardingConfigSchema>;
+
 export const economyConfigSchema = z
   .object({
     training: economyTrainingSchema,
@@ -144,6 +172,7 @@ export const economyConfigSchema = z
     // paths parse the complete shape before using it.
     lecture: z.union([lectureConfigSchema, z.record(z.unknown())]).optional(),
     simulation: simulationConfigSchema.optional(),
+    onboarding: onboardingConfigSchema.optional(),
   })
   .passthrough();
 export type EconomyConfig = z.infer<typeof economyConfigSchema>;
