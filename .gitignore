@@ -5,7 +5,6 @@ dist/
 .env.local
 coverage/
 apps/api/prisma/migrations/dev/
-.superpowers/
 test-results/
 playwright-report/
 playwright/.cache/

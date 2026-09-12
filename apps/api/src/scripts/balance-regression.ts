@@ -23,7 +23,7 @@ import { BOOK_MULT, QUALITY_MULT } from '../modules/training/gains.js';
 import { daysForSessions, sessionsToV, type StudentStats } from '../modules/economy/progression.js';
 
 /**
- * T5.2 数值平衡回归 CLI（docs/ROADMAP.md M5 T5.2）。
+ * T5.2 数值平衡回归 CLI（项目历史路线图 M5 T5.2）。
  * 两部分输出，全部确定性、无 DB、无随机：
  *  A. 训练耗时到各章正赛 recommended_level（即 GAME-DESIGN §6.2 通关锚点）的会话数与日历时长；
  *  B. 进阶石供给（剧情里程碑/NG+/PVP 默认/全服限量事件）vs 彩天赋需求（items.yaml 升阶消耗表）。
