@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import path from 'node:path';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../src/index.js';
+import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
 import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
 
@@ -12,7 +14,14 @@ import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
  * 剧情 clearCount>0、在册≥3 人。
  */
 const app: Express = createApp();
+const DOCS = path.resolve(import.meta.dirname, '../../../docs/data');
 let seq = 0;
+
+// 本文件断言 docs 口径（33 关/讲课档位/历练事件/招募价）：VITEST 默认只装 fixtures，
+// 其 economy 无 lecture.audience_tiers（讲课 500）且仅 1 关，故显式导入 docs。
+beforeAll(async () => {
+  await importConfigs({ configDir: DOCS });
+});
 
 async function register(): Promise<{ token: string; userId: number }> {
   seq += 1;

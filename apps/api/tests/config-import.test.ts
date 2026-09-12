@@ -586,7 +586,8 @@ talents:
     stack: 1
     description: 另一进程的 fixtures。
 `,
-      economy: BASE_ECONOMY,
+      // B 进程 items 仅 other-item：开局包引用同步改指，否则 rename-card 语义校验必挂
+      economy: BASE_ECONOMY.replace('{id: rename-card, count: 1}', '{id: other-item, count: 1}'),
     });
 
     await importConfigs({ configDir: dirA });

@@ -74,11 +74,12 @@ describe('training logs', () => {
       studentName: trainee!.name,
       kind: 'basic',
       dim: result.dim,
-      delta: result.delta,
       cost: result.cost,
       bookItemId: null,
       problemId: null,
     });
+    // MySQL FLOAT 回读（1.32496）≠ JS double 全精度：delta 近似比对
+    expect(page.items[0]!.delta).toBeCloseTo(result.delta, 5);
     expect(page.items[0]!.staminaAfter).toBeCloseTo(4, 2);
     expect(typeof page.items[0]!.createdAt).toBe('string');
   });

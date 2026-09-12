@@ -56,6 +56,7 @@ test.describe('学员管理', () => {
 
     // 开局包人数会变：记相对值，开除后应减一
     await page.goto('/students');
+    await expect(page.getByTestId('student-card').first()).toBeVisible();
     const before = await page.getByTestId('student-card').count();
 
     await page.goto(`/students/${secondId}`);
