@@ -1,5 +1,5 @@
-# e2e 测试：API 全链路旅程（supertest）+ 浏览器 e2e（Playwright）。
-# 每次 push/PR 全量运行。Playwright 用自带 webServer 拉起 API（oinur_e2e 库）与 web。
+# E2E gate: API journey (supertest) + browser e2e (Playwright).
+# Runs fully on every push/PR. Playwright webServer boots API (oinur_e2e db) and web.
 name: e2e
 
 on:
@@ -25,10 +25,10 @@ jobs:
           --health-timeout=5s
           --health-retries=10
     env:
-      # API 旅程库：vitest global-setup 硬编码重建 oinur_test，DATABASE_URL 须指向它
+      # Journey db: vitest global-setup hard-resets oinur_test, DATABASE_URL must point at it
       DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_test
       JWT_SECRET: ci-jwt-secret-0123456789abcdef-e2e-only
-      # Playwright 链路库：API 服务器 + e2e:seed 共用
+      # Playwright db: shared by the API server and e2e:seed
       E2E_DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_e2e
       E2E_JWT_SECRET: ci-e2e-jwt-secret-0123456789abcdef-only
     steps:
@@ -42,19 +42,19 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -C apps/api generate
-      - name: 授权测试用户并创建 e2e 库
+      - name: Grant test user and create e2e database
         run: |
           mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
           mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS oinur_e2e;"
-      - name: 迁移 e2e 库
+      - name: Migrate e2e database
         run: DATABASE_URL="$E2E_DATABASE_URL" pnpm -C apps/api migrate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e:typecheck
-      - name: API 全链路旅程
+      - name: API journey
         run: pnpm -C apps/api exec vitest run tests/journey-full.e2e.test.ts --reporter=default --reporter=github-actions 2>&1 | tee journey.log; test ${PIPESTATUS[0]} -eq 0
-      - name: 浏览器 e2e
+      - name: Browser e2e
         run: pnpm e2e
-      - name: 采集服务启动日志
+      - name: Capture service boot logs
         if: failure()
         run: |
           cd tests/e2e
@@ -75,38 +75,38 @@ jobs:
           pkill -f 'vite' 2>/dev/null || true
           { echo '### dual-poll.log'; cat /tmp/dual-poll.log; echo '### api-boot.log (tail 50)'; tail -n 50 /tmp/api-boot.log; echo '### web-boot.log (tail 30)'; tail -n 30 /tmp/web-boot.log; } > /tmp/boot-capture.txt
           cat /tmp/boot-capture.txt
-          python3 -c "print('::error::服务启动采集（截断 6KB）：%0A' + open('/tmp/boot-capture.txt', errors='replace').read()[-6000:].replace(chr(10), '%0A'))"
-      - name: 定位-register
+          python3 -c "print('::error::Service boot capture (truncated to 6KB):%0A' + open('/tmp/boot-capture.txt', errors='replace').read()[-6000:].replace(chr(10), '%0A'))"
+      - name: locate-register
         if: failure()
         run: grep -q 'JSTAGE:register' journey.log || exit 1
-      - name: 定位-recruit
+      - name: locate-recruit
         if: failure()
         run: grep -q 'JSTAGE:recruit' journey.log || exit 1
-      - name: 定位-train
+      - name: locate-train
         if: failure()
         run: grep -q 'JSTAGE:train' journey.log || exit 1
-      - name: 定位-story
+      - name: locate-story
         if: failure()
         run: grep -q 'JSTAGE:story' journey.log || exit 1
-      - name: 定位-problem
+      - name: locate-problem
         if: failure()
         run: grep -q 'JSTAGE:problem' journey.log || exit 1
-      - name: 定位-lecture
+      - name: locate-lecture
         if: failure()
         run: grep -q 'JSTAGE:lecture' journey.log || exit 1
-      - name: 定位-adventure
+      - name: locate-adventure
         if: failure()
         run: grep -q 'JSTAGE:adventure' journey.log || exit 1
-      - name: 定位-social
+      - name: locate-social
         if: failure()
         run: grep -q 'JSTAGE:social' journey.log || exit 1
-      - name: 定位-pvp
+      - name: locate-pvp
         if: failure()
         run: grep -q 'JSTAGE:pvp' journey.log || exit 1
-      - name: 定位-account
+      - name: locate-account
         if: failure()
         run: grep -q 'JSTAGE:account' journey.log || exit 1
-      - name: 上传失败现场
+      - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
