@@ -66,6 +66,24 @@ recruitment:
   # 刷新价序列：100 → 150 → 225 → 338 → 506 → 759 → 800(封顶)
 
 # ----------------------------------------------------------------------
+# 新用户开局包（注册即发放，存量裸号由 grant-onboarding-backfill.ts 回填）
+# 设计论证：money=1000 覆盖「招第 3 人（N=2 common 价 547）+ 5~8 次基础训练 + 1 次刷新」，
+#   恰好跑通一轮循环；reputation=10 使开除 COMMON（−5）有真实代价感，
+#   同时 rep_mult=1.02 对讲课收入几乎无扰动；GOOD（V≈14）可打 CSP-J 前两关
+#   （recommended 10/13）并落在入门组讲课强接窗内，COMMON 作第二行动点。
+#   students 按序发放固定品质；items.id 须在 items.yaml 存在（启动语义校验）。
+# ----------------------------------------------------------------------
+onboarding:
+  money: 1000
+  reputation: 10
+  students:
+    - { quality: good }
+    - { quality: common }
+  items:
+    - { id: book-ds-yellow, count: 1 }
+    - { id: milk-tea, count: 2 }
+
+# ----------------------------------------------------------------------
 # 讲课收入（GAME-DESIGN §12，主收入来源）
 # 报酬公式：pay = round(base_money × rep_mult × overflow_mult)
 # ----------------------------------------------------------------------

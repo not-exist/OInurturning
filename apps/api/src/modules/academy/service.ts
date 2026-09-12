@@ -23,7 +23,8 @@ import {
  * - 池行在写事务内 SELECT … FOR UPDATE 串行化，防并发重复招募/重复刷新。
  */
 
-const POOL_SIZE = 5;
+/** 招募候选池容量（M1-R1：5 人；开局包预建池复用同一常量） */
+export const POOL_SIZE = 5;
 const HOUR_MS = 3_600_000;
 
 function recruitmentCfg() {

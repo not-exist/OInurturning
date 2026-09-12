@@ -25,6 +25,8 @@ import {
  *   单事务内 条件 UPDATE 扣钱+体力 → 主收益落 dim → 附带成长 → 消耗书/题 → 返回 TrainingResult；
  * - 所有钱/体力/道具变动一律走「条件 UPDATE + 事务」（TECH-DESIGN §5），任一失败整体回滚；
  * - 定向需要 bookItemId（六维书，匹配目标维）；专项需要本人未消耗的 ProblemLibraryEntry。
+ * - 每次成功训练在同事务内写 TrainingLog（含耗材快照），读路径 listTrainingLogs；
+ *   学员被开除后记录保留（studentId 置空 + studentName 快照）。
  */
 
 function requireConfig() {
@@ -62,6 +64,88 @@ export interface TrainingResult {
   rareGains: RareGain[];
   cost: number;
   staminaAfter: number;
+  /** 同一事务内落库的训练记录 id（GET /api/training/logs 可查） */
+  logId: number;
+}
+
+/** API 层训练种别（小写）↔ Prisma 枚举（大写）的双向映射 */
+const KIND_TO_ENUM = { basic: 'BASIC', directed: 'DIRECTED', specialized: 'SPECIALIZED' } as const;
+const ENUM_TO_KIND = { BASIC: 'basic', DIRECTED: 'directed', SPECIALIZED: 'specialized' } as const;
+export type TrainingLogKindFilter = keyof typeof KIND_TO_ENUM;
+
+export interface TrainingLogView {
+  id: number;
+  /** 学员行硬删后 SetNull 置空（开除是软删，保留关联），凭 studentName 快照可读 */
+  studentId: number | null;
+  studentName: string;
+  kind: TrainingLogKindFilter;
+  dim: DimensionKey;
+  delta: number;
+  rareGains: RareGain[];
+  cost: number;
+  staminaAfter: number;
+  bookItemId: string | null;
+  problemId: number | null;
+  createdAt: string;
+}
+
+export interface TrainingLogPage {
+  items: TrainingLogView[];
+  /** id 游标（倒序）：翻页传 cursor=nextCursor；null 表示到底 */
+  nextCursor: number | null;
+}
+
+function toLogView(row: {
+  id: number;
+  studentId: number | null;
+  studentName: string;
+  kind: keyof typeof ENUM_TO_KIND;
+  dim: string;
+  delta: number;
+  rareGains: Prisma.JsonValue;
+  cost: number;
+  staminaAfter: number;
+  bookItemId: string | null;
+  problemId: number | null;
+  createdAt: Date;
+}): TrainingLogView {
+  return {
+    id: row.id,
+    studentId: row.studentId,
+    studentName: row.studentName,
+    kind: ENUM_TO_KIND[row.kind],
+    dim: row.dim as DimensionKey,
+    delta: row.delta,
+    rareGains: row.rareGains as unknown as RareGain[],
+    cost: row.cost,
+    staminaAfter: row.staminaAfter,
+    bookItemId: row.bookItemId,
+    problemId: row.problemId,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * GET 训练记录：按 userId 隔离（studentId 越权只会命中空集，无需额外归属校验），
+ * id 倒序游标分页（limit 1–100，缺省 20）。
+ */
+export async function listTrainingLogs(
+  userId: number,
+  opts: { studentId?: number; kind?: TrainingLogKindFilter; limit?: number; cursor?: number } = {},
+): Promise<TrainingLogPage> {
+  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 100);
+  const rows = await prisma.trainingLog.findMany({
+    where: {
+      userId,
+      ...(opts.studentId !== undefined ? { studentId: opts.studentId } : {}),
+      ...(opts.kind !== undefined ? { kind: KIND_TO_ENUM[opts.kind] } : {}),
+      ...(opts.cursor !== undefined ? { id: { lt: opts.cursor } } : {}),
+    },
+    orderBy: { id: 'desc' },
+    take: limit + 1,
+  });
+  const items = rows.slice(0, limit).map(toLogView);
+  return { items, nextCursor: rows.length > limit && items.length > 0 ? items[items.length - 1]!.id : null };
 }
 
 /** 校验存在/归属/在册（事务前快失败）；事务内再复核 */
@@ -242,6 +326,24 @@ async function runTraining(
       }
     }
 
-    return { dim, delta, rareGains: secondary.rareGains, cost, staminaAfter };
+    // 10. 训练记录落库（同事务：与扣钱/体力/耗材/成长同成功同回滚）
+    const log = await tx.trainingLog.create({
+      data: {
+        userId,
+        studentId: input.studentId,
+        studentName: student.name,
+        kind: KIND_TO_ENUM[kind],
+        dim,
+        delta,
+        rareGains: secondary.rareGains as unknown as Prisma.InputJsonValue,
+        cost,
+        staminaAfter,
+        ...(kind === 'directed' ? { bookItemId: book!.itemId } : {}),
+        ...(kind === 'specialized' ? { problemId: input.problemId! } : {}),
+        createdAt: now,
+      },
+    });
+
+    return { dim, delta, rareGains: secondary.rareGains, cost, staminaAfter, logId: log.id };
   });
 }

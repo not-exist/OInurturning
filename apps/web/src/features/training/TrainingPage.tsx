@@ -5,6 +5,7 @@ import { apiErrorMessage } from '../../lib/api';
 import {
   DIMENSION_LABEL,
   QUALITY_LABEL,
+  TRAINING_KIND_LABEL,
   floor,
   rarityBadge,
   rarityText,
@@ -15,8 +16,9 @@ import {
   useProblems,
   useSpecializedTrain,
   useStudents,
+  useTrainingLogs,
 } from '../../lib/hooks';
-import type { ProblemView, RareGain, TrainingResult } from '../../lib/hooks';
+import type { ProblemView, RareGain, TrainingLogView, TrainingResult } from '../../lib/hooks';
 import { Empty } from '../../components/ui';
 
 type Tab = 'basic' | 'directed' | 'specialized';
@@ -286,7 +288,10 @@ export function TrainingPage(): JSX.Element {
           )}
 
           {msg && (
-            <div data-testid="train-msg" className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div
+              data-testid="train-msg"
+              className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
               {msg}
             </div>
           )}
@@ -294,7 +299,10 @@ export function TrainingPage(): JSX.Element {
       )}
 
       {result && (
-        <section data-testid="train-result" className="rounded border border-green-200 bg-green-50 p-4">
+        <section
+          data-testid="train-result"
+          className="rounded border border-green-200 bg-green-50 p-4"
+        >
           <h3 className="mb-1 font-semibold text-green-800">训练完成</h3>
           <p className="text-sm text-green-800">
             {result.studentName}：{DIMENSION_LABEL[result.dim]} +{roundDelta(result.delta)} · 消耗{' '}
@@ -314,6 +322,8 @@ export function TrainingPage(): JSX.Element {
           </button>
         </section>
       )}
+
+      <TrainingLogsSection studentId={studentId} />
     </div>
   );
 }
@@ -372,4 +382,120 @@ function roundDelta(v: number): number {
 
 function errText(e: unknown): string {
   return apiErrorMessage(e);
+}
+
+/** 训练记录区：默认只看当前选中学员；类型筛选；游标加载更多 */
+function TrainingLogsSection({ studentId }: { studentId: number | null }): JSX.Element {
+  const [kind, setKind] = useState<'' | TrainingLogView['kind']>('');
+  return (
+    <section className="rounded border bg-white p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-neutral-500">
+          {studentId ? '该学员的训练记录' : '全部训练记录'}
+        </h2>
+        <select
+          data-testid="train-log-kind"
+          className="rounded border px-2 py-1 text-xs"
+          value={kind}
+          onChange={(e) => setKind(e.target.value as '' | TrainingLogView['kind'])}
+        >
+          <option value="">全部类型</option>
+          <option value="basic">基础</option>
+          <option value="directed">定向</option>
+          <option value="specialized">专项</option>
+        </select>
+      </div>
+      <LogsList
+        key={`${studentId ?? 'all'}-${kind}`}
+        studentId={studentId}
+        kind={kind === '' ? undefined : kind}
+      />
+    </section>
+  );
+}
+
+function LogsList({
+  studentId,
+  kind,
+}: {
+  studentId: number | null;
+  kind: TrainingLogView['kind'] | undefined;
+}): JSX.Element {
+  const [prev, setPrev] = useState<TrainingLogView[]>([]);
+  const [cursor, setCursor] = useState<number | undefined>(undefined);
+  const q = useTrainingLogs({
+    studentId: studentId ?? undefined,
+    kind,
+    limit: 10,
+    cursor,
+  });
+  // 翻页请求进行中时只展示已累积页，避免占位旧数据重复
+  const current = q.data?.items ?? [];
+  const items = cursor === undefined ? current : [...prev, ...(q.isFetching ? [] : current)];
+  const nextCursor = q.data?.nextCursor ?? null;
+
+  function more(): void {
+    const d = q.data;
+    if (!d || !d.nextCursor) return;
+    setPrev((p) => [...p, ...d.items]);
+    setCursor(d.nextCursor);
+  }
+
+  if (q.isPending && items.length === 0) {
+    return <p className="text-sm text-neutral-400">加载训练记录…</p>;
+  }
+  if (q.isError) {
+    return (
+      <div className="space-y-2 text-sm text-red-600">
+        <p>训练记录加载失败：{errText(q.error)}</p>
+        <button className="rounded border px-3 py-1 text-xs" onClick={() => void q.refetch()}>
+          重试
+        </button>
+      </div>
+    );
+  }
+  if (items.length === 0) {
+    return <Empty icon="📝" title="暂无训练记录" />;
+  }
+  return (
+    <div>
+      <ul className="divide-y text-sm" data-testid="train-log-list">
+        {items.map((t) => (
+          <li key={t.id} className="py-1.5">
+            <p>
+              <span className="font-medium">{t.studentName}</span>
+              <span className="ml-2 text-xs text-neutral-500">
+                {TRAINING_KIND_LABEL[t.kind]} · {DIMENSION_LABEL[t.dim]} +{roundDelta(t.delta)} · 耗{' '}
+                {t.cost} 金 · 体力 {Math.floor(t.staminaAfter)}/5
+              </span>
+            </p>
+            <p className="mt-0.5 text-xs text-neutral-400">
+              {new Date(t.createdAt).toLocaleString()}
+              {t.bookItemId ? ` · 用书 ${t.bookItemId}` : ''}
+              {t.problemId ? ` · 选题 #${t.problemId}` : ''}
+              {t.rareGains.length > 0 && (
+                <>
+                  {' '}
+                  · 稀有{' '}
+                  {t.rareGains
+                    .map((g) => `${GAIN_LABEL[g.stat]}+${roundDelta(g.amount)}`)
+                    .join('、')}
+                </>
+              )}
+            </p>
+          </li>
+        ))}
+      </ul>
+      {q.isFetching && <p className="mt-2 text-xs text-neutral-400">加载中…</p>}
+      {!q.isFetching && nextCursor !== null && (
+        <button
+          data-testid="train-log-more"
+          className="mt-2 rounded border px-3 py-1 text-xs"
+          onClick={more}
+        >
+          加载更多
+        </button>
+      )}
+    </div>
+  );
 }

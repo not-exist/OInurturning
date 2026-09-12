@@ -88,11 +88,11 @@ interface RewardGrant {
 
 describe('journey full (api)', () => {
   it('完整玩家全流程：培养→剧情→历练→PVP→改密→注销', { timeout: 120_000 }, async () => {
-    // —— 注册（0 金开局） ——
+    // —— 注册（开局包：1000 金/10 誉/2 学员/道具/招募池） ——
     const player = await register('journey');
     const auth = { Authorization: `Bearer ${player.token}` };
     const me0 = unwrapOk<{ money: number }>(await request(app).get('/api/users/me').set(auth));
-    expect(me0.money).toBe(0);
+    expect(me0.money).toBe(1000);
     console.log('JSTAGE:register');
 
     // —— 注资（等价运营拨款；见 e2e-seed.ts 背景） ——

@@ -50,11 +50,20 @@ export function clearRefreshCookie(): string {
 export async function register(input: { username: string; password: string }) {
   const exists = await prisma.user.findUnique({ where: { username: input.username }, select: { id: true } });
   if (exists) throw new ApiError('ALREADY_EXISTS', { field: 'username' });
+  // 哈希放事务外：避免占用事务连接做 ~100ms 的 bcrypt 计算
+  const passwordHash = await hash(input.password);
   try {
-    const user = await prisma.user.create({ data: { username: input.username, passwordHash: await hash(input.password) } });
-    return sessionFor(user);
+    return await prisma.$transaction(async (tx) => {
+      // 建号 + 开局包（钱/声誉/固定品质学员/道具/招募池）同一事务：要么全有，要么无号
+      const created = await tx.user.create({ data: { username: input.username, passwordHash } });
+      const { grantOnboardingPackage } = await import('../onboarding/service.js');
+      await grantOnboardingPackage(tx, created.id);
+      const user = await tx.user.findUniqueOrThrow({ where: { id: created.id } });
+      return sessionFor(user);
+    });
   } catch (e) {
-    // 并发注册 TOCTOU：唯一索引兜底
+    // 并发注册 TOCTOU：唯一索引兜底（事务内仅 username 存在唯一约束，
+    // 开局包天赋已去重、招募池按新用户 PK 建行，故 P2002 恒为用户名冲突）
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')
       throw new ApiError('ALREADY_EXISTS', { field: 'username' });
     throw e;

@@ -192,6 +192,19 @@ items:
     sources: [商城]
     stack: 10
     description: 测试用六维书。
+  - id: book-ds-yellow
+    name: 《数据结构·进阶讲义》
+    category: book
+    rarity: yellow
+    effect:
+      desc: 使用后使一名学员数据结构 +4。
+      kind: attr_boost
+      attribute: ds
+      amount: 4
+    price: 100
+    sources: [商城]
+    stack: 99
+    description: 测试用六维书·黄（开局包发放）。
   - id: book-thinking-gray
     name: 《思维·基础手册》
     category: book

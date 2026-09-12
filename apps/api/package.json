@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "seed": "node --import tsx --env-file=../../.env src/scripts/seed.ts",
     "admin:set": "node --import tsx --env-file=../../.env src/scripts/set-admin.ts",
+    "onboarding:backfill": "node --import tsx --env-file=../../.env src/scripts/grant-onboarding-backfill.ts",
     "migrate": "prisma migrate deploy",
     "generate": "prisma generate",
     "test": "vitest run",

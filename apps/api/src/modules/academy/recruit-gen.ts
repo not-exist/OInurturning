@@ -315,7 +315,19 @@ export function generateCandidate(
   tempId: string,
   ctx: GenerateContext,
 ): CandidatePayload {
-  const quality = rollQuality(rng, ctx.reputation);
+  return generateCandidateWithQuality(rng, tempId, rollQuality(rng, ctx.reputation), ctx);
+}
+
+/**
+ * 固定品质候选生成（开局包发放用：品质由 economy.onboarding.students 指定，
+ * 属性/天赋/姓名仍走同一掷点表，与招募池同源，保证数值口径一致）。
+ */
+export function generateCandidateWithQuality(
+  rng: () => number,
+  tempId: string,
+  quality: GenQuality,
+  ctx: GenerateContext,
+): CandidatePayload {
   const table = ATTR_TABLE[quality];
 
   // §3.5：声誉加成先行（仅六维/code/thinking/setting），随后在 [E'−δ, E'+δ] 掷点

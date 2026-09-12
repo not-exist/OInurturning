@@ -69,6 +69,7 @@ describe('GET /api/students', () => {
 
   it('只返回 ACTIVE 学员；视图含 V 值/天赋/资源字段', async () => {
     const u = await createAuthedUser();
+    await prisma.student.deleteMany({ where: { userId: u.userId } }); // 清开局包 2 学员
     const a = await createStudent(u.userId, { name: '在册甲' });
     const b = await createStudent(u.userId, { name: '在册乙' });
     await createStudent(u.userId, { name: '已开除', status: 'DISMISSED', dismissedAt: new Date() });
@@ -252,7 +253,7 @@ describe('POST /api/students/:id/dismiss', () => {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: u.userId } });
     expect(user.reputation).toBe(80);
 
-    const logs = await prisma.reputationLog.findMany({ where: { userId: u.userId } });
+    const logs = await prisma.reputationLog.findMany({ where: { userId: u.userId, reason: 'DISMISS' } });
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ delta: -20, reason: 'DISMISS' });
 
@@ -277,7 +278,7 @@ describe('POST /api/students/:id/dismiss', () => {
     expect(result.reputationDelta).toBe(-5);
 
     expect((await prisma.user.findUniqueOrThrow({ where: { id: u.userId } })).reputation).toBe(0);
-    const log = await prisma.reputationLog.findFirstOrThrow({ where: { userId: u.userId } });
+    const log = await prisma.reputationLog.findFirstOrThrow({ where: { userId: u.userId, reason: 'DISMISS' } });
     expect(log.delta).toBe(-5);
   });
 

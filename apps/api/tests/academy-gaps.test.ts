@@ -45,6 +45,7 @@ describe('academy gaps', () => {
   it('无池时刷新/招募 → NOT_FOUND recruitPool', async () => {
     const user = await register(100000);
     const auth = { Authorization: `Bearer ${user.token}` };
+    await prisma.recruitPool.delete({ where: { userId: user.userId } }); // 注册即预建池：删池还原“无池”前置
     const refresh = await request(app).post('/api/academy/refresh').set(auth);
     expect(refresh.status).toBe(404);
     expect(unwrapErr(refresh)).toMatchObject({ code: 'NOT_FOUND' });
@@ -70,6 +71,7 @@ describe('academy gaps', () => {
   it('并发首建池 → 双双 200 且为同一池', async () => {
     const user = await register();
     const auth = { Authorization: `Bearer ${user.token}` };
+    await prisma.recruitPool.delete({ where: { userId: user.userId } }); // 删预建池，还原 P2002 竞态前置
     const [a, b] = await Promise.all([
       request(app).get('/api/academy/pool').set(auth),
       request(app).get('/api/academy/pool').set(auth),
@@ -94,6 +96,7 @@ describe('academy gaps', () => {
     expect(drained.candidates).toEqual([]);
     const again = await request(app).post('/api/academy/recruit').set(auth).send({ tempId: pool.candidates[0]!.tempId });
     expect(again.status).toBe(404);
-    expect(await prisma.student.count({ where: { userId: user.userId, status: 'ACTIVE' } })).toBe(5);
+    // 开局包 2 + 招满 5 = 7 在册
+    expect(await prisma.student.count({ where: { userId: user.userId, status: 'ACTIVE' } })).toBe(7);
   });
 });

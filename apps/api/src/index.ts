@@ -22,6 +22,7 @@ import { recordRouter, storyRouter } from './modules/story/router.js';
 import { adventureRouter } from './modules/adventure/router.js';
 import { adminRouter } from './modules/admin/router.js';
 import { pvpRouter } from './modules/pvp/router.js';
+import { overviewRouter } from './modules/overview/router.js';
 import type { ApiEnvelope } from '@oinur/shared';
 
 export interface AppOptions {
@@ -107,6 +108,7 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use('/api/talents', talentsRouter);
   app.use('/api/training', trainingRouter);
   app.use('/api/story', storyRouter);
+  app.use('/api/overview', overviewRouter);
   app.use('/api/records', recordRouter);
   app.use('/api/adventures', adventureRouter);
   app.use('/api/admin', adminRouter);

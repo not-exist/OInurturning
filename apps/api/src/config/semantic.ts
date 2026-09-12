@@ -2,6 +2,7 @@ import {
   CONFIG_RARITIES,
   ECONOMY_QUALITY_TIERS,
   lectureConfigSchema,
+  onboardingConfigSchema,
   type ConfigRarity,
   type EconomyConfig,
   type EventsConfig,
@@ -35,6 +36,7 @@ export function runSemanticChecks(input: {
   checkTalents(input.talents, issues);
   checkItems(input.items, issues);
   checkEconomy(input.economy, issues);
+  checkOnboarding(input.economy, input.items, issues);
   checkSimulation(input.economy, input.items, input.stages, issues);
   if (input.problems !== undefined) checkProblems(input.problems, issues);
   if (input.stages !== undefined) checkStages(input.stages, input.problems, input.items, issues);
@@ -312,6 +314,42 @@ function checkEconomy(economy: EconomyConfig, issues: SemanticIssue[]): void {
       issues.push({ file: 'economy', path: 'lecture.reputation_pay_curve', message: '讲课声誉乘区上限不能低于下限' });
     }
   }
+}
+
+/**
+ * 开局包语义校验（注册/回填的前置条件，缺失即坏配置快速失败）：
+ * 分区必填、结构合法（zod）、发放道具 id 必须在 items.yaml 存在且不重复。
+ */
+function checkOnboarding(economy: EconomyConfig, items: ItemDef[], issues: SemanticIssue[]): void {
+  if (economy.onboarding === undefined) {
+    issues.push({
+      file: 'economy',
+      path: 'onboarding',
+      message: '新用户开局包缺失：economy.onboarding 为必填（money/reputation/students/items）',
+    });
+    return;
+  }
+  const parsed = onboardingConfigSchema.safeParse(economy.onboarding);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    issues.push({
+      file: 'economy',
+      path: `onboarding${first && first.path.length > 0 ? `.${first.path.join('.')}` : ''}`,
+      message: `开局包结构非法：${first?.message ?? 'unknown'}`,
+    });
+    return;
+  }
+  const itemIds = new Set(items.map((item) => item.id));
+  const seen = new Set<string>();
+  parsed.data.items.forEach((entry, index) => {
+    if (seen.has(entry.id)) {
+      issues.push({ file: 'economy', path: `onboarding.items.${index}.id`, message: `开局包道具重复：${entry.id}` });
+    }
+    seen.add(entry.id);
+    if (!itemIds.has(entry.id)) {
+      issues.push({ file: 'economy', path: `onboarding.items.${index}.id`, message: `开局包道具不存在：${entry.id}` });
+    }
+  });
 }
 
 function checkSimulation(

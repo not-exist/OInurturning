@@ -3,7 +3,7 @@
  *   pnpm -C apps/api e2e:seed fund <username> [--money N] [--reputation N] [--item id=qty ...]
  *   pnpm -C apps/api e2e:seed backdate-tournament <tournamentId>
  *
- * 背景：正常新用户 money=0 且游戏内无商城/注资入口，e2e 无法仅凭 UI 走完
+ * 背景：开局包仅 money=1000 且游戏内无商城/注资入口，e2e 无法仅凭 UI 走完
  * 招募→培养→PVP 全链路；fund 直接写库注资注道具，等价于"运营后台手工拨款"。
  * backdate-tournament 把赛事 registerEndsAt/autoStartAt 回拨到过去，使管理端
  * start API 可以在 e2e 时间窗口内开赛（UI 创建时强制未来时间）。

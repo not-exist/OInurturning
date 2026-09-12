@@ -18,7 +18,8 @@ test.describe('高级学院', () => {
     await expect(cards).toHaveCount(4);
 
     await page.goto('/students');
-    await expect(page.getByTestId('student-card')).toHaveCount(1);
+    // 开局包自带 2 学员 + 本测招募 1 人
+    await expect(page.getByTestId('student-card')).toHaveCount(3);
   });
 
   test('手动刷新重建候选池（5 人）', async ({ page, request }) => {
@@ -38,7 +39,8 @@ test.describe('高级学院', () => {
 
   test('金币不足时招募被拒并提示"金币不足"', async ({ page, request }) => {
     const account = await registerUser(request, 'acad');
-    // 不注资：新用户 money=0
+    // 开局包自带 1000 金：显式清零以覆盖“金币不足”分支
+    await fund(account.username, { money: 0 });
     await loginViaUI(page, account.username, account.password);
 
     await page.goto('/academy');

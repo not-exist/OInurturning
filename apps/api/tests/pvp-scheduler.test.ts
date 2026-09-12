@@ -17,6 +17,7 @@ async function entrant(): Promise<{ userId: number; studentId: number; token: st
   sequence += 1;
   const auth = await request(app).post('/api/auth/register').send({ username: `sched-${Date.now()}-${sequence}`, password: 'pw-123456' });
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(auth);
+  await prisma.user.update({ where: { id: session.me.id }, data: { money: 0, reputation: 0 } }); // 开局包 1000 金/10 誉归零（奖金/声誉绝对断言口径）
   const student = await prisma.student.create({ data: { userId: session.me.id, name: `Entrant ${sequence}`, sex: 'MALE', qualityTier: 'ELITE', ds: 35, dp: 35, math: 35, graph: 35, greedy: 35, str: 35, code: 35, thinking: 35, setting: 35, mindset: 0, focusCap: 30, energyMax: 80, energy: 80, stamina: 5, staminaRegen: 50, lastSettledAt: PAST } });
   await prisma.userItem.create({ data: { userId: session.me.id, itemId: 'entry-ticket', quantity: 1 } });
   return { userId: session.me.id, studentId: student.id, token: session.accessToken };
@@ -100,7 +101,12 @@ describe('PVP scheduler', () => {
       await registerPvp(player.userId, tournament.id, player.studentId, problem === null ? [] : [problem.id], PAST);
     }
     await advancePvpTournament(tournament.id, PAST);
-    const record = await prisma.contestRecord.findFirstOrThrow({ where: { type: 'PVP', userId: players[0]!.userId } });
+    // 战报挂 homeUserId 名下、主客场由配对种子定：经出场 match 反查，不假设 players[0] 必为 HOME
+    const played = await prisma.pvpMatch.findFirstOrThrow({
+      where: { tournamentId: tournament.id, OR: [{ homeUserId: players[0]!.userId }, { awayUserId: players[0]!.userId }] },
+      orderBy: { round: 'asc' },
+    });
+    const record = await prisma.contestRecord.findFirstOrThrow({ where: { id: played.contestRecordId! } });
     const input = record.inputSnapshot as { questions: Array<{ premadeEntryId?: number; traits: Array<{ traitId: string; severity: string; hooks: Array<{ partial_override?: string; tle_prob_add?: number }> }> }> };
     const premade = input.questions.find((question) => question.premadeEntryId !== undefined);
     expect(premade).toBeDefined();

@@ -73,6 +73,12 @@ const goodEconomy: Record<string, unknown> = {
       free_interval_hours: 24,
     },
   },
+  onboarding: {
+    money: 1000,
+    reputation: 10,
+    students: [{ quality: 'good' }, { quality: 'common' }],
+    items: [{ id: 'rename-card', count: 1 }],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -221,6 +227,41 @@ describe('runSemanticChecks', () => {
     });
     expect(errs.some((e) => e.message.includes('quality_mult'))).toBe(true);
   });
+
+  it('缺 onboarding 分区报错', () => {
+    const rest = { ...goodEconomy };
+    delete rest.onboarding;
+    const noOnboarding = economyConfigSchema.parse(rest);
+    const errs = runSemanticChecks({ talents: [makeTalent({})], items: parsedItem, economy: noOnboarding });
+    expect(errs.some((e) => e.message.includes('onboarding 为必填'))).toBe(true);
+  });
+
+  it('开局包道具不存在报错', () => {
+    const bad = economyConfigSchema.parse({
+      ...goodEconomy,
+      onboarding: {
+        ...(goodEconomy.onboarding as Record<string, unknown>),
+        items: [{ id: 'ghost-item', count: 1 }],
+      },
+    });
+    const errs = runSemanticChecks({ talents: [makeTalent({})], items: parsedItem, economy: bad });
+    expect(errs.some((e) => e.message.includes('ghost-item'))).toBe(true);
+  });
+
+  it('开局包道具重复报错', () => {
+    const bad = economyConfigSchema.parse({
+      ...goodEconomy,
+      onboarding: {
+        ...(goodEconomy.onboarding as Record<string, unknown>),
+        items: [
+          { id: 'rename-card', count: 1 },
+          { id: 'rename-card', count: 2 },
+        ],
+      },
+    });
+    const errs = runSemanticChecks({ talents: [makeTalent({})], items: parsedItem, economy: bad });
+    expect(errs.some((e) => e.message.includes('开局包道具重复'))).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -282,6 +323,14 @@ recruitment:
     refresh_growth: 1.5
     daily_price_cap: 800
     free_interval_hours: 24
+onboarding:
+  money: 1000
+  reputation: 10
+  students:
+    - {quality: good}
+    - {quality: common}
+  items:
+    - {id: rename-card, count: 1}
 lecture:
   note: 多余分区 passthrough
 `;
@@ -537,7 +586,8 @@ talents:
     stack: 1
     description: 另一进程的 fixtures。
 `,
-      economy: BASE_ECONOMY,
+      // B 进程 items 仅 other-item：开局包引用同步改指，否则 rename-card 语义校验必挂
+      economy: BASE_ECONOMY.replace('{id: rename-card, count: 1}', '{id: other-item, count: 1}'),
     });
 
     await importConfigs({ configDir: dirA });

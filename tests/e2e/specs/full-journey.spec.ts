@@ -23,7 +23,7 @@ import {
  *
  * 体力账（学员初始 5，上限 5）：基础训练 1 → 定向 1 → 剧情 cspj:1 → 出题 1 →
  * 体力药水 +3 → 讲课 2 → 历练 tier1。PVP 报名无体力门槛。
- * 注资说明见 apps/api/src/scripts/e2e-seed.ts 文件头（新用户 0 金且无商城，UI 内无解）。
+ * 注资说明见 apps/api/src/scripts/e2e-seed.ts 文件头（开局包仅 1000 金且无商城，UI 内无解）。
  */
 test.describe('完整玩家旅程', () => {
   test.setTimeout(600_000);
@@ -71,7 +71,8 @@ test.describe('完整玩家旅程', () => {
     await expect(cards).toHaveCount(5);
     await recruitBest(page);
     await page.goto('/students');
-    await expect(page.getByTestId('student-card')).toHaveCount(2);
+    // 开局包自带 2 学员 + 本测招募 2 人
+    await expect(page.getByTestId('student-card')).toHaveCount(4);
 
     const list = await apiCall(request, 'GET', '/api/students', token);
     const students = unwrap<{ id: number; v: number; name: string }[]>(list.body, '学员列表');

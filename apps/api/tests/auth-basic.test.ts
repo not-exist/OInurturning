@@ -16,7 +16,7 @@ describe('POST /api/auth/register', () => {
     const data = unwrapOk<{ accessToken: string; me: MeView }>(res);
     expect(data.accessToken.split('.')).toHaveLength(3);
     expect(data.me.username).toBe(U.username);
-    expect(data.me.money).toBe(0);
+    expect(data.me.money).toBe(1000); // 开局包（docs/data 口径）
     const cookies = res.headers['set-cookie'] as unknown as string[];
     const cookie = cookies.find((c: string) => c.startsWith('oinur_rt='));
     expect(cookie).toContain('HttpOnly');

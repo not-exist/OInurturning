@@ -147,7 +147,8 @@ describe('auth coverage：改密/登出/注销/封禁', () => {
     expect(userAfter).not.toBeNull();
     expect(userAfter?.deletedAt).not.toBeNull();
     expect(await prisma.student.findUnique({ where: { id: student.id } })).not.toBeNull();
-    expect(await prisma.userItem.findMany({ where: { userId: session.me.id } })).toHaveLength(1);
+    // 开局包 2 行（黄书×1、奶茶×2）+ 本测改名卡 1 行，注销后全部保留
+    expect(await prisma.userItem.findMany({ where: { userId: session.me.id } })).toHaveLength(3);
     expect(await prisma.recruitPool.findUnique({ where: { userId: session.me.id } })).not.toBeNull();
 
     // 旧 access token 立即失效（requireAuth 读库拦截 deletedAt）

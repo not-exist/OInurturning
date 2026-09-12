@@ -83,6 +83,7 @@ describe('lecture gaps', () => {
 
   it('弱学员（V=1）：全部五档 unavailable', async () => {
     const user = await register();
+    await prisma.student.deleteMany({ where: { userId: user.userId } }); // 清开局包学员（GOOD V≈14 会点亮入门组）
     await makeStudent(user.userId, 1);
     const tiers = unwrapOk<Array<{ id: string; available: boolean }>>(
       await request(app).get('/api/academy/lecture-tiers').set('Authorization', `Bearer ${user.token}`),
@@ -93,6 +94,7 @@ describe('lecture gaps', () => {
 
   it('精确结算：beginner + V=20 + rep=0 → 72 金/1 誉/体力 3', async () => {
     const user = await register();
+    await prisma.user.update({ where: { id: user.userId }, data: { money: 0, reputation: 0 } }); // 开局包 1000 金/10 誉归零
     const student = await makeStudent(user.userId, 20);
     const res = await request(app)
       .post('/api/academy/lectures')
@@ -140,6 +142,7 @@ describe('lecture gaps', () => {
     expect(me.reputation).toBe(5 + view.reputation);
 
     const poor = await register();
+    await prisma.user.update({ where: { id: poor.userId }, data: { reputation: 0 } }); // 开局包 10 誉归零（测 clamp 下限）
     const weak = await makeStudent(poor.userId, 10);
     const res2 = await request(app)
       .post('/api/academy/lectures')
