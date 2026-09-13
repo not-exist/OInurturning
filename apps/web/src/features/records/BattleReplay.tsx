@@ -193,17 +193,33 @@ export function BattleReplay({
         <div className="flex items-center gap-2 text-sm">
           <button
             type="button"
+            data-testid="replay-pause"
             className="rounded border border-neutral-300 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={finished}
             onClick={() => setPaused((value) => !value)}
           >
             {paused ? '继续播放' : '暂停'}
           </button>
+          {/* 跳过逐事件回放，直接到结算面板（长战斗回放可达数十分钟模拟时长） */}
+          {!finished && (
+            <button
+              type="button"
+              data-testid="replay-skip"
+              className="rounded border border-neutral-300 px-3 py-2"
+              onClick={() => {
+                setCursor(Math.max(events.length - 1, 0));
+                setFinished(true);
+              }}
+            >
+              跳过回放
+            </button>
+          )}
           <span className="text-neutral-500">速度</span>
           {SPEEDS.map((value) => (
             <button
               key={value}
               type="button"
+              data-testid={`replay-speed-${value}x`}
               className={`rounded px-2.5 py-1.5 text-xs ${speed === value ? 'bg-neutral-900 text-white' : 'border border-neutral-300 text-neutral-700'}`}
               onClick={() => setSpeed(value)}
             >
@@ -216,6 +232,7 @@ export function BattleReplay({
             {onOpenReport && (
               <button
                 type="button"
+                data-testid="replay-open-report"
                 className="rounded bg-neutral-900 px-3 py-2 text-sm text-white"
                 onClick={() => onOpenReport(replay.recordId)}
               >
@@ -225,6 +242,7 @@ export function BattleReplay({
             {onReturn && (
               <button
                 type="button"
+                data-testid="replay-back"
                 className="rounded border border-neutral-300 px-3 py-2 text-sm"
                 onClick={onReturn}
               >

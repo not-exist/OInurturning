@@ -13,7 +13,12 @@ test.describe('剧情模式', () => {
     await expect(page.getByTestId('story-enter').first()).toBeEnabled();
     await page.getByTestId('story-enter').first().click();
 
+    // 进入后先展示战斗回放：跳过回放 → 查看完整战报 → 跳转 /records/{id}
     // 战报 id 为 cuid 字符串（非数字），用 [^/]+ 匹配
+    await expect(page.getByTestId('replay-skip')).toBeVisible();
+    await page.getByTestId('replay-skip').click();
+    await expect(page.getByTestId('replay-open-report')).toBeVisible();
+    await page.getByTestId('replay-open-report').click();
     await page.waitForURL(/\/records\/[^/]+/);
     await expect(page.getByText('排名赛战报')).toBeVisible();
     // 通过与否皆为合法结算：只断言报告结构完整
