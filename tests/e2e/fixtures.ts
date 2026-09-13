@@ -215,6 +215,23 @@ export function candidateVProxy(cardText: string): number {
  * 依次点击启用的历练分支，结算失败则换下一个；返回是否结算成功。
  * （分支随机：keychain+高额资金保证总有可用分支，energy 不足等个案靠换分支兜底。）
  */
+/**
+ * 结算触发对决时页面会切入战斗回放视图（隐藏历练记录区）：
+ * 跳过回放并点「返回」回到历练页。未触发对决则直接返回。
+ */
+async function dismissBattleReplayIfShown(page: Page): Promise<void> {
+  const skip = page.getByTestId('replay-skip');
+  const shown = await skip
+    .waitFor({ state: 'visible', timeout: 4000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return;
+  await skip.click();
+  const back = page.getByTestId('replay-back');
+  await back.waitFor({ state: 'visible', timeout: 15000 });
+  await back.click();
+}
+
 export async function resolveAdventureChoice(page: Page): Promise<boolean> {
   const selector = '[data-testid^="adventure-choice-"]';
   const count = await page.locator(selector).count();
@@ -224,12 +241,14 @@ export async function resolveAdventureChoice(page: Page): Promise<boolean> {
     await choice.click();
     try {
       await page.waitForSelector(selector, { state: 'detached', timeout: 8000 });
+      await dismissBattleReplayIfShown(page);
       return true;
     } catch {
       // 选项仍在：若出现结算报错则试下一个分支，否则再等一轮
       if (await page.getByTestId('adventure-choose-error').isVisible()) continue;
       try {
         await page.waitForSelector(selector, { state: 'detached', timeout: 8000 });
+        await dismissBattleReplayIfShown(page);
         return true;
       } catch {
         continue;

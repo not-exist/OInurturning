@@ -96,20 +96,27 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
   const pool = await prisma.recruitPool.findUnique({ where: { userId } });
 
   if (!pool) {
-    const ctx = await genCtx(prisma, userId);
-    const candidates = generatePool(newRng(), ctx, POOL_SIZE);
-    try {
-      const created = await prisma.recruitPool.create({
-        data: { userId, candidates: candidates as unknown as Prisma.InputJsonValue, generatedAt: now, refreshDayKey: dayKey(now) },
-      });
-      return toPoolView(created, now);
-    } catch (e) {
-      // 并发首建：唯一键兜底，重读胜出方的池
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        const existing = await prisma.recruitPool.findUniqueOrThrow({ where: { userId } });
-        return toPoolView(existing, now);
+    // 并发首建可能以两种方式失败：P2002（唯一键兜底，他人已建）、
+    // P2034（InnoDB 锁冲突/死锁，CI 上偶发）。先重读胜出方池；若冲突方
+    // 尚未可见（双双回滚），短暂退避后重建，上限 3 次后抛出。
+    for (let attempt = 0; ; attempt++) {
+      const ctx = await genCtx(prisma, userId);
+      const candidates = generatePool(newRng(), ctx, POOL_SIZE);
+      try {
+        const created = await prisma.recruitPool.create({
+          data: { userId, candidates: candidates as unknown as Prisma.InputJsonValue, generatedAt: now, refreshDayKey: dayKey(now) },
+        });
+        return toPoolView(created, now);
+      } catch (e) {
+        const isRace =
+          e instanceof Prisma.PrismaClientKnownRequestError && (e.code === 'P2002' || e.code === 'P2034');
+        if (isRace) {
+          const existing = await prisma.recruitPool.findUnique({ where: { userId } });
+          if (existing) return toPoolView(existing, now);
+          if (attempt < 3) continue;
+        }
+        throw e;
       }
-      throw e;
     }
   }
 

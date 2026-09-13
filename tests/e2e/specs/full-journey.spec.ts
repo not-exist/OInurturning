@@ -92,10 +92,14 @@ test.describe('完整玩家旅程', () => {
     await page.getByTestId('train-run').click();
     await expect(page.getByTestId('train-result')).toContainText('训练完成');
 
-    // —— 5. 剧情首关→战报→返回 ——
+    // —— 5. 剧情首关→回放→战报→返回 ——
     await page.goto('/story');
     await page.getByTestId('story-student').selectOption(String(best.id));
     await page.getByTestId('story-enter').first().click();
+    await expect(page.getByTestId('replay-skip')).toBeVisible();
+    await page.getByTestId('replay-skip').click();
+    await expect(page.getByTestId('replay-open-report')).toBeVisible();
+    await page.getByTestId('replay-open-report').click();
     await page.waitForURL(/\/records\/[^/]+/);
     await expect(page.getByText('排名赛战报')).toBeVisible();
     await page.getByTestId('record-back').click();

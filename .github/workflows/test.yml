@@ -59,7 +59,47 @@ jobs:
           cat typecheck-attrib.log
       - run: pnpm -r lint
       - run: pnpm -r build
-      - run: pnpm --filter @oinur/api test:unit -- --reporter=default --reporter=github-actions
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          pnpm --filter @oinur/api test:unit -- --reporter=default --reporter=github-actions 2>&1 | tee unit-test.log
+      - name: Emit unit-test diagnostics
+        if: failure()
+        run: |
+          python3 - <<'EOF'
+          def esc(s: str) -> str:
+              return s.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          # 1) generated Prisma client engine mode (library vs client/queryCompiler)
+          import glob
+          cands = glob.glob('node_modules/.pnpm/*.prisma+client*/node_modules/.prisma/client/schema.prisma')
+          cands += [p for p in glob.glob('**/node_modules/.prisma/client/schema.prisma', recursive=True)]
+          seen = set()
+          for p in cands:
+              if p in seen: continue
+              seen.add(p)
+              head = [l.strip() for l in open(p, errors='replace') if 'engine' in l.lower()][:4]
+              print(f'::error title=prisma-client-mode::{esc(p + " :: " + " | ".join(head))[:900]}')
+          if not cands:
+              print('::error title=prisma-client-mode::no generated .prisma client found')
+          # 2) tail of the unit-test output
+          try:
+              lines = open('unit-test.log', errors='replace').read().splitlines()
+          except FileNotFoundError:
+              print('::error title=unit-test::tee produced no log (failed before vitest printed anything)')
+          else:
+              chunk, size = [], 0
+              for ln in lines[-70:]:
+                  esc_ln = esc(ln)
+                  if size + len(esc_ln) > 3400 and chunk:
+                      print(f'::error title=unit-test-tail::{esc(chr(10).join(chunk))}')
+                      chunk, size = [], 0
+                  chunk.append(ln); size += len(esc_ln) + 1
+              if chunk:
+                  print(f'::error title=unit-test-tail::{esc(chr(10).join(chunk))}')
+          EOF
+      - name: Cleanup unit-test log
+        if: always()
+        run: rm -f unit-test.log
       - name: locate-api-src
         if: failure()
         run: grep -q '^apps/api|' typecheck-attrib.log && grep '^apps/api|' typecheck-attrib.log | grep -q -v '|tests/' && exit 1 || exit 0
