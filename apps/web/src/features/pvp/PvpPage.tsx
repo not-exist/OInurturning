@@ -1,4 +1,5 @@
 import { useState, type JSX } from 'react';
+import { Link } from 'react-router';
 import { ApiCallError } from '../../lib/api';
 import { Empty } from '../../components/ui';
 import {
@@ -244,6 +245,11 @@ function RewardGrants({
   );
 }
 
+function recordPathFromApiUrl(url: string): string {
+  const prefix = '/api/records/';
+  return url.startsWith(prefix) ? `/records/${url.slice(prefix.length)}` : url;
+}
+
 function BracketView({
   matches,
 }: {
@@ -268,12 +274,12 @@ function BracketView({
                     </p>
                     <p className="mt-1 text-neutral-500">胜者：{match.winnerUserId ?? '-'}</p>
                     {match.reportUrl && (
-                      <a
+                      <Link
                         className="mt-1 inline-block text-blue-700 underline"
-                        href={match.reportUrl}
+                        to={recordPathFromApiUrl(match.reportUrl)}
                       >
                         查看战报
-                      </a>
+                      </Link>
                     )}
                   </div>
                 ))}
