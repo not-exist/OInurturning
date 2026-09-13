@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type AdventureLog, type Student } from '@prisma/client';
 import {
+  type BattleReplay,
   type ConfigRarity,
   type DuelInput,
   type DuelReport,
@@ -18,7 +19,8 @@ import { createRandomStream } from '../contest/engine/rng.js';
 import { deriveStreamSeed } from '../contest/engine/rng.js';
 import { simulateDuel } from '../contest/engine/duel.js';
 import { generateDuelOpponent, type DuelOpponentKind } from '../contest/npc.js';
-import { createContestRecord } from '../contest/repository.js';
+import { buildBattleReplay } from '../contest/replay.js';
+import { createContestRecord, getContestRecordForUser } from '../contest/repository.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
 import {
@@ -71,6 +73,7 @@ export interface AdventureLogView {
 export interface AdventureChoiceResult {
   adventure: AdventureLogView;
   completed: boolean;
+  replay?: BattleReplay;
 }
 
 const STAT_FIELDS = {
@@ -825,7 +828,17 @@ export async function chooseAdventure(
     const event = config.events[log.eventId];
     if (event === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'event', eventId: log.eventId });
     if (log.status === 'RESOLVED') {
-      return { adventure: toLogView(log, event, true), completed: true };
+      const existingRecord =
+        log.contestRecordId === null
+          ? null
+          : await getContestRecordForUser(userId, log.contestRecordId, tx);
+      return {
+        adventure: toLogView(log, event, true),
+        completed: true,
+        ...(existingRecord === null
+          ? {}
+          : { replay: buildBattleReplay(existingRecord.id, existingRecord.report, event.name) }),
+      };
     }
 
     const preview = resultPhase(log) === 'PREVIEW';
@@ -978,7 +991,13 @@ export async function chooseAdventure(
         resolvedAt: now,
       },
     });
-    return { adventure: toLogView(resolved, event, true), completed: true };
+    return {
+      adventure: toLogView(resolved, event, true),
+      completed: true,
+      ...(contestRecord === null
+        ? {}
+        : { replay: buildBattleReplay(contestRecord.id, duelReport!, event.name) }),
+    };
   });
 }
 

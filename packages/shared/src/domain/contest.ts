@@ -796,3 +796,114 @@ const duelReportShape = reportHeaderShape
 export const duelReportSchema = withJsonSafety(duelReportShape);
 
 export type ContestReportView = ContestReport;
+
+/**
+ * A server-authored, presentation-only sequence for the client battle viewer.
+ * The report remains the source of truth; replay events never mutate game state.
+ */
+export type BattleReplayEvent =
+  | {
+      seq: number;
+      type: 'BATTLE_START';
+      durationMs: number;
+      title: string;
+      format: ContestFormat;
+      homeName: string;
+      awayName?: string;
+    }
+  | {
+      seq: number;
+      type: 'QUESTION_START';
+      durationMs: number;
+      participantName: string;
+      questionIndex: number;
+      problemInstanceId: string;
+      dimension: string;
+      score: number;
+    }
+  | {
+      seq: number;
+      type: 'SUBMISSION';
+      durationMs: number;
+      participantName: string;
+      questionIndex: number;
+      attemptNumber: number;
+      verdict: ContestVerdict;
+      submissionTimeMin: number;
+      penaltyMin: number;
+      extraEnergyCost: number;
+      clockExhausted: boolean;
+    }
+  | {
+      seq: number;
+      type: 'QUESTION_RESULT';
+      durationMs: number;
+      participantName: string;
+      questionIndex: number;
+      verdict: Exclude<ContestVerdict, 'SKIP'> | 'SKIP';
+      timeSpentMin: number;
+      penaltyMin: number;
+      scoreAwarded: number;
+      totalScore: number;
+      energyAfter: number;
+      focusAfter: number;
+      mindsetAfter: number;
+      notes: string[];
+    }
+  | {
+      seq: number;
+      type: 'ROUND_START';
+      durationMs: number;
+      roundNo: number;
+      setterSide: 'HOME' | 'AWAY';
+      answererSide: 'HOME' | 'AWAY';
+      questionInstanceId: string;
+      participantName: string;
+    }
+  | {
+      seq: number;
+      type: 'ROUND_RESULT';
+      durationMs: number;
+      roundNo: number;
+      setterSide: 'HOME' | 'AWAY';
+      answererSide: 'HOME' | 'AWAY';
+      answererName: string;
+      solved: boolean;
+      reason: Exclude<ContestVerdict, 'SKIP'>;
+      timeSpentMin: number;
+      penaltyMin: number;
+      energyCost: number;
+      scoreAwardedTo: 'HOME' | 'AWAY';
+      scoreAwarded: number;
+      homeScore: number;
+      awayScore: number;
+    }
+  | {
+      seq: number;
+      type: 'TIEBREAK';
+      durationMs: number;
+      decidedBy: string;
+      trail: string[];
+    }
+  | {
+      seq: number;
+      type: 'BATTLE_FINISH';
+      durationMs: number;
+      winnerSide?: DuelWinnerSide;
+      rank?: number;
+      totalScore?: number;
+      participantCount?: number;
+      pass?: boolean;
+      homeScore?: number;
+      awayScore?: number;
+      rewards: RewardLine[];
+      growth: GrowthDelta[];
+    };
+
+export interface BattleReplay {
+  replayVersion: 1;
+  recordId: string;
+  format: ContestFormat;
+  title: string;
+  events: BattleReplayEvent[];
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  BattleReplay,
   ContestRecordView,
   DimensionKey,
   MeView,
@@ -118,6 +119,7 @@ export interface AdventureLogView {
 export interface AdventureChoiceResult {
   adventure: AdventureLogView;
   completed: boolean;
+  replay?: BattleReplay;
 }
 
 export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
@@ -1073,6 +1075,7 @@ export interface StoryOverview {
 
 export interface StoryEntryResult {
   record: ContestRecordView;
+  replay: BattleReplay;
   replayed: boolean;
   firstClear: boolean;
 }
@@ -1129,5 +1132,13 @@ export function useContestRecord(recordId: string | undefined) {
     queryKey: ['contest-record', recordId],
     queryFn: () => apiFetch<ContestRecordView>(`/api/records/${recordId}`),
     enabled: recordId !== undefined,
+  });
+}
+
+export function useContestReplay(recordId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['contest-replay', recordId],
+    queryFn: () => apiFetch<BattleReplay>(`/api/records/${recordId}/replay`),
+    enabled: recordId !== undefined && enabled,
   });
 }

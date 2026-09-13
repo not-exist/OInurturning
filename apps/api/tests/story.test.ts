@@ -69,22 +69,47 @@ describe('story stage API', () => {
       .set({ ...authorization, 'Idempotency-Key': 'story-entry-1' })
       .send({ roster: [studentId] });
     expect(first.status).toBe(200);
-    const firstData = unwrapOk<{ record: { id: string }; replayed: boolean }>(first);
+    const firstData = unwrapOk<{
+      record: { id: string };
+      replay: { recordId: string; format: string; events: { type: string }[] };
+      replayed: boolean;
+    }>(first);
     expect(firstData.replayed).toBe(false);
     expect(firstData.record.id).toBeTypeOf('string');
+    expect(firstData.replay).toMatchObject({
+      recordId: firstData.record.id,
+      format: 'RANKING',
+    });
+    expect(firstData.replay.events.at(-1)?.type).toBe('BATTLE_FINISH');
 
     const replay = await request(app)
       .post('/api/story/stages/cspj:1/enter')
       .set({ ...authorization, 'Idempotency-Key': 'story-entry-1' })
       .send({ roster: [studentId] });
     expect(replay.status).toBe(200);
-    const replayData = unwrapOk<{ record: { id: string }; replayed: boolean; firstClear: boolean }>(
-      replay,
-    );
-    expect(replayData).toEqual({
+    const replayData = unwrapOk<{
+      record: { id: string };
+      replay: { recordId: string; format: string; events: { type: string }[] };
+      replayed: boolean;
+      firstClear: boolean;
+    }>(replay);
+    expect(replayData).toMatchObject({
       record: expect.objectContaining({ id: firstData.record.id }),
+      replay: expect.objectContaining({ recordId: firstData.record.id, format: 'RANKING' }),
       replayed: true,
       firstClear: false,
+    });
+    expect(replayData.replay.events.at(-1)?.type).toBe('BATTLE_FINISH');
+
+    const replayEndpoint = await request(app)
+      .get(`/api/records/${firstData.record.id}/replay`)
+      .set(authorization);
+    expect(replayEndpoint.status).toBe(200);
+    expect(
+      unwrapOk<{ recordId: string; format: string; events: { type: string }[] }>(replayEndpoint),
+    ).toMatchObject({
+      recordId: firstData.record.id,
+      format: 'RANKING',
     });
 
     const record = await request(app).get(`/api/records/${firstData.record.id}`).set(authorization);

@@ -64,6 +64,11 @@ describe('M3 duel adventure integration', () => {
     });
 
     expect(result.completed).toBe(true);
+    expect(result.replay).toMatchObject({
+      recordId: record.id,
+      format: 'DUEL',
+    });
+    expect(result.replay?.events.at(-1)?.type).toBe('BATTLE_FINISH');
     expect(stored.contestRecordId).toBeTruthy();
     expect(record.type).toBe('ADVENTURE');
     expect(record.format).toBe('DUEL');
