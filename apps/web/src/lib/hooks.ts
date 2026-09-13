@@ -162,7 +162,7 @@ export interface AnnouncementView {
   id: number;
   title: string;
   body: string;
-  authorId: number;
+  authorId: number | null;
   createdAt: string;
 }
 
@@ -173,7 +173,6 @@ export interface UserAdminView {
   money: number;
   reputation: number;
   bannedAt: string | null;
-  deletedAt: string | null;
   createdAt: string;
 }
 

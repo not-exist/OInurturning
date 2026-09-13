@@ -44,7 +44,7 @@
 
 | 功能 | 普通测试 | 浏览器 e2e | 全旅程 |
 |------|---------|-----------|--------|
-| 注册/登录/登出/改密/注销/封禁 | `auth-basic/session/coverage` | `auth.spec`、`settings.spec` | ✓（改密→注销→登录失败） |
+| 注册/登录/登出/改密/注销/封禁 | `auth-basic/session/coverage` | `auth.spec`、`settings.spec` | ✓（改密→注销→数据级联清空→同名可重注册） |
 | 招募/刷新/候选 | `academy/academy-gaps` | `academy.spec` | ✓（选 V 最高×2） |
 | 学员详情/改名/开除 | `students/students-gaps` | `students.spec` | ✓（改名） |
 | 基础/定向/专项训练 | `training/training-gaps` | `training.spec` | ✓（基础+定向） |

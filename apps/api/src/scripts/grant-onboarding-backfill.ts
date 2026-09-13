@@ -4,7 +4,7 @@
  *
  * 背景：开局包上线前注册的用户（onboardedAt 为空）处于 0 钱/0 誉/0 学员的死锁态，
  * 本脚本为其补发与新注册完全相同的开局包（economy.yaml `onboarding` 分区）。
- * - 目标：onboardedAt IS NULL 且未注销（deletedAt IS NULL）的用户；
+ * - 目标：onboardedAt IS NULL 的用户（注销即物理删除，不存在"已注销但仍留库"的行）；
  * - 幂等：grantOnboardingPackage 以 onboardedAt 为键，重复跑跳过已发放用户；
  * - 逐用户独立事务：单个失败不影响其他用户，末尾汇总失败清单并以 exit 1 退出；
  * - 先跑 --dry-run 确认影响面（见 docs/OPERATIONS.md §回填）。
@@ -42,7 +42,7 @@ for (let i = 0; i < args.length; i += 1) {
 async function main(): Promise<void> {
   await importConfigs();
   const targets = await prisma.user.findMany({
-    where: { onboardedAt: null, deletedAt: null },
+    where: { onboardedAt: null },
     select: { id: true, username: true },
     orderBy: { id: 'asc' },
     take: limit,

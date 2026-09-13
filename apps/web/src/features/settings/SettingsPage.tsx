@@ -27,7 +27,14 @@ export function SettingsPage(): JSX.Element {
       qc.clear();
       nav('/login');
     },
-    onError: () => setMsg('注销失败：密码确认不符'),
+    // STATE_CONFLICT＝尚有进行中的 PVP 赛事（护栏见 api auth/service.ts deactivate）：
+    // 此时物理删除会让该赛事对所有剩余选手卡死，故先拒绝，等赛事结束再注销。
+    onError: (e) =>
+      setMsg(
+        e instanceof ApiCallError && e.code === 'STATE_CONFLICT'
+          ? '注销失败：你还有进行中的 PVP 赛事，请等赛事结束后再注销'
+          : '注销失败：密码确认不符',
+      ),
   });
 
   if (meQ.isLoading) return <p className="text-neutral-500">加载中…</p>;
@@ -105,7 +112,11 @@ export function SettingsPage(): JSX.Element {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (confirm('确认注销账户？该操作不可恢复，将删除全部数据！'))
+            if (
+              confirm(
+                '确认注销账户？该操作不可恢复，将立即删除全部数据（学员/道具/战报/进度），且用户名会被释放、可被他人重新注册！',
+              )
+            )
               deactivate.mutate(String(new FormData(e.currentTarget).get('password')));
           }}
           className="flex gap-2 text-sm"

@@ -58,7 +58,7 @@ test.describe('用户设置', () => {
     await expect(page.getByTestId('settings-msg')).toHaveText('注销失败：密码确认不符');
   });
 
-  test('注销成功后账号彻底失效', async ({ page }) => {
+  test('注销成功后账号彻底失效，用户名可立即重新注册', async ({ page }) => {
     const username = uniqueName('set-gone');
     await page.goto('/register');
     await page.getByTestId('register-username').fill(username);
@@ -76,5 +76,13 @@ test.describe('用户设置', () => {
     await page.getByTestId('login-password').fill(DEFAULT_PASSWORD);
     await page.getByTestId('login-submit').click();
     await expect(page.getByTestId('auth-error')).toHaveText('用户名或密码错误');
+
+    // 回归：注销＝物理删除，用户名已释放，同名重注册不得再提示「用户名已被占用」
+    await page.goto('/register');
+    await page.getByTestId('register-username').fill(username);
+    await page.getByTestId('register-password').fill(DEFAULT_PASSWORD);
+    await page.getByTestId('register-submit').click();
+    await page.waitForURL('/');
+    await expect(page.getByTestId('auth-error')).toHaveCount(0);
   });
 });

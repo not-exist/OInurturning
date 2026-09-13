@@ -127,7 +127,7 @@ describe('auth coverage：改密/登出/注销/封禁', () => {
     expect(unwrapErr(refresh).code).toBe('UNAUTHENTICATED');
   });
 
-  it('注销＝软删：业务数据保留、deletedAt 落库、登录与旧 token 彻底失效', async () => {
+  it('注销＝物理删除：账号与业务数据级联清空、用户名释放、登录与旧 token 彻底失效', async () => {
     const { session } = await register();
     const student = await prisma.student.create({
       data: {
@@ -142,22 +142,56 @@ describe('auth coverage：改密/登出/注销/封禁', () => {
 
     const res = await request(app).post('/api/auth/deactivate').set('Authorization', `Bearer ${session.accessToken}`).send({ password: 'pw-12345678' });
     expect(res.status).toBe(200);
-    // 软删：行仍在、deletedAt 落库；学员/道具/招募池等业务数据全部保留
-    const userAfter = await prisma.user.findUnique({ where: { id: session.me.id } });
-    expect(userAfter).not.toBeNull();
-    expect(userAfter?.deletedAt).not.toBeNull();
-    expect(await prisma.student.findUnique({ where: { id: student.id } })).not.toBeNull();
-    // 开局包 2 行（黄书×1、奶茶×2）+ 本测改名卡 1 行，注销后全部保留
-    expect(await prisma.userItem.findMany({ where: { userId: session.me.id } })).toHaveLength(3);
-    expect(await prisma.recruitPool.findUnique({ where: { userId: session.me.id } })).not.toBeNull();
+    // 硬删：用户行消失，DB 级联清空学员/道具/招募池/声誉日志等全部业务数据
+    expect(await prisma.user.findUnique({ where: { id: session.me.id } })).toBeNull();
+    expect(await prisma.student.findUnique({ where: { id: student.id } })).toBeNull();
+    expect(await prisma.userItem.findMany({ where: { userId: session.me.id } })).toHaveLength(0);
+    expect(await prisma.recruitPool.findUnique({ where: { userId: session.me.id } })).toBeNull();
+    expect(await prisma.reputationLog.findMany({ where: { userId: session.me.id } })).toHaveLength(0);
 
-    // 旧 access token 立即失效（requireAuth 读库拦截 deletedAt）
+    // 旧 access token 立即失效（用户行已不存在，requireAuth 查库返回 null）
     const me = await request(app).get('/api/users/me').set('Authorization', `Bearer ${session.accessToken}`);
     expect(me.status).toBe(401);
-    // 登录彻底失败（不泄露已注销状态，仍走 INVALID_CREDENTIALS）
+    // 登录彻底失败（用户名已无人持有）
     const login = await request(app).post('/api/auth/login').send({ username: session.me.username, password: 'pw-12345678' });
     expect(login.status).toBe(401);
     expect(unwrapErr(login).code).toBe('INVALID_CREDENTIALS');
+
+    // username 唯一索引已释放：同名可立即重新注册，且拿到全新 id
+    const reuse = await request(app).post('/api/auth/register').send({ username: session.me.username, password: 'pw-12345678' });
+    expect(reuse.status).toBe(200);
+    expect(unwrapOk<Session>(reuse).me.id).not.toBe(session.me.id);
+  });
+
+  it('注销护栏：进行中 PVP 赛事的报名者不可注销，赛事结束后可注销', async () => {
+    const { session } = await register();
+    const tournament = await prisma.pvpTournament.create({
+      data: { name: '护栏赛', size: 8, registerEndsAt: new Date('2099-01-02T00:00:00.000Z'), autoStartAt: new Date('2099-01-03T00:00:00.000Z'), prizes: {}, config: {} },
+    });
+    await prisma.pvpRegistration.create({
+      data: { tournamentId: tournament.id, userId: session.me.id, roster: {} },
+    });
+
+    // REGISTERING/RUNNING 期间拒绝注销：PvpMatch 的参赛者 id 是无外键裸 Int，
+    // 硬删会让 playPending 抛 STATE_CONFLICT 并回滚整场推进，赛事对所有剩余选手永久 409
+    for (const status of ['REGISTERING', 'RUNNING'] as const) {
+      await prisma.pvpTournament.update({ where: { id: tournament.id }, data: { status } });
+      const blocked = await request(app).post('/api/auth/deactivate').set('Authorization', `Bearer ${session.accessToken}`).send({ password: 'pw-12345678' });
+      expect(blocked.status).toBe(409);
+      expect(unwrapErr(blocked).code).toBe('STATE_CONFLICT');
+      expect(await prisma.user.findUnique({ where: { id: session.me.id } })).not.toBeNull();
+    }
+
+    // 赛事 FINISHED 后放行，且报名行随用户级联删除
+    await prisma.pvpTournament.update({ where: { id: tournament.id }, data: { status: 'FINISHED' } });
+    const ok = await request(app).post('/api/auth/deactivate').set('Authorization', `Bearer ${session.accessToken}`).send({ password: 'pw-12345678' });
+    expect(ok.status).toBe(200);
+    expect(await prisma.user.findUnique({ where: { id: session.me.id } })).toBeNull();
+    expect(await prisma.pvpRegistration.findMany({ where: { tournamentId: tournament.id } })).toHaveLength(0);
+    // 赛事本体与其他选手数据不受影响
+    expect(await prisma.pvpTournament.findUnique({ where: { id: tournament.id } })).not.toBeNull();
+    // 本文件 beforeEach 只清 users，赛事行会跨用例/跨文件残留 → 显式清理，避免污染 admin/pvp 套件
+    await prisma.pvpTournament.delete({ where: { id: tournament.id } });
   });
 
   it('封禁用户：持旧 token 访问被拒', async () => {

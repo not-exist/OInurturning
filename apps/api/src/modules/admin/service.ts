@@ -29,7 +29,7 @@ export interface AnnouncementView {
   id: number;
   title: string;
   body: string;
-  authorId: number;
+  authorId: number | null; // 作者注销后置空（公告是全站内容，不随作者删除）
   createdAt: string;
 }
 
@@ -40,7 +40,6 @@ export interface UserAdminView {
   money: number;
   reputation: number;
   bannedAt: string | null;
-  deletedAt: string | null;
   createdAt: string;
 }
 
@@ -192,12 +191,11 @@ export async function searchUsers(query: string | undefined, limit = 50): Promis
     where: query === undefined ? undefined : { username: { contains: query } },
     orderBy: { id: 'desc' },
     take: limit,
-    select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, deletedAt: true, createdAt: true },
+    select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, createdAt: true },
   });
   return rows.map((row) => ({
     ...row,
     bannedAt: row.bannedAt?.toISOString() ?? null,
-    deletedAt: row.deletedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   }));
 }
@@ -221,13 +219,12 @@ export async function setUserBan(
     const row = await tx.user.update({
       where: { id: targetId },
       data: { bannedAt: banned ? new Date() : null },
-      select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, deletedAt: true, createdAt: true },
+      select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, createdAt: true },
     });
     await audit(tx, adminId, banned ? 'USER_BAN' : 'USER_UNBAN', 'USER', String(targetId), { banned });
     return {
       ...row,
       bannedAt: row.bannedAt?.toISOString() ?? null,
-      deletedAt: row.deletedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
     };
   });
