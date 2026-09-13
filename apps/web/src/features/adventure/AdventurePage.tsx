@@ -1,5 +1,7 @@
 import { useState, type JSX } from 'react';
+import { useNavigate } from 'react-router';
 import { apiErrorMessage } from '../../lib/api';
+import { BattleReplay, BattleWaiting } from '../records/BattleReplay';
 import {
   rarityBadge,
   useAdventureLogs,
@@ -144,9 +146,11 @@ export function AdventurePage(): JSX.Element {
   const draw = useDrawAdventure();
   const choose = useChooseAdventure();
   const activate = useUseItem();
+  const navigate = useNavigate();
   const [studentId, setStudentId] = useState<number>();
   const [tier, setTier] = useState<1 | 2 | 3>(1);
   const [active, setActive] = useState<AdventureLogView>();
+  const [battleReplay, setBattleReplay] = useState<import('@oinur/shared').BattleReplay>();
   const [intelReady, setIntelReady] = useState(false);
 
   if (students.isPending || inventory.isPending || logs.isPending) {
@@ -182,6 +186,20 @@ export function AdventurePage(): JSX.Element {
     );
   }
 
+  if (choose.isPending) {
+    return <BattleWaiting label="服务端正在结算遭遇，若触发对决将传回战斗回放…" />;
+  }
+
+  if (battleReplay !== undefined) {
+    return (
+      <BattleReplay
+        replay={battleReplay}
+        onOpenReport={(recordId) => navigate(`/records/${recordId}?details=1`)}
+        onReturn={() => setBattleReplay(undefined)}
+      />
+    );
+  }
+
   const selectedStudentId = studentId ?? students.data[0]?.id;
   const pending = active ?? logs.data.find((log) => log.status === 'PENDING');
   const intel = inventory.data.find((item) => item.itemId === 'intel-slip');
@@ -200,7 +218,14 @@ export function AdventurePage(): JSX.Element {
     choose.mutate(
       { id: pending.id, ...input },
       {
-        onSuccess: (result) => setActive(result.completed ? undefined : result.adventure),
+        onSuccess: (result) => {
+          if (result.replay !== undefined) {
+            setBattleReplay(result.replay);
+            setActive(undefined);
+          } else {
+            setActive(result.completed ? undefined : result.adventure);
+          }
+        },
       },
     );
   };
@@ -279,8 +304,16 @@ export function AdventurePage(): JSX.Element {
         >
           {intelReady ? '情报已激活' : `激活情报 · ${intel?.quantity ?? 0}`}
         </button>
-        {drawError && <span data-testid="adventure-draw-error" className="text-sm text-red-600">{drawError}</span>}
-        {chooseError && <span data-testid="adventure-choose-error" className="text-sm text-red-600">{chooseError}</span>}
+        {drawError && (
+          <span data-testid="adventure-draw-error" className="text-sm text-red-600">
+            {drawError}
+          </span>
+        )}
+        {chooseError && (
+          <span data-testid="adventure-choose-error" className="text-sm text-red-600">
+            {chooseError}
+          </span>
+        )}
       </div>
 
       {pending && (
@@ -300,7 +333,10 @@ export function AdventurePage(): JSX.Element {
         {logs.data.length === 0 ? (
           <p className="text-sm text-neutral-500">暂无记录。</p>
         ) : (
-          <ul data-testid="adventure-logs" className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
+          <ul
+            data-testid="adventure-logs"
+            className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white"
+          >
             {logs.data.map((log) => (
               <li
                 key={log.id}

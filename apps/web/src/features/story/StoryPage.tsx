@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { apiErrorMessage } from '../../lib/api';
-import { useEnterStoryStage, useStoryOverview, useStudents } from '../../lib/hooks';
+import { BattleReplay, BattleWaiting } from '../records/BattleReplay';
+import {
+  useEnterStoryStage,
+  useStoryOverview,
+  useStudents,
+  type StoryEntryResult,
+} from '../../lib/hooks';
 import { Empty } from '../../components/ui';
 
 const CHAPTER_LABEL: Record<string, string> = {
@@ -22,6 +28,7 @@ export function StoryPage() {
   const students = useStudents();
   const enter = useEnterStoryStage();
   const navigate = useNavigate();
+  const [battleReplay, setBattleReplay] = useState<StoryEntryResult['replay']>();
 
   if (overview.isPending || students.isPending)
     return (
@@ -48,6 +55,20 @@ export function StoryPage() {
   }
   if (overview.data === undefined || students.data === undefined) return null;
 
+  if (enter.isPending) {
+    return <BattleWaiting label="服务端正在完成比赛模拟并传回回放…" />;
+  }
+
+  if (battleReplay !== undefined) {
+    return (
+      <BattleReplay
+        replay={battleReplay}
+        onOpenReport={(recordId) => navigate(`/records/${recordId}?details=1`)}
+        onReturn={() => setBattleReplay(undefined)}
+      />
+    );
+  }
+
   const activeStudentId = studentId ?? students.data[0]?.id;
   const enterStage = (stageKey: string) => {
     if (activeStudentId === undefined) return;
@@ -58,7 +79,7 @@ export function StoryPage() {
         ngLevel,
         idempotencyKey: crypto.randomUUID(),
       },
-      { onSuccess: (result) => navigate(`/records/${result.record.id}`) },
+      { onSuccess: (result) => setBattleReplay(result.replay) },
     );
   };
 

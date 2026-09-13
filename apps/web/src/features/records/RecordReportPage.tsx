@@ -1,7 +1,8 @@
-import { useState, type JSX } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useEffect, useState, type JSX } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { ContestRecordView, ContestReport, RewardLine } from '@oinur/shared';
-import { useContestRecord } from '../../lib/hooks';
+import { BattleReplay, BattleWaiting } from './BattleReplay';
+import { useContestRecord, useContestReplay } from '../../lib/hooks';
 
 const BACK_TARGET: Record<ContestRecordView['type'], { to: string; label: string }> = {
   STORY: { to: '/story', label: '返回剧情' },
@@ -12,19 +13,47 @@ const BACK_TARGET: Record<ContestRecordView['type'], { to: string; label: string
 export function RecordReportPage(): JSX.Element {
   const { recordId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const detailsOnly = searchParams.get('details') === '1';
   const query = useContestRecord(recordId);
+  const replayQuery = useContestReplay(recordId, !detailsOnly);
+  const [replayFinished, setReplayFinished] = useState(detailsOnly);
   const [copied, setCopied] = useState(false);
 
-  if (query.isPending) return <p className="text-neutral-500">加载战报…</p>;
-  if (query.isError || query.data === undefined) {
+  useEffect(() => {
+    setReplayFinished(detailsOnly);
+  }, [detailsOnly, recordId]);
+
+  if (query.isPending || (!detailsOnly && replayQuery.isPending)) {
+    return <BattleWaiting label={detailsOnly ? '加载完整战报…' : '服务端正在传回战斗回放…'} />;
+  }
+  if (
+    query.isError ||
+    query.data === undefined ||
+    (!detailsOnly && (replayQuery.isError || replayQuery.data === undefined))
+  ) {
     return (
       <div className="space-y-2 text-sm text-red-600">
-        <p>战报不存在、已失效或无权访问。</p>
-        <button className="rounded border px-3 py-1 text-xs" onClick={() => void query.refetch()}>
+        <p>
+          {replayQuery.isError && !detailsOnly
+            ? '战斗回放加载失败。'
+            : '战报不存在、已失效或无权访问。'}
+        </p>
+        <button
+          className="rounded border px-3 py-1 text-xs"
+          onClick={() => {
+            void query.refetch();
+            if (!detailsOnly) void replayQuery.refetch();
+          }}
+        >
           重试
         </button>
       </div>
     );
+  }
+
+  if (!detailsOnly && !replayFinished && replayQuery.data !== undefined) {
+    return <BattleReplay replay={replayQuery.data} onFinished={() => setReplayFinished(true)} />;
   }
 
   const record = query.data;

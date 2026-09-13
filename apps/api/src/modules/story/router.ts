@@ -65,6 +65,17 @@ storyRouter.post('/stages/:stageKey/enter', requireAuth, async (req, res, next) 
 });
 
 export const recordRouter = Router();
+recordRouter.get('/:recordId/replay', requireAuth, async (req, res, next) => {
+  try {
+    res.json({
+      ok: true,
+      data: await service.getContestReplay(req.user!.id, String(req.params.recordId)),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 recordRouter.get('/:recordId', requireAuth, async (req, res, next) => {
   try {
     res.json({

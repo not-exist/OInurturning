@@ -3,6 +3,7 @@ import {
   CONFIG_RARITIES,
   frozenSolveHooksSchema,
   normalizeProblemTemplate,
+  type BattleReplay,
   type ContestRecordView,
   type GrowthDelta,
   type ParticipantSnapshot,
@@ -21,6 +22,7 @@ import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
+import { buildBattleReplay } from '../contest/replay.js';
 import {
   buildContestSummary as buildSummary,
   validateRankingReport,
@@ -41,6 +43,7 @@ const FULL_CLEAR_TROPHY = 'trophy-gold';
 
 export interface StoryEntryResult {
   record: ContestRecordView;
+  replay: BattleReplay;
   replayed: boolean;
   firstClear: boolean;
 }
@@ -210,6 +213,14 @@ export async function getProgress(userId: number, ngLevel?: number): Promise<Sto
   return rows.map(rowToProgress);
 }
 
+export async function getContestReplay(userId: number, recordId: string): Promise<BattleReplay> {
+  const record = await getContestRecord(userId, recordId);
+  const title =
+    record.stageKey ??
+    (record.type === 'PVP' ? 'PVP 对决' : record.type === 'ADVENTURE' ? '历练对决' : '剧情比赛');
+  return buildBattleReplay(record.id, record.report, title);
+}
+
 export async function getContestRecord(
   userId: number,
   recordId: string,
@@ -220,7 +231,8 @@ export async function getContestRecord(
       where: { contestRecordId: recordId, OR: [{ homeUserId: userId }, { awayUserId: userId }] },
       select: { contestRecord: { select: { userId: true } } },
     });
-    if (pvpMatch?.contestRecord?.userId !== undefined) record = await getContestRecordForUser(pvpMatch.contestRecord.userId, recordId);
+    if (pvpMatch?.contestRecord?.userId !== undefined)
+      record = await getContestRecordForUser(pvpMatch.contestRecord.userId, recordId);
   }
   if (record === null) throw new ApiError('NOT_FOUND', { resource: 'contestRecord', recordId });
   return record;
@@ -568,7 +580,14 @@ export async function enterStoryStage(
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const replay = await getContestRecordByIdempotency(userId, idempotencyKey, tx);
-    if (replay !== null) return { record: replay, replayed: true, firstClear: false };
+    if (replay !== null) {
+      return {
+        record: replay,
+        replay: buildBattleReplay(replay.id, replay.report, stage.name),
+        replayed: true,
+        firstClear: false,
+      };
+    }
     await tx.$queryRaw`SELECT id FROM Student WHERE id = ${roster[0]} FOR UPDATE`;
     const student = await tx.student.findUnique({
       where: { id: roster[0] },
@@ -742,6 +761,11 @@ export async function enterStoryStage(
         tx,
       );
     }
-    return { record, replayed: false, firstClear: firstClear && report.pass };
+    return {
+      record,
+      replay: buildBattleReplay(record.id, report, stage.name),
+      replayed: false,
+      firstClear: firstClear && report.pass,
+    };
   });
 }
