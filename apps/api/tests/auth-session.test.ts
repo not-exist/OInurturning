@@ -103,7 +103,7 @@ describe('改密后的全局失效', () => {
 });
 
 describe('注销', () => {
-  it('POST /api/auth/deactivate：软删账号、token 失效、用户名不可复用', async () => {
+  it('POST /api/auth/deactivate：物理删除账号、token 失效、用户名立即可复用', async () => {
     const { token } = await registerAndGetCookies();
     const del = await request(app)
       .post('/api/auth/deactivate')
@@ -114,10 +114,11 @@ describe('注销', () => {
     const me = await request(app).get('/api/users/me').set('Authorization', `Bearer ${token}`);
     expect(me.status).toBe(401);
 
-    // 软删后用户名保持占用：重新注册同用户名 → ALREADY_EXISTS
+    // 回归：注销＝硬删，username 唯一索引随行释放，同名重新注册必须成功。
+    // （此前实现为软删，用户行仍占索引，此处恒返回 409 ALREADY_EXISTS →「用户名已被占用」）
     const reuse = await request(app).post('/api/auth/register').send(U);
-    expect(reuse.status).toBe(409);
-    expect(unwrapErr(reuse).code).toBe('ALREADY_EXISTS');
+    expect(reuse.status).toBe(200);
+    expect(unwrapOk<{ accessToken: string; me: MeView }>(reuse).me.username).toBe(U.username);
   });
 
   it('密码确认不符 → INVALID_CREDENTIALS，账号保留', async () => {

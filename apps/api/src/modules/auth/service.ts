@@ -73,8 +73,8 @@ export async function register(input: { username: string; password: string }) {
 export async function login(input: { username: string; password: string }) {
   const user = await prisma.user.findUnique({ where: { username: input.username } });
   const ok = await bcrypt.compare(input.password, user?.passwordHash ?? DUMMY_HASH);
-  // 软删账号视为不存在（不泄露「已注销」状态，且仍执行等耗时 bcrypt 保持侧信道均衡）
-  if (!user || !user.passwordHash || user.deletedAt || !ok) throw new ApiError('INVALID_CREDENTIALS');
+  // 注销账号已被物理删除，此处 findUnique 自然查不到，无需额外状态位
+  if (!user || !user.passwordHash || !ok) throw new ApiError('INVALID_CREDENTIALS');
   const updated = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   return sessionFor(updated);
 }
@@ -89,11 +89,38 @@ export async function changePassword(userId: number, oldPassword: string, newPas
   });
 }
 
+/**
+ * 注销＝物理删除（TECH-DESIGN §9.6 / §12 T4）：立刻清除该账号在库内的全部数据。
+ *
+ * 依赖既有 ON DELETE CASCADE 外键，单条 DELETE 即级联清空学员/道具/题库条目/声誉日志/
+ * 招募池/战报/剧情进度/历练日志/讲课日志/训练日志/PVP 报名与奖励发放；AdminAuditLog.adminId、
+ * PvpTournament.createdBy 与 AdminAnnouncement.authorId 走 SET NULL（审计与全站内容留存）。
+ * username 唯一索引随行释放，同名可立即重新注册。
+ *
+ * 护栏——进行中赛事禁止注销：PvpMatch.homeUserId/awayUserId/winnerUserId 是无外键的裸 Int，
+ * 而 playPending 以「双方报名行必须存在」为不变量（缺失即抛 STATE_CONFLICT 并回滚整场推进）。
+ * 若参赛者在对局打完前注销，其报名行级联消失，advancePvpTournament 会在 GET 读路径上永久失败，
+ * 该赛事对所有剩余选手变成死局。故 REGISTERING/RUNNING 赛事的报名者一律拒绝注销；赛事一旦
+ * 推进到 FINISHED/CANCELLED（懒推进，任一次读请求即完成全部轮次）即可删除。
+ */
 export async function deactivate(userId: number): Promise<void> {
-  // 注销＝软删：仅标记 deletedAt，保留全部业务数据（学员/战报/声誉日志/审计快照等）
-  // 以满足引用完整性与审计需求；登录/refresh/requireAuth 均以 deletedAt 拦截，等效账号失效，
-  // 用户名保持占用不可复用（唯一索引仍指向该行）。
-  await prisma.user.update({ where: { id: userId }, data: { deletedAt: new Date() } });
+  await prisma.$transaction(async (tx) => {
+    // 单用户名下报名行极少，一次取回再在内存判定赛事状态（避免关系型 where 过滤）
+    const registrations = await tx.pvpRegistration.findMany({
+      where: { userId },
+      select: { tournamentId: true, tournament: { select: { status: true } } },
+    });
+    const active = registrations.find(
+      (row) => row.tournament.status === 'REGISTERING' || row.tournament.status === 'RUNNING',
+    );
+    if (active !== undefined)
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'pvp-tournament',
+        id: active.tournamentId,
+        reason: 'ACTIVE_TOURNAMENT',
+      });
+    await tx.user.delete({ where: { id: userId } });
+  });
 }
 
 export async function bumpTokenVersionAndLogout(userId: number): Promise<void> {

@@ -172,7 +172,18 @@ export async function ensurePvpRewardGrants(tx: Prisma.TransactionClient, tourna
   ]);
   const config = normalizePrizes(tournament.prizes);
   validateItems(config);
-  for (const standing of standings(matches, registrations.map((registration) => registration.userId))) {
+  const computed = standings(matches, registrations.map((registration) => registration.userId));
+  // PvpMatch.homeUserId/awayUserId/winnerUserId 是无外键的裸 Int，参赛者注销（物理删除）后
+  // 这些 id 仍残留在历史对阵行里；直接拿去写 PvpRewardGrant 会撞 users 外键（P2003）并让
+  // GET /api/pvp/tournaments/:id 这条读路径对所有剩余选手 500。故先过滤掉已不存在的账号，
+  // 其名次与奖励一并作废（rank 由 standings 定序，跳过不改变他人名次）。
+  const alive = await tx.user.findMany({
+    where: { id: { in: computed.map((standing) => standing.userId) } },
+    select: { id: true },
+  });
+  const aliveIds = new Set(alive.map((row) => row.id));
+  for (const standing of computed) {
+    if (!aliveIds.has(standing.userId)) continue;
     const bucket = standing.rank === 1
       ? config.champion
       : standing.rank === 2

@@ -136,6 +136,39 @@ pnpm -C apps/api onboarding:backfill
 pnpm -C apps/api onboarding:backfill --limit 500
 ```
 
-- 目标：`onboardedAt` 为空且未注销（`deletedAt` 为空）的用户；已发放/已注销自动跳过；
+- 目标：`onboardedAt` 为空的用户（注销即物理删除，不存在「已注销但仍留库」的行）；已发放自动跳过；
 - 幂等：按 `onboardedAt` 标记，重复执行不翻倍（钱/声誉走 increment、道具走 upsert-increment）；
 - 逐用户独立事务：单用户失败记日志继续，不影响其他用户，事后重跑即可补齐。
+
+## 10. 注销硬删迁移（不可逆，务必先备份）
+
+迁移 `20260913000000_hard_delete_users` 把注销从软删改为物理删除（TECH-DESIGN §9.6），
+随 `docker compose up -d --build` 由 entrypoint 自动 `migrate deploy` 执行。它会：
+
+1. 把 `AdminAnnouncement.authorId` 外键改为 `SET NULL`（公告不再随作者注销被删）；
+2. `DELETE FROM users WHERE deletedAt IS NOT NULL`——**级联清空历史软删账号的全部业务数据并释放其用户名**；
+3. `DROP COLUMN users.deletedAt`。
+
+上线前后要点：
+
+```bash
+# 1) 执行前必备份（第 2 步不可逆，删掉的数据无法恢复）
+deploy/backup.sh
+
+# 2) 先看影响面：有多少历史软删账号会被清除（只读）
+docker compose exec mysql sh -c \
+  'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
+   -e "SELECT COUNT(*) AS soft_deleted FROM users WHERE deletedAt IS NOT NULL;"'
+
+# 3) 升级并确认迁移已应用
+docker compose up -d --build
+docker compose exec mysql sh -c \
+  'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
+   -e "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY finished_at DESC LIMIT 3;"'
+```
+
+- 第 2、3 步顺序不可调换：否则已注销管理员名下的全站公告会被旧的 `CASCADE` 规则连带删除；
+- 迁移后这些用户名立即可被重新注册，新账号是**全新 id、零数据**，与旧账号无任何关联，客服侧不要按旧 id 追溯；
+- 注销后的用户数据不可恢复（无软删标记、无回收站）；误注销只能从备份库单表捞回，属事故级操作；
+- 玩家侧行为变化：进行中（`REGISTERING`/`RUNNING`）PVP 赛事的参赛者注销会被拒（`409 STATE_CONFLICT`），
+  前端提示「等赛事结束后再注销」，赛事 `FINISHED`/`CANCELLED` 后即可注销。

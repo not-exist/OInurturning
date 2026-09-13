@@ -348,3 +348,55 @@ describe('pvp coverage：admin 一键开赛真实路径', () => {
     expect(audit.adminId).toBe(admin.userId);
   });
 });
+
+describe('pvp coverage：参赛者注销（物理删除）后的历史赛事健壮性', () => {
+  it('完赛后冠军注销 → 赛事读路径仍 200，其奖励行级联消失且不再重建', async () => {
+    const tournament = await makeTournament({ autoStartAt: PAST });
+    const players: Player[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      const player = await makePlayer();
+      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      players.push(player);
+    }
+    await finishTournament(tournament.id);
+
+    const grantsBefore = await prisma.pvpRewardGrant.findMany({ where: { tournamentId: tournament.id } });
+    expect(grantsBefore).toHaveLength(8);
+    const champion = grantsBefore.find((grant) => grant.rank === 1)!;
+    const championPlayer = players.find((player) => player.userId === champion.userId)!;
+
+    // 赛事已 FINISHED → deactivate 护栏放行，账号被物理删除
+    const gone = await request(app)
+      .post('/api/auth/deactivate')
+      .set('Authorization', `Bearer ${championPlayer.token}`)
+      .send({ password: 'pw-12345678' });
+    expect(gone.status).toBe(200);
+    expect(await prisma.user.findUnique({ where: { id: champion.userId } })).toBeNull();
+
+    // 回归护栏：PvpMatch 的参赛者 id 是无外键裸 Int，注销后仍残留；ensurePvpRewardGrants
+    // 若拿它去 upsert 会撞 users 外键（P2003），令 GET 详情对所有剩余选手 500。
+    const survivor = players.find((player) => player.userId !== champion.userId)!;
+    const detail = await request(app)
+      .get(`/api/pvp/tournaments/${tournament.id}`)
+      .set('Authorization', `Bearer ${survivor.token}`);
+    expect(detail.status).toBe(200);
+    expect(unwrapOk<{ status: string }>(detail).status).toBe('FINISHED');
+
+    // 对阵历史仍完整可读（7 场），只是已删冠军的战报链接随其 ContestRecord 一并消失
+    const bracket = await request(app)
+      .get(`/api/pvp/tournaments/${tournament.id}/bracket`)
+      .set('Authorization', `Bearer ${survivor.token}`);
+    expect(bracket.status).toBe(200);
+    expect(unwrapOk<unknown[]>(bracket)).toHaveLength(7);
+
+    // 已删冠军的奖励行不复活，其余 7 人名次与奖励不受影响
+    const grantsAfter = await prisma.pvpRewardGrant.findMany({ where: { tournamentId: tournament.id }, orderBy: { rank: 'asc' } });
+    expect(grantsAfter).toHaveLength(7);
+    expect(grantsAfter.some((grant) => grant.userId === champion.userId)).toBe(false);
+    const rewards = await request(app)
+      .get(`/api/pvp/tournaments/${tournament.id}/rewards`)
+      .set('Authorization', `Bearer ${survivor.token}`);
+    expect(rewards.status).toBe(200);
+    expect(unwrapOk<RewardGrant[]>(rewards)).toHaveLength(7);
+  });
+});

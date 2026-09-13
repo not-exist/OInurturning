@@ -441,7 +441,7 @@ MySQL 8 + Prisma 最新稳定版（6.x）。设计要点先行：
 - **快照优于引用**：参赛学员属性、报名阵容、题目参数一律在开赛/报名时刻**冻结为 JSON 快照**存入记录表；此后学员成长、开除、道具变动都不影响历史对局的可复现性与公平性。战报与快照自包含，不依赖 join。
 - **JSON 列**用于：战报、快照、奖励明细、配置 payload、勋章列表。形状由 shared 类型约束，读取端按 `reportVersion` 容错渲染。
 - **浮点资源列**：`stamina/energy/mindset` 存 `Float`——惰性恢复是连续量，取整只发生在 API 出口（`Math.floor`），避免高频小额结算丢失小数（§6）。
-- **删除策略**：玩家数据随账号注销**软删**（`deletedAt` 标记，业务数据保留），登录/refresh/鉴权一律拦截，等效账号失效且 username 不再释放（理由见 §9.6）。学员开除是软状态（`status=DISMISSED`），保留供历史战报/历练档案展示。
+- **删除策略**：玩家数据随账号注销**物理删除**（单条 DELETE 由 DB 级联清空全部业务数据，`username` 唯一索引随行释放、可立即复用；护栏与取舍见 §9.6）。学员开除是软状态（`status=DISMISSED`），保留供历史战报/历练档案展示。
 
 ```prisma
 // apps/api/prisma/schema.prisma
@@ -525,14 +525,13 @@ enum PassiveKind {
 model User {
   id            Int       @id @default(autoincrement())
   username      String    @unique @db.VarChar(32)
-  passwordHash  String?   // 注销＝软删：置 deletedAt，保留 hash 与全部业务数据（§9.6）
+  passwordHash  String?   // 注销＝物理删除：整行连同 hash 一并清除（§9.6）
   role          Role      @default(USER)
   money         Int       @default(0)          // Int 上限约 2.1e9，代码层加溢出护栏
   reputation    Int       @default(0)
   badges        Json      @default("[]")       // 勋章 id 数组，如 "legendary_coach"
   tokenVersion  Int       @default(0)          // 改密/登出全部设备时 +1，使存量 JWT 失效
   bannedAt      DateTime?                       // 管理员封禁；非空则一切鉴权拒绝
-  deletedAt     DateTime?                       // 注销软删标记；非空则登录/refresh/鉴权一律拒绝
   lastLoginAt   DateTime?
   lastSettledAt DateTime  @default(now())      // 被动收入惰性结算锚点（§6）
   createdAt     DateTime  @default(now())
@@ -1064,7 +1063,7 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | 3 | POST /api/auth/refresh | 公开(Cookie) | 无 body，读 HttpOnly 刷新 Cookie | 轮换新 accessToken + 新 Cookie | 会话续期 |
 | 4 | POST /api/auth/logout | 登录 | — | 清 Cookie；tokenVersion+1 全设备失效 | 登出 |
 | 5 | PUT /api/auth/password | 登录 | oldPassword+newPassword | 成功后 tokenVersion+1，需重新登录 | 设置页改密 |
-| 6 | POST /api/auth/deactivate | 登录 | password 确认 | 软删（置 deletedAt，§9.6），清 Cookie | 设置页注销 |
+| 6 | POST /api/auth/deactivate | 登录 | password 确认 | 物理删除账号 + DB 级联清数据（§9.6），清 Cookie；进行中赛事参赛者 409 STATE_CONFLICT | 设置页注销 |
 | 7 | GET /api/users/me | 登录 | — | MeView（id/注册时间/lastLoginAt/钱/声誉/勋章） | 设置页展示 |
 | 8 | GET /api/meta | 公开 | — | configVersion、serverTime、恢复速率常量 | 前端本地投影 |
 
@@ -1457,7 +1456,7 @@ API client：薄 fetch 封装（自动带 Bearer、解信封、401 时静默 ref
 | accessToken | TTL 15 分钟，仅存前端内存（zustand） | 不落 localStorage，XSS 无法持久窃取 |
 | refreshToken | TTL 7 天，HttpOnly + Secure + SameSite=Strict Cookie（Path=/api/auth） | Strict 完全隔离跨站携带，CSRF 面归零；仅 refresh/logout 两端点消费 |
 | 轮换 | 每次 refresh 签发新对 | 旧 access 自然过期 |
-| 全局失效 | 改密/登出全部设备 → `tokenVersion+1` 写回 JWT claim；封禁/注销 → `bannedAt`/`deletedAt` 标记，`requireAuth` 每次请求读库拦截（即时生效，无 access 15 分钟窗口） | 无状态实现"踢下线"，不需要 token 黑名单表 |
+| 全局失效 | 改密/登出全部设备 → `tokenVersion+1` 写回 JWT claim；封禁 → `bannedAt` 标记，`requireAuth` 每次请求读库拦截（即时生效，无 access 15 分钟窗口）；注销 → 账号行物理删除，查库得 null 即拒绝 | 无状态实现"踢下线"，不需要 token 黑名单表 |
 | 已接受风险 | refreshToken 无使用检测（reuse detection 需服务端存储） | 社区规模下风险与成本不成比例；Cookie 属性已限窄路径 |
 
 ### 9.3 HTTP 安全头 / CORS / 限流
@@ -1486,16 +1485,39 @@ Prisma 全程参数化。纪律：
 
 ### 9.6 注销账户的数据处理
 
-选择**软删**（M5 修订：原 §12 T4「硬删」在实现复审中改为软删，理由见下）：
+选择**物理删除**（M6 修订：M5 曾改判软删，但软删保留用户行会永久占用 `username` 唯一索引，
+导致「注销后同名重注册提示用户名已被占用」，与前端二次确认承诺的「将删除全部数据」及 §11.2
+M0 验收项「注销后数据级联删除断言」直接冲突，故回归硬删并补齐护栏）：
 
-1. 校验密码 → 单条 UPDATE 置 `deletedAt = now()`，**不物理删除任何行**；
-2. 全部业务数据（students / user_items / problem_entries / contest_records / story_progress / adventure_logs / registrations / reputation_logs）随行保留，外键永不悬空、历史战报与历练档案始终可渲染；
-3. 登录（`login`）、会话续期（`refresh`）与鉴权中间件（`requireAuth`）均以 `deletedAt` 拦截，等效账号失效——比 tokenVersion 更强（每次请求读库校验，无 15 分钟窗口）；
-4. AdminAuditLog 原本即不级联删除（`adminId` SetNull + `adminNameSnapshot` 冗余），软删后自然保留；
-5. `username` 唯一索引仍指向该行，**昵称不可复用**（避免"朋友可复用昵称"引发的身份冒充与历史归属混淆）；若要真正回收用户名，需人工 DBA 干预；
-6. 误注销恢复：管理员可通过 DBA 置空 `deletedAt` 恢复账号（无自助通道，属受控运维操作）。
+1. 校验密码 → 单事务内删除 `users` 行，由既有 `ON DELETE CASCADE` 外键级联清空该账号全部业务数据：
+   students / user_items / problem_library_entries / reputation_logs / recruit_pool / contest_records /
+   story_progress / adventure_logs / lecture_logs / training_logs / pvp_registrations / pvp_reward_grants；
+2. `username` 唯一索引随行释放，**同名可立即重新注册**；新账号拿到全新自增 id，与旧账号无任何关联；
+3. 留存项（非玩家个人数据或属法定审计）：`AdminAuditLog.adminId`、`PvpTournament.createdBy` 走 `SET NULL`
+   （审计另有 `adminNameSnapshot` 冗余留档）；`AdminAnnouncement.authorId` 亦走 `SET NULL`——公告是全站
+   内容，不应因作者注销而消失（原为 `CASCADE`，管理员自行注销会连带清空历史公告）；
+4. 账号行删除后 `login` / `refresh` / `requireAuth` 查库自然得 null，一律拒绝，旧 token 立即失效；
+   无需状态位，也不泄露「该用户名曾存在」；
+5. **护栏一——进行中赛事禁止注销**：`PvpMatch.homeUserId/awayUserId/winnerUserId` 是无外键的裸 Int，而
+   `playPending` 以「双方报名行必须存在」为不变量（缺失即抛 `STATE_CONFLICT` 并回滚整场推进）。若参赛者
+   在对局打完前注销，其报名行级联消失，`advancePvpTournament` 会在 **GET 读路径**上永久失败，该赛事对所有
+   剩余选手变成死局。故 `REGISTERING/RUNNING` 赛事的报名者注销返回 `409 STATE_CONFLICT`，前端提示
+   「等赛事结束后再注销」；懒推进下单次读请求即跑完全部轮次，等待窗口很短；
+6. **护栏二——奖励发放跳过已删账号**：`ensurePvpRewardGrants` 的名次由历史 `PvpMatch` 裸 Int 推导，参赛者
+   注销后这些 id 仍残留在对阵行里；直接拿去 upsert `PvpRewardGrant` 会撞 `users` 外键（P2003），令赛事详情
+   读路径对所有剩余选手 500。故先按存活账号过滤，已删者名次与奖励一并作废（`rank` 由 `standings` 定序，
+   跳过不改变他人名次）；
+7. 已知取舍：完赛后注销，其 `ContestRecord` 随账号删除、`PvpMatch.contestRecordId` 置空 → **对手失去该场
+   「查看战报」链接**；对阵比分（`homeScore`/`awayScore`/`winnerUserId`）与赛程结构仍完整保留，历史 bracket
+   照常渲染（前端本就按 userId 显示，非昵称）。这是「立即清除个人数据」的必然代价，优先级高于战报可复现性；
+8. 误注销**不可恢复**（前端二次确认文案已明确列出将删除的数据范围与用户名会被释放）；
+9. 存量数据迁移：`20260913000000_hard_delete_users`，三步且**顺序不可调换**——
+   ① 先把 `AdminAnnouncement` 外键改为 `SET NULL`；② 再 `DELETE FROM users WHERE deletedAt IS NOT NULL`
+   级联清空历史软删账号并释放其用户名；③ 最后 DROP `deletedAt` 列。若 ② 早于 ①，已注销管理员名下的
+   全站公告会被旧的 `CASCADE` 规则连带删除。该迁移不可逆（执行前须备份，见 OPERATIONS §备份）。
 
-> 变更理由：硬删依赖 DB 级联清空 PvpMatch 所引用 ContestRecord，会破坏「快照自包含、战报可复现」的对局历史；软删以 1 列代价换取数据可审计、可恢复、引用永不悬空，成本远低于硬删的合规与恢复风险。
+> 变更理由：软删的「引用永不悬空、可 DBA 恢复」收益，抵不过「用户注销后个人数据仍在库、且同名无法重新注册」
+> 这一与产品承诺和合规要求直接冲突的缺陷；硬删的引用完整性风险已由护栏 1/2 与 `SET NULL` 关系收敛到可接受范围。
 
 ---
 
@@ -1658,7 +1680,7 @@ CI 顺序：`pnpm -r lint → typecheck → unit → integration`；集成任务
 | T1 | 时间资源推进 | 读时惰性结算（§6）：免 cron、离线补偿天然正确、零写放大 | cron 方案；代价：读路径返回投影值与库内值有微小时间差（无害，写路径权威化） |
 | T2 | 实时能力 | 无 WebSocket/Redis/MQ，即时模拟+战报；弱提醒用轮询+浏览器 Notification 降级 | 实时推送；代价：PVP 开赛通知延迟 ≤30s |
 | T3 | 战报存储 | ContestRecord 单表承载 STORY/PVP/ADVENTURE 三类（GAME-DESIGN §17 所述 contest_records/duel_records 合一，format 字段区分）：生命周期与信封完全同构，少一张表一套读写 | 双表方案；代价：无 |
-| T4 | 注销数据处理 | 软删（deletedAt 标记，数据保留、username 占用）：对局历史与审计永不悬空、误注销可 DBA 恢复 | 硬删；代价：昵称不可回收、残留行（无实质影响） |
+| T4 | 注销数据处理 | 物理删除（DB 级联清空业务数据、username 立即释放可复用）+ 双护栏（进行中赛事拒绝注销、奖励发放跳过已删账号）：兑现前端「将删除全部数据」承诺与注销即清除个人数据的合规要求 | 软删（deletedAt 标记）；代价：`username` 永久占用致同名不可重注册、个人数据未清除。硬删自身代价：对手丢失该场战报链接、误注销不可恢复 |
 | T5 | 并发控制 | 写路径行锁（FOR UPDATE）+ 固定加锁顺序 + 条件 UPDATE 双保险；读路径零写入投影 | 乐观锁版本号；代价：$queryRaw 一处受控豁免 |
 | T6 | 会话失效 | tokenVersion claim 无状态踢人 | refresh token 存储表/reuse detection；代价：被盗 Cookie 无法定向吊销单个设备（只能全体失效） |
 | T7 | 部署形态 | API 单实例：内存限流桶、内存幂等缓存成立 | 多实例水平扩展；升级路径：限流换 Redis 存储、幂等缓存入库——均为局部改造，架构不推翻 |

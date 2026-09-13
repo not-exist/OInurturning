@@ -192,11 +192,8 @@ function UserTable({ users }: { users: UserAdminView[] }): JSX.Element {
         </thead>
         <tbody className="divide-y divide-neutral-200">
           {users.map((user) => {
-            const status = user.deletedAt
-              ? '已注销'
-              : user.bannedAt
-                ? '已封禁'
-                : '正常';
+            // 注销＝物理删除，已注销账号不再出现在列表里，故只剩封禁/正常两态
+            const status = user.bannedAt ? '已封禁' : '正常';
             return (
               <tr key={user.id}>
                 <td className="px-3 py-3 font-medium">{user.username}</td>

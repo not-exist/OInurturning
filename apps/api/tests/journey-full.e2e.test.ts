@@ -371,16 +371,26 @@ describe('journey full (api)', () => {
     expect(loginNew.status).toBe(200);
     const newToken = unwrapOk<{ accessToken: string }>(loginNew).accessToken;
 
-    // —— 注销：账号彻底失效 ——
+    // —— 注销：物理删除，数据立刻清空 ——
     const gone = await request(app)
       .post('/api/auth/deactivate')
       .set({ Authorization: `Bearer ${newToken}` })
       .send({ password: 'pw-new-12345678' });
     expect(gone.status).toBe(200);
+    // 赛事已 FINISHED，护栏放行；账号行与名下学员/道具被 DB 级联清空
+    expect(await prisma.user.findUnique({ where: { id: player.userId } })).toBeNull();
+    expect(await prisma.student.findMany({ where: { userId: player.userId } })).toHaveLength(0);
+    expect(await prisma.userItem.findMany({ where: { userId: player.userId } })).toHaveLength(0);
     const loginGone = await request(app)
       .post('/api/auth/login')
       .send({ username: player.username, password: 'pw-new-12345678' });
     expect(loginGone.status).toBe(401);
+    // 回归本 bug：username 唯一索引随行释放，同名可立即重新注册（旧实现为软删 → 409 已被占用）
+    const reborn = await request(app)
+      .post('/api/auth/register')
+      .send({ username: player.username, password: 'pw-new-12345678' });
+    expect(reborn.status).toBe(200);
+    expect(unwrapOk<{ me: { id: number } }>(reborn).me.id).not.toBe(player.userId);
     console.log('JSTAGE:account');
   });
 });

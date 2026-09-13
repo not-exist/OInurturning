@@ -24,9 +24,10 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
       }
       const user = await prisma.user.findUnique({
         where: { id: claims.uid },
-        select: { id: true, role: true, tokenVersion: true, bannedAt: true, deletedAt: true },
+        select: { id: true, role: true, tokenVersion: true, bannedAt: true },
       });
-      if (!user || user.bannedAt || user.deletedAt || user.tokenVersion !== claims.tv) throw new ApiError('UNAUTHENTICATED');
+      // 注销账号已物理删除 → findUnique 返回 null，同样落到 UNAUTHENTICATED，无需状态位
+      if (!user || user.bannedAt || user.tokenVersion !== claims.tv) throw new ApiError('UNAUTHENTICATED');
       req.user = { id: user.id, role: user.role, tokenVersion: user.tokenVersion };
       next();
     } catch (e) { next(e); }
