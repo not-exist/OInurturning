@@ -23,6 +23,9 @@ export default async function setup(): Promise<void> {
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     multipleStatements: true, // 迁移 SQL 为多语句脚本
+    // MySQL 8.x 默认 caching_sha2_password：非 SSL TCP 上首次认证需取回服务端 RSA 公钥
+    //（本驱动缺省拒绝拉取，见 ER_CANNOT_RETRIEVE_RSA_KEY）。仅用于本地/CI 回环连接。
+    allowPublicKeyRetrieval: true,
   });
   try {
     await admin.query(`DROP DATABASE IF EXISTS \`${database}\``);

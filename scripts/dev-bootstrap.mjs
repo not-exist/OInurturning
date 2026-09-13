@@ -209,6 +209,8 @@ async function applyMigrations(mariadb, database) {
     user: 'oinur',
     password: 'oinur',
     multipleStatements: true,
+    // MySQL 8.x caching_sha2_password：非 SSL TCP 首次认证需允许取回 RSA 公钥（仅回环）
+    allowPublicKeyRetrieval: true,
   });
   await admin.query(`DROP DATABASE IF EXISTS \`${database}\``);
   await admin.query(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
