@@ -32,6 +32,18 @@ pnpm dev                    # 前端通常在 http://localhost:5173
 
 需要演示数据时可运行 `pnpm seed`。数据库相关命令和环境变量说明见各包的 `package.json` 及 `docs/OPERATIONS.md`。
 
+### 受限网络环境（二进制 CDN 不可达、无 Docker）
+
+在无法访问 `binaries.prisma.sh` 且没有 Docker 的机器（如部分 CI 沙箱）上，可运行：
+
+```bash
+pnpm install
+node scripts/dev-bootstrap.mjs   # 自动：占位引擎文件 + queryCompiler 模式 generate + 本地 MySQL + 建库
+pnpm test
+```
+
+该脚本检测到 Prisma 二进制 CDN 不可达时，会把客户端切换为 **Rust-free queryCompiler（WASM）+ `@prisma/adapter-mariadb` driver adapter** 模式（运行时不依赖任何下载的引擎二进制；即 `PRISMA_CLIENT_ENGINE_TYPE=client`，见 `apps/api/src/lib/prisma.ts`），并从 npm 拉取 MySQL 5.7 社区二进制在本地启动（生产/常规开发仍为 compose 的 MySQL 8.4，迁移 SQL 两者兼容）。正常网络环境下脚本为 no-op。
+
 ## 检查与测试
 
 ```bash
