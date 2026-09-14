@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react';
 import type { BattleReplay as BattleReplayData, BattleReplayEvent } from '@oinur/shared';
 
 const SPEEDS = [1, 2, 4, 8] as const;
+const BASE_PLAYBACK_RATE = 0.5;
 
 type ReplaySpeed = (typeof SPEEDS)[number];
 
@@ -103,7 +104,8 @@ export function BattleReplay({
 
   useEffect(() => {
     if (paused || finished || current === undefined) return undefined;
-    const duration = Math.max(100, current.durationMs / speed);
+    const effectiveSpeed = speed * BASE_PLAYBACK_RATE;
+    const duration = Math.max(100, current.durationMs / effectiveSpeed);
     const timer = window.setTimeout(() => {
       if (cursor + 1 < events.length) {
         setCursor((value) => value + 1);
