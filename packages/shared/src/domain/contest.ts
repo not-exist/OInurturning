@@ -236,6 +236,34 @@ const participantSnapshotShape = z
 export const participantSnapshotSchema = withJsonSafety(participantSnapshotShape);
 export type ParticipantSnapshot = z.infer<typeof participantSnapshotSchema>;
 
+/** 一支队伍的出战人数区间；同一场比赛内所有队伍必须取相同人数。 */
+export const TEAM_SIZE_MIN = 3 as const;
+export const TEAM_SIZE_MAX = 4 as const;
+
+const teamMembersShape = z
+  .array(participantSnapshotSchema)
+  .min(TEAM_SIZE_MIN)
+  .max(TEAM_SIZE_MAX);
+export const teamMembersSchema = withJsonSafety(teamMembersShape);
+export type TeamMembers = z.infer<typeof teamMembersSchema>;
+
+/** 一场比赛的参赛队伍：HOME 为玩家队（恒 index 0），其余为 NPC 队。 */
+const contestTeamShape = z
+  .object({
+    teamId: z.string().min(1),
+    side: z.enum(['HOME', 'NPC']),
+    userId: z.number().int().positive().nullable(),
+    members: teamMembersSchema,
+  })
+  .strict();
+export const contestTeamSchema = withJsonSafety(contestTeamShape);
+export type ContestTeam = z.infer<typeof contestTeamSchema>;
+
+/** 出题对决的某一侧队伍：只允许携带成员表，出场人数与对侧必须一致。 */
+const duelSideInputShape = z.object({ members: teamMembersSchema }).strict();
+export const duelSideInputSchema = withJsonSafety(duelSideInputShape);
+export type DuelSideInput = z.infer<typeof duelSideInputSchema>;
+
 const attemptResolutionShape = z
   .object({
     attemptNumber: z.number().int().positive(),
@@ -348,7 +376,7 @@ export type ParticipantTimeline = z.infer<typeof participantTimelineSchema>;
 
 const rankingStandingShape = z
   .object({
-    participantIndex: z.number().int().nonnegative(),
+    teamIndex: z.number().int().nonnegative(),
     totalScore: nonnegativeFinite,
     rank: z.number().int().positive(),
   })
@@ -417,8 +445,7 @@ const rankingInputShape = z
   .object({
     kind: z.enum(['story', 'custom']).optional(),
     stageRef: contestStageRefSchema.optional(),
-    student: participantSnapshotSchema,
-    participants: z.array(participantSnapshotSchema).optional(),
+    teams: z.array(contestTeamSchema).min(2),
     problems: z.array(questionSnapshotSchema).min(1),
     durationMin: finiteNumber.positive(),
     npcPoolParam: npcPoolParamSchema.optional(),
@@ -434,6 +461,34 @@ const rankingInputShape = z
         message: 'instanceId values must be unique',
       });
     }
+
+    const teamIds = new Set<string>();
+    const rosterSize = input.teams[0]?.members.length;
+    input.teams.forEach((team, teamIndex) => {
+      const expectedSide = teamIndex === 0 ? 'HOME' : 'NPC';
+      if (team.side !== expectedSide) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['teams', teamIndex, 'side'],
+          message: `Team ${teamIndex} must use side ${expectedSide}`,
+        });
+      }
+      if (team.members.length !== rosterSize) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['teams', teamIndex, 'members'],
+          message: 'Every team must field the same number of members',
+        });
+      }
+      if (teamIds.has(team.teamId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['teams', teamIndex, 'teamId'],
+          message: 'teamId values must be unique',
+        });
+      }
+      teamIds.add(team.teamId);
+    });
   });
 export const rankingInputSchema = withJsonSafety(rankingInputShape);
 export type RankingInput = z.infer<typeof rankingInputSchema>;
@@ -454,10 +509,80 @@ const reportHeaderShape = z
 export const reportHeaderSchema = withJsonSafety(reportHeaderShape);
 export type ReportHeader = z.infer<typeof reportHeaderSchema>;
 
+/** 队员身份摘要，用于核对 participants 与 teams.flatMap(members) 的顺序一致性。 */
+function memberIdentityKey(member: ParticipantSnapshot): string {
+  return JSON.stringify([
+    member.side,
+    member.userId,
+    member.studentId,
+    member.displayName,
+    member.mindset,
+    member.focusCap,
+    member.energyMax,
+  ]);
+}
+
+interface TeamAggregate {
+  totalScore: number;
+  rankingPenaltyMin: number;
+}
+
+function isBetterTeamAttempt(
+  candidate: TeamAttemptScore,
+  incumbent: TeamAttemptScore,
+): boolean {
+  if (candidate.scoreAwarded !== incumbent.scoreAwarded)
+    return candidate.scoreAwarded > incumbent.scoreAwarded;
+  if (candidate.minutesUsed !== incumbent.minutesUsed)
+    return candidate.minutesUsed < incumbent.minutesUsed;
+  return candidate.memberIndex < incumbent.memberIndex;
+}
+
+interface TeamAttemptScore {
+  scoreAwarded: number;
+  minutesUsed: number;
+  memberIndex: number;
+  accepted: boolean;
+}
+
+/**
+ * 队伍聚合：同一道题被多名队员作答时只取最优的一份成绩入账。
+ * 排序口径（确定性可复放）：得分高者优 → 用时少者优 → 队内序号小者优。
+ * 罚时沿用 ACM 口径：只有 AC 的成绩才累计用时。
+ */
+function aggregateTeam(timelines: readonly ParticipantTimeline[]): TeamAggregate {
+  const best = new Map<string, TeamAttemptScore>();
+
+  timelines.forEach((timeline, memberIndex) => {
+    for (const attempt of timeline.attempts) {
+      const candidate: TeamAttemptScore = {
+        scoreAwarded: attempt.resolution.scoreAwarded,
+        minutesUsed: attempt.minutesUsed,
+        memberIndex,
+        accepted: attempt.verdict === 'AC',
+      };
+      const incumbent = best.get(attempt.problemInstanceId);
+      if (incumbent === undefined || isBetterTeamAttempt(candidate, incumbent)) {
+        best.set(attempt.problemInstanceId, candidate);
+      }
+    }
+  });
+
+  let totalScore = 0;
+  let rankingPenaltyMin = 0;
+  for (const attempt of best.values()) {
+    totalScore += attempt.scoreAwarded;
+    if (attempt.accepted) rankingPenaltyMin += attempt.minutesUsed;
+  }
+
+  return { totalScore, rankingPenaltyMin };
+}
+
 const rankingReportShape = reportHeaderShape.extend({
   format: z.literal('RANKING'),
   inputSnapshot: rankingInputSchema,
   questions: z.array(questionSnapshotSchema).min(1),
+  teams: z.array(contestTeamSchema).min(2),
   participants: z.array(participantTimelineSchema).min(1),
   standings: z.array(rankingStandingSchema).min(1),
   pass: z.boolean(),
@@ -473,41 +598,54 @@ const rankingReportWithChecks = rankingReportShape.superRefine((report, context)
     });
   }
 
-  if (report.standings.length !== report.participants.length) {
+  if (report.standings.length !== report.teams.length) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['standings'],
-      message: 'Must contain exactly one standing per participant',
+      message: 'Must contain exactly one standing per team',
     });
   }
 
-  const expectedParticipantOrder = report.participants
-    .map((timeline, participantIndex) => ({
-      participantIndex,
-      totalScore: timeline.attempts.reduce(
-        (total, attempt) => total + attempt.resolution.scoreAwarded,
-        0,
-      ),
-      rankingPenaltyMin: timeline.attempts.reduce(
-        (total, attempt) => total + (attempt.verdict === 'AC' ? attempt.minutesUsed : 0),
-        0,
-      ),
-    }))
+  const flatMembers = report.teams.flatMap((team) => team.members);
+  if (flatMembers.length !== report.participants.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['participants'],
+      message: 'Must contain one timeline per team member',
+    });
+  } else {
+    report.participants.forEach((timeline, index) => {
+      if (memberIdentityKey(timeline.participant) !== memberIdentityKey(flatMembers[index]!)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['participants', index, 'participant'],
+          message: 'Order must follow teams.flatMap(members)',
+        });
+      }
+    });
+  }
+
+  let memberOffset = 0;
+  const expectedTeamOrder = report.teams
+    .map((team, teamIndex) => {
+      const timelines = report.participants.slice(memberOffset, memberOffset + team.members.length);
+      memberOffset += team.members.length;
+      return { teamIndex, ...aggregateTeam(timelines) };
+    })
     .sort(
       (left, right) =>
         right.totalScore - left.totalScore ||
         left.rankingPenaltyMin - right.rankingPenaltyMin ||
-        left.participantIndex - right.participantIndex,
+        left.teamIndex - right.teamIndex,
     );
 
-  const seenParticipants = new Set<number>();
+  const seenTeams = new Set<number>();
   report.standings.forEach((standing, standingPosition) => {
-    if (
-      standing.participantIndex !== expectedParticipantOrder[standingPosition]?.participantIndex
-    ) {
+    const expected = expectedTeamOrder[standingPosition];
+    if (standing.teamIndex !== expected?.teamIndex) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['standings', standingPosition, 'participantIndex'],
+        path: ['standings', standingPosition, 'teamIndex'],
         message: 'Must match score, accepted-time, and stable-index ordering',
       });
     }
@@ -518,60 +656,47 @@ const rankingReportWithChecks = rankingReportShape.superRefine((report, context)
         message: 'Ranks must be contiguous and match standings order',
       });
     }
-    if (
-      standing.participantIndex >= report.participants.length ||
-      seenParticipants.has(standing.participantIndex)
-    ) {
+    if (standing.teamIndex >= report.teams.length || seenTeams.has(standing.teamIndex)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['standings', standingPosition, 'participantIndex'],
-        message: 'Participant indexes must be unique and in range',
+        path: ['standings', standingPosition, 'teamIndex'],
+        message: 'Team indexes must be unique and in range',
       });
     }
-    seenParticipants.add(standing.participantIndex);
+    seenTeams.add(standing.teamIndex);
 
-    const timeline = report.participants[standing.participantIndex];
-    if (timeline !== undefined) {
-      const expectedScore = timeline.attempts.reduce(
-        (total, attempt) => total + attempt.resolution.scoreAwarded,
-        0,
-      );
-      if (standing.totalScore !== expectedScore) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['standings', standingPosition, 'totalScore'],
-          message: 'Must equal the participant replay score',
-        });
-      }
-      const seenProblems = new Set<string>();
-      timeline.attempts.forEach((attempt, attemptPosition) => {
-        if (
-          !instanceIds.has(attempt.problemInstanceId) ||
-          seenProblems.has(attempt.problemInstanceId)
-        ) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [
-              'participants',
-              standing.participantIndex,
-              'attempts',
-              attemptPosition,
-              'problemInstanceId',
-            ],
-            message: 'Attempt problem instance IDs must be known and unique per participant',
-          });
-        }
-        seenProblems.add(attempt.problemInstanceId);
+    if (standing.totalScore !== expected?.totalScore) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['standings', standingPosition, 'totalScore'],
+        message: 'Must equal the aggregated team score',
       });
     }
   });
 
-  const playerStanding = report.standings.find((standing) => standing.participantIndex === 0);
+  report.participants.forEach((timeline, participantIndex) => {
+    const seenProblems = new Set<string>();
+    timeline.attempts.forEach((attempt, attemptPosition) => {
+      if (
+        !instanceIds.has(attempt.problemInstanceId) ||
+        seenProblems.has(attempt.problemInstanceId)
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['participants', participantIndex, 'attempts', attemptPosition, 'problemInstanceId'],
+          message: 'Attempt problem instance IDs must be known and unique per participant',
+        });
+      }
+      seenProblems.add(attempt.problemInstanceId);
+    });
+  });
+
+  const playerStanding = report.standings.find((standing) => standing.teamIndex === 0);
   if (playerStanding === undefined || report.pass !== playerStanding.rank <= 8) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['pass'],
-      message: 'Must match the player rank pass line',
+      message: 'Must match the player team rank pass line',
     });
   }
 });
@@ -582,6 +707,10 @@ export interface DuelRoundReport {
   roundNo: number;
   setterSide: 'HOME' | 'AWAY';
   answererSide: 'HOME' | 'AWAY';
+  /** 出题方队内成员下标（0-based），按 §2N 局轮换规则取 k % N */
+  setterMemberIndex: number;
+  /** 答题方队内成员下标（0-based），取 (k + 1) % N */
+  answererMemberIndex: number;
   question: QuestionSnapshot;
   problemSource: 'GENERATED' | 'PREMADE';
   roundLimitMin: number;
@@ -616,6 +745,7 @@ export type ContestReport = RankingReport | DuelReport;
 export interface RankingSummary {
   format: 'RANKING';
   rank: number;
+  /** 参赛**队伍**数（不是队员数）；玩家队、每支 NPC 队各计 1 */
   participantCount: number;
   totalScore: number;
   rewards: RewardLine[];
@@ -658,11 +788,13 @@ const duelTiebreakInputShape = z
   .strict();
 export const duelTiebreakInputSchema = withJsonSafety(duelTiebreakInputShape);
 
+const duelMemberIndex = z.number().int().nonnegative();
+
 const duelInputShape = z
   .object({
-    home: participantSnapshotSchema,
-    away: participantSnapshotSchema,
-    questions: z.array(questionSnapshotSchema).min(4),
+    home: duelSideInputSchema,
+    away: duelSideInputSchema,
+    questions: z.array(questionSnapshotSchema).min(TEAM_SIZE_MIN * 2),
     qualityRuleOn: z.boolean(),
     tiebreak: z.enum(['SUDDEN_DEATH', 'ENERGY', 'QUALITY', 'FRIENDLY']).optional(),
   })
@@ -676,11 +808,45 @@ const duelInputShape = z
         message: 'instanceId values must be unique',
       });
     }
-    input.questions.slice(4).forEach((question, offset) => {
+    if (input.home.members.length !== input.away.members.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['away', 'members'],
+        message: 'Both sides must field the same number of members',
+      });
+    }
+    input.home.members.forEach((member, memberIndexValue) => {
+      if (member.side !== 'HOME') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['home', 'members', memberIndexValue, 'side'],
+          message: 'Home members must use side HOME',
+        });
+      }
+    });
+    input.away.members.forEach((member, memberIndexValue) => {
+      if (member.side !== 'AWAY') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['away', 'members', memberIndexValue, 'side'],
+          message: 'Away members must use side AWAY',
+        });
+      }
+    });
+
+    const roundCount = input.home.members.length * 2;
+    if (input.questions.length < roundCount) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['questions'],
+        message: `Must supply at least ${roundCount} questions for ${input.home.members.length} members per side`,
+      });
+    }
+    input.questions.slice(roundCount).forEach((question, offset) => {
       if (question.source === 'PREMADE') {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['questions', offset + 4, 'source'],
+          path: ['questions', offset + roundCount, 'source'],
           message: 'Sudden-death questions must be generated',
         });
       }
@@ -694,6 +860,8 @@ const duelRoundReportShape = z
     roundNo: z.number().int().positive(),
     setterSide: z.enum(['HOME', 'AWAY']),
     answererSide: z.enum(['HOME', 'AWAY']),
+    setterMemberIndex: duelMemberIndex,
+    answererMemberIndex: duelMemberIndex,
     question: questionSnapshotSchema,
     problemSource: z.enum(['GENERATED', 'PREMADE']),
     roundLimitMin: finiteNumber.positive(),
@@ -739,7 +907,7 @@ const duelReportShape = reportHeaderShape
   .extend({
     format: z.literal('DUEL'),
     inputSnapshot: duelInputSchema,
-    rounds: z.array(duelRoundReportSchema).min(4),
+    rounds: z.array(duelRoundReportSchema).min(TEAM_SIZE_MIN * 2),
     scores: z
       .object({ home: z.number().int().nonnegative(), away: z.number().int().nonnegative() })
       .strict(),
@@ -749,7 +917,7 @@ const duelReportShape = reportHeaderShape
           .object({ home: z.number().int().nonnegative(), away: z.number().int().nonnegative() })
           .strict(),
       )
-      .min(4),
+      .min(TEAM_SIZE_MIN * 2),
     tiebreak: z.enum(['SUDDEN_DEATH', 'ENERGY', 'QUALITY', 'FRIENDLY']).optional(),
     decidedBy: z.enum(['REGULAR', 'SUDDEN_DEATH', 'ENERGY', 'QUALITY', 'FRIENDLY']).optional(),
     tiebreakTrail: z.array(z.string()).optional(),
@@ -791,6 +959,67 @@ const duelReportShape = reportHeaderShape
         path: ['scores'],
         message: 'Must match final cumulative score',
       });
+    }
+
+    // 2N 局轮换：第 r 局（1-based）k = floor((r-1)/2)，出题方取队员 k，答题方取队员 (k+1) % N；
+    // 奇数局 HOME 出题、偶数局 AWAY 出题。由此前 2N 局内每人恰好出题 1 次、答题 1 次。
+    const memberCount = report.inputSnapshot.home.members.length;
+    const roundCount = memberCount * 2;
+    if (report.rounds.length < roundCount) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['rounds'],
+        message: `Must contain at least ${roundCount} rounds for ${memberCount} members per side`,
+      });
+    }
+
+    const duties = new Set<string>();
+    report.rounds.slice(0, roundCount).forEach((round, index) => {
+      const group = Math.floor(index / 2);
+      const expectedSetterSide = index % 2 === 0 ? 'HOME' : 'AWAY';
+      const expectedSetterMember = group % memberCount;
+      const expectedAnswererMember = (group + 1) % memberCount;
+
+      if (round.setterSide !== expectedSetterSide) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rounds', index, 'setterSide'],
+          message: 'Odd rounds must be set by HOME and even rounds by AWAY',
+        });
+      }
+      if (round.setterMemberIndex !== expectedSetterMember) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rounds', index, 'setterMemberIndex'],
+          message: 'Setter member must follow the 2N rotation',
+        });
+      }
+      if (round.answererMemberIndex !== expectedAnswererMember) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rounds', index, 'answererMemberIndex'],
+          message: 'Answerer member must follow the 2N rotation',
+        });
+      }
+
+      duties.add(`setter:${round.setterSide}:${round.setterMemberIndex}`);
+      duties.add(`answerer:${round.answererSide}:${round.answererMemberIndex}`);
+    });
+
+    if (report.rounds.length >= roundCount) {
+      for (const side of ['HOME', 'AWAY'] as const) {
+        for (let member = 0; member < memberCount; member += 1) {
+          for (const duty of ['setter', 'answerer'] as const) {
+            if (!duties.has(`${duty}:${side}:${member}`)) {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['rounds'],
+                message: `Every ${side} member must ${duty === 'setter' ? 'set' : 'answer'} exactly once`,
+              });
+            }
+          }
+        }
+      }
     }
   });
 export const duelReportSchema = withJsonSafety(duelReportShape);
@@ -857,6 +1086,7 @@ export type BattleReplayEvent =
       roundNo: number;
       setterSide: 'HOME' | 'AWAY';
       answererSide: 'HOME' | 'AWAY';
+      setterName: string;
       questionInstanceId: string;
       participantName: string;
     }
@@ -867,6 +1097,7 @@ export type BattleReplayEvent =
       roundNo: number;
       setterSide: 'HOME' | 'AWAY';
       answererSide: 'HOME' | 'AWAY';
+      setterName: string;
       answererName: string;
       solved: boolean;
       reason: Exclude<ContestVerdict, 'SKIP'>;
