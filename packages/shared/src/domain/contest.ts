@@ -473,6 +473,32 @@ const rankingInputShape = z
           message: `Team ${teamIndex} must use side ${expectedSide}`,
         });
       }
+      const expectedUserId = teamIndex === 0 ? team.userId : null;
+      if (team.userId !== expectedUserId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['teams', teamIndex, 'userId'],
+          message: teamIndex === 0 ? 'Player team must have a userId' : 'NPC teams must not have a userId',
+        });
+      }
+      const memberStudentIds = new Set<number>();
+      team.members.forEach((member, memberIndex) => {
+        if (member.side !== expectedSide) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['teams', teamIndex, 'members', memberIndex, 'side'],
+            message: `Team members must use side ${expectedSide}`,
+          });
+        }
+        if (member.studentId !== null && memberStudentIds.has(member.studentId)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['teams', teamIndex, 'members', memberIndex, 'studentId'],
+            message: 'Student IDs must be unique within a team',
+          });
+        }
+        if (member.studentId !== null) memberStudentIds.add(member.studentId);
+      });
       if (team.members.length !== rosterSize) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -516,9 +542,21 @@ function memberIdentityKey(member: ParticipantSnapshot): string {
     member.userId,
     member.studentId,
     member.displayName,
+    ABILITY_KEYS.map((key) => member.abilities[key]),
+    member.traits.map((trait) => trait.traitId),
     member.mindset,
     member.focusCap,
+    member.energy,
     member.energyMax,
+  ]);
+}
+
+function teamIdentityKey(team: ContestTeam): string {
+  return JSON.stringify([
+    team.teamId,
+    team.side,
+    team.userId,
+    team.members.map(memberIdentityKey),
   ]);
 }
 
@@ -603,6 +641,19 @@ const rankingReportWithChecks = rankingReportShape.superRefine((report, context)
       code: z.ZodIssueCode.custom,
       path: ['standings'],
       message: 'Must contain exactly one standing per team',
+    });
+  }
+
+  if (
+    report.teams.length !== report.inputSnapshot.teams.length ||
+    report.teams.some(
+      (team, index) => teamIdentityKey(team) !== teamIdentityKey(report.inputSnapshot.teams[index]!),
+    )
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['teams'],
+      message: 'Teams must match inputSnapshot.teams exactly',
     });
   }
 
@@ -974,17 +1025,27 @@ const duelReportShape = reportHeaderShape
     }
 
     const duties = new Set<string>();
-    report.rounds.slice(0, roundCount).forEach((round, index) => {
+    report.rounds.forEach((round, index) => {
       const group = Math.floor(index / 2);
       const expectedSetterSide = index % 2 === 0 ? 'HOME' : 'AWAY';
+      const expectedAnswererSide = expectedSetterSide === 'HOME' ? 'AWAY' : 'HOME';
       const expectedSetterMember = group % memberCount;
       const expectedAnswererMember = (group + 1) % memberCount;
+      const answererMembers = report.inputSnapshot[expectedAnswererSide === 'HOME' ? 'home' : 'away'].members;
+      const expectedAnswerer = answererMembers[expectedAnswererMember];
 
       if (round.setterSide !== expectedSetterSide) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['rounds', index, 'setterSide'],
           message: 'Odd rounds must be set by HOME and even rounds by AWAY',
+        });
+      }
+      if (round.answererSide !== expectedAnswererSide) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rounds', index, 'answererSide'],
+          message: 'Answerer side must be opposite the setter side',
         });
       }
       if (round.setterMemberIndex !== expectedSetterMember) {
@@ -999,6 +1060,33 @@ const duelReportShape = reportHeaderShape
           code: z.ZodIssueCode.custom,
           path: ['rounds', index, 'answererMemberIndex'],
           message: 'Answerer member must follow the 2N rotation',
+        });
+      }
+      if (expectedAnswerer === undefined || memberIdentityKey(round.answerer) !== memberIdentityKey(expectedAnswerer)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rounds', index, 'answerer'],
+          message: 'Answerer must match the input snapshot member',
+        });
+      }
+      const expectedQuestion = report.inputSnapshot.questions[index];
+      if (index < roundCount) {
+        if (
+          expectedQuestion === undefined ||
+          round.question.instanceId !== expectedQuestion.instanceId ||
+          round.question.source !== expectedQuestion.source
+        ) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['rounds', index, 'question'],
+            message: 'Regular round question must match inputSnapshot.questions',
+          });
+        }
+      } else if (round.question.source !== 'GENERATED') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rounds', index, 'question', 'source'],
+          message: 'Sudden-death questions must be generated',
         });
       }
 
