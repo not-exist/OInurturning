@@ -80,7 +80,7 @@ interface ParticipantSnapshot {       // 参赛队员快照（结算前冻结）
 interface ContestTeam {
   teamId: string;
   side: 'HOME' | 'NPC';               // teams[0] 为玩家 HOME 队，其余为 NPC 队
-  userId: string | null;
+  userId: number | null;
   members: ParticipantSnapshot[];     // 3~4 名；同场所有队伍人数相同
 }
 
