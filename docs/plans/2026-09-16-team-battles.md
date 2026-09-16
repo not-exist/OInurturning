@@ -17,7 +17,16 @@
 | 体力口径 | 每名出战学员各扣全额出战体力 |
 | 各场景人数 | 剧情 4 / 历练 3 / PVP 报名时由管理员 rosterSize 决定（3~4） |
 
-**破坏性约定（重要，先确认再动手）：** 战报/report 的 Zod 结构会改（`student` → 队伍、榜单按队伍）。**不为旧战报做兼容层**（项目规则：默认无保留地删）。`ENGINE_VERSION` / `DUEL_ENGINE_VERSION` 需升版，本地/测试库的 `contest_records` 旧记录将无法回放，开发前直接清空该表。
+**破坏性约定（已确认）：** 战报/report 的 Zod 结构会改（`student` → 队伍、榜单按队伍）。**不为旧战报做兼容层**（项目规则：默认无保留地删）。`ENGINE_VERSION` / `DUEL_ENGINE_VERSION` 需升版，本地/开发环境的 `contest_records` 旧记录**直接删除**（不做迁移、不做解析器兼容分支）。
+
+**工作流约定（已确认，每个 Task 都要遵守）：**
+
+- 分支：`feat/team-battles`（已从 `main` 切出，实施期间不回 `main`）。
+- **提交粒度：尽可能原子化** —— 一次小改动一个 commit（每个 Task 内部按 Step 再拆：改文档一个、改配置一个、改引擎一个、改测试一个），不要把一个 Task 攒成一个大 commit。
+- **每个 commit 都必须可编译/可运行**：提交前至少 `pnpm typecheck`（涉及前端再 `pnpm -C apps/web lint`），跑不到的场景要在 commit message 里说明。
+- **不要 push**（全程只在本地分支上提交）。
+- **文档与代码同步**：任何语义改动若与 `docs/GAME-DESIGN.md`、`docs/systems/*.md`、`docs/data/*.yaml` 冲突，**同一个改动链里必须改文档**，不允许留冲突口径。
+- 每完成一个 Task，回头检查存量测试是否与新语义相符（项目规则 #9）。
 
 ---
 
