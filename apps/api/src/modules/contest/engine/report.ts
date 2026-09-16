@@ -5,7 +5,7 @@ import {
   type RankingReport,
 } from '@oinur/shared';
 
-export const ENGINE_VERSION = 'ranking-v1' as const;
+export const ENGINE_VERSION = 'ranking-v2' as const;
 export const PASS_RANK_MAX = 8 as const;
 
 function encodeStable(value: unknown, active: WeakSet<object>): string {
@@ -114,14 +114,14 @@ export function isPassingRank(rank: number): boolean {
 }
 
 export function buildContestSummary(report: RankingReport): ContestSummary {
-  const playerStanding = report.standings.find((standing) => standing.participantIndex === 0);
+  const playerStanding = report.standings.find((standing) => standing.teamIndex === 0);
   if (playerStanding === undefined)
     throw new Error('Ranking report is missing the player standing');
 
   return {
     format: 'RANKING',
     rank: playerStanding.rank,
-    participantCount: report.participants.length,
+    participantCount: report.teams.length,
     totalScore: playerStanding.totalScore,
     rewards: report.rewards.map((reward) => ({ ...reward })),
     growth: report.growth.map((delta) => ({ ...delta })),

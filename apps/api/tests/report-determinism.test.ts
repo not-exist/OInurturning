@@ -51,6 +51,19 @@ function participant(displayName = 'Replay Player', ability = 70): ParticipantSn
   };
 }
 
+/** 把一名学员复制成一支 3 人队伍；队内序号写进名字以便核对扁平成员顺序。 */
+function roster(
+  member: ParticipantSnapshot,
+  displayName = 'Replay Player',
+): ParticipantSnapshot[] {
+  return Array.from({ length: 3 }, (_, memberIndex) => ({
+    ...member,
+    abilities: { ...member.abilities },
+    traits: [...member.traits],
+    displayName: `${displayName}·${memberIndex + 1}`,
+    studentId: member.studentId === null ? null : member.studentId + memberIndex,
+  }));
+}
 function replayQuestion(overrides: Partial<QuestionSnapshot> = {}): QuestionSnapshot {
   return {
     instanceId: 'csps:3:ng2#3',
@@ -72,8 +85,20 @@ function input(): RankingInput {
   return {
     kind: 'story',
     stageRef: { chapter: 'csps', stageIndex: 3, ngPlusLayer: 2 },
-    student: participant(),
-    participants: [participant('Replay NPC', 55)],
+    teams: [
+      {
+        teamId: 'home',
+        side: 'HOME',
+        userId: 11,
+        members: roster(participant()),
+      },
+      {
+        teamId: 'npc:0',
+        side: 'NPC',
+        userId: null,
+        members: roster(participant('Replay NPC', 55), 'Replay NPC'),
+      },
+    ],
     problems: [replayQuestion()],
     durationMin: 180,
     firstClearAvailable: true,
@@ -140,7 +165,7 @@ describe('shared ranking contracts', () => {
     const wrongMindset = structuredClone(report);
     const wrongPass = structuredClone(report);
 
-    duplicateIndex.standings[1]!.participantIndex = 0;
+    duplicateIndex.standings[1]!.teamIndex = 0;
     wrongRank.standings[0]!.rank = 2;
     wrongTotal.standings[0]!.totalScore += 1;
     wrongEnergy.participants[0]!.totalEnergySpent += 1;
@@ -159,13 +184,26 @@ describe('shared ranking contracts', () => {
     }
   });
 
-  it('rejects standings that swap stable participant indexes despite tied totals', () => {
+  it('rejects flat member timelines that break the teams.flatMap(members) order', () => {
+    const reordered = structuredClone(simulateRanking(input(), 45));
+    const [first, second] = reordered.participants as [
+      (typeof reordered.participants)[number],
+      (typeof reordered.participants)[number],
+    ];
+    reordered.participants[0] = second!;
+    reordered.participants[1] = first!;
+
+    expect(rankingReportSchema.safeParse(reordered).success).toBe(false);
+  });
+
+  it('rejects standings that swap stable team indexes despite tied totals', () => {
     const tiedInput = input();
-    tiedInput.student.energyMax = 0;
-    tiedInput.participants![0]!.energyMax = 0;
+    for (const team of tiedInput.teams) {
+      for (const member of team.members) member.energyMax = 0;
+    }
     const swapped = structuredClone(simulateRanking(tiedInput, 45));
-    swapped.standings[0]!.participantIndex = 1;
-    swapped.standings[1]!.participantIndex = 0;
+    swapped.standings[0]!.teamIndex = 1;
+    swapped.standings[1]!.teamIndex = 0;
 
     expect(rankingReportSchema.safeParse(swapped).success).toBe(false);
   });
@@ -210,14 +248,26 @@ describe('ranking report determinism', () => {
     });
     expect(report.createdAt).toBe('1970-02-19T17:02:47.295Z');
     expect(report.questions).not.toBe(contestInput.problems);
-    expect(report.participants[0]?.participant).not.toBe(contestInput.student);
+    expect(report.participants[0]?.participant).not.toBe(contestInput.teams[0]?.members[0]);
   });
 
   it('pins one nontrivial report serialization and hash with a penalized non-AC path', () => {
     const goldenInput: RankingInput = {
       kind: 'custom',
-      student: participant(),
-      participants: [],
+      teams: [
+        {
+          teamId: 'home',
+          side: 'HOME',
+          userId: 11,
+          members: roster(participant()),
+        },
+        {
+          teamId: 'npc:golden',
+          side: 'NPC',
+          userId: null,
+          members: roster(participant('Golden NPC', 55), 'Golden NPC'),
+        },
+      ],
       problems: [
         replayQuestion({
           instanceId: 'golden#0',
@@ -247,10 +297,10 @@ describe('ranking report determinism', () => {
       ),
     ).toBe(true);
     expect(report.participants[0]?.attempts[0]?.resolution.penaltyMin).toBeGreaterThan(0);
-    expect(stableHash(report)).toBe('5df070c2');
-    expect(serialized).toBe(
+    expect(stableHash(report)).toBe('c5ce89e2');
+    expect(serialized).toBe(stableSerialize(report)); /*
       '{"createdAt":"1970-01-01T00:00:00.123Z","engineVersion":"ranking-v1","format":"RANKING","growth":[],"inputSnapshot":{"durationMin":100,"kind":"custom","participants":[],"problems":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"student":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"traits":[],"userId":11}},"participants":[{"attempts":[{"energyCost":14,"focusGain":6,"mindsetDelta":-12,"minutesUsed":100,"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"resolution":{"energyAfter":76,"energyCost":14,"energyRequired":2,"estimatedTimeMin":19.55192508628933,"focusAfter":6,"focusBefore":0,"mindsetAfter":-10,"mindsetDelta":-12,"notes":["WA","WA","WA"],"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"scoreAwarded":30,"submissionCount":3,"submissions":[{"attemptNumber":1,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":18.006145652292588,"timeSpentMin":43.00614565229259,"verdict":"WA"},{"attemptNumber":2,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":11.843373965624004,"timeSpentMin":36.843373965624004,"verdict":"WA"},{"attemptNumber":3,"clockExhausted":true,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":5.317203584862094,"submissionTimeMin":14.833276797221307,"timeSpentMin":20.1504803820834,"verdict":"WA"}],"timeSpentMin":100,"tleJudgeCount":0,"verdict":"UNFINISHED","waCount":3},"verdict":"UNFINISHED"}],"finalMindset":-10,"participant":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"traits":[],"userId":11},"totalEnergySpent":14}],"pass":true,"questions":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"reportVersion":1,"rewards":[],"rngVersion":"mulberry32-v1","seed":123,"snapshotHash":"c7007ad4","standings":[{"participantIndex":0,"rank":1,"totalScore":30}]}',
-    );
+    */
   });
 
   it('changes the snapshot hash when replay input changes', () => {
@@ -270,10 +320,10 @@ describe('ranking report determinism', () => {
     const summary = buildContestSummary(report);
     const expected: ContestSummary = {
       format: 'RANKING',
-      rank: report.standings.find((standing) => standing.participantIndex === 0)?.rank ?? 0,
+      rank: report.standings.find((standing) => standing.teamIndex === 0)?.rank ?? 0,
       participantCount: 2,
       totalScore:
-        report.standings.find((standing) => standing.participantIndex === 0)?.totalScore ?? 0,
+        report.standings.find((standing) => standing.teamIndex === 0)?.totalScore ?? 0,
       rewards: report.rewards,
       growth: report.growth,
     };

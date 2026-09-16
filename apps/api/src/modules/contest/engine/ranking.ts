@@ -27,6 +27,19 @@ interface ParticipantResult {
   rankingPenaltyMin: number;
 }
 
+/** 同一道题在队内的候选成绩；AC 才计入罚时（沿用 ACM 口径）。 */
+interface TeamAttemptCandidate {
+  scoreAwarded: number;
+  minutesUsed: number;
+  memberIndex: number;
+  accepted: boolean;
+}
+
+interface TeamResult {
+  totalScore: number;
+  rankingPenaltyMin: number;
+}
+
 function hooksFor(question: QuestionSnapshot): readonly FrozenSolveHooks[] {
   return question.traits.flatMap((trait) => trait.hooks);
 }
@@ -192,10 +205,53 @@ function simulateParticipant(
   };
 }
 
-function buildStandings(results: readonly ParticipantResult[]): RankingStanding[] {
+function isBetterTeamAttempt(
+  candidate: TeamAttemptCandidate,
+  incumbent: TeamAttemptCandidate,
+): boolean {
+  if (candidate.scoreAwarded !== incumbent.scoreAwarded)
+    return candidate.scoreAwarded > incumbent.scoreAwarded;
+  if (candidate.minutesUsed !== incumbent.minutesUsed)
+    return candidate.minutesUsed < incumbent.minutesUsed;
+  return candidate.memberIndex < incumbent.memberIndex;
+}
+
+/**
+ * 队伍聚合：同一道题被多名队员作答时只把最优的一份成绩计入队伍总分，绝不重复计分。
+ * 比较口径（确定性可复放）：得分高者优 → 用时少者优 → 队内序号小者优。
+ */
+function aggregateTeam(timelines: readonly ParticipantTimeline[]): TeamResult {
+  const best = new Map<string, TeamAttemptCandidate>();
+
+  timelines.forEach((timeline, memberIndex) => {
+    for (const attempt of timeline.attempts) {
+      const candidate: TeamAttemptCandidate = {
+        scoreAwarded: attempt.resolution.scoreAwarded,
+        minutesUsed: attempt.minutesUsed,
+        memberIndex,
+        accepted: attempt.verdict === 'AC',
+      };
+      const incumbent = best.get(attempt.problemInstanceId);
+      if (incumbent === undefined || isBetterTeamAttempt(candidate, incumbent)) {
+        best.set(attempt.problemInstanceId, candidate);
+      }
+    }
+  });
+
+  let totalScore = 0;
+  let rankingPenaltyMin = 0;
+  for (const attempt of best.values()) {
+    totalScore += attempt.scoreAwarded;
+    if (attempt.accepted) rankingPenaltyMin += attempt.minutesUsed;
+  }
+
+  return { totalScore, rankingPenaltyMin };
+}
+
+function buildStandings(results: readonly TeamResult[]): RankingStanding[] {
   return results
-    .map((result, participantIndex) => ({
-      participantIndex,
+    .map((result, teamIndex) => ({
+      teamIndex,
       totalScore: result.totalScore,
       rankingPenaltyMin: result.rankingPenaltyMin,
     }))
@@ -203,10 +259,10 @@ function buildStandings(results: readonly ParticipantResult[]): RankingStanding[
       (left, right) =>
         right.totalScore - left.totalScore ||
         left.rankingPenaltyMin - right.rankingPenaltyMin ||
-        left.participantIndex - right.participantIndex,
+        left.teamIndex - right.teamIndex,
     )
-    .map(({ participantIndex, totalScore }, position) => ({
-      participantIndex,
+    .map(({ teamIndex, totalScore }, position) => ({
+      teamIndex,
       totalScore,
       rank: position + 1,
     }));
@@ -216,12 +272,21 @@ export function simulateRanking(input: RankingInput, seed: number): RankingRepor
   const validatedSeed = rankingSeedSchema.parse(seed);
   const validatedInput = rankingInputSchema.parse(input);
   const questions = validatedInput.problems.map(cloneQuestionSnapshot);
-  const participants = [validatedInput.student, ...(validatedInput.participants ?? [])];
-  const results = participants.map((participant, participantIndex) =>
+  const members = validatedInput.teams.flatMap((team) => team.members);
+  const results = members.map((participant, participantIndex) =>
     simulateParticipant(participant, questions, validatedInput.durationMin, validatedSeed, participantIndex),
   );
-  const standings = buildStandings(results);
-  const playerRank = standings.find((standing) => standing.participantIndex === 0)?.rank ?? Number.POSITIVE_INFINITY;
+  const timelines = results.map((result) => result.timeline);
+
+  let memberOffset = 0;
+  const teamResults = validatedInput.teams.map((team) => {
+    const slice = timelines.slice(memberOffset, memberOffset + team.members.length);
+    memberOffset += team.members.length;
+    return aggregateTeam(slice);
+  });
+
+  const standings = buildStandings(teamResults);
+  const playerRank = standings.find((standing) => standing.teamIndex === 0)?.rank ?? Number.POSITIVE_INFINITY;
   const report: RankingReport = {
     reportVersion: 1,
     engineVersion: ENGINE_VERSION,
@@ -235,7 +300,8 @@ export function simulateRanking(input: RankingInput, seed: number): RankingRepor
     format: 'RANKING',
     inputSnapshot: validatedInput,
     questions,
-    participants: results.map((result) => result.timeline),
+    teams: validatedInput.teams,
+    participants: timelines,
     standings,
     pass: isPassingRank(playerRank),
   };
