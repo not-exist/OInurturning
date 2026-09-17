@@ -240,7 +240,8 @@ describe('story coverage：总览与解锁链', () => {
     expect(err.code).toBe('INSUFFICIENT_RESOURCE');
     expect(err.details).toMatchObject({ resource: 'stamina', need: 1 });
     const rows = await prisma.student.findMany({ where: { id: { in: roster } } });
-    expect(rows.map((row) => row.stamina)).toEqual([5, 0, 5, 5]);
+    const staminaById = new Map(rows.map((row) => [row.id, row.stamina]));
+    expect(roster.map((id) => staminaById.get(id))).toEqual([5, 0, 5, 5]);
   });
 
   it('他人学员 → FORBIDDEN；已开除/不存在 → NOT_FOUND', async () => {
