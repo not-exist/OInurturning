@@ -3,6 +3,7 @@ import type {
   BattleReplayEvent,
   ContestReport,
   DuelReport,
+  ParticipantSnapshot,
   RankingReport,
 } from '@oinur/shared';
 
@@ -29,14 +30,21 @@ export function buildBattleReplay(
     : buildDuelReplay(recordId, report, title);
 }
 
+/** 队伍展示名，例如 `4 人队：张三 / 李四 / 王五 / 赵六`。 */
+function teamLabel(members: readonly ParticipantSnapshot[]): string {
+  if (members.length === 0) return '空队';
+  return `${members.length} 人队：${members.map((member) => member.displayName).join(' / ')}`;
+}
+
 function buildRankingReplay(recordId: string, report: RankingReport, title: string): BattleReplay {
   const events: BattleReplayEvent[] = [];
   let seq = 0;
-  const player = report.participants[0];
-  const playerName = player?.participant.displayName ?? '我方';
-  const playerStanding = report.standings.find((standing) => standing.participantIndex === 0);
+  const playerMembers = report.teams[0]?.members ?? [];
+  // participants 是 teams.flatMap(members) 的扁平时间线，前 N 条即玩家队成员。
+  const playerTimelines = report.participants.slice(0, playerMembers.length);
+  const playerStanding = report.standings.find((standing) => standing.teamIndex === 0);
   const questionById = new Map(report.questions.map((question) => [question.instanceId, question]));
-  let totalScore = 0;
+  let teamScore = 0;
 
   events.push({
     seq: seq++,
@@ -44,57 +52,64 @@ function buildRankingReplay(recordId: string, report: RankingReport, title: stri
     durationMs: INTRO_MS,
     title,
     format: 'RANKING',
-    homeName: playerName,
+    homeName: playerMembers.length > 0 ? teamLabel(playerMembers) : '我方',
   });
 
-  for (const attempt of player?.attempts ?? []) {
-    const question = questionById.get(attempt.problemInstanceId);
-    if (question === undefined) continue;
+  for (const timeline of playerTimelines) {
+    const memberName = timeline.participant.displayName;
+    let memberScore = 0;
 
-    events.push({
-      seq: seq++,
-      type: 'QUESTION_START',
-      durationMs: QUESTION_START_MS,
-      participantName: playerName,
-      questionIndex: attempt.questionIndex,
-      problemInstanceId: question.instanceId,
-      dimension: question.dimension,
-      score: question.score,
-    });
+    for (const attempt of timeline.attempts) {
+      const question = questionById.get(attempt.problemInstanceId);
+      if (question === undefined) continue;
 
-    for (const submission of attempt.resolution.submissions) {
       events.push({
         seq: seq++,
-        type: 'SUBMISSION',
-        durationMs: SUBMISSION_MS,
-        participantName: playerName,
+        type: 'QUESTION_START',
+        durationMs: QUESTION_START_MS,
+        participantName: memberName,
         questionIndex: attempt.questionIndex,
-        attemptNumber: submission.attemptNumber,
-        verdict: submission.verdict,
-        submissionTimeMin: submission.submissionTimeMin,
-        penaltyMin: submission.penaltyMin,
-        extraEnergyCost: submission.extraEnergyCost,
-        clockExhausted: submission.clockExhausted,
+        problemInstanceId: question.instanceId,
+        dimension: question.dimension,
+        score: question.score,
+      });
+
+      for (const submission of attempt.resolution.submissions) {
+        events.push({
+          seq: seq++,
+          type: 'SUBMISSION',
+          durationMs: SUBMISSION_MS,
+          participantName: memberName,
+          questionIndex: attempt.questionIndex,
+          attemptNumber: submission.attemptNumber,
+          verdict: submission.verdict,
+          submissionTimeMin: submission.submissionTimeMin,
+          penaltyMin: submission.penaltyMin,
+          extraEnergyCost: submission.extraEnergyCost,
+          clockExhausted: submission.clockExhausted,
+        });
+      }
+
+      memberScore += attempt.resolution.scoreAwarded;
+      events.push({
+        seq: seq++,
+        type: 'QUESTION_RESULT',
+        durationMs: QUESTION_RESULT_MS,
+        participantName: memberName,
+        questionIndex: attempt.questionIndex,
+        verdict: attempt.verdict,
+        timeSpentMin: attempt.resolution.timeSpentMin,
+        penaltyMin: attempt.resolution.penaltyMin,
+        scoreAwarded: attempt.resolution.scoreAwarded,
+        totalScore: memberScore,
+        energyAfter: attempt.resolution.energyAfter,
+        focusAfter: attempt.resolution.focusAfter,
+        mindsetAfter: attempt.resolution.mindsetAfter,
+        notes: attempt.resolution.notes,
       });
     }
 
-    totalScore += attempt.resolution.scoreAwarded;
-    events.push({
-      seq: seq++,
-      type: 'QUESTION_RESULT',
-      durationMs: QUESTION_RESULT_MS,
-      participantName: playerName,
-      questionIndex: attempt.questionIndex,
-      verdict: attempt.verdict,
-      timeSpentMin: attempt.resolution.timeSpentMin,
-      penaltyMin: attempt.resolution.penaltyMin,
-      scoreAwarded: attempt.resolution.scoreAwarded,
-      totalScore,
-      energyAfter: attempt.resolution.energyAfter,
-      focusAfter: attempt.resolution.focusAfter,
-      mindsetAfter: attempt.resolution.mindsetAfter,
-      notes: attempt.resolution.notes,
-    });
+    teamScore += memberScore;
   }
 
   events.push({
@@ -102,8 +117,8 @@ function buildRankingReplay(recordId: string, report: RankingReport, title: stri
     type: 'BATTLE_FINISH',
     durationMs: FINISH_MS,
     rank: playerStanding?.rank,
-    totalScore: playerStanding?.totalScore ?? totalScore,
-    participantCount: report.participants.length,
+    totalScore: playerStanding?.totalScore ?? teamScore,
+    participantCount: report.teams.length,
     pass: report.pass,
     rewards: report.rewards,
     growth: report.growth,
@@ -121,8 +136,8 @@ function buildRankingReplay(recordId: string, report: RankingReport, title: stri
 function buildDuelReplay(recordId: string, report: DuelReport, title: string): BattleReplay {
   const events: BattleReplayEvent[] = [];
   let seq = 0;
-  const homeName = report.inputSnapshot.home.displayName;
-  const awayName = report.inputSnapshot.away.displayName;
+  const homeMembers = report.inputSnapshot.home.members;
+  const awayMembers = report.inputSnapshot.away.members;
   const scoreAfterEachRound = report.scoreAfterEachRound;
 
   events.push({
@@ -131,11 +146,14 @@ function buildDuelReplay(recordId: string, report: DuelReport, title: string): B
     durationMs: INTRO_MS,
     title,
     format: 'DUEL',
-    homeName,
-    awayName,
+    homeName: teamLabel(homeMembers),
+    awayName: teamLabel(awayMembers),
   });
 
   report.rounds.forEach((round, index) => {
+    const setterMembers = round.setterSide === 'HOME' ? homeMembers : awayMembers;
+    const setterName = setterMembers[round.setterMemberIndex]?.displayName ?? '出题方';
+
     events.push({
       seq: seq++,
       type: 'ROUND_START',
@@ -143,6 +161,7 @@ function buildDuelReplay(recordId: string, report: DuelReport, title: string): B
       roundNo: round.roundNo,
       setterSide: round.setterSide,
       answererSide: round.answererSide,
+      setterName,
       questionInstanceId: round.question.instanceId,
       participantName: round.answerer.displayName,
     });
@@ -155,6 +174,7 @@ function buildDuelReplay(recordId: string, report: DuelReport, title: string): B
       roundNo: round.roundNo,
       setterSide: round.setterSide,
       answererSide: round.answererSide,
+      setterName,
       answererName: round.answerer.displayName,
       solved: round.solved,
       reason: round.reason,
