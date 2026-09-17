@@ -82,7 +82,7 @@ function question(instanceId: string, index: number, quality: number): QuestionS
   };
 }
 
-function questions(count: number, quality = (index: number) => (index % 2 === 0 ? 90 : 10)) {
+function questions(count: number, quality: (index: number) => number = (index) => (index % 2 === 0 ? 90 : 10)) {
   return Array.from({ length: count }, (_, index) =>
     question(`duel-${index}`, index, quality(index)),
   );
