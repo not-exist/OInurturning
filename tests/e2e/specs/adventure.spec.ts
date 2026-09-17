@@ -6,6 +6,7 @@ import {
   recruitStudent,
   resolveAdventureChoice,
   ADVENTURE_KEYCHAIN,
+  pickRoster,
 } from '../fixtures';
 
 /**
@@ -21,6 +22,7 @@ test.describe('历练', () => {
     await loginViaUI(page, account.username, account.password);
 
     await page.goto('/adventure');
+    await pickRoster(page, 'adventure-roster', 3);
     await page.getByTestId('adventure-draw').click();
 
     // 无情报：分支直接可见，不出现 preview 接受/回避按钮
@@ -48,6 +50,7 @@ test.describe('历练', () => {
     await loginViaUI(page, account.username, account.password);
 
     await page.goto('/adventure');
+    await pickRoster(page, 'adventure-roster', 3);
     await page.getByTestId('adventure-intel').click();
     await expect(page.getByTestId('adventure-intel')).toContainText('情报已激活');
     await page.getByTestId('adventure-draw').click();
@@ -74,6 +77,7 @@ test.describe('历练', () => {
     await loginViaUI(page, account.username, account.password);
 
     await page.goto('/adventure');
+    await pickRoster(page, 'adventure-roster', 3);
     await page.getByTestId('adventure-intel').click();
     await expect(page.getByTestId('adventure-intel')).toContainText('情报已激活');
     await page.getByTestId('adventure-draw').click();

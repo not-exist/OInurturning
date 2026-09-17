@@ -9,8 +9,13 @@ import {
   apiCall,
   unwrap,
   uniqueName,
+  rosterIds,
+  pickRoster,
   type TestAccount,
 } from '../fixtures';
+
+/** 赛事默认 rosterSize（config 未指定时为 3）。 */
+const DEFAULT_ROSTER_SIZE = 3;
 
 /**
  * PVP 锦标赛全周期（8 人编排）：
@@ -22,11 +27,13 @@ test.describe('PVP 锦标赛', () => {
   async function setupPlayer(
     request: Parameters<typeof apiCall>[0],
     prefix: string,
-  ): Promise<TestAccount & { studentId: number }> {
+  ): Promise<TestAccount & { studentIds: number[] }> {
     const account = await registerUser(request, prefix);
     await fund(account.username, { money: 50000, items: { 'entry-ticket': 1 } });
-    const studentId = await recruitStudent(request, account.accessToken);
-    return { ...account, studentId };
+    // 开局 2 人 + 招募 1 人 = 3 人阵容
+    await recruitStudent(request, account.accessToken);
+    const studentIds = await rosterIds(request, account.accessToken, DEFAULT_ROSTER_SIZE);
+    return { ...account, studentIds };
   }
 
   test('8 人满编开赛并决出冠军，冠军可领取奖池', async ({ page, request }) => {
@@ -47,10 +54,14 @@ test.describe('PVP 锦标赛', () => {
     await loginViaUI(page, main.username, main.password);
     await page.goto('/pvp');
     await page.getByTestId('pvp-select').selectOption(String(tournamentId));
+    await pickRoster(page, 'pvp-roster', DEFAULT_ROSTER_SIZE);
     await page.getByTestId('pvp-register').click();
     await expect(page.getByTestId('pvp-registered')).toBeVisible();
+    // 报名后展示完整阵容名单
+    const rosterLine = await page.getByTestId('pvp-roster-list').innerText();
+    expect(rosterLine.split('、').length).toBe(DEFAULT_ROSTER_SIZE);
 
-    const others: (TestAccount & { studentId: number })[] = [];
+    const others: (TestAccount & { studentIds: number[] })[] = [];
     for (let i = 0; i < 7; i += 1) {
       const Brain = await setupPlayer(request, 'pvp');
       const reg = await apiCall(
@@ -58,7 +69,7 @@ test.describe('PVP 锦标赛', () => {
         'POST',
         `/api/pvp/tournaments/${tournamentId}/register`,
         Brain.accessToken,
-        { studentId: Brain.studentId, problemEntryIds: [] },
+        { studentIds: Brain.studentIds, problemEntryIds: [] },
       );
       unwrap(reg.body, `报名 ${Brain.username}`);
       others.push(Brain);

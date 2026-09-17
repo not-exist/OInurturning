@@ -381,7 +381,7 @@ function RegistrationView({ registration }: { registration: PvpRegistrationView 
   return (
     <div className="mt-5 border-t border-neutral-200 pt-4 text-sm">
       <p data-testid="pvp-registered" className="font-medium text-green-700">已报名，快照已锁定</p>
-      <p className="mt-2 text-neutral-600">
+      <p data-testid="pvp-roster-list" className="mt-2 text-neutral-600">
         出战：{registration.roster.map((student) => student.displayName).join('、')}
       </p>
       <p className="mt-1 text-neutral-600">

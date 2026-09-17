@@ -258,6 +258,28 @@ export async function resolveAdventureChoice(page: Page): Promise<boolean> {
   return false;
 }
 
+/** 在多选阵容里按页面顺序勾选前 count 名学员（勾选前需保证学员数 ≥ count）。 */
+export async function pickRoster(page: Page, prefix: string, count: number): Promise<void> {
+  const boxes = page.locator(`[data-testid^="${prefix}-checkbox-"]`);
+  for (let i = 0; i < count; i += 1) {
+    await boxes.nth(i).check();
+  }
+}
+
+/** 取当前账号前 count 名学员 id（组队报名等纯 API 场景）。 */
+export async function rosterIds(
+  request: APIRequestContext,
+  token: string,
+  count: number,
+): Promise<number[]> {
+  const list = await apiCall(request, 'GET', '/api/students', token);
+  const students = unwrap<{ id: number }[]>(list.body, '学员列表');
+  if (students.length < count) {
+    throw new Error(`学员不足：需要 ${count} 名，实有 ${students.length} 名`);
+  }
+  return students.slice(0, count).map((student) => student.id);
+}
+
 /** 经 API 招募一名学员（返回 studentId；调用方须已注资）。 */
 export async function recruitStudent(
   request: APIRequestContext,
