@@ -32,6 +32,7 @@ beforeEach(async () => {
 interface Player {
   userId: number;
   studentId: number;
+  studentIds: number[];
   token: string;
 }
 
@@ -47,15 +48,19 @@ async function register(username?: string): Promise<{ token: string; userId: num
 
 async function makePlayer(): Promise<Player> {
   const { token, userId } = await register();
-  const student = await prisma.student.create({
-    data: {
-      userId, name: `PVP 选手 ${seq}`, sex: 'MALE', qualityTier: 'ELITE',
-      ds: 60, dp: 60, math: 60, graph: 60, greedy: 60, str: 60, code: 60, thinking: 60, setting: 60,
-      focusCap: 40, energyMax: 80, energy: 80, staminaRegen: 50,
-    },
-  });
+  const studentIds: number[] = [];
+  for (let member = 0; member < 3; member += 1) {
+    const student = await prisma.student.create({
+      data: {
+        userId, name: `PVP 选手 ${seq}-${member}`, sex: 'MALE', qualityTier: 'ELITE',
+        ds: 60, dp: 60, math: 60, graph: 60, greedy: 60, str: 60, code: 60, thinking: 60, setting: 60,
+        focusCap: 40, energyMax: 80, energy: 80, staminaRegen: 50,
+      },
+    });
+    studentIds.push(student.id);
+  }
   await prisma.userItem.create({ data: { userId, itemId: 'entry-ticket', quantity: 1 } });
-  return { userId, studentId: student.id, token };
+  return { userId, studentId: studentIds[0]!, studentIds, token };
 }
 
 async function makeTournament(
@@ -100,16 +105,17 @@ describe('pvp coverage：报名 HTTP', () => {
     const first = await request(app)
       .post(`/api/pvp/tournaments/${tournament.id}/register`)
       .set('Authorization', `Bearer ${player.token}`)
-      .send({ studentId: player.studentId, problemEntryIds: [] });
+      .send({ studentIds: player.studentIds, problemEntryIds: [] });
     expect(first.status).toBe(200);
     const created = unwrapOk<{ id: number; replayed: boolean; roster: Array<{ studentId: number }> }>(first);
     expect(created.replayed).toBe(false);
-    expect(created.roster[0]?.studentId).toBe(player.studentId);
+    expect(created.roster).toHaveLength(3);
+    expect(created.roster[0]?.studentId).toBe(player.studentIds[0]);
 
     const again = await request(app)
       .post(`/api/pvp/tournaments/${tournament.id}/register`)
       .set('Authorization', `Bearer ${player.token}`)
-      .send({ studentId: player.studentId, problemEntryIds: [] });
+      .send({ studentIds: player.studentIds, problemEntryIds: [] });
     expect(again.status).toBe(200);
     const replayed = unwrapOk<{ id: number; replayed: boolean }>(again);
     expect(replayed).toMatchObject({ id: created.id, replayed: true });
@@ -124,17 +130,17 @@ describe('pvp coverage：报名 HTTP', () => {
     })));
     const tooMany = await request(app)
       .post(`/api/pvp/tournaments/${tournament.id}/register`).set(auth)
-      .send({ studentId: player.studentId, problemEntryIds: problems.map((p) => p.id) });
+      .send({ studentIds: player.studentIds, problemEntryIds: problems.map((p) => p.id) });
     expect(tooMany.status).toBe(400);
     const dup = await request(app)
       .post(`/api/pvp/tournaments/${tournament.id}/register`).set(auth)
-      .send({ studentId: player.studentId, problemEntryIds: [problems[0]!.id, problems[0]!.id] });
+      .send({ studentIds: player.studentIds, problemEntryIds: [problems[0]!.id, problems[0]!.id] });
     expect(dup.status).toBe(400);
 
     const closed = await makeTournament({ registerEndsAt: PAST });
     const closedRes = await request(app)
       .post(`/api/pvp/tournaments/${closed.id}/register`).set(auth)
-      .send({ studentId: player.studentId, problemEntryIds: [] });
+      .send({ studentIds: player.studentIds, problemEntryIds: [] });
     expect(closedRes.status).toBe(409);
     expect(unwrapErr(closedRes).code).toBe('STATE_CONFLICT');
 
@@ -143,12 +149,12 @@ describe('pvp coverage：报名 HTTP', () => {
       const res = await request(app)
         .post(`/api/pvp/tournaments/${tournament.id}/register`)
         .set('Authorization', `Bearer ${entrant.token}`)
-        .send({ studentId: entrant.studentId, problemEntryIds: [] });
+        .send({ studentIds: entrant.studentIds, problemEntryIds: [] });
       expect(res.status).toBe(200);
     }
     const full = await request(app)
       .post(`/api/pvp/tournaments/${tournament.id}/register`).set(auth)
-      .send({ studentId: player.studentId, problemEntryIds: [] });
+      .send({ studentIds: player.studentIds, problemEntryIds: [] });
     expect(full.status).toBe(409);
   });
 });
@@ -160,7 +166,7 @@ describe('pvp coverage：奖励与认领 HTTP', () => {
     for (let i = 0; i < 8; i += 1) {
       const player = await makePlayer();
       players.push(player);
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await finishTournament(tournament.id);
 
@@ -206,7 +212,7 @@ describe('pvp coverage：奖励与认领 HTTP', () => {
     for (let i = 0; i < 8; i += 1) {
       const player = await makePlayer();
       players.push(player);
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await finishTournament(tournament.id);
 
@@ -236,7 +242,7 @@ describe('pvp coverage：奖励与认领 HTTP', () => {
   it('未完赛/非参赛认领 → NOT_FOUND；局外人可看奖励榜', async () => {
     const tournament = await makeTournament();
     const player = await makePlayer();
-    await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     const early = await request(app)
       .post(`/api/pvp/tournaments/${tournament.id}/rewards/claim`)
       .set('Authorization', `Bearer ${player.token}`);
@@ -262,7 +268,7 @@ describe('pvp coverage：战报共享与对阵 HTTP', () => {
     for (let i = 0; i < 8; i += 1) {
       const player = await makePlayer();
       players.push(player);
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await finishTournament(tournament.id);
 
@@ -289,7 +295,7 @@ describe('pvp coverage：战报共享与对阵 HTTP', () => {
     for (let i = 0; i < 8; i += 1) {
       const player = await makePlayer();
       players.push(player);
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     const before = unwrapOk<{ status: string; registeredCount: number; myRegistration: number | null }>(
       await request(app).get(`/api/pvp/tournaments/${tournament.id}`).set('Authorization', `Bearer ${players[0]!.token}`),
@@ -316,7 +322,7 @@ describe('pvp coverage：admin 一键开赛真实路径', () => {
     await prisma.user.update({ where: { id: admin.userId }, data: { role: 'ADMIN' } });
     const tournament = await makeTournament({ autoStartAt: PAST });
     const player = await makePlayer();
-    await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     expect(await prisma.userItem.findUnique({ where: { userId_itemId: { userId: player.userId, itemId: 'entry-ticket' } } })).toBeNull();
 
     const res = await request(app)
@@ -336,7 +342,7 @@ describe('pvp coverage：admin 一键开赛真实路径', () => {
     const tournament = await makeTournament({ autoStartAt: PAST });
     for (let i = 0; i < 8; i += 1) {
       const player = await makePlayer();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     const res = await request(app)
       .post(`/api/admin/pvp-tournaments/${tournament.id}/actions/start`)
@@ -355,7 +361,7 @@ describe('pvp coverage：参赛者注销（物理删除）后的历史赛事健�
     const players: Player[] = [];
     for (let i = 0; i < 8; i += 1) {
       const player = await makePlayer();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
       players.push(player);
     }
     await finishTournament(tournament.id);
