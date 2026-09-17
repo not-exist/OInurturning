@@ -7,7 +7,7 @@ import * as service from './service.js';
 const ngLevelSchema = z.coerce.number().int().nonnegative();
 const enterSchema = z
   .object({
-    roster: z.array(z.number().int().positive()).length(1),
+    roster: z.array(z.number().int().positive()).min(3).max(4),
     ngLevel: ngLevelSchema.default(0),
     idempotencyKey: z.string().min(1).max(128).optional(),
   })
