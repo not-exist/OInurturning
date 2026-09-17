@@ -9,7 +9,11 @@ import { simulateRanking } from '../src/modules/contest/engine/ranking.js';
 import { createRandomStream, deriveStreamSeed } from '../src/modules/contest/engine/rng.js';
 import { solveQuestion } from '../src/modules/contest/engine/solve.js';
 
-function participant(displayName: string, side: ParticipantSnapshot['side']): ParticipantSnapshot {
+function participant(
+  displayName: string,
+  side: ParticipantSnapshot['side'],
+  studentId: number | null,
+): ParticipantSnapshot {
   const keys: AbilityKey[] = [
     'DS',
     'DP',
@@ -24,7 +28,7 @@ function participant(displayName: string, side: ParticipantSnapshot['side']): Pa
   return {
     side,
     userId: side === 'HOME' ? 1 : null,
-    studentId: side === 'HOME' ? 2 : null,
+    studentId,
     displayName,
     abilities: Object.fromEntries(keys.map((key) => [key, 60])) as Record<AbilityKey, number>,
     traits: [],
@@ -50,12 +54,28 @@ const question: QuestionSnapshot = {
 
 describe('ranking RNG replay labels', () => {
   it('uses direct noise/judge streams for the player and npc:i hierarchy for NPCs', () => {
-    const player = participant('Player', 'HOME');
-    const npc = participant('NPC 0', 'NPC');
+    const player = participant('Player', 'HOME', 1);
+    const npc = participant('NPC 1-1', 'NPC', null);
     const input: RankingInput = {
       kind: 'custom',
-      student: player,
-      participants: [npc],
+      teams: [
+        {
+          teamId: 'home',
+          side: 'HOME',
+          userId: 1,
+          members: [
+            player,
+            participant('队友 2', 'HOME', 2),
+            participant('队友 3', 'HOME', 3),
+          ],
+        },
+        {
+          teamId: 'npc:0',
+          side: 'NPC',
+          userId: null,
+          members: [npc, participant('NPC 1-2', 'NPC', null), participant('NPC 1-3', 'NPC', null)],
+        },
+      ],
       problems: [question],
       durationMin: 180,
     };
