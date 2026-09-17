@@ -3,11 +3,23 @@ import type { ParticipantSnapshot } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 
+export type PvpRosterSize = 3 | 4;
+export const DEFAULT_PVP_ROSTER_SIZE: PvpRosterSize = 3;
+
+export function pvpRosterSize(config: unknown): PvpRosterSize {
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) return DEFAULT_PVP_ROSTER_SIZE;
+  const value = (config as Record<string, unknown>).rosterSize;
+  if (value === undefined) return DEFAULT_PVP_ROSTER_SIZE;
+  if (value === 3 || value === 4) return value;
+  throw new ApiError('STATE_CONFLICT', { resource: 'tournament', reason: 'invalid rosterSize' });
+}
+
 export interface PvpTournamentView {
   id: number;
   name: string;
   status: PvpTournament['status'];
   size: number;
+  rosterSize: PvpRosterSize;
   registerEndsAt: string;
   autoStartAt: string;
   registered: boolean;
@@ -26,6 +38,7 @@ export interface PvpRegistrationView {
   id: number;
   tournamentId: number;
   userId: number;
+  rosterSize: PvpRosterSize;
   roster: ParticipantSnapshot[];
   problemEntryIds: number[];
   problemSnapshots: PvpProblemSnapshot[];
@@ -68,17 +81,19 @@ function tournamentView(row: PvpTournament & { registrations: { id: number }[] }
     name: row.name,
     status: row.status,
     size: row.size,
+    rosterSize: pvpRosterSize(row.config),
     registerEndsAt: row.registerEndsAt.toISOString(),
     autoStartAt: row.autoStartAt.toISOString(),
     registered: row.registrations.length > 0,
   };
 }
 
-function registrationView(row: PvpRegistration, replayed: boolean): PvpRegistrationView {
+function registrationView(row: PvpRegistration, replayed: boolean, rosterSize: PvpRosterSize): PvpRegistrationView {
   return {
     id: row.id,
     tournamentId: row.tournamentId,
     userId: row.userId,
+    rosterSize,
     roster: row.roster as unknown as ParticipantSnapshot[],
     problemEntryIds: row.problemEntryIds as unknown as number[],
     problemSnapshots: row.problemSnapshots as unknown as PvpProblemSnapshot[],
@@ -102,13 +117,18 @@ export async function getRegistration(
   const row = await prisma.pvpRegistration.findUnique({
     where: { tournamentId_userId: { tournamentId, userId } },
   });
-  return row === null ? null : registrationView(row, false);
+  if (row === null) return null;
+  const tournament = await prisma.pvpTournament.findUnique({
+    where: { id: tournamentId },
+    select: { config: true },
+  });
+  return registrationView(row, false, pvpRosterSize(tournament?.config));
 }
 
 export async function registerPvp(
   userId: number,
   tournamentId: number,
-  studentId: number,
+  studentIds: number[],
   problemEntryIds: readonly number[],
   now: Date = new Date(),
 ): Promise<PvpRegistrationView> {
@@ -121,10 +141,22 @@ export async function registerPvp(
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const tournament = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
     if (tournament === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
+    const rosterSize = pvpRosterSize(tournament.config);
+    if (
+      !Array.isArray(studentIds) ||
+      studentIds.length !== rosterSize ||
+      new Set(studentIds).size !== rosterSize ||
+      studentIds.some((id) => !Number.isInteger(id) || id <= 0)
+    ) {
+      throw new ApiError('VALIDATION_FAILED', {
+        field: 'studentIds',
+        reason: `exactly ${rosterSize} distinct active students are required`,
+      });
+    }
     const existing = await tx.pvpRegistration.findUnique({
       where: { tournamentId_userId: { tournamentId, userId } },
     });
-    if (existing !== null) return registrationView(existing, true);
+    if (existing !== null) return registrationView(existing, true, rosterSize);
     if (tournament.status !== 'REGISTERING' || now >= tournament.registerEndsAt) {
       throw new ApiError('STATE_CONFLICT', { resource: 'tournament', id: tournamentId, reason: 'registration closed' });
     }
@@ -132,10 +164,21 @@ export async function registerPvp(
     if (registrations >= tournament.size) {
       throw new ApiError('STATE_CONFLICT', { resource: 'tournament', id: tournamentId, reason: 'tournament is full' });
     }
-    await tx.$queryRaw`SELECT id FROM Student WHERE id = ${studentId} FOR UPDATE`;
-    const student = await tx.student.findUnique({ where: { id: studentId }, include: { talents: true } });
-    if (student === null || student.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
-    if (student.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
+    // 整支队伍一次性上锁：按 id 升序，避免并发报名互相等锁。
+    const lockedIds = [...new Set(studentIds)].sort((left, right) => left - right);
+    await tx.$queryRaw`SELECT id FROM Student WHERE id IN (${Prisma.join(lockedIds)}) FOR UPDATE`;
+    const studentRows = await tx.student.findMany({
+      where: { id: { in: lockedIds } },
+      include: { talents: true },
+    });
+    const rowById = new Map(studentRows.map((row) => [row.id, row]));
+    const roster = studentIds.map((studentId) => {
+      const student = rowById.get(studentId);
+      if (student === undefined || student.status !== 'ACTIVE')
+        throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
+      if (student.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
+      return participantSnapshot(student);
+    });
     const problems = problemEntryIds.length === 0
       ? []
       : await tx.problemLibraryEntry.findMany({ where: { id: { in: [...problemEntryIds] } } });
@@ -156,17 +199,16 @@ export async function registerPvp(
     });
     if (ticket.count !== 1) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'entry-ticket', need: 1 });
     await tx.userItem.deleteMany({ where: { userId, itemId: 'entry-ticket', quantity: { lte: 0 } } });
-    const roster = [participantSnapshot(student)];
     const problemsById = new Map(problems.map((problem) => [problem.id, problem]));
     const snapshots: PvpProblemSnapshot[] = problemEntryIds.map((problemId) => {
       const problem = problemsById.get(problemId)!;
       return {
-      id: problem.id,
-      name: problem.name,
-      dominantDim: problem.dominantDim,
-      rarity: problem.rarity,
-      quality: problem.quality,
-      traitId: problem.traitId,
+        id: problem.id,
+        name: problem.name,
+        dominantDim: problem.dominantDim,
+        rarity: problem.rarity,
+        quality: problem.quality,
+        traitId: problem.traitId,
       };
     });
     const row = await tx.pvpRegistration.create({
@@ -179,6 +221,6 @@ export async function registerPvp(
         createdAt: now,
       },
     });
-    return registrationView(row, false);
+    return registrationView(row, false, rosterSize);
   });
 }

@@ -8,7 +8,7 @@ import { claimPvpReward, listPvpRewardGrants } from './rewards.js';
 
 const registrationSchema = z
   .object({
-    studentId: z.number().int().positive(),
+    studentIds: z.array(z.number().int().positive()).min(3).max(4),
     problemEntryIds: z.array(z.number().int().positive()).max(2).default([]),
   })
   .strict();
@@ -85,7 +85,7 @@ pvpRouter.post('/tournaments/:id/register', async (req, res, next) => {
       data: await service.registerPvp(
         req.user!.id,
         parseId(req.params.id),
-        parsed.data.studentId,
+        parsed.data.studentIds,
         parsed.data.problemEntryIds,
       ),
     });
@@ -99,7 +99,7 @@ pvpRouter.post('/tournaments/:id/registration', async (req, res, next) => {
   try {
     const parsed = registrationSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
-    res.json({ ok: true, data: await service.registerPvp(req.user!.id, parseId(req.params.id), parsed.data.studentId, parsed.data.problemEntryIds) });
+    res.json({ ok: true, data: await service.registerPvp(req.user!.id, parseId(req.params.id), parsed.data.studentIds, parsed.data.problemEntryIds) });
   } catch (error) {
     next(error);
   }
