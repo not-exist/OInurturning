@@ -121,11 +121,12 @@ describe('pvp coverage：报名 HTTP', () => {
     expect(replayed).toMatchObject({ id: created.id, replayed: true });
   });
 
-  it('报名校验：超 2 题/重复题/截止/满员', async () => {
+  it('报名校验：超 rosterSize 题/重复题/截止/满员', async () => {
     const tournament = await makeTournament();
     const player = await makePlayer();
     const auth = { Authorization: `Bearer ${player.token}` };
-    const problems = await Promise.all([1, 2, 3].map(() => prisma.problemLibraryEntry.create({
+    // 每名队员至多携带一道：rosterSize=3 时第 4 道越界
+    const problems = await Promise.all([1, 2, 3, 4].map(() => prisma.problemLibraryEntry.create({
       data: { userId: player.userId, authorStudentId: player.studentId, name: 'PVP 题', dominantDim: 'DS', rarity: 'green', quality: 60 },
     })));
     const tooMany = await request(app)

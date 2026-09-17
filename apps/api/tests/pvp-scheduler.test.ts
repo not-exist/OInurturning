@@ -13,13 +13,13 @@ const PAST = new Date('2020-01-01T00:00:00.000Z');
 const OPEN = new Date('2099-01-01T00:00:00.000Z');
 let sequence = 0;
 
-async function entrant(): Promise<{ userId: number; studentId: number; studentIds: number[]; token: string }> {
+async function entrant(rosterSize = 3): Promise<{ userId: number; studentId: number; studentIds: number[]; token: string }> {
   sequence += 1;
   const auth = await request(app).post('/api/auth/register').send({ username: `sched-${Date.now()}-${sequence}`, password: 'pw-123456' });
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(auth);
   await prisma.user.update({ where: { id: session.me.id }, data: { money: 0, reputation: 0 } }); // 开局包 1000 金/10 誉归零（奖金/声誉绝对断言口径）
   const studentIds: number[] = [];
-  for (let member = 0; member < 3; member += 1) {
+  for (let member = 0; member < rosterSize; member += 1) {
     const student = await prisma.student.create({ data: { userId: session.me.id, name: `Entrant ${sequence}-${member}`, sex: 'MALE', qualityTier: 'ELITE', ds: 35, dp: 35, math: 35, graph: 35, greedy: 35, str: 35, code: 35, thinking: 35, setting: 35, mindset: 0, focusCap: 30, energyMax: 80, energy: 80, stamina: 5, staminaRegen: 50, lastSettledAt: PAST } });
     studentIds.push(student.id);
   }
@@ -38,6 +38,26 @@ describe('PVP scheduler', () => {
     expect(first.filter((match) => match.status === 'BYE')).toHaveLength(3);
     expect(first.flatMap((match) => [match.homeUserId, match.awayUserId]).filter(Boolean)).toHaveLength(5);
     expect(buildFirstRound(Array.from({ length: 17 }, (_, userId) => ({ userId: userId + 1 })), 32, 42)).toHaveLength(16);
+  });
+
+  it('rosterSize=4 的赛事跑完 2N=8 局且客队成员 side 为 AWAY', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Four', size: 4, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: { rosterSize: 4 } } });
+    for (let index = 0; index < 4; index += 1) {
+      const player = await entrant(4);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
+    }
+    await advancePvpTournament(tournament.id, PAST);
+    expect((await prisma.pvpTournament.findUniqueOrThrow({ where: { id: tournament.id } })).status).toBe('FINISHED');
+
+    const record = await prisma.contestRecord.findFirstOrThrow({ where: { type: 'PVP' }, orderBy: { createdAt: 'asc' } });
+    const report = record.report as {
+      rounds: Array<{ roundNo: number; setterSide: string }>;
+      inputSnapshot: { home: { members: unknown[] }; away: { members: Array<{ side: string }> } };
+    };
+    expect(report.rounds.map((round) => round.roundNo)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(report.inputSnapshot.home.members).toHaveLength(4);
+    expect(report.inputSnapshot.away.members).toHaveLength(4);
+    expect(report.inputSnapshot.away.members.every((entry) => entry.side === 'AWAY')).toBe(true);
   });
 
   it('cancels underfilled tournaments and refunds tickets once', async () => {

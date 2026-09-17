@@ -121,6 +121,19 @@ describe('M4.2 PVP registration', () => {
     await expect(registerPvp(otherUserId, tournamentId, [oS1, s2, s3], [], new Date('2099-01-03T00:00:00.000Z'))).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
   });
 
+  it('rosterSize=4 的赛事要求恰好 4 人报名', async () => {
+    const userId = await createUser();
+    const roster = await createStudents(userId, 4);
+    await prisma.userItem.create({ data: { userId, itemId: 'entry-ticket', quantity: 1 } });
+    const tournamentId = await createTournament({ rosterSize: 4 });
+
+    await expect(registerPvp(userId, tournamentId, roster.slice(0, 3), [], NOW)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    const registered = await registerPvp(userId, tournamentId, roster, [], NOW);
+    expect(registered.rosterSize).toBe(4);
+    expect(registered.roster).toHaveLength(4);
+    expect(await getRegistration(userId, tournamentId)).toMatchObject({ rosterSize: 4 });
+  });
+
   it('rejects registrations after the declared tournament capacity is reached', async () => {
     const tournamentId = await createTournament();
     const firstUser = await createUser();
