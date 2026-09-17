@@ -1,16 +1,17 @@
 import { Prisma, type PvpRegistration, type PvpTournament, type Student } from '@prisma/client';
-import type { ParticipantSnapshot } from '@oinur/shared';
+import { TEAM_SIZE_MAX, TEAM_SIZE_MIN, type ParticipantSnapshot } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 
-export type PvpRosterSize = 3 | 4;
-export const DEFAULT_PVP_ROSTER_SIZE: PvpRosterSize = 3;
+/** 出战队伍人数即契约的队伍规模域（shared TEAM_SIZE_MIN~MAX），不是可调数值。 */
+export type PvpRosterSize = typeof TEAM_SIZE_MIN | typeof TEAM_SIZE_MAX;
+export const DEFAULT_PVP_ROSTER_SIZE: PvpRosterSize = TEAM_SIZE_MIN;
 
 export function pvpRosterSize(config: unknown): PvpRosterSize {
   if (typeof config !== 'object' || config === null || Array.isArray(config)) return DEFAULT_PVP_ROSTER_SIZE;
   const value = (config as Record<string, unknown>).rosterSize;
   if (value === undefined) return DEFAULT_PVP_ROSTER_SIZE;
-  if (value === 3 || value === 4) return value;
+  if (value === TEAM_SIZE_MIN || value === TEAM_SIZE_MAX) return value;
   throw new ApiError('STATE_CONFLICT', { resource: 'tournament', reason: 'invalid rosterSize' });
 }
 
@@ -116,13 +117,10 @@ export async function getRegistration(
 ): Promise<PvpRegistrationView | null> {
   const row = await prisma.pvpRegistration.findUnique({
     where: { tournamentId_userId: { tournamentId, userId } },
+    include: { tournament: { select: { config: true } } },
   });
   if (row === null) return null;
-  const tournament = await prisma.pvpTournament.findUnique({
-    where: { id: tournamentId },
-    select: { config: true },
-  });
-  return registrationView(row, false, pvpRosterSize(tournament?.config));
+  return registrationView(row, false, pvpRosterSize(row.tournament.config));
 }
 
 export async function registerPvp(
@@ -132,8 +130,8 @@ export async function registerPvp(
   problemEntryIds: readonly number[],
   now: Date = new Date(),
 ): Promise<PvpRegistrationView> {
-  if (problemEntryIds.length > 2 || new Set(problemEntryIds).size !== problemEntryIds.length) {
-    throw new ApiError('VALIDATION_FAILED', { field: 'problemEntryIds', reason: 'at most two unique problems' });
+  if (new Set(problemEntryIds).size !== problemEntryIds.length) {
+    throw new ApiError('VALIDATION_FAILED', { field: 'problemEntryIds', reason: 'duplicate problems' });
   }
   return prisma.$transaction(async (tx) => {
     // PVP lock ordering is Tournament -> User -> Student, matching scheduler/refund paths.
@@ -151,6 +149,13 @@ export async function registerPvp(
       throw new ApiError('VALIDATION_FAILED', {
         field: 'studentIds',
         reason: `exactly ${rosterSize} distinct active students are required`,
+      });
+    }
+    // 每名队员至多携带一道自己的预制题（progression.md §2.3）
+    if (problemEntryIds.length > rosterSize) {
+      throw new ApiError('VALIDATION_FAILED', {
+        field: 'problemEntryIds',
+        reason: `at most ${rosterSize} problems, one per member`,
       });
     }
     const existing = await tx.pvpRegistration.findUnique({

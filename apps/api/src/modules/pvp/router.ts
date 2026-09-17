@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { TEAM_SIZE_MAX, TEAM_SIZE_MIN } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as service from './registration.js';
@@ -8,8 +9,8 @@ import { claimPvpReward, listPvpRewardGrants } from './rewards.js';
 
 const registrationSchema = z
   .object({
-    studentIds: z.array(z.number().int().positive()).min(3).max(4),
-    problemEntryIds: z.array(z.number().int().positive()).max(2).default([]),
+    studentIds: z.array(z.number().int().positive()).min(TEAM_SIZE_MIN).max(TEAM_SIZE_MAX),
+    problemEntryIds: z.array(z.number().int().positive()).max(TEAM_SIZE_MAX).default([]),
   })
   .strict();
 

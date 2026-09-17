@@ -15,7 +15,7 @@ import { stableHash } from '../contest/engine/report.js';
 import { createContestRecord } from '../contest/repository.js';
 import { buildFirstRound, buildNextRound } from './bracket.js';
 import { ensurePvpRewardGrants } from './rewards.js';
-import { pvpRosterSize } from './registration.js';
+import { pvpRosterSize, type PvpRosterSize } from './registration.js';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 type Registration = PvpRegistration;
@@ -79,7 +79,7 @@ export interface PvpTournamentDetail {
   name: string;
   status: PvpTournament['status'];
   size: number;
-  rosterSize: 3 | 4;
+  rosterSize: PvpRosterSize;
   registerEndsAt: string;
   autoStartAt: string;
   prizes: unknown;
