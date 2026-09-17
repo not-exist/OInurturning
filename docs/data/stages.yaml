@@ -22,7 +22,8 @@ defaults:
   stamina_cost_by_chapter: { cspj: 1, csps: 1, noip: 1, province: 1, noi: 2, ctt: 2, cts: 2, ioi: 2 }   # 参赛体力：第1–4章1点、第5–8章2点（progression.md 口径）
   pass_rank_max: 8                            # 通关线：固定前 8 名（与 NPC 池规模解耦；名次奖金同门槛）
   roster_size: 4                              # 每关出战学员数；玩家队伍与每支 NPC 队伍人数必须相同。
-                                              # 当前只生效 defaults.roster_size；单关覆盖待后续 Task 实现 defaults→stage 继承后再启用
+                                              # story 逐关读取 `stage.roster_size ?? defaults.roster_size`，单关可覆盖；
+                                              # 历练对决固定 3 人（events.yaml party_size），PVP 由赛事 config.rosterSize 决定。
   # 题目实例化规则：
   #   * problem_slots 各组按序抽取，同一场内模板不重复（池不足时允许复用）；
   #   * 带 chance 的组为概率附加题（超纲题），未触发则本场少一题；
