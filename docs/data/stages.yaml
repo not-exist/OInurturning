@@ -8,7 +8,9 @@
 # 关名序列按关数取：热身赛 → 模拟赛Ⅰ…Ⅲ → 正赛。
 #
 # 组队口径：一场比赛由玩家 1 支队伍出战，NPC 也按相同人数组成若干支队伍，按「队伍总分」排名。
-# TODO(bal:regress): NPC 队伍数待 Task 数值回归后微调
+# 数值口径（2026-09-17 重标定）：NPC 队伍数为旧粗标定 x3；mean_level 按「达标画像」标定——4 人均衡队
+# （8 项属性同为该关 recommended_level、无天赋）的通关率沿关卡单调下降（cspj 热身 ~90% -> ioi 正赛 ~10%），
+# 150 seed/关纯引擎蒙特卡洛采样，标定口径与结果见 commit 说明。
 # =============================================================================
 
 version: 1
@@ -48,7 +50,7 @@ stages:
     duration_min: 180
     problem_slots:
       - { tier: cspj, count: 3 }
-    npc_pool: { size: 10, mean_level: 8, spread: 5 }
+    npc_pool: { size: 30, mean_level: 1, spread: 5 }
     first_clear:
       money: 500                              # 500 × 1.0
       items: { count: 1, chance: 0.6, pool: [{ rarity: gray, weight: 1.0 }] }
@@ -62,7 +64,7 @@ stages:
     problem_slots:
       - { tier: cspj, count: 3 }
       - { tier: csps, count: 1, chance: 0.2 }   # 少量超纲题
-    npc_pool: { size: 11, mean_level: 11, spread: 5 }
+    npc_pool: { size: 33, mean_level: 5, spread: 5 }
     first_clear:
       money: 650                              # 500 × 1.3
       items: { count: 1, chance: 0.6, pool: [{ rarity: gray, weight: 1.0 }] }
@@ -76,7 +78,7 @@ stages:
     problem_slots:
       - { tier: cspj, count: 3 }
       - { tier: csps, count: 1, chance: 0.35 }
-    npc_pool: { size: 12, mean_level: 14, spread: 6 }
+    npc_pool: { size: 36, mean_level: 8, spread: 6 }
     first_clear:
       money: 800                              # 500 × 1.6
       items: { count: 1, chance: 0.6, pool: [{ rarity: gray, weight: 1.0 }] }
@@ -90,7 +92,7 @@ stages:
     problem_slots:
       - { tier: cspj, count: 3 }
       - { tier: csps, count: 1, chance: 0.5 }
-    npc_pool: { size: 14, mean_level: 17, spread: 6 }
+    npc_pool: { size: 42, mean_level: 10, spread: 6 }
     first_clear:
       money: 1100                             # 500 × 2.2
       items: { count: 1, chance: 0.6, pool: [{ rarity: gray, weight: 1.0 }] }
@@ -106,7 +108,7 @@ stages:
     duration_min: 210
     problem_slots:
       - { tier: csps, count: 3 }
-    npc_pool: { size: 11, mean_level: 21, spread: 5 }
+    npc_pool: { size: 33, mean_level: 17, spread: 5 }
     first_clear:
       money: 1200                             # 1200 × 1.0
       items:
@@ -123,7 +125,7 @@ stages:
     problem_slots:
       - { tier: csps, count: 3 }
       - { tier: noip, count: 1, chance: 0.2 }
-    npc_pool: { size: 12, mean_level: 26, spread: 6 }
+    npc_pool: { size: 36, mean_level: 20, spread: 6 }
     first_clear:
       money: 1560                             # 1200 × 1.3
       items:
@@ -140,7 +142,7 @@ stages:
     problem_slots:
       - { tier: csps, count: 3 }
       - { tier: noip, count: 1, chance: 0.35 }
-    npc_pool: { size: 13, mean_level: 31, spread: 6 }
+    npc_pool: { size: 39, mean_level: 27, spread: 6 }
     first_clear:
       money: 1920                             # 1200 × 1.6
       items:
@@ -157,7 +159,7 @@ stages:
     problem_slots:
       - { tier: csps, count: 3 }
       - { tier: noip, count: 1, chance: 0.5 }
-    npc_pool: { size: 14, mean_level: 35, spread: 7 }
+    npc_pool: { size: 42, mean_level: 28, spread: 7 }
     first_clear:
       money: 2640                             # 1200 × 2.2
       items:
@@ -177,7 +179,7 @@ stages:
     duration_min: 250
     problem_slots:
       - { tier: noip, count: 3 }
-    npc_pool: { size: 12, mean_level: 37, spread: 6 }
+    npc_pool: { size: 36, mean_level: 30, spread: 6 }
     first_clear:
       money: 3000                             # 3000 × 1.0
       items:
@@ -194,7 +196,7 @@ stages:
     problem_slots:
       - { tier: noip, count: 3 }
       - { tier: province, count: 1, chance: 0.2 }
-    npc_pool: { size: 13, mean_level: 42, spread: 6 }
+    npc_pool: { size: 39, mean_level: 37, spread: 6 }
     first_clear:
       money: 3900                             # 3000 × 1.3
       items:
@@ -211,7 +213,7 @@ stages:
     problem_slots:
       - { tier: noip, count: 3 }
       - { tier: province, count: 1, chance: 0.3 }
-    npc_pool: { size: 14, mean_level: 47, spread: 7 }
+    npc_pool: { size: 42, mean_level: 40, spread: 7 }
     first_clear:
       money: 4800                             # 3000 × 1.6
       items:
@@ -228,7 +230,7 @@ stages:
     problem_slots:
       - { tier: noip, count: 2, dims: [ds, dp] }   # 保证数据结构+DP 底盘
       - { tier: noip, count: 2 }
-    npc_pool: { size: 15, mean_level: 51, spread: 7 }
+    npc_pool: { size: 45, mean_level: 50, spread: 7 }
     first_clear:
       money: 6600                             # 3000 × 2.2
       items:
@@ -244,7 +246,7 @@ stages:
     duration_min: 330
     problem_slots:
       - { tier: noip, count: 4 }
-    npc_pool: { size: 16, mean_level: 55, spread: 7 }
+    npc_pool: { size: 48, mean_level: 52, spread: 7 }
     first_clear:
       money: 8400                             # 3000 × 2.8
       items:
@@ -263,7 +265,7 @@ stages:
     duration_min: 320
     problem_slots:
       - { tier: province, count: 3 }
-    npc_pool: { size: 13, mean_level: 57, spread: 5 }
+    npc_pool: { size: 39, mean_level: 52, spread: 5 }
     first_clear:
       money: 8000                             # 8000 × 1.0
       items:
@@ -280,7 +282,7 @@ stages:
     problem_slots:
       - { tier: province, count: 3 }
       - { tier: noi, count: 1, chance: 0.2 }
-    npc_pool: { size: 14, mean_level: 61, spread: 6 }
+    npc_pool: { size: 42, mean_level: 54, spread: 6 }
     first_clear:
       money: 10400                            # 8000 × 1.3
       items:
@@ -296,7 +298,7 @@ stages:
     duration_min: 420
     problem_slots:
       - { tier: province, count: 4 }
-    npc_pool: { size: 15, mean_level: 65, spread: 6 }
+    npc_pool: { size: 45, mean_level: 57, spread: 6 }
     first_clear:
       money: 12800                            # 8000 × 1.6
       items:
@@ -313,7 +315,7 @@ stages:
     problem_slots:
       - { tier: province, count: 3 }
       - { tier: noi, count: 1, chance: 0.3 }
-    npc_pool: { size: 16, mean_level: 69, spread: 6 }
+    npc_pool: { size: 48, mean_level: 63, spread: 6 }
     first_clear:
       money: 17600                            # 8000 × 2.2
       items:
@@ -329,7 +331,7 @@ stages:
     duration_min: 430
     problem_slots:
       - { tier: province, count: 4 }
-    npc_pool: { size: 17, mean_level: 72, spread: 7 }
+    npc_pool: { size: 51, mean_level: 72, spread: 7 }
     first_clear:
       money: 22400                            # 8000 × 2.8
       items:
@@ -348,7 +350,7 @@ stages:
     duration_min: 340
     problem_slots:
       - { tier: noi, count: 3 }
-    npc_pool: { size: 14, mean_level: 73, spread: 5 }
+    npc_pool: { size: 42, mean_level: 68, spread: 5 }
     first_clear:
       money: 20000                            # 20000 × 1.0
       items:
@@ -365,7 +367,7 @@ stages:
     problem_slots:
       - { tier: noi, count: 3 }
       - { tier: ctt, count: 1, chance: 0.2 }
-    npc_pool: { size: 15, mean_level: 77, spread: 6 }
+    npc_pool: { size: 45, mean_level: 71, spread: 6 }
     first_clear:
       money: 26000                            # 20000 × 1.3
       items:
@@ -381,7 +383,7 @@ stages:
     duration_min: 460
     problem_slots:
       - { tier: noi, count: 4 }
-    npc_pool: { size: 16, mean_level: 80, spread: 6 }
+    npc_pool: { size: 48, mean_level: 74, spread: 6 }
     first_clear:
       money: 32000                            # 20000 × 1.6
       items:
@@ -398,7 +400,7 @@ stages:
     problem_slots:
       - { tier: noi, count: 3 }
       - { tier: ctt, count: 1, chance: 0.3 }
-    npc_pool: { size: 17, mean_level: 84, spread: 6 }
+    npc_pool: { size: 51, mean_level: 76, spread: 6 }
     first_clear:
       money: 44000                            # 20000 × 2.2
       items:
@@ -414,7 +416,7 @@ stages:
     duration_min: 460
     problem_slots:
       - { tier: noi, count: 4 }
-    npc_pool: { size: 18, mean_level: 86, spread: 6 }
+    npc_pool: { size: 54, mean_level: 84, spread: 6 }
     first_clear:
       money: 56000                            # 20000 × 2.8
       items:
@@ -436,7 +438,7 @@ stages:
     duration_min: 360
     problem_slots:
       - { tier: ctt, count: 3 }
-    npc_pool: { size: 16, mean_level: 84, spread: 4 }
+    npc_pool: { size: 48, mean_level: 78, spread: 4 }
     first_clear:
       money: 45000                            # 45000 × 1.0
       items:
@@ -453,7 +455,7 @@ stages:
     problem_slots:
       - { tier: ctt, count: 3 }
       - { tier: cts, count: 1, chance: 0.15 }
-    npc_pool: { size: 18, mean_level: 88, spread: 4 }
+    npc_pool: { size: 54, mean_level: 82, spread: 4 }
     first_clear:
       money: 58500                            # 45000 × 1.3
       items:
@@ -470,7 +472,7 @@ stages:
     problem_slots:
       - { tier: ctt, count: 3 }
       - { tier: cts, count: 1, chance: 0.25 }
-    npc_pool: { size: 18, mean_level: 90, spread: 5 }
+    npc_pool: { size: 54, mean_level: 85, spread: 5 }
     first_clear:
       money: 72000                            # 45000 × 1.6
       items:
@@ -489,7 +491,7 @@ stages:
     duration_min: 380
     problem_slots:
       - { tier: cts, count: 3 }
-    npc_pool: { size: 16, mean_level: 88, spread: 4 }
+    npc_pool: { size: 48, mean_level: 81, spread: 4 }
     first_clear:
       money: 90000                            # 90000 × 1.0
       items:
@@ -506,7 +508,7 @@ stages:
     problem_slots:
       - { tier: cts, count: 3 }
       - { tier: ioi, count: 1, chance: 0.15 }
-    npc_pool: { size: 18, mean_level: 91, spread: 4 }
+    npc_pool: { size: 54, mean_level: 85, spread: 4 }
     first_clear:
       money: 117000                           # 90000 × 1.3
       items:
@@ -523,7 +525,7 @@ stages:
     problem_slots:
       - { tier: cts, count: 3 }
       - { tier: ioi, count: 1, chance: 0.25 }
-    npc_pool: { size: 18, mean_level: 93, spread: 5 }
+    npc_pool: { size: 54, mean_level: 87, spread: 5 }
     first_clear:
       money: 144000                           # 90000 × 1.6
       items:
@@ -542,7 +544,7 @@ stages:
     duration_min: 410
     problem_slots:
       - { tier: ioi, count: 3 }
-    npc_pool: { size: 17, mean_level: 90, spread: 4 }
+    npc_pool: { size: 51, mean_level: 84, spread: 4 }
     first_clear:
       money: 180000                           # 180000 × 1.0
       items:
@@ -558,7 +560,7 @@ stages:
     duration_min: 410
     problem_slots:
       - { tier: ioi, count: 3 }
-    npc_pool: { size: 18, mean_level: 93, spread: 4 }
+    npc_pool: { size: 54, mean_level: 86, spread: 4 }
     first_clear:
       money: 234000                           # 180000 × 1.3
       items:
@@ -574,7 +576,7 @@ stages:
     duration_min: 410
     problem_slots:
       - { tier: ioi, count: 3 }
-    npc_pool: { size: 18, mean_level: 95, spread: 4 }
+    npc_pool: { size: 54, mean_level: 88, spread: 4 }
     first_clear:
       money: 288000                           # 180000 × 1.6
       items:
@@ -591,7 +593,7 @@ stages:
     problem_slots:
       - { tier: ioi, count: 1, dims: [math] }      # 保底抽出「传说压轴」
       - { tier: ioi, count: 3 }
-    npc_pool: { size: 18, mean_level: 97, spread: 3 }   # 顶点局：分布收窄，人人都是怪物
+    npc_pool: { size: 54, mean_level: 93, spread: 3 }   # 顶点局：分布收窄；均值低于推荐等级，靠队伍数与罚时维持区分度
     first_clear:
       money: 396000                           # 180000 × 2.2
       items:
