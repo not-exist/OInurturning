@@ -69,11 +69,11 @@ interface DrawnView {
   event: { choices: Choice[] | null };
 }
 
-/** 逐个试可用分支直到结算（高额资金+钥匙篮保证必有可解分支） */
-async function resolveAdventure(token: string, studentId: number): Promise<void> {
+/** 逐个试可用分支直到结算（高额资金+钥匙篮保证必有可解分支）；历练固定 3 人队伍 */
+async function resolveAdventure(token: string, roster: number[]): Promise<void> {
   const auth = { Authorization: `Bearer ${token}` };
   const drawn = unwrapOk<DrawnView>(
-    await request(app).post('/api/adventures/draw').set(auth).send({ studentId, tier: 1 }),
+    await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 1 }),
   );
   let completed = false;
   for (const choice of drawn.event.choices ?? []) {
@@ -201,13 +201,29 @@ describe('POST /api/overview/checklist/claim', () => {
     const good = students.find((s) => s.qualityTier === 'GOOD') ?? students[0]!;
     const other = students.find((s) => s.id !== good.id) ?? students[1]!;
 
+    // 剧情/历练都要多人队伍：先补齐队伍人数（在册 2 人 + 招募 2 人）
+    const recruitedIds: number[] = [];
+    for (let index = 0; index < 2; index += 1) {
+      const pool = unwrapOk<{ candidates: { tempId: string }[] }>(
+        await request(app).get('/api/academy/pool').set(auth),
+      );
+      const recruited = unwrapOk<{ id: number }>(
+        await request(app)
+          .post('/api/academy/recruit')
+          .set(auth)
+          .send({ tempId: pool.candidates[0]!.tempId }),
+      );
+      recruitedIds.push(recruited.id);
+    }
+    const roster = [good.id, other.id, ...recruitedIds];
+
     // 剧情：GOOD（V≈14）打 cspj:1（NPC 均值 8 取前 8，单次≈99%，至多 3 次）
     let cleared = false;
     for (let attempt = 0; attempt < 3 && !cleared; attempt += 1) {
       const entered = await request(app)
         .post('/api/story/stages/cspj:1/enter')
         .set(auth)
-        .send({ roster: [good.id], ngLevel: 0, idempotencyKey: randomUUID() });
+        .send({ roster, ngLevel: 0, idempotencyKey: randomUUID() });
       expect(entered.status).toBe(200);
       cleared = await stageCleared(user.token, 'cspj:1');
     }
@@ -232,16 +248,7 @@ describe('POST /api/overview/checklist/claim', () => {
       .send({ studentId: good.id, tier: 'beginner', force: true });
     expect(lectured.status).toBe(200);
 
-    await resolveAdventure(user.token, other.id);
-
-    const pool = unwrapOk<{ candidates: { tempId: string }[] }>(
-      await request(app).get('/api/academy/pool').set(auth),
-    );
-    const recruited = await request(app)
-      .post('/api/academy/recruit')
-      .set(auth)
-      .send({ tempId: pool.candidates[0]!.tempId });
-    expect(recruited.status).toBe(200);
+    await resolveAdventure(user.token, [other.id, good.id, recruitedIds[0]!]);
   }
 
   it('未完成领取 → 409 STATE_CONFLICT', async () => {
@@ -290,11 +297,14 @@ describe('POST /api/overview/checklist/claim', () => {
   it('领奖事务内重算：完成后开除至 2 人 → 409', async () => {
     const user = await register();
     await completeAll(user);
+    // 开除至只剩 2 人（在册 <3 → recruit3 步骤回退）
     const students = await onboardingStudents(user.userId);
-    const dismissed = await request(app)
-      .post(`/api/students/${students[1]!.id}/dismiss`)
-      .set({ Authorization: `Bearer ${user.token}` });
-    expect(dismissed.status).toBe(200);
+    for (const victim of students.slice(2)) {
+      const dismissed = await request(app)
+        .post(`/api/students/${victim.id}/dismiss`)
+        .set({ Authorization: `Bearer ${user.token}` });
+      expect(dismissed.status).toBe(200);
+    }
 
     const res = await request(app)
       .post('/api/overview/checklist/claim')
