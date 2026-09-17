@@ -362,14 +362,14 @@ export interface ParticipantTimeline {
 /** §8.2 出题对决战报（PVP/历练遭遇战） */
 export interface DuelReport extends ReportHeader {
   format: 'DUEL';
-  rounds: DuelRoundReport[];      // 固定 4 局 + 可能的加赛局
+  rounds: DuelRoundReport[];      // 2N 局（N = 每侧人数）+ 可能的加赛局
   scores: { home: number; away: number };
   tiebreak?: 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';  // 平局分流侧重，由场景注入
   qualityRuleOn: boolean;         // 是否启用【考察出题质量】（未解出出题方+2）
   winnerSide: 'HOME' | 'AWAY' | 'DRAW';
 }
 export interface DuelRoundReport {
-  roundNo: number;                // 1..4，加赛从 5 起
+  roundNo: number;                // 1..2N，加赛从 2N+1 起
   setterSide: 'HOME' | 'AWAY';    // 本局出题方
   question: QuestionSnapshot;
   answerer: ParticipantSnapshot;
@@ -1089,7 +1089,7 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 
 | # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
 |---|---|---|---|---|---|
-| 17 | POST /api/adventures/draw | 登录 | studentId+tier(1..3)；已有 PENDING 则 409 | 先抽档过滤再稀有度加权池抽取；返回事件与可用选项 | §10 抽事件 |
+| 17 | POST /api/adventures/draw | 登录 | roster(3 名学员 id)+tier(1..3)；任一体力不足或已有 PENDING 则失败 | 先抽档过滤再稀有度加权池抽取；返回事件与可用选项 | §10 抽事件 |
 | 18 | POST /api/adventures/:id/choice | 登录 | optionIndex（须满足 requirements） | 分支/对决（内联生成 ContestRecord）/奖励结算；RESOLVED | 事件选项 |
 | 19 | GET /api/adventures/logs | 登录 | 分页 | AdventureLog 历史（含结果摘要） | 历练档案 |
 
@@ -1423,7 +1423,7 @@ API client：薄 fetch 封装（自动带 Bearer、解信封、401 时静默 ref
  │           ├─ <FocusSparkline>         # 专注积累曲线（SVG polyline）
  │           └─ <DeltaChips>             # 心态Δ / 精力Δ / 用时
  └─ [format=DUEL]
-     ├─ <DuelScoreBoard home away>       # 四局比分大数字 + 加赛局高亮
+     ├─ <DuelScoreBoard home away>       # 2N 局比分大数字 + 加赛局高亮
      │   └─ <DuelRoundCard> per 局       # 出题方 / 答题方 / solved / scoreAwarded
      └─ <QualityRuleTag on?>             # 【考察出题质量】标记
  └─ <RewardSummary>                      # 钱/道具/进阶石入账动画
@@ -1698,7 +1698,7 @@ GAME-DESIGN 未明确、本文按以下假设推进（均已在正文对应位�
 |---|---|---|
 | A1 | 心态是否随时间恢复（§4 只写明体力/精力恢复） | 心态向基线缓慢线性回归，速率与基线在 `economy.yaml.recovery.mindsetPerHour/mindsetBaseline`；速率置 0 即关闭该机制 |
 | A2 | 心态数值边界 | 闭区间 [−100, +100]，界值在 economy.yaml 定义；专注衰减语义由 systems/contest.md 细化 |
-| A3 | 历练事件的参与者模型 | 单学员执行 + 投入档位二选一；Y1 小型赛等也由该学员单独参赛；多学员协作事件暂不存在 |
+| A3 | 历练事件的参与者模型 | 3 人队伍（roster 第 1 名为队长）+ 投入档位三选一；对决事件 3 人全上，非对决事件只有队长是行动者 |
 | A4 | 同一时间能否并行多个事件 | 不能：每玩家至多一个 PENDING AdventureLog，抽新事件前必须解决当前事件 |
 | A5 | PVP 出战阵容人数 | 报名锁定 rosterSize 名学员（具体数值入 stages/economy 配置），对阵模拟按报名快照进行 |
 | A6 | 对决中答题学员如何产生 | 服务端从锁定阵容中按当局主导六维确定性择优（可由 seed 复现），不支持实时指定——批量结算架构下无实时交互窗口 |
