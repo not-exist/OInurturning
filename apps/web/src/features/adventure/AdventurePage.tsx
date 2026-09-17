@@ -13,6 +13,9 @@ import {
   type AdventureLogView,
 } from '../../lib/hooks';
 import { Empty } from '../../components/ui';
+import { RosterPicker } from '../../components/RosterPicker';
+
+const ROSTER_SIZE = 3;
 
 const RARITY_LABEL: Record<string, string> = {
   gray: '灰',
@@ -147,7 +150,7 @@ export function AdventurePage(): JSX.Element {
   const choose = useChooseAdventure();
   const activate = useUseItem();
   const navigate = useNavigate();
-  const [studentId, setStudentId] = useState<number>();
+  const [roster, setRoster] = useState<number[]>([]);
   const [tier, setTier] = useState<1 | 2 | 3>(1);
   const [active, setActive] = useState<AdventureLogView>();
   const [battleReplay, setBattleReplay] = useState<import('@oinur/shared').BattleReplay>();
@@ -200,18 +203,15 @@ export function AdventurePage(): JSX.Element {
     );
   }
 
-  const selectedStudentId = studentId ?? students.data[0]?.id;
+  const rosterReady = roster.length === ROSTER_SIZE;
   const pending = active ?? logs.data.find((log) => log.status === 'PENDING');
   const intel = inventory.data.find((item) => item.itemId === 'intel-slip');
   const drawError = draw.isError ? '抽取失败，请检查体力或当前待处理事件。' : null;
   const chooseError = choose.isError ? '结算失败，请检查选项条件。' : null;
 
   const drawEvent = () => {
-    if (selectedStudentId === undefined) return;
-    draw.mutate(
-      { studentId: selectedStudentId, tier },
-      { onSuccess: (result) => setActive(result) },
-    );
+    if (!rosterReady) return;
+    draw.mutate({ roster, tier }, { onSuccess: (result) => setActive(result) });
   };
   const chooseEvent = (input: { action?: 'accept' | 'avoid'; optionIndex?: number }) => {
     if (pending === undefined) return;
@@ -243,21 +243,14 @@ export function AdventurePage(): JSX.Element {
       </div>
 
       <section className="grid gap-4 border-b border-neutral-200 pb-5 md:grid-cols-[1fr_auto] md:items-end">
-        <label className="text-sm">
-          <span className="mb-2 block text-neutral-500">出发学员</span>
-          <select
-            data-testid="adventure-student"
-            className="w-full rounded border border-neutral-300 bg-white px-3 py-2 md:min-w-64"
-            value={selectedStudentId ?? ''}
-            onChange={(event) => setStudentId(Number(event.target.value))}
-          >
-            {students.data.map((student) => (
-              <option key={student.id} value={student.id}>
-                {student.name} · 体力 {Math.floor(student.stamina)} · V {student.v}
-              </option>
-            ))}
-          </select>
-        </label>
+        <RosterPicker
+          students={students.data}
+          selectedIds={roster}
+          min={ROSTER_SIZE}
+          max={ROSTER_SIZE}
+          onChange={setRoster}
+          dataTestIdPrefix="adventure-roster"
+        />
         <div>
           <span className="mb-2 block text-sm text-neutral-500">投入体力</span>
           <div className="flex gap-1">
@@ -277,9 +270,9 @@ export function AdventurePage(): JSX.Element {
         </div>
       </section>
 
-      {students.data.length === 0 && (
-        <Empty icon="🧭" title="还没有可以历练的学员">
-          招募学员后即可投入体力探索未知事件。
+      {students.data.length < ROSTER_SIZE && (
+        <Empty icon="🧭" title="至少需要 3 名学员出发">
+          历练为 3 人小队，招募满 3 名学员后即可投入体力探索未知事件。
         </Empty>
       )}
 
@@ -288,7 +281,7 @@ export function AdventurePage(): JSX.Element {
           type="button"
           data-testid="adventure-draw"
           className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-          disabled={selectedStudentId === undefined || pending !== undefined || draw.isPending}
+          disabled={!rosterReady || pending !== undefined || draw.isPending}
           onClick={drawEvent}
         >
           {draw.isPending ? '抽取中…' : '开始历练'}

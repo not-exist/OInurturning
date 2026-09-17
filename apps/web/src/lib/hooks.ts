@@ -194,6 +194,7 @@ export interface PvpTournamentView {
   name: string;
   status: 'REGISTERING' | 'RUNNING' | 'FINISHED' | 'CANCELLED';
   size: number;
+  rosterSize: number;
   registerEndsAt: string;
   autoStartAt: string;
   registered: boolean;
@@ -212,6 +213,7 @@ export interface PvpRegistrationView {
   id: number;
   tournamentId: number;
   userId: number;
+  rosterSize: number;
   roster: import('@oinur/shared').ParticipantSnapshot[];
   problemEntryIds: number[];
   problemSnapshots: PvpProblemSnapshot[];
@@ -711,10 +713,10 @@ export function useAdventureLogs() {
 export function useDrawAdventure() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ studentId, tier }: { studentId: number; tier: 1 | 2 | 3 }) =>
+    mutationFn: ({ roster, tier }: { roster: number[]; tier: 1 | 2 | 3 }) =>
       apiFetch<AdventureLogView>('/api/adventures/draw', {
         method: 'POST',
-        body: JSON.stringify({ studentId, tier }),
+        body: JSON.stringify({ roster, tier }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['adventure-logs'] });
@@ -971,16 +973,16 @@ export function useRegisterPvp() {
   return useMutation({
     mutationFn: ({
       tournamentId,
-      studentId,
+      studentIds,
       problemEntryIds,
     }: {
       tournamentId: number;
-      studentId: number;
+      studentIds: number[];
       problemEntryIds: number[];
     }) =>
       apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/register`, {
         method: 'POST',
-        body: JSON.stringify({ studentId, problemEntryIds }),
+        body: JSON.stringify({ studentIds, problemEntryIds }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pvp-tournaments'] });

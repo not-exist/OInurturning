@@ -9,6 +9,9 @@ import {
   type StoryEntryResult,
 } from '../../lib/hooks';
 import { Empty } from '../../components/ui';
+import { RosterPicker } from '../../components/RosterPicker';
+
+const ROSTER_SIZE = 4;
 
 const CHAPTER_LABEL: Record<string, string> = {
   cspj: 'CSP-J',
@@ -23,7 +26,7 @@ const CHAPTER_LABEL: Record<string, string> = {
 
 export function StoryPage() {
   const [ngLevel, setNgLevel] = useState(0);
-  const [studentId, setStudentId] = useState<number>();
+  const [roster, setRoster] = useState<number[]>([]);
   const overview = useStoryOverview(ngLevel);
   const students = useStudents();
   const enter = useEnterStoryStage();
@@ -69,13 +72,13 @@ export function StoryPage() {
     );
   }
 
-  const activeStudentId = studentId ?? students.data[0]?.id;
+  const rosterReady = roster.length === ROSTER_SIZE;
   const enterStage = (stageKey: string) => {
-    if (activeStudentId === undefined) return;
+    if (!rosterReady) return;
     enter.mutate(
       {
         stageKey,
-        roster: [activeStudentId],
+        roster,
         ngLevel,
         idempotencyKey: crypto.randomUUID(),
       },
@@ -109,33 +112,26 @@ export function StoryPage() {
         </label>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-b pb-4">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-500">出战学员</span>
-          <select
-            data-testid="story-student"
-            className="rounded border border-neutral-300 bg-white px-3 py-2"
-            value={activeStudentId ?? ''}
-            onChange={(event) => setStudentId(Number(event.target.value))}
-          >
-            {students.data.map((student) => (
-              <option key={student.id} value={student.id}>
-                {student.name} · V{student.v} · 精力 {Math.floor(student.energy)}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="border-b pb-4">
+        <RosterPicker
+          students={students.data}
+          selectedIds={roster}
+          min={ROSTER_SIZE}
+          max={ROSTER_SIZE}
+          onChange={setRoster}
+          dataTestIdPrefix="story-roster"
+        />
         {enter.isError && (
-          <span data-testid="story-error" className="text-sm text-red-600">
+          <span data-testid="story-error" className="mt-3 block text-sm text-red-600">
             进入关卡失败：{apiErrorMessage(enter.error)}（解锁、体力与精力均需满足）
           </span>
         )}
       </div>
 
-      {students.data.length === 0 && (
+      {students.data.length < ROSTER_SIZE && (
         <Empty
           icon="🏟️"
-          title="还没有可以出战的学员"
+          title="至少需要 4 名学员出战"
           action={
             <Link
               to="/academy"
@@ -145,7 +141,7 @@ export function StoryPage() {
             </Link>
           }
         >
-          招募并培养一名学员，才能踏上 CSP-J 的赛场。
+          剧情关卡为 4 人团体赛，招募满 4 名学员才能踏上 CSP-J 的赛场。
         </Empty>
       )}
 
@@ -193,7 +189,7 @@ export function StoryPage() {
                     type="button"
                     className="rounded bg-neutral-900 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
                     data-testid="story-enter"
-                    disabled={!stage.unlocked || activeStudentId === undefined || enter.isPending}
+                    disabled={!stage.unlocked || !rosterReady || enter.isPending}
                     onClick={() => enterStage(stage.stageKey)}
                   >
                     {enter.isPending ? '结算中…' : '进入'}
