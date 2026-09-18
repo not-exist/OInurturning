@@ -31,6 +31,20 @@ import {
 
 type JsonRecord = Record<string, unknown>;
 
+/** 历练队伍固定 3 人：roster[0] 为队长（行动者）。 */
+const ADVENTURE_ROSTER_SIZE = 3;
+
+interface LockedStudent {
+  current: Student & { talents: { talentId: string }[] };
+  settled: Student;
+}
+
+interface DuelStudentState {
+  studentId: number;
+  energy: number;
+  mindset: number;
+}
+
 export interface AdventureChoiceInput {
   action?: 'accept' | 'avoid';
   optionIndex?: number;
@@ -139,7 +153,7 @@ function outcomeSupported(outcome: EventOutcome): boolean {
     const duel = record(raw.duel);
     return (
       typeof duel.opponent === 'string' &&
-      duel.rounds === 4 &&
+      duel.party_size === ADVENTURE_ROSTER_SIZE &&
       typeof duel.quality_rule === 'boolean' &&
       typeof duel.tiebreak === 'string' &&
       ![raw.rewards_win, raw.rewards_lose, raw.rewards_draw].some(unsupportedRewards)
@@ -190,6 +204,15 @@ function eventView(event: EventConfig, revealChoices: boolean): AdventureEventVi
   };
 }
 
+/** 历练日志记录的 3 人队伍；队长（studentId）始终是 roster[0]。 */
+function adventureRoster(log: AdventureLog): number[] {
+  const roster = array(log.studentIds).filter((value): value is number => typeof value === 'number');
+  if (roster.length !== ADVENTURE_ROSTER_SIZE) {
+    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'three-member roster missing' });
+  }
+  return roster;
+}
+
 function resultPhase(log: AdventureLog): string | undefined {
   const last = array(log.results).at(-1);
   const phase = record(last).phase;
@@ -217,20 +240,31 @@ function toLogView(log: AdventureLog, event: EventConfig, revealChoices: boolean
   };
 }
 
-async function lockStudent(
+/**
+ * 锁定整支历练队伍：先按 id 升序 FOR UPDATE（避免并发抽卡互相等锁），再按请求顺序返回。
+ * 队长即 roster[0]，非对决事件的行动者语义仍绑定在他身上。
+ */
+async function lockStudents(
   tx: Prisma.TransactionClient,
   userId: number,
-  studentId: number,
+  roster: readonly number[],
   now: Date,
-): Promise<{ current: Student & { talents: { talentId: string }[] }; settled: Student }> {
-  await tx.$queryRaw`SELECT id FROM Student WHERE id = ${studentId} FOR UPDATE`;
-  const current = await tx.student.findUnique({ where: { id: studentId }, include: { talents: true } });
-  if (current === null || current.status !== 'ACTIVE') {
-    throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
-  }
-  if (current.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
-  const settled = settle(current, aggregateMeta(current.talents.map((talent) => talent.talentId)), now);
-  return { current, settled };
+): Promise<LockedStudent[]> {
+  const ids = [...new Set(roster)].sort((left, right) => left - right);
+  await tx.$queryRaw`SELECT id FROM Student WHERE id IN (${Prisma.join(ids)}) FOR UPDATE`;
+  const rows = await tx.student.findMany({ where: { id: { in: ids } }, include: { talents: true } });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return roster.map((studentId) => {
+    const current = byId.get(studentId);
+    if (current === undefined || current.status !== 'ACTIVE') {
+      throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
+    }
+    if (current.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
+    return {
+      current,
+      settled: settle(current, aggregateMeta(current.talents.map((talent) => talent.talentId)), now),
+    };
+  });
 }
 
 async function persistStudentSettlement(
@@ -314,12 +348,15 @@ async function drawContext(
 
 export async function drawAdventure(
   userId: number,
-  studentId: number,
+  roster: readonly number[],
   investment: AdventureStaminaCost,
   now: Date = new Date(),
 ): Promise<AdventureLogView> {
   if (![1, 2, 3].includes(investment)) {
     throw new ApiError('VALIDATION_FAILED', { field: 'tier', reason: 'must be 1, 2, or 3' });
+  }
+  if (roster.length !== ADVENTURE_ROSTER_SIZE || new Set(roster).size !== ADVENTURE_ROSTER_SIZE) {
+    throw new ApiError('VALIDATION_FAILED', { field: 'roster', reason: '需要 3 名互不相同的学员' });
   }
   const config = requireConfig();
   return prisma.$transaction(async (tx) => {
@@ -328,11 +365,19 @@ export async function drawAdventure(
     if (pending !== null) {
       throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'pending adventure exists' });
     }
-    const { current, settled } = await lockStudent(tx, userId, studentId, now);
-    if (settled.stamina < investment) {
-      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', need: investment });
+    const locked = await lockStudents(tx, userId, roster, now);
+    const short = locked.find((member) => member.settled.stamina < investment);
+    if (short !== undefined) {
+      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', studentId: short.current.id, need: investment });
     }
-    const context = await drawContext(tx, userId, { ...current, stamina: settled.stamina }, investment, now);
+    const [captain] = locked;
+    const context = await drawContext(
+      tx,
+      userId,
+      { ...captain!.current, stamina: captain!.settled.stamina },
+      investment,
+      now,
+    );
     const event = drawAdventureEvent(
       Object.values(config.events).filter((candidate) => candidate.choices.some(choiceSupported)),
       context,
@@ -347,12 +392,15 @@ export async function drawAdventure(
     });
     if (!preview.adventureIntelReady) {
       await claimWeeklyLimit(tx, event, now);
-      await persistStudentSettlement(tx, current, settled, settled.stamina - investment);
+      for (const member of locked) {
+        await persistStudentSettlement(tx, member.current, member.settled, member.settled.stamina - investment);
+      }
     }
     const log = await tx.adventureLog.create({
       data: {
         userId,
-        studentId,
+        studentId: roster[0]!,
+        studentIds: [...roster],
         eventId: event.id,
         tier: investment,
         seed,
@@ -475,14 +523,19 @@ function duelTiebreak(value: unknown): DuelInput['tiebreak'] {
   return modes[value];
 }
 
+/**
+ * 出题顺序与 duel.ts 的 2N 局轮换一致：第 index 局（0-based）出题方 = index 奇偶定侧、
+ * 出题队员下标 = floor(index / 2) % N，于是每人恰好出一题、答一题。
+ */
 function duelQuestions(
-  home: ParticipantSnapshot,
-  away: ParticipantSnapshot,
+  home: readonly ParticipantSnapshot[],
+  away: readonly ParticipantSnapshot[],
   seed: number,
 ): QuestionSnapshot[] {
   const random = createRandomStream(deriveStreamSeed(seed, 'questions'), 'duel');
-  return Array.from({ length: 4 }, (_, index) => {
-    const setter = index % 2 === 0 ? home : away;
+  return Array.from({ length: home.length * 2 }, (_, index) => {
+    const side = index % 2 === 0 ? home : away;
+    const setter = side[Math.floor(index / 2) % home.length]!;
     const dimension = DUEL_DIMENSIONS[
       Math.max(
         0,
@@ -519,8 +572,9 @@ function duelQuestions(
   });
 }
 
+/** 参战队伍固定 3 人：HOME 为玩家队伍，AWAY 由事件对手档位生成同人数 NPC。 */
 function duelInput(
-  student: Student & { talents?: { talentId: string }[] },
+  students: readonly (Student & { talents?: { talentId: string }[] })[],
   duel: JsonRecord,
   seed: number,
 ): DuelInput {
@@ -537,33 +591,40 @@ function duelInput(
   }
   const params = record(duel.opponent_params);
   const powerMultiplier = typeof params.power_mult === 'number' ? params.power_mult : 1;
-  const home = studentParticipant(student, 'HOME');
-  const away = generateDuelOpponent(
-    opponent as DuelOpponentKind,
-    deriveStreamSeed(seed, 'opponent'),
-    powerMultiplier,
-  );
+  const home = students.map((student) => studentParticipant(student, 'HOME'));
+  const away = home.map((_, index) => {
+    const npc = generateDuelOpponent(
+      opponent as DuelOpponentKind,
+      deriveStreamSeed(seed, `opponent:${index}`),
+      powerMultiplier,
+    );
+    return { ...npc, displayName: `${npc.displayName}·${index + 1}` };
+  });
   return {
-    home,
-    away,
+    home: { members: home },
+    away: { members: away },
     questions: duelQuestions(home, away, seed),
     qualityRuleOn: duel.quality_rule === true,
     tiebreak: duelTiebreak(duel.tiebreak),
   };
 }
 
-function playerDuelState(report: DuelReport, settled: Student): { energy: number; mindset: number } {
-  const initialEnergy = report.inputSnapshot.home.energy ?? report.inputSnapshot.home.energyMax;
-  const spent = report.rounds
-    .filter((round) => round.answererSide === 'HOME')
-    .reduce((total, round) => total + round.energyCost, 0);
-  const mindsetDelta = report.rounds
-    .filter((round) => round.answererSide === 'HOME')
-    .reduce((total, round) => total + round.answererMindsetDelta, 0);
-  return {
-    energy: clamp(initialEnergy - spent, 0, settled.energyMax),
-    mindset: clamp(settled.mindset + mindsetDelta, -10, 10),
-  };
+/** 对决后每名参战学员各自的精力/心态（结算只统计自己答题的局）。 */
+function playerDuelStates(report: DuelReport, locked: readonly LockedStudent[]): DuelStudentState[] {
+  return report.inputSnapshot.home.members.map((member, index) => {
+    const { settled } = locked[index]!;
+    const rounds = report.rounds.filter(
+      (round) => round.answererSide === 'HOME' && round.answererMemberIndex === index,
+    );
+    const spent = rounds.reduce((total, round) => total + round.energyCost, 0);
+    const mindsetDelta = rounds.reduce((total, round) => total + round.answererMindsetDelta, 0);
+    const initialEnergy = member.energy ?? member.energyMax;
+    return {
+      studentId: settled.id,
+      energy: clamp(initialEnergy - spent, 0, settled.energyMax),
+      mindset: clamp(settled.mindset + mindsetDelta, -10, 10),
+    };
+  });
 }
 
 async function priorWinStreak(
@@ -851,13 +912,16 @@ export async function chooseAdventure(
       return { adventure: toLogView(resolved, event, true), completed: true };
     }
     if (preview && input.action === 'accept') {
-      if (log.studentId === null) throw new ApiError('STATE_CONFLICT', { resource: 'student', reason: 'actor dismissed' });
-      const { current, settled } = await lockStudent(tx, userId, log.studentId, now);
-      if (settled.stamina < log.tier) {
-        throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', need: log.tier });
+      const roster = adventureRoster(log);
+      const locked = await lockStudents(tx, userId, roster, now);
+      const short = locked.find((member) => member.settled.stamina < log.tier);
+      if (short !== undefined) {
+        throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', studentId: short.current.id, need: log.tier });
       }
       await claimWeeklyLimit(tx, event, now);
-      await persistStudentSettlement(tx, current, settled, settled.stamina - log.tier);
+      for (const member of locked) {
+        await persistStudentSettlement(tx, member.current, member.settled, member.settled.stamina - log.tier);
+      }
       await tx.user.update({ where: { id: userId }, data: { adventureIntelReady: false } });
       const accepted = await tx.adventureLog.update({
         where: { id: adventureId },
@@ -881,8 +945,8 @@ export async function chooseAdventure(
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { money: true } });
       if (user.money < choice.cost_money) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: choice.cost_money });
     }
-    if (log.studentId === null) throw new ApiError('STATE_CONFLICT', { resource: 'student', reason: 'actor dismissed' });
-    const { current, settled } = await lockStudent(tx, userId, log.studentId, now);
+    const locked = await lockStudents(tx, userId, adventureRoster(log), now);
+    const { current, settled } = locked[0]!;
     const meta = aggregateMeta(current.talents.map((talent) => talent.talentId));
     const random = createRandomStream(log.seed, `choice:${input.optionIndex}`);
     const selected = weightedPick(
@@ -891,13 +955,14 @@ export async function chooseAdventure(
     );
     const outcomeRecord = { ...(selected as unknown as JsonRecord) };
     let duelReport: DuelReport | undefined;
+    let duelStates: DuelStudentState[] | undefined;
     let rewardStudent = settled;
     let winStreak = 0;
     let bankSourceQuestion: QuestionSnapshot | undefined;
     if (selected.type === 'duel') {
       const duel = record(outcomeRecord.duel);
       const inputSnapshot = duelInput(
-        { ...current, energy: settled.energy, mindset: settled.mindset },
+        locked.map((member) => ({ ...member.current, energy: member.settled.energy, mindset: member.settled.mindset })),
         duel,
         log.seed,
       );
@@ -909,8 +974,8 @@ export async function chooseAdventure(
             ? 'rewards_lose'
             : 'rewards_draw';
       outcomeRecord.rewards = record(outcomeRecord[rewardKey]);
-      const playerState = playerDuelState(duelReport, settled);
-      rewardStudent = { ...settled, energy: playerState.energy, mindset: playerState.mindset };
+      duelStates = playerDuelStates(duelReport, locked);
+      rewardStudent = { ...settled, energy: duelStates[0]!.energy, mindset: duelStates[0]!.mindset };
       bankSourceQuestion = duelReport.rounds.find((round) => round.setterSide === 'HOME')?.question;
       if (record(outcomeRecord.rewards).win_streak_bonus !== undefined && duelReport.winnerSide === 'HOME') {
         winStreak = (await priorWinStreak(tx, userId, log.eventId, now)) + 1;
@@ -947,6 +1012,13 @@ export async function chooseAdventure(
         ...applied.studentData,
       },
     );
+    if (duelStates !== undefined) {
+      for (const [index, state] of duelStates.entries()) {
+        if (index === 0) continue;
+        const member = locked[index]!;
+        await persistStudentSettlement(tx, member.current, member.settled, member.settled.stamina, state.energy, state.mindset);
+      }
+    }
     const contestRecord =
       duelReport === undefined
         ? null

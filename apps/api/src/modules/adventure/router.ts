@@ -6,7 +6,7 @@ import * as service from './service.js';
 
 const drawSchema = z
   .object({
-    studentId: z.number().int().positive(),
+    roster: z.array(z.number().int().positive()).length(3),
     tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   })
   .strict();
@@ -34,7 +34,7 @@ adventureRouter.post('/draw', requireAuth, async (req, res, next) => {
   try {
     const parsed = drawSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
-    const data = await service.drawAdventure(req.user!.id, parsed.data.studentId, parsed.data.tier);
+    const data = await service.drawAdventure(req.user!.id, parsed.data.roster, parsed.data.tier);
     res.json({ ok: true, data });
   } catch (error) {
     next(error);

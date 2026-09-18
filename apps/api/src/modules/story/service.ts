@@ -28,7 +28,7 @@ import {
   validateRankingReport,
 } from '../contest/engine/report.js';
 import { simulateRanking } from '../contest/engine/ranking.js';
-import { generateNpcPool } from '../contest/npc.js';
+import { generateNpcTeams } from '../contest/npc.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
 import {
@@ -440,8 +440,9 @@ function buildGrowth(
   report: RankingReport,
   student: Student,
   seed: number,
+  participantIndex: number,
 ): { lines: GrowthDelta[]; data: Prisma.StudentUpdateManyMutationInput } {
-  const random = createRandomStream(seed, 'growth');
+  const random = createRandomStream(deriveSeed(seed, 'growth', student.id), 'growth');
   const lines: GrowthDelta[] = [];
   const counts = {
     ds: 0,
@@ -464,7 +465,7 @@ function buildGrowth(
     STRING: ['str', 'string'],
   } as const;
 
-  for (const attempt of report.participants[0]?.attempts ?? []) {
+  for (const attempt of report.participants[participantIndex]?.attempts ?? []) {
     if (attempt.verdict !== 'AC') continue;
     const question = report.questions.find(
       (entry) => entry.instanceId === attempt.problemInstanceId,
@@ -563,19 +564,24 @@ export async function enterStoryStage(
 ): Promise<StoryEntryResult> {
   if (!Number.isInteger(ngLevel) || ngLevel < 0)
     throw new ApiError('VALIDATION_FAILED', { field: 'ngLevel' });
-  if (roster.length !== 1 || !Number.isInteger(roster[0]) || roster[0]! <= 0) {
+  const config = requireConfig();
+  const stage = config.stages[requestedStageKey];
+  if (stage === undefined)
+    throw new ApiError('NOT_FOUND', { resource: 'stage', stageKey: requestedStageKey });
+  const rosterSize = stage.roster_size ?? config.stageDefaults.roster_size;
+  if (
+    roster.length !== rosterSize ||
+    roster.some((id) => !Number.isInteger(id) || id <= 0) ||
+    new Set(roster).size !== rosterSize
+  ) {
     throw new ApiError('VALIDATION_FAILED', {
       field: 'roster',
-      reason: 'exactly one active student is required',
+      reason: `exactly ${rosterSize} distinct active students are required`,
     });
   }
   if (idempotencyKey.length < 1 || idempotencyKey.length > 128) {
     throw new ApiError('VALIDATION_FAILED', { field: 'idempotencyKey' });
   }
-  const config = requireConfig();
-  const stage = config.stages[requestedStageKey];
-  if (stage === undefined)
-    throw new ApiError('NOT_FOUND', { resource: 'stage', stageKey: requestedStageKey });
 
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
@@ -588,21 +594,28 @@ export async function enterStoryStage(
         firstClear: false,
       };
     }
-    await tx.$queryRaw`SELECT id FROM Student WHERE id = ${roster[0]} FOR UPDATE`;
-    const student = await tx.student.findUnique({
-      where: { id: roster[0] },
+    // 整支队伍一次性上锁：按 id 升序申请，避免并发入关互相等锁。
+    const lockedIds = [...new Set(roster)].sort((left, right) => left - right);
+    await tx.$queryRaw`SELECT id FROM Student WHERE id IN (${Prisma.join(lockedIds)}) FOR UPDATE`;
+    const rows = await tx.student.findMany({
+      where: { id: { in: lockedIds } },
       include: { talents: true },
     });
-    if (student === null || student.status !== 'ACTIVE')
-      throw new ApiError('NOT_FOUND', { resource: 'student', id: roster[0] });
-    if (student.userId !== userId)
-      throw new ApiError('FORBIDDEN', { resource: 'student', id: roster[0] });
-    const settledStudent = settle(
-      student,
-      aggregateMeta(student.talents.map((talent) => talent.talentId)),
-      now,
-    );
-    const entrant = { ...settledStudent, talents: student.talents };
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    // 按请求顺序回表：请求顺序即队内序号，直接对应 participants 的下标。
+    const members = roster.map((studentId) => {
+      const current = rowById.get(studentId);
+      if (current === undefined || current.status !== 'ACTIVE')
+        throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
+      if (current.userId !== userId)
+        throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
+      const settled = settle(
+        current,
+        aggregateMeta(current.talents.map((talent) => talent.talentId)),
+        now,
+      );
+      return { current, settled, talents: current.talents };
+    });
 
     const progressRows = await tx.storyProgress.findMany({ where: { userId, ngLevel } });
     const progress = new Map(progressRows.map((row) => [row.stageKey, row]));
@@ -619,17 +632,27 @@ export async function enterStoryStage(
     if (staminaCost === undefined) {
       throw new ApiError('STATE_CONFLICT', { resource: 'stage', stageKey: requestedStageKey });
     }
-    if (settledStudent.stamina < staminaCost) {
-      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', need: staminaCost });
+    for (const member of members) {
+      if (member.settled.stamina < staminaCost) {
+        throw new ApiError('INSUFFICIENT_RESOURCE', {
+          resource: 'stamina',
+          need: staminaCost,
+          studentId: member.current.id,
+        });
+      }
     }
     const firstClear = (progress.get(requestedStageKey)?.clearCount ?? 0) === 0;
-    const seed = deriveSeed(userId, student.id, requestedStageKey, ngLevel, idempotencyKey);
-    const player = studentSnapshot(entrant);
+    const seed = deriveSeed(userId, roster.join(','), requestedStageKey, ngLevel, idempotencyKey);
+    const playerMembers = members.map(({ settled, talents }) =>
+      studentSnapshot({ ...settled, talents }),
+    );
     const input: RankingInput = {
       kind: 'story',
       stageRef: { chapter: stage.chapter, stageIndex: stage.stage_index, ngPlusLayer: ngLevel },
-      student: player,
-      participants: generateNpcPool(stage, seed),
+      teams: [
+        { teamId: 'player', side: 'HOME', userId, members: playerMembers },
+        ...generateNpcTeams(stage, rosterSize, seed),
+      ],
       problems: instantiateQuestions(stage, ngLevel, seed),
       durationMin: stage.duration_min,
       npcPoolParam: {
@@ -641,7 +664,7 @@ export async function enterStoryStage(
     };
     const initialReport = simulateRanking(input, seed);
     const rank =
-      initialReport.standings.find((standing) => standing.participantIndex === 0)?.rank ??
+      initialReport.standings.find((standing) => standing.teamIndex === 0)?.rank ??
       Number.POSITIVE_INFINITY;
     let rewards = buildRewards(stage, ngLevel, firstClear, rank, seed);
     const completedFinals = new Set(
@@ -697,26 +720,47 @@ export async function enterStoryStage(
       }
     }
 
-    const growth = buildGrowth(initialReport, settledStudent, seed);
+    // 每人独立成长流：读自己那条 timeline、用自己的 RNG 子流，再逐人回写；任一回写失败则整笔回滚。
+    const growthLines: GrowthDelta[] = [];
+    const writebacks: {
+      id: number;
+      where: Prisma.StudentWhereInput;
+      data: Prisma.StudentUpdateManyMutationInput;
+    }[] = [];
+    members.forEach((member, memberIndex) => {
+      const growth = buildGrowth(initialReport, member.settled, seed, memberIndex);
+      growthLines.push(...growth.lines);
+      const timeline = initialReport.participants[memberIndex];
+      writebacks.push({
+        id: member.current.id,
+        where: {
+          id: member.current.id,
+          userId,
+          status: 'ACTIVE',
+          updatedAt: member.current.updatedAt,
+        },
+        data: {
+          ...growth.data,
+          stamina: member.settled.stamina - staminaCost,
+          energy: timeline?.attempts.at(-1)?.resolution.energyAfter ?? member.settled.energy,
+          mindset: timeline?.finalMindset ?? member.settled.mindset,
+          lastSettledAt: now,
+        },
+      });
+    });
     const report: RankingReport = validateRankingReport({
       ...initialReport,
       rewards,
-      growth: growth.lines,
+      growth: growthLines,
     });
-    const timeline = report.participants[0];
-    const energyAfter =
-      timeline?.attempts.at(-1)?.resolution.energyAfter ?? player.energy ?? player.energyMax;
-    const updatedStudent = await tx.student.updateMany({
-      where: { id: student.id, userId, status: 'ACTIVE', updatedAt: student.updatedAt },
-      data: {
-        ...growth.data,
-        stamina: settledStudent.stamina - staminaCost,
-        energy: energyAfter,
-        mindset: timeline?.finalMindset ?? settledStudent.mindset,
-        lastSettledAt: now,
-      },
-    });
-    if (updatedStudent.count !== 1) throw new ApiError('STATE_CONFLICT', { studentId: student.id });
+    for (const writeback of writebacks) {
+      const updatedStudent = await tx.student.updateMany({
+        where: writeback.where,
+        data: writeback.data,
+      });
+      if (updatedStudent.count !== 1)
+        throw new ApiError('STATE_CONFLICT', { studentId: writeback.id });
+    }
     await applyRewards(
       tx,
       userId,
@@ -754,7 +798,7 @@ export async function enterStoryStage(
           ),
           clearCount: (progress.get(requestedStageKey)?.clearCount ?? 0) + 1,
           rewards,
-          growth: growth.lines,
+          growth: growthLines,
           lastRecordId: record.id,
           lastSummary: summary,
         },

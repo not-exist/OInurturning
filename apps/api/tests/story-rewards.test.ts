@@ -5,11 +5,14 @@ import { prisma } from '../src/lib/prisma.js';
 import { enterStoryStage } from '../src/modules/story/service.js';
 import { resetUsers } from './helpers.js';
 
-async function createStudent(userId: number): Promise<number> {
+/** fixtures/config 的 defaults.roster_size：出战人数必须精确匹配。 */
+const ROSTER_SIZE = 4;
+
+async function createStudent(userId: number, index = 0): Promise<number> {
   const student = await prisma.student.create({
     data: {
       userId,
-      name: 'Reward Student',
+      name: `Reward Student ${index}`,
       sex: 'FEMALE',
       qualityTier: 'ELITE',
       ds: 100,
@@ -32,15 +35,23 @@ async function createStudent(userId: number): Promise<number> {
   return student.id;
 }
 
+async function createRoster(userId: number): Promise<number[]> {
+  const roster: number[] = [];
+  for (let index = 0; index < ROSTER_SIZE; index += 1) {
+    roster.push(await createStudent(userId, index));
+  }
+  return roster;
+}
+
 describe('story rewards and retries', () => {
   beforeEach(resetUsers);
 
   it('deducts stamina once per entry, awards first clear once, and records repeats', async () => {
     await importConfigs({ configDir: path.resolve(import.meta.dirname, 'fixtures/config') });
     const user = await prisma.user.create({ data: { username: 'story-rewards' } });
-    const studentId = await createStudent(user.id);
+    const roster = await createRoster(user.id);
 
-    const first = await enterStoryStage(user.id, 'cspj:1', 0, [studentId], 'reward-entry-1');
+    const first = await enterStoryStage(user.id, 'cspj:1', 0, roster, 'reward-entry-1');
     expect(first.replayed).toBe(false);
     expect(first.firstClear).toBe(true);
     expect(first.record.rewards).toEqual(
@@ -50,15 +61,19 @@ describe('story rewards and retries', () => {
       ]),
     );
 
-    const afterFirst = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
+    const afterFirst = await prisma.student.findMany({ where: { id: { in: roster } } });
     const userAfterFirst = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
-    expect(afterFirst.stamina).toBe(4);
+    expect(afterFirst.map((row) => row.stamina)).toEqual(
+      Array.from({ length: ROSTER_SIZE }, () => 4),
+    );
     expect(userAfterFirst.money).toBe(1);
 
-    const second = await enterStoryStage(user.id, 'cspj:1', 0, [studentId], 'reward-entry-2');
+    const second = await enterStoryStage(user.id, 'cspj:1', 0, roster, 'reward-entry-2');
     expect(second.firstClear).toBe(false);
-    const afterSecond = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
-    expect(afterSecond.stamina).toBeCloseTo(3, 3);
+    for (const studentId of roster) {
+      const afterSecond = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
+      expect(afterSecond.stamina).toBeCloseTo(3, 3);
+    }
     expect(
       await prisma.storyProgress.count({ where: { userId: user.id, stageKey: 'cspj:1' } }),
     ).toBe(1);

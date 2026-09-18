@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { TEAM_SIZE_MAX, TEAM_SIZE_MIN } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as service from './registration.js';
@@ -8,8 +9,8 @@ import { claimPvpReward, listPvpRewardGrants } from './rewards.js';
 
 const registrationSchema = z
   .object({
-    studentId: z.number().int().positive(),
-    problemEntryIds: z.array(z.number().int().positive()).max(2).default([]),
+    studentIds: z.array(z.number().int().positive()).min(TEAM_SIZE_MIN).max(TEAM_SIZE_MAX),
+    problemEntryIds: z.array(z.number().int().positive()).max(TEAM_SIZE_MAX).default([]),
   })
   .strict();
 
@@ -85,7 +86,7 @@ pvpRouter.post('/tournaments/:id/register', async (req, res, next) => {
       data: await service.registerPvp(
         req.user!.id,
         parseId(req.params.id),
-        parsed.data.studentId,
+        parsed.data.studentIds,
         parsed.data.problemEntryIds,
       ),
     });
@@ -99,7 +100,7 @@ pvpRouter.post('/tournaments/:id/registration', async (req, res, next) => {
   try {
     const parsed = registrationSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
-    res.json({ ok: true, data: await service.registerPvp(req.user!.id, parseId(req.params.id), parsed.data.studentId, parsed.data.problemEntryIds) });
+    res.json({ ok: true, data: await service.registerPvp(req.user!.id, parseId(req.params.id), parsed.data.studentIds, parsed.data.problemEntryIds) });
   } catch (error) {
     next(error);
   }

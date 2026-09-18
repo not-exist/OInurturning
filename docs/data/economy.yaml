@@ -233,7 +233,7 @@ pvp:
   min_players_to_start: 4        # 低于此数赛事取消并全员退票
   entry_ticket_per_registration: 1   # 报名消耗报名券数量（items.yaml entry-ticket）
   refund_first_round_winners: 1  # 首轮获胜者返票数量
-  submitted_problems_max: 2      # 报名时可提交入赛场题池的自制预制题上限
+  submitted_problems_max: 4      # 报名时可提交入赛场题池的自制预制题上限：每名队员至多 1 道，实际上限 = 本赛事 rosterSize（3~4）
   problem_reputation_per_unsolved: 2 # 对手未解出你的携带题时的声誉收益
   problem_rep_cap_per_match: 1   # 同一道题同一场对决最多计费次数（防刷）
   problem_rep_cap_per_tournament: 12 # 单道题单届锦标赛声誉收益上限

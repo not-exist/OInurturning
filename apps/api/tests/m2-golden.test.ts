@@ -26,12 +26,12 @@ const abilityKeys: readonly AbilityKey[] = [
   'PROBLEM',
 ];
 
-function participant(side: ParticipantSnapshot['side']): ParticipantSnapshot {
+function participant(side: ParticipantSnapshot['side'], memberIndex = 0): ParticipantSnapshot {
   return {
     side,
     userId: side === 'HOME' ? 1 : side === 'AWAY' ? 2 : null,
-    studentId: side === 'HOME' ? 10 : side === 'AWAY' ? 20 : null,
-    displayName: side,
+    studentId: side === 'HOME' ? 10 + memberIndex : side === 'AWAY' ? 20 + memberIndex : null,
+    displayName: `${side}-${memberIndex}`,
     abilities: Object.fromEntries(abilityKeys.map((key) => [key, 70])) as Record<
       AbilityKey,
       number
@@ -79,17 +79,20 @@ describe('M2 consolidated golden', () => {
   beforeEach(resetUsers);
 
   it('pins deterministic ranking and duel report JSON', () => {
+    const roster = [0, 1, 2].map((index) => index);
     const rankingInput: RankingInput = {
       kind: 'custom',
-      student: participant('HOME'),
-      participants: [participant('NPC')],
+      teams: [
+        { teamId: 'player', side: 'HOME', userId: 1, members: roster.map((index) => participant('HOME', index)) },
+        { teamId: 'npc:0', side: 'NPC', userId: null, members: roster.map((index) => participant('NPC', index)) },
+      ],
       problems: [question('golden-ranking#0', 0)],
       durationMin: 120,
     };
     const duelInput: DuelInput = {
-      home: participant('HOME'),
-      away: participant('AWAY'),
-      questions: [0, 1, 2, 3].map((index) => question(`golden-duel#${index}`, index)),
+      home: { members: roster.map((index) => participant('HOME', index)) },
+      away: { members: roster.map((index) => participant('AWAY', index)) },
+      questions: [0, 1, 2, 3, 4, 5].map((index) => question(`golden-duel#${index}`, index)),
       qualityRuleOn: true,
       tiebreak: 'QUALITY',
     };
@@ -98,8 +101,8 @@ describe('M2 consolidated golden', () => {
 
     expect(stableSerialize(simulateRanking(rankingInput, 20260901))).toBe(stableSerialize(ranking));
     expect(stableSerialize(simulateDuel(duelInput, 20260901))).toBe(stableSerialize(duel));
-    expect(stableHash(ranking)).toBe('ec43a98d');
-    expect(stableHash(duel)).toBe('909f2bf8');
+    expect(stableHash(ranking)).toBe('2087e0bc');
+    expect(stableHash(duel)).toBe('247b5b9c');
   });
 
   it('loads the full M2 problem and stage catalog', async () => {

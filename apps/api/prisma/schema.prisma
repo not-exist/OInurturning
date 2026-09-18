@@ -124,6 +124,7 @@ model AdventureLog {
   id         Int             @id @default(autoincrement())
   userId     Int
   studentId  Int?
+  studentIds Json            @default("[]")
   eventId    String          @db.VarChar(64)
   contestRecordId String?     @db.VarChar(64)
   tier       Int

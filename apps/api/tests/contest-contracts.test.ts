@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type {
   ContestSummary,
+  ContestTeam,
   GrowthDelta,
   RankingReport,
   RewardLine,
@@ -30,6 +31,26 @@ const snapshotParticipant = {
   focusCap: 40,
   energyMax: 100,
 };
+
+/** 队伍契约：玩家 HOME 队 + NPC 队，同场人数一致（此处各 3 人）。 */
+const playerTeams: ContestTeam[] = [
+  {
+    teamId: 'player',
+    side: 'HOME',
+    userId: 1,
+    members: [snapshotParticipant, { ...snapshotParticipant, studentId: 2, displayName: 'Player 2' }, { ...snapshotParticipant, studentId: 3, displayName: 'Player 3' }],
+  },
+  {
+    teamId: 'npc:0',
+    side: 'NPC',
+    userId: null,
+    members: [
+      { ...snapshotParticipant, side: 'NPC', userId: null, studentId: null, displayName: 'NPC 1-1' },
+      { ...snapshotParticipant, side: 'NPC', userId: null, studentId: null, displayName: 'NPC 1-2' },
+      { ...snapshotParticipant, side: 'NPC', userId: null, studentId: null, displayName: 'NPC 1-3' },
+    ],
+  },
+];
 
 const rankingSummary = {
   format: 'RANKING',
@@ -61,13 +82,13 @@ const rankingReport = {
   inputSnapshot: {
     kind: 'story',
     stageRef: { chapter: 'chapter-1', stageIndex: 1, ngPlusLayer: 2 },
-    student: snapshotParticipant,
-    participants: [],
+    teams: playerTeams,
     problems: [],
     durationMin: 1,
     firstClearAvailable: true,
   },
   questions: [],
+  teams: playerTeams,
   participants: [],
   standings: [],
   pass: true,

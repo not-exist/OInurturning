@@ -334,7 +334,7 @@ function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): JSX.Ele
         <div className="rounded border border-purple-200 bg-purple-50 p-6 text-center">
           <p className="text-sm text-purple-800">第 {event.roundNo} 局</p>
           <p className="mt-2 text-xl font-semibold">
-            {SIDE_LABEL[event.setterSide]}出题 → {SIDE_LABEL[event.answererSide]}答题
+            {event.setterName} 出题 → {SIDE_LABEL[event.answererSide]}答题
           </p>
           <p className="mt-3 text-sm text-neutral-600">{event.participantName} 正在接战</p>
           <p className="mt-1 text-xs text-neutral-500">题目 {event.questionInstanceId}</p>
@@ -349,7 +349,9 @@ function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): JSX.Ele
             >
               {event.solved ? '答题成功' : (VERDICT_LABEL[event.reason] ?? event.reason)}
             </span>
-            <span className="text-sm text-neutral-500">{event.answererName}</span>
+            <span className="text-sm text-neutral-500">
+              {event.setterName} 出题 → {event.answererName} 答题
+            </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <Metric
@@ -407,7 +409,7 @@ function FinishedPanel({
           <>
             <p className="mt-2 text-xl font-semibold">第 {finish.rank ?? '-'} 名</p>
             <p className="mt-1 text-sm text-neutral-700">
-              {finish.participantCount ?? '-'} 人参赛 · 总分 {finish.totalScore ?? 0} ·{' '}
+              {finish.participantCount ?? '-'} 支队伍参赛 · 总分 {finish.totalScore ?? 0} ·{' '}
               {finish.pass ? '达成通关线' : '未达通关线'}
             </p>
           </>

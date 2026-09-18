@@ -15,20 +15,43 @@ import { energyCost, solveQuestion } from './solve.js';
 import { createRandomStream, deriveStreamSeed, RNG_VERSION } from './rng.js';
 import { stableHash } from './report.js';
 
-export const DUEL_ENGINE_VERSION = 'duel-v1' as const;
+export const DUEL_ENGINE_VERSION = 'duel-v2' as const;
 
 type DuelSide = 'HOME' | 'AWAY';
 
+/** 精力/心态/答题数按 (side, memberIndex) 逐名成员独立结算，比分仍是每侧一个标量。 */
 interface DuelState {
-  energy: Record<DuelSide, number>;
-  mindset: Record<DuelSide, number>;
-  answers: Record<DuelSide, number>;
+  energy: Record<DuelSide, number[]>;
+  mindset: Record<DuelSide, number[]>;
+  answers: Record<DuelSide, number[]>;
   scores: Record<DuelSide, number>;
 }
 
-function sideForRound(roundNo: number): { setterSide: DuelSide; answererSide: DuelSide } {
+interface RoundAssignment {
+  setterSide: DuelSide;
+  answererSide: DuelSide;
+  setterMemberIndex: number;
+  answererMemberIndex: number;
+}
+
+/**
+ * 2N 局轮换（N = 每侧人数）：第 r 局（1-based）取 k = floor((r-1)/2)，
+ * 出题方队员下标 = k，答题方队员下标 = (k+1) % N；奇数局 HOME 出题、偶数局 AWAY 出题。
+ * 于是前 2N 局内每名成员恰好出题 1 次、答题 1 次。加赛局沿同一公式继续循环。
+ */
+function sideForRound(roundNo: number, memberCount: number): RoundAssignment {
+  const group = Math.floor((roundNo - 1) / 2);
   const setterSide: DuelSide = roundNo % 2 === 1 ? 'HOME' : 'AWAY';
-  return { setterSide, answererSide: setterSide === 'HOME' ? 'AWAY' : 'HOME' };
+  return {
+    setterSide,
+    answererSide: setterSide === 'HOME' ? 'AWAY' : 'HOME',
+    setterMemberIndex: group % memberCount,
+    answererMemberIndex: (group + 1) % memberCount,
+  };
+}
+
+function sum(values: readonly number[]): number {
+  return values.reduce((total, value) => total + value, 0);
 }
 
 function questionHooks(question: QuestionSnapshot) {
@@ -77,16 +100,20 @@ function runRound(
   roundNo: number,
   seed: number,
 ): DuelRoundReport {
-  const { setterSide, answererSide } = sideForRound(roundNo);
-  const answerer = input[answererSide === 'HOME' ? 'home' : 'away'];
+  const memberCount = input.home.members.length;
+  const { setterSide, answererSide, setterMemberIndex, answererMemberIndex } = sideForRound(
+    roundNo,
+    memberCount,
+  );
+  const answerer = input[answererSide === 'HOME' ? 'home' : 'away'].members[answererMemberIndex]!;
   const hooks = questionHooks(question);
   const hookContext = {
-    isFirstProblem: state.answers[answererSide] === 0,
+    isFirstProblem: state.answers[answererSide][answererMemberIndex] === 0,
     isAntiAk: false,
   };
   const roundLimitMin = question.timeLimitMin * 1.25;
   const solverParticipant: ParticipantSnapshot = { ...answerer, focusCap: 0 };
-  const energyBefore = state.energy[answererSide];
+  const energyBefore = state.energy[answererSide][answererMemberIndex]!;
   const energyRequired = energyCost({
     participant: solverParticipant,
     question,
@@ -113,7 +140,7 @@ function runRound(
         participant: solverParticipant,
         question,
         focus: 0,
-        mindset: state.mindset[answererSide],
+        mindset: state.mindset[answererSide][answererMemberIndex]!,
         availableEnergy: energyBefore,
         remainingClockMin: roundLimitMin,
         partialScores: question.partialScores,
@@ -139,9 +166,10 @@ function runRound(
     penaltyMin = resolution.penaltyMin;
     energySpent = resolution.energyCost;
     mindsetDelta = resolution.mindsetDelta;
-    state.energy[answererSide] = resolution.energyAfter;
-    state.mindset[answererSide] = resolution.mindsetAfter;
-    state.answers[answererSide] += 1;
+    state.energy[answererSide][answererMemberIndex] = resolution.energyAfter;
+    state.mindset[answererSide][answererMemberIndex] = resolution.mindsetAfter;
+    state.answers[answererSide][answererMemberIndex] =
+      state.answers[answererSide][answererMemberIndex]! + 1;
     notes.push(...resolution.notes);
   }
 
@@ -153,6 +181,8 @@ function runRound(
     roundNo,
     setterSide,
     answererSide,
+    setterMemberIndex,
+    answererMemberIndex,
     question,
     problemSource: question.source,
     roundLimitMin,
@@ -175,8 +205,9 @@ function suddenDeathQuestion(
   setterSide: DuelSide,
   groupNo: number,
   questionOffset: number,
+  regularRoundCount: number,
 ) {
-  const supplied = input.questions[4 + (groupNo - 1) * 2 + questionOffset];
+  const supplied = input.questions[regularRoundCount + (groupNo - 1) * 2 + questionOffset];
   if (supplied !== undefined) return supplied;
 
   const source = input.questions[setterSide === 'HOME' ? 0 : 1]!;
@@ -193,20 +224,19 @@ function suddenDeathQuestion(
 function tieInput(
   mode: NonNullable<DuelInput['tiebreak']>,
   state: DuelState,
-  questions: readonly QuestionSnapshot[],
   rounds: readonly DuelRoundReport[],
   seed: number,
 ): DuelTiebreakInput {
   return {
     mode,
-    homeEnergy: state.energy.HOME,
-    awayEnergy: state.energy.AWAY,
-    homeQuality: questions
-      .filter((_, index) => index % 2 === 0)
-      .reduce((total, question) => total + qualityOf(question), 0),
-    awayQuality: questions
-      .filter((_, index) => index % 2 === 1)
-      .reduce((total, question) => total + qualityOf(question), 0),
+    homeEnergy: sum(state.energy.HOME),
+    awayEnergy: sum(state.energy.AWAY),
+    homeQuality: rounds
+      .filter((round) => round.setterSide === 'HOME')
+      .reduce((total, round) => total + qualityOf(round.question), 0),
+    awayQuality: rounds
+      .filter((round) => round.setterSide === 'AWAY')
+      .reduce((total, round) => total + qualityOf(round.question), 0),
     homePenaltyMin: rounds
       .filter((round) => round.answererSide === 'HOME')
       .reduce((total, round) => total + round.penaltyMin, 0),
@@ -236,23 +266,28 @@ function tiebreakTrail(input: DuelTiebreakInput, winner: DuelWinnerSide): string
 export function simulateDuel(input: DuelInput, seed: number): DuelReport {
   const validatedSeed = rankingSeedSchema.parse(seed);
   const validatedInput = duelInputSchema.parse(input);
-  if (validatedInput.home.side !== 'HOME' || validatedInput.away.side !== 'AWAY') {
-    throw new Error('Duel home and away snapshots must use matching sides');
-  }
+  const memberCount = validatedInput.home.members.length;
+  const regularRoundCount = memberCount * 2;
 
   const state: DuelState = {
     energy: {
-      HOME: validatedInput.home.energy ?? validatedInput.home.energyMax,
-      AWAY: validatedInput.away.energy ?? validatedInput.away.energyMax,
+      HOME: validatedInput.home.members.map((member) => member.energy ?? member.energyMax),
+      AWAY: validatedInput.away.members.map((member) => member.energy ?? member.energyMax),
     },
-    mindset: { HOME: validatedInput.home.mindset, AWAY: validatedInput.away.mindset },
-    answers: { HOME: 0, AWAY: 0 },
+    mindset: {
+      HOME: validatedInput.home.members.map((member) => member.mindset),
+      AWAY: validatedInput.away.members.map((member) => member.mindset),
+    },
+    answers: {
+      HOME: validatedInput.home.members.map(() => 0),
+      AWAY: validatedInput.away.members.map(() => 0),
+    },
     scores: { HOME: 0, AWAY: 0 },
   };
   const rounds: DuelRoundReport[] = [];
-  const usedQuestions = validatedInput.questions.slice(0, 4);
+  const usedQuestions = validatedInput.questions.slice(0, regularRoundCount);
 
-  for (let roundNo = 1; roundNo <= 4; roundNo += 1) {
+  for (let roundNo = 1; roundNo <= regularRoundCount; roundNo += 1) {
     rounds.push(
       runRound(validatedInput, state, usedQuestions[roundNo - 1]!, roundNo, validatedSeed),
     );
@@ -269,8 +304,20 @@ export function simulateDuel(input: DuelInput, seed: number): DuelReport {
     let suddenDeathWinner: DuelWinnerSide = 'DRAW';
     let suddenDeathGroup = 0;
     for (let groupNo = 1; groupNo <= 3 && suddenDeathWinner === 'DRAW'; groupNo += 1) {
-      const homeQuestion = suddenDeathQuestion(validatedInput, 'HOME', groupNo, 0);
-      const awayQuestion = suddenDeathQuestion(validatedInput, 'AWAY', groupNo, 1);
+      const homeQuestion = suddenDeathQuestion(
+        validatedInput,
+        'HOME',
+        groupNo,
+        0,
+        regularRoundCount,
+      );
+      const awayQuestion = suddenDeathQuestion(
+        validatedInput,
+        'AWAY',
+        groupNo,
+        1,
+        regularRoundCount,
+      );
       const homeRound = runRound(
         validatedInput,
         state,
@@ -293,13 +340,7 @@ export function simulateDuel(input: DuelInput, seed: number): DuelReport {
       }
     }
 
-    const tiebreak = tieInput(
-      tiebreakMode,
-      state,
-      rounds.map((round) => round.question),
-      rounds,
-      validatedSeed,
-    );
+    const tiebreak = tieInput(tiebreakMode, state, rounds, validatedSeed);
     winnerSide = suddenDeathWinner === 'DRAW' ? resolveTiebreak(tiebreak) : suddenDeathWinner;
     decidedBy = 'SUDDEN_DEATH';
     trail =
@@ -307,7 +348,7 @@ export function simulateDuel(input: DuelInput, seed: number): DuelReport {
         ? tiebreakTrail(tiebreak, winnerSide)
         : [`sudden-death-group:${suddenDeathGroup}`, `winner:${suddenDeathWinner}`];
   } else {
-    const tiebreak = tieInput(tiebreakMode, state, usedQuestions, rounds, validatedSeed);
+    const tiebreak = tieInput(tiebreakMode, state, rounds, validatedSeed);
     winnerSide = resolveTiebreak(tiebreak);
     decidedBy = winnerSide === 'DRAW' ? 'FRIENDLY' : tiebreakMode;
     trail = tiebreakTrail(tiebreak, winnerSide);

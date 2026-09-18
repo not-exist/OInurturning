@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import type { Prisma } from '@prisma/client';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
@@ -48,7 +49,11 @@ async function createStudent(userId: number): Promise<number> {
   return student.id;
 }
 
-async function createTournament(): Promise<number> {
+async function createStudents(userId: number, count: number): Promise<number[]> {
+  return Promise.all(Array.from({ length: count }, () => createStudent(userId)));
+}
+
+async function createTournament(config: Prisma.InputJsonValue = {}): Promise<number> {
   const adminId = await createUser();
   const tournament = await prisma.pvpTournament.create({
     data: {
@@ -57,7 +62,7 @@ async function createTournament(): Promise<number> {
       registerEndsAt: REGISTER_END,
       autoStartAt: AUTO_START,
       prizes: {},
-      config: {},
+      config,
       createdBy: adminId,
     },
   });
@@ -70,59 +75,77 @@ describe('M4.2 PVP registration', () => {
     await importConfigs();
   });
 
-  it('locks participant and problem snapshots and consumes one entry ticket', async () => {
+  it('locks a 3-member roster and problem snapshots and consumes one entry ticket', async () => {
     const userId = await createUser();
-    const studentId = await createStudent(userId);
+    const [s1, s2, s3] = await createStudents(userId, 3);
     const problem = await prisma.problemLibraryEntry.create({
-      data: { userId, authorStudentId: studentId, name: '锁定题', dominantDim: 'DS', rarity: 'green', quality: 60 },
+      data: { userId, authorStudentId: s1, name: '锁定题', dominantDim: 'DS', rarity: 'green', quality: 60 },
     });
     await prisma.userItem.create({ data: { userId, itemId: 'entry-ticket', quantity: 2 } });
     const tournamentId = await createTournament();
 
-    const first = await registerPvp(userId, tournamentId, studentId, [problem.id], NOW);
+    const first = await registerPvp(userId, tournamentId, [s1, s2, s3], [problem.id], NOW);
     expect(first.replayed).toBe(false);
+    expect(first.roster).toHaveLength(3);
     expect(first.roster[0]?.displayName).toBe('报名学员');
+    expect(first.rosterSize).toBe(3);
     expect(first.problemSnapshots).toMatchObject([{ id: problem.id, name: '锁定题', quality: 60 }]);
     expect((await prisma.userItem.findUniqueOrThrow({ where: { userId_itemId: { userId, itemId: 'entry-ticket' } } })).quantity).toBe(1);
 
     await prisma.problemLibraryEntry.update({ where: { id: problem.id }, data: { name: '改名题', quality: 99 } });
-    const replay = await registerPvp(userId, tournamentId, studentId, [problem.id], NOW);
+    const replay = await registerPvp(userId, tournamentId, [s1, s2, s3], [problem.id], NOW);
     expect(replay.replayed).toBe(true);
+    expect(replay.roster).toHaveLength(3);
     expect(replay.problemSnapshots[0]?.name).toBe('锁定题');
     expect((await prisma.userItem.findUniqueOrThrow({ where: { userId_itemId: { userId, itemId: 'entry-ticket' } } })).quantity).toBe(1);
     expect(await getRegistration(userId, tournamentId)).toMatchObject({ problemEntryIds: [problem.id] });
   });
 
-  it('enforces ownership, quality, ticket, uniqueness and cutoff rules', async () => {
+  it('enforces roster size, ownership, quality, ticket, uniqueness and cutoff rules', async () => {
     const userId = await createUser();
     const otherUserId = await createUser();
-    const studentId = await createStudent(userId);
-    const otherStudentId = await createStudent(otherUserId);
+    const [s1, s2, s3] = await createStudents(userId, 3);
+    const [oS1] = await createStudents(otherUserId, 1);
     const low = await prisma.problemLibraryEntry.create({
-      data: { userId, authorStudentId: studentId, name: '低质量题', dominantDim: 'DS', rarity: 'gray', quality: 39 },
+      data: { userId, authorStudentId: s1, name: '低质量题', dominantDim: 'DS', rarity: 'gray', quality: 39 },
     });
     const tournamentId = await createTournament();
 
-    await expect(registerPvp(userId, tournamentId, studentId, [], NOW)).rejects.toMatchObject({ code: 'INSUFFICIENT_RESOURCE' });
+    await expect(registerPvp(userId, tournamentId, [s1, s2, s3], [], NOW)).rejects.toMatchObject({ code: 'INSUFFICIENT_RESOURCE' });
     await prisma.userItem.create({ data: { userId, itemId: 'entry-ticket', quantity: 3 } });
-    await expect(registerPvp(otherUserId, tournamentId, studentId, [], NOW)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(registerPvp(userId, tournamentId, studentId, [low.id], NOW)).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
-    await expect(registerPvp(userId, tournamentId, studentId, [low.id, low.id], NOW)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-    await expect(registerPvp(otherUserId, tournamentId, otherStudentId, [], new Date('2099-01-03T00:00:00.000Z'))).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
+    await expect(registerPvp(userId, tournamentId, [s1, s2], [], NOW)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(registerPvp(otherUserId, tournamentId, [s1, s2, s3], [], NOW)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(registerPvp(userId, tournamentId, [oS1, s2, s3], [], NOW)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(registerPvp(userId, tournamentId, [s1, s2, s3], [low.id], NOW)).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
+    await expect(registerPvp(userId, tournamentId, [s1, s2, s3], [low.id, low.id], NOW)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(registerPvp(otherUserId, tournamentId, [oS1, s2, s3], [], new Date('2099-01-03T00:00:00.000Z'))).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
+  });
+
+  it('rosterSize=4 的赛事要求恰好 4 人报名', async () => {
+    const userId = await createUser();
+    const roster = await createStudents(userId, 4);
+    await prisma.userItem.create({ data: { userId, itemId: 'entry-ticket', quantity: 1 } });
+    const tournamentId = await createTournament({ rosterSize: 4 });
+
+    await expect(registerPvp(userId, tournamentId, roster.slice(0, 3), [], NOW)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    const registered = await registerPvp(userId, tournamentId, roster, [], NOW);
+    expect(registered.rosterSize).toBe(4);
+    expect(registered.roster).toHaveLength(4);
+    expect(await getRegistration(userId, tournamentId)).toMatchObject({ rosterSize: 4 });
   });
 
   it('rejects registrations after the declared tournament capacity is reached', async () => {
     const tournamentId = await createTournament();
     const firstUser = await createUser();
     const secondUser = await createUser();
-    const firstStudent = await createStudent(firstUser);
-    const secondStudent = await createStudent(secondUser);
+    const firstStudents = await createStudents(firstUser, 3);
+    const secondStudents = await createStudents(secondUser, 3);
     await prisma.userItem.create({ data: { userId: firstUser, itemId: 'entry-ticket', quantity: 1 } });
     await prisma.userItem.create({ data: { userId: secondUser, itemId: 'entry-ticket', quantity: 1 } });
     await prisma.pvpTournament.update({ where: { id: tournamentId }, data: { size: 1 } });
 
-    await registerPvp(firstUser, tournamentId, firstStudent, [], NOW);
-    await expect(registerPvp(secondUser, tournamentId, secondStudent, [], NOW)).rejects.toMatchObject({
+    await registerPvp(firstUser, tournamentId, firstStudents, [], NOW);
+    await expect(registerPvp(secondUser, tournamentId, secondStudents, [], NOW)).rejects.toMatchObject({
       code: 'STATE_CONFLICT',
     });
   });
@@ -134,7 +157,7 @@ describe('M4.2 PVP registration', () => {
       .send({ username: `pvp-route-${sequence}-${Date.now().toString(36)}`, password: 'pw-123456' });
     const session = unwrapOk<{ accessToken: string; me: { id: number } }>(registration);
     await prisma.user.update({ where: { id: session.me.id }, data: { money: 0 } });
-    const routeStudent = await createStudent(session.me.id);
+    const routeStudents = await createStudents(session.me.id, 3);
     await prisma.userItem.create({ data: { userId: session.me.id, itemId: 'entry-ticket', quantity: 1 } });
     const headers = { Authorization: `Bearer ${session.accessToken}` };
     const tournaments = await request(app).get('/api/pvp/tournaments').set(headers);
@@ -143,7 +166,7 @@ describe('M4.2 PVP registration', () => {
     const registered = await request(app)
       .post(`/api/pvp/tournaments/${tournamentId}/register`)
       .set(headers)
-      .send({ studentId: routeStudent, problemEntryIds: [] });
+      .send({ studentIds: routeStudents, problemEntryIds: [] });
     expect(registered.status).toBe(200);
     expect((await request(app).get(`/api/pvp/tournaments/${tournamentId}/registration`).set(headers)).status).toBe(200);
   });

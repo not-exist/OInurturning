@@ -30,6 +30,7 @@
 # 【字段字典】
 #   repeatable        false 的事件受 once_per_student / server_weekly_limit 约束
 #   cooldown_days     账号级单事件冷却（现实时间，懒结算）；0 = 无冷却
+#   party_size        历练对决的队伍人数，实际局数 = party_size × 2（每人出一题、答一题）
 #   weight            组内权重：同稀有度同体力层内相对占比（各组内部和为 100）。
 #                     最终概率 = 层权重[投入档][rarity] × weight ÷ Σ组内权重
 #                     （层权重见 gameplay.md §3.2：−1{gray70,yellow30}
@@ -92,7 +93,7 @@ events:
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_common, rounds: 4, quality_rule: false, tiebreak: friendly }
+            duel: { opponent: random_common, party_size: 3, quality_rule: false, tiebreak: friendly }
             rewards_win: { money: { min: 20, max: 35 }, reputation: 1, stat_gain: { mindset: 1 } }
             rewards_lose: { money: { min: 8, max: 15 } }
             rewards_draw: { money: 12, stat_gain: { mindset: 1 } }
@@ -464,7 +465,7 @@ events:
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_skilled, rounds: 4, quality_rule: false, tiebreak: by_energy }
+            duel: { opponent: random_skilled, party_size: 3, quality_rule: false, tiebreak: by_energy }
             rewards_win: { money: { min: 150, max: 220 }, reputation: 3, stat_gain: { mindset: 1 } }
             rewards_lose: { money: 40, stat_gain: { mindset: -1 } }
 
@@ -535,7 +536,7 @@ events:
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: platform_reviewer, rounds: 4, quality_rule: true, tiebreak: by_quality }
+            duel: { opponent: platform_reviewer, party_size: 3, quality_rule: true, tiebreak: by_quality }
             rewards_win:
               money: { min: 150, max: 250 }
               reputation: 3
@@ -653,7 +654,7 @@ events:
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_elite, rounds: 4, quality_rule: false, tiebreak: sudden_death }
+            duel: { opponent: random_elite, party_size: 3, quality_rule: false, tiebreak: sudden_death }
             rewards_win:
               items: [{ id: dim-book, rarity: purple, qty: 1 }]
               money: 300
@@ -744,7 +745,7 @@ events:
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_skilled, rounds: 4, quality_rule: false, tiebreak: by_quality }
+            duel: { opponent: random_skilled, party_size: 3, quality_rule: false, tiebreak: by_quality }
             rewards_win: { reputation: 8, stat_gain: { mindset: 1 } }
             rewards_lose: { reputation: -6, stat_gain: { mindset: -2 } }
       - text: 破财消灾（花 250 钱）
@@ -881,7 +882,7 @@ events:
             duel:
               opponent: random_elite
               opponent_params: { power_mult: 1.15 }
-              rounds: 4
+              party_size: 3
               quality_rule: false
               tiebreak: sudden_death
             rewards_win:
@@ -958,7 +959,7 @@ events:
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_elite, rounds: 4, quality_rule: false, tiebreak: sudden_death }
+            duel: { opponent: random_elite, party_size: 3, quality_rule: false, tiebreak: sudden_death }
             rewards_win:
               money: 600
               reputation: 10
@@ -1016,7 +1017,7 @@ events:
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: legendary_ghost, rounds: 4, quality_rule: true, tiebreak: by_quality }
+            duel: { opponent: legendary_ghost, party_size: 3, quality_rule: true, tiebreak: by_quality }
             rewards_win: { items: [{ id: tag-card, qty: 1 }], reputation: 100 }
             rewards_lose: { reputation: 5, stat_gain: { mindset: -3 } }
 

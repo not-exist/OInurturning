@@ -39,12 +39,21 @@ test.describe('总览与开局任务', () => {
     // GOOD（V≈14）做剧情+训练+讲课，另一人只做历练
     const good = students.find((s) => s.qualityTier === 'GOOD') ?? students[0];
     const other = students.find((s) => s.id !== good.id) ?? students[1];
+    // 剧情 4 人、历练 3 人：先补足学员（开局 2 人 + 招募 2 人）
+    await recruitStudent(request, token);
+    await recruitStudent(request, token);
+    const refreshed = await apiCall(request, 'GET', '/api/students', token);
+    const extras = unwrap<{ id: number }[]>(refreshed.body, '学员列表')
+      .map((s) => s.id)
+      .filter((id) => id !== good.id && id !== other.id);
+    const storyRoster = [good.id, other.id, ...extras];
+    const adventureRoster = [other.id, ...extras];
 
     // 1) 剧情：GOOD 打 cspj:1（NPC 均值 8 取前 8，单次≈99%；至多 3 次，重查进度确认通关）
     let cleared = false;
     for (let attempt = 0; attempt < 3 && !cleared; attempt += 1) {
       const entered = await apiCall(request, 'POST', '/api/story/stages/cspj:1/enter', token, {
-        roster: [good.id],
+        roster: storyRoster,
         ngLevel: 0,
         idempotencyKey: uniqueName('ov-story'),
       });
@@ -74,7 +83,7 @@ test.describe('总览与开局任务', () => {
     unwrap(lectured.body, '讲课');
     // 4) 历练：另一人直抽 tier1 后逐个试可用分支直到 RESOLVED
     const drawn = await apiCall(request, 'POST', '/api/adventures/draw', token, {
-      studentId: other.id,
+      roster: adventureRoster,
       tier: 1,
     });
     const adventure = unwrap<{
@@ -102,7 +111,7 @@ test.describe('总览与开局任务', () => {
       }
     }
     expect(completed).toBe(true);
-    // 5) 招募第 3 名学员
+    // 5) 招募（开局任务第 5 步：学员数 ≥ 3，前面补人时已满足）
     await recruitStudent(request, token);
 
     const ov = await apiCall(request, 'GET', '/api/overview', token);

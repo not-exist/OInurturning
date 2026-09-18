@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   participantAttemptSchema,
   type AbilityKey,
+  type ContestTeam,
   type ParticipantSnapshot,
   type QuestionSnapshot,
   type RankingInput,
@@ -55,11 +56,34 @@ function frozenQuestion(partialScores: boolean): QuestionSnapshot {
   };
 }
 
+/** 3 人玩家队 + 一支 3 人 NPC 队；同场队伍人数必须一致。 */
+function teams(member: ParticipantSnapshot): ContestTeam[] {
+  return [
+    {
+      teamId: 'player',
+      side: 'HOME',
+      userId: 1,
+      members: [0, 1, 2].map((index) => ({ ...member, studentId: 10 + index, displayName: `Hook Player ${index + 1}` })),
+    },
+    {
+      teamId: 'npc:0',
+      side: 'NPC',
+      userId: null,
+      members: [0, 1, 2].map((index) => ({
+        ...member,
+        side: 'NPC' as const,
+        userId: null,
+        studentId: null,
+        displayName: `NPC 1-${index + 1}`,
+      })),
+    },
+  ];
+}
+
 function input(partialScores: boolean): RankingInput {
   return {
     kind: 'custom',
-    student: participant(),
-    participants: [],
+    teams: teams(participant()),
     problems: [frozenQuestion(partialScores)],
     durationMin: 60,
   };

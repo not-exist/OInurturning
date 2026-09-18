@@ -1,4 +1,9 @@
-import { rankingSeedSchema, type ParticipantSnapshot, type StageConfig } from '@oinur/shared';
+import {
+  rankingSeedSchema,
+  type ContestTeam,
+  type ParticipantSnapshot,
+  type StageConfig,
+} from '@oinur/shared';
 import { createRandomStream, deriveStreamSeed } from './engine/rng.js';
 import type { RandomSource } from './engine/models.js';
 
@@ -23,7 +28,8 @@ function normal(random: RandomSource, mean: number, standardDeviation: number): 
 
 function npcParticipant(
   random: RandomSource,
-  index: number,
+  teamIndex: number,
+  memberIndex: number,
   stage: StageConfig,
 ): ParticipantSnapshot {
   const { mean_level: meanLevel, spread } = stage.npc_pool;
@@ -42,7 +48,7 @@ function npcParticipant(
     side: 'NPC',
     userId: null,
     studentId: null,
-    displayName: `NPC ${index + 1}`,
+    displayName: `NPC ${teamIndex + 1}-${memberIndex + 1}`,
     abilities: {
       ...abilities,
       CODING: clamp(Math.round(normal(random, level, 3)), 1, 100),
@@ -57,12 +63,22 @@ function npcParticipant(
   };
 }
 
-export function generateNpcPool(stage: StageConfig, seed: number): ParticipantSnapshot[] {
+export function generateNpcTeams(stage: StageConfig, rosterSize: number, seed: number): ContestTeam[] {
   const validatedSeed = rankingSeedSchema.parse(seed);
-  return Array.from({ length: stage.npc_pool.size }, (_, index) => {
-    const npcSeed = deriveStreamSeed(validatedSeed, `npc:${index}`);
-    return npcParticipant(createRandomStream(npcSeed, 'misc'), index, stage);
-  });
+  return Array.from({ length: stage.npc_pool.size }, (_, teamIndex) => ({
+    teamId: `npc:${teamIndex}`,
+    side: 'NPC' as const,
+    userId: null,
+    members: Array.from({ length: rosterSize }, (_, memberIndex) => {
+      const npcSeed = deriveStreamSeed(validatedSeed, `npc:${teamIndex}:${memberIndex}`);
+      return npcParticipant(
+        createRandomStream(npcSeed, 'misc'),
+        teamIndex,
+        memberIndex,
+        stage,
+      );
+    }),
+  }));
 }
 
 const DUEL_OPPONENTS: Record<DuelOpponentKind, { level: number; spread: number; energy: number }> = {

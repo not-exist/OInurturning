@@ -13,14 +13,18 @@ const PAST = new Date('2020-01-01T00:00:00.000Z');
 const OPEN = new Date('2099-01-01T00:00:00.000Z');
 let sequence = 0;
 
-async function entrant(): Promise<{ userId: number; studentId: number; token: string }> {
+async function entrant(rosterSize = 3): Promise<{ userId: number; studentId: number; studentIds: number[]; token: string }> {
   sequence += 1;
   const auth = await request(app).post('/api/auth/register').send({ username: `sched-${Date.now()}-${sequence}`, password: 'pw-123456' });
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(auth);
   await prisma.user.update({ where: { id: session.me.id }, data: { money: 0, reputation: 0 } }); // 开局包 1000 金/10 誉归零（奖金/声誉绝对断言口径）
-  const student = await prisma.student.create({ data: { userId: session.me.id, name: `Entrant ${sequence}`, sex: 'MALE', qualityTier: 'ELITE', ds: 35, dp: 35, math: 35, graph: 35, greedy: 35, str: 35, code: 35, thinking: 35, setting: 35, mindset: 0, focusCap: 30, energyMax: 80, energy: 80, stamina: 5, staminaRegen: 50, lastSettledAt: PAST } });
+  const studentIds: number[] = [];
+  for (let member = 0; member < rosterSize; member += 1) {
+    const student = await prisma.student.create({ data: { userId: session.me.id, name: `Entrant ${sequence}-${member}`, sex: 'MALE', qualityTier: 'ELITE', ds: 35, dp: 35, math: 35, graph: 35, greedy: 35, str: 35, code: 35, thinking: 35, setting: 35, mindset: 0, focusCap: 30, energyMax: 80, energy: 80, stamina: 5, staminaRegen: 50, lastSettledAt: PAST } });
+    studentIds.push(student.id);
+  }
   await prisma.userItem.create({ data: { userId: session.me.id, itemId: 'entry-ticket', quantity: 1 } });
-  return { userId: session.me.id, studentId: student.id, token: session.accessToken };
+  return { userId: session.me.id, studentId: studentIds[0]!, studentIds, token: session.accessToken };
 }
 
 beforeEach(async () => { await resetUsers(); await importConfigs(); });
@@ -36,10 +40,30 @@ describe('PVP scheduler', () => {
     expect(buildFirstRound(Array.from({ length: 17 }, (_, userId) => ({ userId: userId + 1 })), 32, 42)).toHaveLength(16);
   });
 
+  it('rosterSize=4 的赛事跑完 2N=8 局且客队成员 side 为 AWAY', async () => {
+    const tournament = await prisma.pvpTournament.create({ data: { name: 'Four', size: 4, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: { rosterSize: 4 } } });
+    for (let index = 0; index < 4; index += 1) {
+      const player = await entrant(4);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
+    }
+    await advancePvpTournament(tournament.id, PAST);
+    expect((await prisma.pvpTournament.findUniqueOrThrow({ where: { id: tournament.id } })).status).toBe('FINISHED');
+
+    const record = await prisma.contestRecord.findFirstOrThrow({ where: { type: 'PVP' }, orderBy: { createdAt: 'asc' } });
+    const report = record.report as {
+      rounds: Array<{ roundNo: number; setterSide: string }>;
+      inputSnapshot: { home: { members: unknown[] }; away: { members: Array<{ side: string }> } };
+    };
+    expect(report.rounds.map((round) => round.roundNo)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(report.inputSnapshot.home.members).toHaveLength(4);
+    expect(report.inputSnapshot.away.members).toHaveLength(4);
+    expect(report.inputSnapshot.away.members.every((entry) => entry.side === 'AWAY')).toBe(true);
+  });
+
   it('cancels underfilled tournaments and refunds tickets once', async () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Small', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     const player = await entrant();
-    await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+    await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     await advancePvpTournament(tournament.id, PAST);
     await advancePvpTournament(tournament.id, PAST);
     expect((await prisma.pvpTournament.findUniqueOrThrow({ where: { id: tournament.id } })).status).toBe('CANCELLED');
@@ -50,7 +74,7 @@ describe('PVP scheduler', () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Eight', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     for (let index = 0; index < 8; index += 1) {
       const player = await entrant();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await advancePvpTournament(tournament.id, PAST);
     await advancePvpTournament(tournament.id, PAST);
@@ -63,7 +87,7 @@ describe('PVP scheduler', () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Sixteen', size: 16, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     for (let index = 0; index < 16; index += 1) {
       const player = await entrant();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await advancePvpTournament(tournament.id, PAST);
     expect((await prisma.pvpTournament.findUniqueOrThrow({ where: { id: tournament.id } })).status).toBe('FINISHED');
@@ -78,15 +102,15 @@ describe('PVP scheduler', () => {
       const player = await entrant();
       players.push(player);
       const problem = index === 0 ? await prisma.problemLibraryEntry.create({ data: { userId: player.userId, authorStudentId: player.studentId, name: 'Frozen problem', dominantDim: 'DS', rarity: 'green', quality: 60 } }) : null;
-      await registerPvp(player.userId, tournament.id, player.studentId, problem === null ? [] : [problem.id], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, problem === null ? [] : [problem.id], PAST);
     }
-    await prisma.student.update({ where: { id: players[0]!.studentId }, data: { name: 'Changed live name', ds: 99 } });
+    await prisma.student.update({ where: { id: players[0]!.studentIds[0]! }, data: { name: 'Changed live name', ds: 99 } });
     await prisma.problemLibraryEntry.updateMany({ where: { userId: players[0]!.userId }, data: { name: 'Changed live problem', quality: 99 } });
     await advancePvpTournament(tournament.id, PAST);
     const record = await prisma.contestRecord.findFirstOrThrow({ where: { type: 'PVP' }, orderBy: { createdAt: 'asc' } });
-    const input = record.inputSnapshot as { home: { displayName: string; abilities: { DS: number } } };
-    expect(input.home.displayName).not.toBe('Changed live name');
-    expect(input.home.abilities.DS).toBe(35);
+    const input = record.inputSnapshot as { home: { members: Array<{ displayName: string; abilities: { DS: number } }> } };
+    expect(input.home.members[0]!.displayName).not.toBe('Changed live name');
+    expect(input.home.members[0]!.abilities.DS).toBe(35);
   });
 
   it('resolves premade problem traits into the match snapshot', async () => {
@@ -98,7 +122,7 @@ describe('PVP scheduler', () => {
       const problem = index === 0
         ? await prisma.problemLibraryEntry.create({ data: { userId: player.userId, authorStudentId: player.studentId, name: 'Traited problem', dominantDim: 'DS', rarity: 'green', quality: 60, traitId: 'wide-data' } })
         : null;
-      await registerPvp(player.userId, tournament.id, player.studentId, problem === null ? [] : [problem.id], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, problem === null ? [] : [problem.id], PAST);
     }
     await advancePvpTournament(tournament.id, PAST);
     // 战报挂 homeUserId 名下、主客场由配对种子定：经出场 match 反查，不假设 players[0] 必为 HOME
@@ -122,7 +146,7 @@ describe('PVP scheduler', () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Concurrent', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     for (let index = 0; index < 8; index += 1) {
       const player = await entrant();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await Promise.all([advancePvpTournament(tournament.id, PAST), advancePvpTournament(tournament.id, PAST), advancePvpTournament(tournament.id, PAST)]);
     expect(await prisma.pvpMatch.count({ where: { tournamentId: tournament.id } })).toBe(7);
@@ -135,7 +159,7 @@ describe('PVP scheduler', () => {
     for (let index = 0; index < 4; index += 1) {
       const player = await entrant();
       players.push(player);
-      const response = await request(app).post(`/api/pvp/tournaments/${tournament.id}/registration`).set('Authorization', `Bearer ${player.token}`).send({ studentId: player.studentId, problemEntryIds: [] });
+      const response = await request(app).post(`/api/pvp/tournaments/${tournament.id}/registration`).set('Authorization', `Bearer ${player.token}`).send({ studentIds: player.studentIds, problemEntryIds: [] });
       expect(response.status).toBe(200);
     }
     expect((await request(app).get(`/api/pvp/tournaments/${tournament.id}`)).status).toBe(401);
@@ -166,7 +190,7 @@ describe('PVP scheduler', () => {
     const player = await entrant();
     const outcome = await Promise.race([
       Promise.allSettled([
-        registerPvp(player.userId, tournament.id, player.studentId, [], PAST),
+        registerPvp(player.userId, tournament.id, player.studentIds, [], PAST),
         advancePvpTournament(tournament.id, PAST),
       ]),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('registration/advance timeout')), 5_000)),
@@ -179,7 +203,7 @@ describe('PVP scheduler', () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Quality rule', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: { rules: { qualityScoring: true } } } });
     for (let index = 0; index < 4; index += 1) {
       const player = await entrant();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await advancePvpTournament(tournament.id, PAST);
     const records = await prisma.contestRecord.findMany({ where: { type: 'PVP' } });
@@ -192,10 +216,10 @@ describe('PVP scheduler', () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Problem reputation', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     const owner = await entrant();
     const problem = await prisma.problemLibraryEntry.create({ data: { userId: owner.userId, authorStudentId: owner.studentId, name: 'Hard carried problem', dominantDim: 'DS', rarity: 'rainbow', quality: 100 } });
-    await registerPvp(owner.userId, tournament.id, owner.studentId, [problem.id], PAST);
+    await registerPvp(owner.userId, tournament.id, owner.studentIds, [problem.id], PAST);
     for (let index = 0; index < 3; index += 1) {
       const player = await entrant();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
 
     await advancePvpTournament(tournament.id, PAST);
@@ -217,10 +241,10 @@ describe('PVP scheduler', () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Problem reputation cap', size: 8, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     const owner = await entrant();
     const problem = await prisma.problemLibraryEntry.create({ data: { userId: owner.userId, authorStudentId: owner.studentId, name: 'Capped carried problem', dominantDim: 'DS', rarity: 'rainbow', quality: 100 } });
-    await registerPvp(owner.userId, tournament.id, owner.studentId, [problem.id], PAST);
+    await registerPvp(owner.userId, tournament.id, owner.studentIds, [problem.id], PAST);
     for (let index = 0; index < 3; index += 1) {
       const player = await entrant();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await prisma.user.update({ where: { id: owner.userId }, data: { reputation: 10 } });
     for (let index = 0; index < 5; index += 1) {
@@ -240,7 +264,7 @@ describe('PVP scheduler', () => {
     for (let index = 0; index < 4; index += 1) {
       const player = await entrant();
       players.push(player);
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
 
     await advancePvpTournament(tournament.id, PAST);
@@ -269,7 +293,7 @@ describe('PVP scheduler', () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Default prizes', size: 16, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: {} } });
     for (let index = 0; index < 16; index += 1) {
       const player = await entrant();
-      await registerPvp(player.userId, tournament.id, player.studentId, [], PAST);
+      await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
     await advancePvpTournament(tournament.id, PAST);
     const grants = await prisma.pvpRewardGrant.findMany({ where: { tournamentId: tournament.id }, orderBy: { rank: 'asc' } });

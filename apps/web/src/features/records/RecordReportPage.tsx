@@ -1,6 +1,12 @@
 import { useEffect, useState, type JSX } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
-import type { ContestRecordView, ContestReport, RewardLine } from '@oinur/shared';
+import type {
+  ContestRecordView,
+  ContestReport,
+  ContestTeam,
+  ParticipantTimeline,
+  RewardLine,
+} from '@oinur/shared';
 import { BattleReplay, BattleWaiting } from './BattleReplay';
 import { useContestRecord, useContestReplay } from '../../lib/hooks';
 
@@ -149,6 +155,25 @@ export function RecordReportPage(): JSX.Element {
   );
 }
 
+/** 队名：由成员名组合（排名表/时间线分组展示用）。 */
+function teamName(team: ContestTeam): string {
+  return team.members.map((member) => member.displayName).join('、');
+}
+
+/** 排名赛按队伍切分扁平的 participants（顺序恒为 teams.flatMap(members)）。 */
+function teamTimelines(report: Extract<ContestReport, { format: 'RANKING' }>): {
+  teamIndex: number;
+  team: ContestTeam;
+  timelines: ParticipantTimeline[];
+}[] {
+  let offset = 0;
+  return report.teams.map((team, teamIndex) => {
+    const timelines = report.participants.slice(offset, offset + team.members.length);
+    offset += team.members.length;
+    return { teamIndex, team, timelines };
+  });
+}
+
 function rewardLineText(reward: RewardLine): string {
   switch (reward.type) {
     case 'first_clear_money':
@@ -174,16 +199,17 @@ function buildShareText(record: ContestRecordView): string {
 
   const lines: string[] = [title];
   if (report.format === 'RANKING') {
-    const player = report.participants[0]?.participant.displayName ?? '我方';
-    const standing = report.standings.find((entry) => entry.participantIndex === 0);
+    const playerTeam = report.teams[0];
+    const player = playerTeam === undefined ? '我方' : teamName(playerTeam);
+    const standing = report.standings.find((entry) => entry.teamIndex === 0);
     const rank = standing?.rank ?? '-';
     const total = standing?.totalScore ?? 0;
-    const count = report.standings.length;
+    const count = report.teams.length;
     lines.push(`${where} · ${when}`);
     lines.push(
-      `${player} 出战：最终第 ${rank} 名 / ${count} 人，总分 ${total}，${report.pass ? '达成通关线 ✅' : '未达通关线 ❌'}`,
+      `${player} 出战：最终第 ${rank} 名 / ${count} 支队伍，总分 ${total}，${report.pass ? '达成通关线 ✅' : '未达通关线 ❌'}`,
     );
-    const playerAttempts = report.participants[0]?.attempts ?? [];
+    const playerAttempts = teamTimelines(report)[0]?.timelines.flatMap((t) => t.attempts) ?? [];
     const ac = playerAttempts.filter((attempt) => attempt.verdict === 'AC').length;
     const skipped = playerAttempts.filter((attempt) => attempt.verdict === 'SKIP').length;
     const unfinished = playerAttempts.filter((attempt) => attempt.verdict === 'UNFINISHED').length;
@@ -239,20 +265,15 @@ function RankingReport({
 }: {
   report: Extract<ContestReport, { format: 'RANKING' }>;
 }): JSX.Element {
+  const mine = report.standings.find((standing) => standing.teamIndex === 0);
+  const teams = teamTimelines(report);
+
   return (
     <>
       <div className="grid gap-3 sm:grid-cols-4">
-        <Metric
-          label="排名"
-          value={`#${report.standings.find((standing) => standing.participantIndex === 0)?.rank ?? '-'}`}
-        />
-        <Metric
-          label="总分"
-          value={String(
-            report.standings.find((standing) => standing.participantIndex === 0)?.totalScore ?? 0,
-          )}
-        />
-        <Metric label="参赛人数" value={String(report.participants.length)} />
+        <Metric label="排名" value={`#${mine?.rank ?? '-'}`} />
+        <Metric label="总分" value={String(mine?.totalScore ?? 0)} />
+        <Metric label="参赛队伍" value={String(report.teams.length)} />
         <Metric label="结果" value={report.pass ? '通过' : '未通过'} />
       </div>
 
@@ -263,20 +284,24 @@ function RankingReport({
             <thead className="border-b bg-neutral-50 text-xs uppercase text-neutral-500">
               <tr>
                 <th className="px-4 py-3">名次</th>
-                <th className="px-4 py-3">选手</th>
+                <th className="px-4 py-3">队伍</th>
                 <th className="px-4 py-3">分数</th>
               </tr>
             </thead>
             <tbody>
-              {report.standings.map((standing) => (
-                <tr key={standing.participantIndex} className="border-b last:border-b-0">
-                  <td className="px-4 py-3">{standing.rank}</td>
-                  <td className="px-4 py-3">
-                    {report.participants[standing.participantIndex]?.participant.displayName ?? '-'}
-                  </td>
-                  <td className="px-4 py-3">{standing.totalScore}</td>
-                </tr>
-              ))}
+              {report.standings.map((standing) => {
+                const team = report.teams[standing.teamIndex];
+                return (
+                  <tr key={standing.teamIndex} className="border-b last:border-b-0">
+                    <td className="px-4 py-3">{standing.rank}</td>
+                    <td className="px-4 py-3">
+                      {team === undefined ? '-' : teamName(team)}
+                      {standing.teamIndex === 0 ? '（我方）' : ''}
+                    </td>
+                    <td className="px-4 py-3">{standing.totalScore}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -284,40 +309,48 @@ function RankingReport({
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">答题时间线</h2>
-        <div className="space-y-3">
-          {report.participants.map((timeline) => (
-            <div
-              key={timeline.participant.displayName}
-              className="overflow-x-auto rounded border border-neutral-200 bg-white"
-            >
-              <div className="border-b px-4 py-3 font-medium">
-                {timeline.participant.displayName}
-              </div>
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b bg-neutral-50 text-xs text-neutral-500">
-                  <tr>
-                    <th className="px-4 py-2">题目</th>
-                    <th className="px-4 py-2">结果</th>
-                    <th className="px-4 py-2">用时</th>
-                    <th className="px-4 py-2">精力</th>
-                    <th className="px-4 py-2">心态</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {timeline.attempts.map((attempt) => (
-                    <tr key={attempt.problemInstanceId} className="border-b last:border-b-0">
-                      <td className="px-4 py-2">{attempt.problemInstanceId}</td>
-                      <td className="px-4 py-2">{attempt.verdict}</td>
-                      <td className="px-4 py-2">{Math.ceil(attempt.minutesUsed)} min</td>
-                      <td className="px-4 py-2">-{attempt.energyCost}</td>
-                      <td className="px-4 py-2">
-                        {attempt.mindsetDelta > 0 ? '+' : ''}
-                        {attempt.mindsetDelta}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="space-y-4">
+          {teams.map(({ teamIndex, team, timelines }) => (
+            <div key={teamIndex} className="space-y-3">
+              <h3 className="text-sm font-medium">
+                {teamName(team)}
+                {teamIndex === 0 ? '（我方）' : ''}
+              </h3>
+              {timelines.map((timeline) => (
+                <div
+                  key={timeline.participant.displayName}
+                  className="overflow-x-auto rounded border border-neutral-200 bg-white"
+                >
+                  <div className="border-b px-4 py-3 font-medium">
+                    {timeline.participant.displayName}
+                  </div>
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="border-b bg-neutral-50 text-xs text-neutral-500">
+                      <tr>
+                        <th className="px-4 py-2">题目</th>
+                        <th className="px-4 py-2">结果</th>
+                        <th className="px-4 py-2">用时</th>
+                        <th className="px-4 py-2">精力</th>
+                        <th className="px-4 py-2">心态</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timeline.attempts.map((attempt) => (
+                        <tr key={attempt.problemInstanceId} className="border-b last:border-b-0">
+                          <td className="px-4 py-2">{attempt.problemInstanceId}</td>
+                          <td className="px-4 py-2">{attempt.verdict}</td>
+                          <td className="px-4 py-2">{Math.ceil(attempt.minutesUsed)} min</td>
+                          <td className="px-4 py-2">-{attempt.energyCost}</td>
+                          <td className="px-4 py-2">
+                            {attempt.mindsetDelta > 0 ? '+' : ''}
+                            {attempt.mindsetDelta}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
             </div>
           ))}
         </div>

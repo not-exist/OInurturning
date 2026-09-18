@@ -23,8 +23,13 @@ export const stageProblemSlotSchema = z
   .strict();
 export type StageProblemSlot = z.infer<typeof stageProblemSlotSchema>;
 
+/** 出战队伍人数（玩家队伍与每支 NPC 队伍同人数） */
+export const rosterSizeSchema = z.number().int().min(3).max(4);
+export type RosterSize = z.infer<typeof rosterSizeSchema>;
+
 export const stageNpcPoolSchema = z
   .object({
+    /** NPC 队伍数（不是人数）；每队人数取 defaults.roster_size */
     size: positiveInt,
     mean_level: nonNegativeInt,
     spread: z.number().finite().nonnegative(),
@@ -77,6 +82,7 @@ export const stageConfigSchema = z
     duration_min: z.number().finite().positive(),
     problem_slots: z.array(stageProblemSlotSchema).min(1),
     npc_pool: stageNpcPoolSchema,
+    roster_size: rosterSizeSchema.optional(),
     first_clear: stageFirstClearSchema,
   })
   .strict();
@@ -87,6 +93,7 @@ export const stagesDefaultsSchema = z
     engine_ref: z.string().min(1),
     stamina_cost_by_chapter: z.record(z.enum(STAGE_CHAPTERS), positiveInt),
     pass_rank_max: positiveInt,
+    roster_size: rosterSizeSchema,
   })
   .strict();
 

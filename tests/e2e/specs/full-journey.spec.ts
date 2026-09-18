@@ -14,6 +14,8 @@ import {
   adminToken,
   candidateVProxy,
   resolveAdventureChoice,
+  rosterIds,
+  pickRoster,
   type TestAccount,
 } from '../fixtures';
 
@@ -94,7 +96,7 @@ test.describe('完整玩家旅程', () => {
 
     // —— 5. 剧情首关→回放→战报→返回 ——
     await page.goto('/story');
-    await page.getByTestId('story-student').selectOption(String(best.id));
+    await pickRoster(page, 'story-roster', 4);
     await page.getByTestId('story-enter').first().click();
     await expect(page.getByTestId('replay-skip')).toBeVisible();
     await page.getByTestId('replay-skip').click();
@@ -141,7 +143,7 @@ test.describe('完整玩家旅程', () => {
 
     // —— 9. 历练（无情报直抽→分支） ——
     await page.goto('/adventure');
-    await page.getByTestId('adventure-student').selectOption(String(best.id));
+    await pickRoster(page, 'adventure-roster', 3);
     await page.getByTestId('adventure-draw').click();
     await expect(page.locator('[data-testid^="adventure-choice-"]').first()).toBeVisible();
     expect(await resolveAdventureChoice(page)).toBe(true);
@@ -183,19 +185,20 @@ test.describe('完整玩家旅程', () => {
       'POST',
       `/api/pvp/tournaments/${tournamentId}/register`,
       token,
-      { studentId: best.id, problemEntryIds: [] },
+      { studentIds: await rosterIds(request, token, 3), problemEntryIds: [] },
     );
     unwrap(mainReg.body, '主角报名');
     for (let i = 0; i < 7; i += 1) {
       const Brain = await registerUser(request, 'journey-rival');
       await fund(Brain.username, { money: 50000, items: { 'entry-ticket': 1 } });
-      const studentId = await recruitStudent(request, Brain.accessToken);
+      await recruitStudent(request, Brain.accessToken);
+      const studentIds = await rosterIds(request, Brain.accessToken, 3);
       const reg = await apiCall(
         request,
         'POST',
         `/api/pvp/tournaments/${tournamentId}/register`,
         Brain.accessToken,
-        { studentId, problemEntryIds: [] },
+        { studentIds, problemEntryIds: [] },
       );
       unwrap(reg.body, `报名 ${Brain.username}`);
       contenders.push(Brain);

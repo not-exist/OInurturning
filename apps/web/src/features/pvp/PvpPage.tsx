@@ -2,6 +2,7 @@ import { useState, type JSX } from 'react';
 import { Link } from 'react-router';
 import { ApiCallError } from '../../lib/api';
 import { Empty } from '../../components/ui';
+import { RosterPicker } from '../../components/RosterPicker';
 import {
   useInventory,
   usePvpRegistration,
@@ -17,6 +18,7 @@ import {
   type PvpRewardGrantView,
   type PvpRewardLine,
 } from '../../lib/hooks';
+import type { StudentView } from '@oinur/shared';
 
 export function PvpPage(): JSX.Element {
   const tournaments = usePvpTournaments();
@@ -24,7 +26,7 @@ export function PvpPage(): JSX.Element {
   const problems = useProblems();
   const inventory = useInventory();
   const [tournamentId, setTournamentId] = useState<number>();
-  const [studentId, setStudentId] = useState<number>();
+  const [roster, setRoster] = useState<number[]>([]);
   const selectedTournamentId = tournamentId ?? tournaments.data?.[0]?.id;
   const registration = usePvpRegistration(selectedTournamentId);
   const detail = usePvpTournamentDetail(selectedTournamentId);
@@ -104,7 +106,8 @@ export function PvpPage(): JSX.Element {
     selectedTournamentEntry === undefined || detail.data === undefined
       ? selectedTournamentEntry
       : { ...selectedTournamentEntry, ...detail.data };
-  const selectedStudentId = studentId ?? students.data[0]?.id;
+  const rosterSize = selectedTournament?.rosterSize ?? 3;
+  const rosterReady = roster.length === rosterSize;
   const selectedRegistration = registration.data;
   const tickets = inventory.data.find((item) => item.itemId === 'entry-ticket')?.quantity ?? 0;
   const eligibleProblems = problems.data.filter((problem) => problem.quality >= 40);
@@ -132,12 +135,13 @@ export function PvpPage(): JSX.Element {
               value={selectedTournamentId ?? ''}
               onChange={(event) => {
                 setTournamentId(Number(event.target.value));
+                setRoster([]);
                 setProblemIds([]);
               }}
             >
               {tournaments.data.map((entry) => (
                 <option key={entry.id} value={entry.id}>
-                  {entry.name} · {entry.size} 人 · {entry.status}
+                  {entry.name} · {entry.size} 队 · 每队 {entry.rosterSize} 人 · {entry.status}
                 </option>
               ))}
             </select>
@@ -162,15 +166,16 @@ export function PvpPage(): JSX.Element {
                 <RegistrationForm
                   students={students.data}
                   problems={eligibleProblems}
-                  studentId={selectedStudentId}
-                  onStudentChange={setStudentId}
+                  rosterSize={rosterSize}
+                  roster={roster}
+                  onRosterChange={setRoster}
                   problemIds={problemIds}
                   onProblemsChange={setProblemIds}
                   onSubmit={() =>
-                    selectedStudentId !== undefined &&
+                    rosterReady &&
                     register.mutate({
                       tournamentId: selectedTournament.id,
-                      studentId: selectedStudentId,
+                      studentIds: roster,
                       problemEntryIds: problemIds,
                     })
                   }
@@ -294,18 +299,20 @@ function BracketView({
 function RegistrationForm({
   students,
   problems,
-  studentId,
-  onStudentChange,
+  rosterSize,
+  roster,
+  onRosterChange,
   problemIds,
   onProblemsChange,
   onSubmit,
   pending,
   error,
 }: {
-  students: { id: number; name: string; v: number }[];
+  students: StudentView[];
   problems: { id: number; name: string; quality: number }[];
-  studentId: number | undefined;
-  onStudentChange: (id: number) => void;
+  rosterSize: number;
+  roster: number[];
+  onRosterChange: (ids: number[]) => void;
   problemIds: number[];
   onProblemsChange: (ids: number[]) => void;
   onSubmit: () => void;
@@ -314,21 +321,14 @@ function RegistrationForm({
 }): JSX.Element {
   return (
     <div className="mt-5 space-y-4 border-t border-neutral-200 pt-4">
-      <label className="block text-sm">
-        <span className="mb-2 block text-neutral-500">出战学员</span>
-        <select
-          data-testid="pvp-student"
-          className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
-          value={studentId ?? ''}
-          onChange={(event) => onStudentChange(Number(event.target.value))}
-        >
-          {students.map((student) => (
-            <option key={student.id} value={student.id}>
-              {student.name} · V {student.v}
-            </option>
-          ))}
-        </select>
-      </label>
+      <RosterPicker
+        students={students}
+        selectedIds={roster}
+        min={rosterSize}
+        max={rosterSize}
+        onChange={onRosterChange}
+        dataTestIdPrefix="pvp-roster"
+      />
       <fieldset>
         <legend className="mb-2 text-sm text-neutral-500">携带预制题（最多 2 道，Q ≥ 40）</legend>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -361,7 +361,7 @@ function RegistrationForm({
         type="button"
         data-testid="pvp-register"
         className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50"
-        disabled={studentId === undefined || pending}
+        disabled={pending || roster.length !== rosterSize}
         onClick={onSubmit}
       >
         {pending ? '报名中…' : '提交报名'}
@@ -381,7 +381,7 @@ function RegistrationView({ registration }: { registration: PvpRegistrationView 
   return (
     <div className="mt-5 border-t border-neutral-200 pt-4 text-sm">
       <p data-testid="pvp-registered" className="font-medium text-green-700">已报名，快照已锁定</p>
-      <p className="mt-2 text-neutral-600">
+      <p data-testid="pvp-roster-list" className="mt-2 text-neutral-600">
         出战：{registration.roster.map((student) => student.displayName).join('、')}
       </p>
       <p className="mt-1 text-neutral-600">

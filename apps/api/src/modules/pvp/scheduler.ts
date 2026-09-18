@@ -15,6 +15,7 @@ import { stableHash } from '../contest/engine/report.js';
 import { createContestRecord } from '../contest/repository.js';
 import { buildFirstRound, buildNextRound } from './bracket.js';
 import { ensurePvpRewardGrants } from './rewards.js';
+import { pvpRosterSize, type PvpRosterSize } from './registration.js';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 type Registration = PvpRegistration;
@@ -78,6 +79,7 @@ export interface PvpTournamentDetail {
   name: string;
   status: PvpTournament['status'];
   size: number;
+  rosterSize: PvpRosterSize;
   registerEndsAt: string;
   autoStartAt: string;
   prizes: unknown;
@@ -86,11 +88,12 @@ export interface PvpTournamentDetail {
   myRegistration: number | null;
 }
 
-function participant(row: Registration, side: 'HOME' | 'AWAY'): ParticipantSnapshot {
+function members(row: Registration, side: 'HOME' | 'AWAY'): { members: ParticipantSnapshot[] } {
   const roster = row.roster as unknown as ParticipantSnapshot[];
-  const source = roster[0];
-  if (source === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'registration', id: row.id });
-  return { ...source, side, userId: row.userId, studentId: source.studentId };
+  if (roster.length === 0) throw new ApiError('STATE_CONFLICT', { resource: 'registration', id: row.id });
+  return {
+    members: roster.map((member) => ({ ...member, side, userId: row.userId, studentId: member.studentId })),
+  };
 }
 
 /**
@@ -159,13 +162,17 @@ function inputFor(match: PvpMatch, home: Registration, away: Registration, quali
   const homeProblems = (home.problemSnapshots as unknown as { id: number; name: string; dominantDim: string; quality: number; traitId: string | null }[]);
   const awayProblems = (away.problemSnapshots as unknown as { id: number; name: string; dominantDim: string; quality: number; traitId: string | null }[]);
   const snapshotKey = stableHash({ home: home.roster, away: away.roster, homeProblems, awayProblems });
-  const questions = [0, 1, 2, 3].map((index) => {
-    const source = index % 2 === 0 ? homeProblems[index / 2] : awayProblems[(index - 1) / 2];
-    return source === undefined ? generatedQuestion(match.tournamentId, match.round, match.slot, snapshotKey, index, index % 2 === 0 ? 'HOME' : 'AWAY') : questionFor(source, match.tournamentId, match.round, match.slot, snapshotKey, index);
+  const rosterSize = (home.roster as unknown as ParticipantSnapshot[]).length;
+  const questions = Array.from({ length: 2 * rosterSize }, (_, index) => {
+    const isHome = index % 2 === 0;
+    const source = isHome ? homeProblems[index / 2] : awayProblems[(index - 1) / 2];
+    return source === undefined
+      ? generatedQuestion(match.tournamentId, match.round, match.slot, snapshotKey, index, isHome ? 'HOME' : 'AWAY')
+      : questionFor(source, match.tournamentId, match.round, match.slot, snapshotKey, index);
   });
   return {
-    home: participant(home, 'HOME'),
-    away: participant(away, 'AWAY'),
+    home: members(home, 'HOME'),
+    away: members(away, 'AWAY'),
     questions,
     qualityRuleOn,
     tiebreak: 'SUDDEN_DEATH',
@@ -326,7 +333,7 @@ export async function advancePvpTournament(tournamentId: number, now?: Date, act
 
 async function detailInTx(tx: Db, tournament: PvpTournament, userId: number | null, registrations?: Registration[]): Promise<PvpTournamentDetail> {
   const rows = registrations ?? await tx.pvpRegistration.findMany({ where: { tournamentId: tournament.id } });
-  return { id: tournament.id, name: tournament.name, status: tournament.status, size: tournament.size, registerEndsAt: tournament.registerEndsAt.toISOString(), autoStartAt: tournament.autoStartAt.toISOString(), prizes: tournament.prizes, config: tournament.config, registeredCount: rows.length, myRegistration: userId === null ? null : rows.find((row) => row.userId === userId)?.id ?? null };
+  return { id: tournament.id, name: tournament.name, status: tournament.status, size: tournament.size, rosterSize: pvpRosterSize(tournament.config), registerEndsAt: tournament.registerEndsAt.toISOString(), autoStartAt: tournament.autoStartAt.toISOString(), prizes: tournament.prizes, config: tournament.config, registeredCount: rows.length, myRegistration: userId === null ? null : rows.find((row) => row.userId === userId)?.id ?? null };
 }
 
 export async function getPvpTournamentDetail(userId: number, tournamentId: number, now?: Date): Promise<PvpTournamentDetail> {

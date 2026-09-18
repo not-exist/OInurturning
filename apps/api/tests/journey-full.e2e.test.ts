@@ -16,7 +16,7 @@ import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
  *
  * 真配置（docs/data，等价生产）+ 跑后恢复 fixtures，避免污染相邻文件。
  * 体力账（初始 5）：基础 1 → 定向 1 → 剧情 1 → 出题 1 → 专项 1 → 药水 +3 →
- * 讲课 2 → 历练 1，正好归零。
+ * 讲课 2 → 历练 1（3 人各扣 1，队长 best 正好归零）。
  */
 const app: Express = createApp();
 const FIXTURES = path.resolve(import.meta.dirname, 'fixtures/config');
@@ -114,7 +114,7 @@ describe('journey full (api)', () => {
     expect(pool.candidates).toHaveLength(5);
     const students: StudentView[] = [];
     // 单抽 V<7 概率约 19%（common 占 55% 且 V 上限约 11），12 轮全失败 ≈ 2e-9，可忽略
-    for (let round = 0; round < 12 && !students.some((s) => s.v >= 7); round += 1) {
+    for (let round = 0; round < 12 && !(students.some((s) => s.v >= 7) && students.length >= 2); round += 1) {
       if (round > 0) {
         const refreshed = await request(app).post('/api/academy/refresh').set(auth);
         expect(refreshed.status).toBe(200);
@@ -157,11 +157,18 @@ describe('journey full (api)', () => {
     console.log('JSTAGE:train');
 
     // —— 剧情首关：进关→战报结构完整 ——
+    const storyRoster = [
+      best.id,
+      ...(await unwrapOk<StudentView[]>(await request(app).get('/api/students').set(auth)))
+        .map((s) => s.id)
+        .filter((id) => id !== best.id),
+    ].slice(0, 4);
+    expect(storyRoster).toHaveLength(4);
     const entered = unwrapOk<{ record: { id: number } }>(
       await request(app)
         .post('/api/story/stages/cspj:1/enter')
         .set(auth)
-        .send({ roster: [best.id], ngLevel: 0, idempotencyKey: randomUUID() }),
+        .send({ roster: storyRoster, ngLevel: 0, idempotencyKey: randomUUID() }),
     );
     const report = unwrapOk<{
       report: { format: string; engineVersion: string; standings: unknown[]; pass: boolean };
@@ -225,12 +232,19 @@ describe('journey full (api)', () => {
     expect(lectureLogs).toHaveLength(1);
     console.log('JSTAGE:lecture');
 
-    // —— 历练：无情报直抽→分支（逐个试可用分支直到结算；钥匙篮+20 万资金保证必有可解分支） ——
+    // —— 历练：无情报直抽→分支（3 人队伍，逐个试可用分支直到结算；钥匙篮+20 万资金保证必有可解分支） ——
+    // 队伍 = 队长 best + 另外两名学员；三人都扣 1 点体力，只有 best 会归零
+    const allStudents = unwrapOk<StudentView[]>(await request(app).get('/api/students').set(auth));
+    const adventureRoster = [
+      best.id,
+      ...allStudents.filter((s) => s.id !== best.id).map((s) => s.id),
+    ].slice(0, 3);
+    expect(adventureRoster).toHaveLength(3);
     const drawn = unwrapOk<AdventureView>(
       await request(app)
         .post('/api/adventures/draw')
         .set(auth)
-        .send({ studentId: best.id, tier: 1 }),
+        .send({ roster: adventureRoster, tier: 1 }),
     );
     expect(drawn.preview).toBe(false);
     expect(drawn.event.choices?.length).toBeGreaterThan(0);
@@ -298,31 +312,43 @@ describe('journey full (api)', () => {
         config: {},
       }),
     );
-    const contenders = [{ token: player.token, userId: player.userId, studentId: best.id }];
+    // PVP 报名固定 3 人队伍（config.rosterSize 缺省 3）
+    const pvpRoster = [
+      best.id,
+      ...(await unwrapOk<StudentView[]>(await request(app).get('/api/students').set(auth)))
+        .map((s) => s.id)
+        .filter((id) => id !== best.id),
+    ].slice(0, 3);
+    expect(pvpRoster).toHaveLength(3);
+    const contenders = [{ token: player.token, userId: player.userId, roster: pvpRoster }];
     const mainReg = await request(app)
       .post(`/api/pvp/tournaments/${tournament.id}/register`)
       .set(auth)
-      .send({ studentId: best.id, problemEntryIds: [] });
+      .send({ studentIds: pvpRoster, problemEntryIds: [] });
     expect(mainReg.status).toBe(200);
     for (let i = 0; i < 7; i += 1) {
       const rival = await register('journey-rival');
       await fund(rival.userId, 50000, { 'entry-ticket': 1 });
       const rivalAuth = { Authorization: `Bearer ${rival.token}` };
-      const rivalPool = unwrapOk<{ candidates: Candidate[] }>(
-        await request(app).get('/api/academy/pool').set(rivalAuth),
-      );
-      const rivalStudent = unwrapOk<StudentView>(
-        await request(app)
-          .post('/api/academy/recruit')
-          .set(rivalAuth)
-          .send({ tempId: rivalPool.candidates[0]!.tempId }),
-      );
+      const rivalRoster: number[] = [];
+      for (let member = 0; member < 3; member += 1) {
+        const rivalPool = unwrapOk<{ candidates: Candidate[] }>(
+          await request(app).get('/api/academy/pool').set(rivalAuth),
+        );
+        const rivalStudent = unwrapOk<StudentView>(
+          await request(app)
+            .post('/api/academy/recruit')
+            .set(rivalAuth)
+            .send({ tempId: rivalPool.candidates[0]!.tempId }),
+        );
+        rivalRoster.push(rivalStudent.id);
+      }
       const reg = await request(app)
         .post(`/api/pvp/tournaments/${tournament.id}/register`)
         .set(rivalAuth)
-        .send({ studentId: rivalStudent.id, problemEntryIds: [] });
+        .send({ studentIds: rivalRoster, problemEntryIds: [] });
       expect(reg.status).toBe(200);
-      contenders.push({ token: rival.token, userId: rival.userId, studentId: rivalStudent.id });
+      contenders.push({ token: rival.token, userId: rival.userId, roster: rivalRoster });
     }
     await prisma.pvpTournament.update({
       where: { id: tournament.id },

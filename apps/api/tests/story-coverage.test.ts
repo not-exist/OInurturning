@@ -53,7 +53,7 @@ interface EnterResult {
     id: string;
     report: {
       pass: boolean;
-      standings: Array<{ participantIndex: number; rank: number }>;
+      standings: Array<{ teamIndex: number; rank: number }>;
     };
     summary: { rank: number };
   };
@@ -77,12 +77,15 @@ async function register(): Promise<Session> {
   return unwrapOk<Session>(res);
 }
 
-/** 满属性学员：cspj 章首通近乎必过（NPC 均值个位数），消除种子方差。 */
-async function maxedStudent(userId: number): Promise<{ id: number }> {
+/** docs/data 的 defaults.roster_size：出战人数必须精确匹配。 */
+const ROSTER_SIZE = 4;
+
+/** 满属性学员队：cspj 章首通近乎必过（NPC 均值个位数），消除种子方差。 */
+async function maxedStudent(userId: number, index = 0): Promise<{ id: number }> {
   const student = await prisma.student.create({
     data: {
       userId,
-      name: '满级学员',
+      name: `满级学员${index}`,
       sex: 'MALE',
       qualityTier: 'GENIUS',
       ds: 100, dp: 100, math: 100, graph: 100, greedy: 100, str: 100,
@@ -94,36 +97,47 @@ async function maxedStudent(userId: number): Promise<{ id: number }> {
   return { id: student.id };
 }
 
-async function refill(studentId: number): Promise<void> {
-  await prisma.student.update({ where: { id: studentId }, data: { stamina: 5, energy: 100, mindset: 10 } });
+async function maxedRoster(userId: number): Promise<number[]> {
+  const roster: number[] = [];
+  for (let index = 0; index < ROSTER_SIZE; index += 1) {
+    roster.push((await maxedStudent(userId, index)).id);
+  }
+  return roster;
+}
+
+async function refill(roster: readonly number[]): Promise<void> {
+  await prisma.student.updateMany({
+    where: { id: { in: [...roster] } },
+    data: { stamina: 5, energy: 100, mindset: 10 },
+  });
 }
 
 async function enter(
   token: string,
   stageKey: string,
-  studentId: number,
+  roster: readonly number[],
   key: string,
   ngLevel = 0,
 ): Promise<request.Response> {
   return request(app)
     .post(`/api/story/stages/${stageKey}/enter`)
     .set({ Authorization: `Bearer ${token}`, 'Idempotency-Key': key })
-    .send({ roster: [studentId], ngLevel });
+    .send({ roster: [...roster], ngLevel });
 }
 
 /** 以不同幂等键重试直到通关（满级打 cspj 通常一次即过，重试仅防极端种子）。 */
 async function clearStage(
   token: string,
   stageKey: string,
-  studentId: number,
+  roster: readonly number[],
   ngLevel = 0,
 ): Promise<EnterResult> {
   // 每次调用换新幂等键命名空间：同一用例内多次 clearStage 不可复用键（否则第二次命中 replay）
   seq += 1;
   const tag = seq;
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    await refill(studentId);
-    const res = await enter(token, stageKey, studentId, `clear-${stageKey}-ng${ngLevel}-${attempt}-${tag}`, ngLevel);
+    await refill(roster);
+    const res = await enter(token, stageKey, roster, `clear-${stageKey}-ng${ngLevel}-${attempt}-${tag}`, ngLevel);
     expect(res.status).toBe(200);
     const data = unwrapOk<EnterResult>(res);
     if (data.record.report.pass) return data;
@@ -184,28 +198,31 @@ describe('story coverage：总览与解锁链', () => {
 
   it('锁定关卡 → STATE_CONFLICT；未知关卡 → NOT_FOUND', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
-    const locked = await enter(user.accessToken, 'cspj:2', student.id, 'lock-1');
+    const roster = await maxedRoster(user.me.id);
+    const locked = await enter(user.accessToken, 'cspj:2', roster, 'lock-1');
     expect(locked.status).toBe(409);
     expect(unwrapErr(locked)).toMatchObject({ code: 'STATE_CONFLICT' });
-    const missing = await enter(user.accessToken, 'nope:99', student.id, 'lock-2');
+    const missing = await enter(user.accessToken, 'nope:99', roster, 'lock-2');
     expect(missing.status).toBe(404);
     expect(unwrapErr(missing).code).toBe('NOT_FOUND');
   });
 
   it('参数校验：roster/幂等键/ngLevel 非法 → VALIDATION_FAILED', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
+    const roster = await maxedRoster(user.me.id);
     const auth = { Authorization: `Bearer ${user.accessToken}` };
 
     const empty = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-1' }).send({ roster: [] });
     expect(empty.status).toBe(400);
-    const two = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-2' }).send({ roster: [student.id, student.id] });
-    expect(two.status).toBe(400);
-    const noKey = await request(app).post('/api/story/stages/cspj:1/enter').set(auth).send({ roster: [student.id] });
+    const tooFew = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-1-3' }).send({ roster: roster.slice(0, 3) });
+    expect(tooFew.status).toBe(400);
+    const duplicated = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-2' }).send({ roster: [...roster.slice(0, 3), roster[0]!] });
+    expect(duplicated.status).toBe(400);
+    expect(unwrapErr(duplicated).details).toMatchObject({ field: 'roster' });
+    const noKey = await request(app).post('/api/story/stages/cspj:1/enter').set(auth).send({ roster });
     expect(noKey.status).toBe(400);
     expect(unwrapErr(noKey).code).toBe('VALIDATION_FAILED');
-    const badNg = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-3' }).send({ roster: [student.id], ngLevel: -1 });
+    const badNg = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-3' }).send({ roster, ngLevel: -1 });
     expect(badNg.status).toBe(400);
     const badQuery = await request(app).get('/api/story/overview?ngLevel=abc').set(auth);
     expect(badQuery.status).toBe(400);
@@ -213,30 +230,33 @@ describe('story coverage：总览与解锁链', () => {
     expect(badProgress.status).toBe(400);
   });
 
-  it('体力不足 → INSUFFICIENT_RESOURCE（need=关卡体力耗）', async () => {
+  it('任一队员体力不足 → INSUFFICIENT_RESOURCE（need=关卡体力耗，全队不扣）', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
-    await prisma.student.update({ where: { id: student.id }, data: { stamina: 0 } });
-    const res = await enter(user.accessToken, 'cspj:1', student.id, 'stam-1');
+    const roster = await maxedRoster(user.me.id);
+    await prisma.student.update({ where: { id: roster[1]! }, data: { stamina: 0 } });
+    const res = await enter(user.accessToken, 'cspj:1', roster, 'stam-1');
     expect(res.status).toBe(409);
     const err = unwrapErr(res);
     expect(err.code).toBe('INSUFFICIENT_RESOURCE');
     expect(err.details).toMatchObject({ resource: 'stamina', need: 1 });
+    const rows = await prisma.student.findMany({ where: { id: { in: roster } } });
+    const staminaById = new Map(rows.map((row) => [row.id, row.stamina]));
+    expect(roster.map((id) => staminaById.get(id))).toEqual([5, 0, 5, 5]);
   });
 
   it('他人学员 → FORBIDDEN；已开除/不存在 → NOT_FOUND', async () => {
     const user = await register();
     const other = await register();
-    const mine = await maxedStudent(user.me.id);
-    const foreign = await maxedStudent(other.me.id);
+    const mine = await maxedRoster(user.me.id);
+    const foreignId = (await maxedStudent(other.me.id)).id;
 
-    const forbidden = await enter(user.accessToken, 'cspj:1', foreign.id, 'own-1');
+    const forbidden = await enter(user.accessToken, 'cspj:1', [foreignId, ...mine.slice(1)], 'own-1');
     expect(forbidden.status).toBe(403);
-    const dismissed = await prisma.student.update({ where: { id: mine.id }, data: { status: 'DISMISSED' } });
-    expect(dismissed.status).toBe('DISMISSED');
-    const gone = await enter(user.accessToken, 'cspj:1', mine.id, 'own-2');
+    await prisma.student.update({ where: { id: mine[0]! }, data: { status: 'DISMISSED' } });
+    expect((await prisma.student.findUniqueOrThrow({ where: { id: mine[0]! } })).status).toBe('DISMISSED');
+    const gone = await enter(user.accessToken, 'cspj:1', mine, 'own-2');
     expect(gone.status).toBe(404);
-    const missing = await enter(user.accessToken, 'cspj:1', 99999999, 'own-3');
+    const missing = await enter(user.accessToken, 'cspj:1', [...mine.slice(1), 99999999], 'own-3');
     expect(missing.status).toBe(404);
   });
 });
@@ -244,11 +264,11 @@ describe('story coverage：总览与解锁链', () => {
 describe('story coverage：首通与复刷', () => {
   it('首通：奖钱精确到账，进度/总览/战报/体力联动', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
+    const roster = await maxedRoster(user.me.id);
     const before = await prisma.user.findUniqueOrThrow({ where: { id: user.me.id } });
     const expectedMoney = yamlFirstClearMoney('cspj', 1);
 
-    const data = await clearStage(user.accessToken, 'cspj:1', student.id);
+    const data = await clearStage(user.accessToken, 'cspj:1', roster);
     expect(data.replayed).toBe(false);
     expect(data.firstClear).toBe(true);
 
@@ -277,15 +297,15 @@ describe('story coverage：首通与复刷', () => {
     expect(cspj[0]).toMatchObject({ stageKey: 'cspj:1', cleared: true, clearCount: 1 });
     expect(cspj[1]).toMatchObject({ stageKey: 'cspj:2', unlocked: true, cleared: false });
 
-    const spent = await prisma.student.findUniqueOrThrow({ where: { id: student.id } });
-    expect(spent.stamina).toBe(4);
+    const spent = await prisma.student.findMany({ where: { id: { in: roster } } });
+    expect(spent.map((row) => row.stamina)).toEqual([4, 4, 4, 4]);
   });
 
   it('复刷：无首通奖、clearCount 累加、bestRank 取历史最优', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
-    const first = await clearStage(user.accessToken, 'cspj:1', student.id);
-    const second = await clearStage(user.accessToken, 'cspj:1', student.id);
+    const roster = await maxedRoster(user.me.id);
+    const first = await clearStage(user.accessToken, 'cspj:1', roster);
+    const second = await clearStage(user.accessToken, 'cspj:1', roster);
     expect(second.replayed).toBe(false);
     expect(second.firstClear).toBe(false);
 
@@ -301,11 +321,11 @@ describe('story coverage：首通与复刷', () => {
 
   it('幂等键跨关复用 → 返回原记录（replay 优先于解锁检查）', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
-    const firstRes = await enter(user.accessToken, 'cspj:1', student.id, 'cross-stage-key');
+    const roster = await maxedRoster(user.me.id);
+    const firstRes = await enter(user.accessToken, 'cspj:1', roster, 'cross-stage-key');
     expect(firstRes.status).toBe(200);
     const first = unwrapOk<EnterResult>(firstRes);
-    const replayRes = await enter(user.accessToken, 'cspj:2', student.id, 'cross-stage-key');
+    const replayRes = await enter(user.accessToken, 'cspj:2', roster, 'cross-stage-key');
     expect(replayRes.status).toBe(200);
     const replay = unwrapOk<EnterResult>(replayRes);
     expect(replay.replayed).toBe(true);
@@ -316,8 +336,8 @@ describe('story coverage：首通与复刷', () => {
   it('战报鉴权：他人战报/不存在 → NOT_FOUND', async () => {
     const user = await register();
     const other = await register();
-    const student = await maxedStudent(user.me.id);
-    const data = await clearStage(user.accessToken, 'cspj:1', student.id);
+    const roster = await maxedRoster(user.me.id);
+    const data = await clearStage(user.accessToken, 'cspj:1', roster);
     const foreign = await request(app).get(`/api/records/${data.record.id}`).set('Authorization', `Bearer ${other.accessToken}`);
     expect(foreign.status).toBe(404);
     const missing = await request(app).get('/api/records/does-not-exist').set('Authorization', `Bearer ${user.accessToken}`);
@@ -333,11 +353,11 @@ describe('story coverage：NG+', () => {
 
   it('未全通：NG+1 总览/参赛均拒绝', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
+    const roster = await maxedRoster(user.me.id);
     const ov = await request(app).get('/api/story/overview?ngLevel=1').set('Authorization', `Bearer ${user.accessToken}`);
     expect(ov.status).toBe(409);
     expect(unwrapErr(ov).code).toBe('STATE_CONFLICT');
-    const denied = await enter(user.accessToken, 'cspj:1', student.id, 'ng-locked', 1);
+    const denied = await enter(user.accessToken, 'cspj:1', roster, 'ng-locked', 1);
     expect(denied.status).toBe(409);
     expect(unwrapErr(denied).code).toBe('STATE_CONFLICT');
   });
@@ -357,11 +377,11 @@ describe('story coverage：NG+', () => {
 
   it('NG+1 首通奖钱 ×1.5，进度按层隔离', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
+    const roster = await maxedRoster(user.me.id);
     await seedStages(user.me.id, await finalsOf(user.accessToken));
     const base = yamlFirstClearMoney('cspj', 1);
 
-    const data = await clearStage(user.accessToken, 'cspj:1', student.id, 1);
+    const data = await clearStage(user.accessToken, 'cspj:1', roster, 1);
     expect(data.firstClear).toBe(true);
     const record = await request(app).get(`/api/records/${data.record.id}`).set('Authorization', `Bearer ${user.accessToken}`);
     const rewards = unwrapOk<{ rewards: RewardLine[] }>(record).rewards;
@@ -377,7 +397,7 @@ describe('story coverage：NG+', () => {
 
   it('真实一周目：补齐最后一关 → 徽章/奖杯/结算金/NG 解锁', async () => {
     const user = await register();
-    const student = await maxedStudent(user.me.id);
+    const roster = await maxedRoster(user.me.id);
     const ov = await overview(user.accessToken);
     const allKeys = ov.chapters.flatMap((c) => c.stages.map((s) => s.stageKey));
     expect(allKeys).toHaveLength(33);
@@ -387,7 +407,7 @@ describe('story coverage：NG+', () => {
     );
     const before = await prisma.user.findUniqueOrThrow({ where: { id: user.me.id } });
 
-    const data = await clearStage(user.accessToken, 'cspj:4', student.id);
+    const data = await clearStage(user.accessToken, 'cspj:4', roster);
     expect(data.firstClear).toBe(true);
 
     const record = await request(app).get(`/api/records/${data.record.id}`).set('Authorization', `Bearer ${user.accessToken}`);

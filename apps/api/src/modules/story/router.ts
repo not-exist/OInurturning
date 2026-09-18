@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { TEAM_SIZE_MAX, TEAM_SIZE_MIN } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as service from './service.js';
@@ -7,7 +8,7 @@ import * as service from './service.js';
 const ngLevelSchema = z.coerce.number().int().nonnegative();
 const enterSchema = z
   .object({
-    roster: z.array(z.number().int().positive()).length(1),
+    roster: z.array(z.number().int().positive()).min(TEAM_SIZE_MIN).max(TEAM_SIZE_MAX),
     ngLevel: ngLevelSchema.default(0),
     idempotencyKey: z.string().min(1).max(128).optional(),
   })

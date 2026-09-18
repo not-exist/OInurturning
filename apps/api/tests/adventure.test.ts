@@ -108,6 +108,19 @@ async function createStudent(userId: number, stamina = 2): Promise<number> {
   return student.id;
 }
 
+/** 历练固定 3 人队伍，roster[0] 是队长（行动者）。 */
+async function createRoster(userId: number, stamina = 2): Promise<[number, number, number]> {
+  return [
+    await createStudent(userId, stamina),
+    await createStudent(userId, stamina),
+    await createStudent(userId, stamina),
+  ];
+}
+
+async function staminaOf(studentId: number): Promise<number> {
+  return (await prisma.student.findUniqueOrThrow({ where: { id: studentId } })).stamina;
+}
+
 describe('M3 adventure API service', () => {
   beforeEach(async () => {
     await resetUsers();
@@ -121,29 +134,60 @@ describe('M3 adventure API service', () => {
 
   it('draws a pending event, settles stamina, applies fixed rewards and stores buffs', async () => {
     const userId = await createUser(10);
-    const studentId = await createStudent(userId);
-    const drawn = await drawAdventure(userId, studentId, 1, TEST_NOW);
+    const roster = await createRoster(userId);
+    const [captain, second, third] = roster;
+    const drawn = await drawAdventure(userId, roster, 1, TEST_NOW);
 
     expect(drawn.status).toBe('PENDING');
     expect(drawn.event.id).toBe('evt-test-adventure');
     expect(drawn.event.choices).toEqual([{ index: 0, text: '收下奖励', available: true }]);
-    expect((await prisma.student.findUniqueOrThrow({ where: { id: studentId } })).stamina).toBe(1);
+    expect(await staminaOf(captain)).toBe(1);
+    expect(await staminaOf(second)).toBe(1);
+    expect(await staminaOf(third)).toBe(1);
 
     const result = await chooseAdventure(userId, drawn.id, { optionIndex: 0 }, new Date(TEST_NOW.getTime() + 60_000));
     expect(result.completed).toBe(true);
     expect(result.adventure.results[0]).toMatchObject({ outcomeType: 'fixed' });
     expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).money).toBe(35);
-    expect((await prisma.student.findUniqueOrThrow({ where: { id: studentId } })).mindset).toBe(3);
-    expect((await prisma.student.findUniqueOrThrow({ where: { id: studentId } })).counters).toMatchObject({
+    const captainRow = await prisma.student.findUniqueOrThrow({ where: { id: captain } });
+    expect(captainRow.mindset).toBe(3);
+    expect(captainRow.counters).toMatchObject({
       adventureBuffs: [{ target: 'next_training', duration: 1 }],
     });
+    // 非对决事件只有队长（行动者）吃奖励，队友属性不变
+    expect((await prisma.student.findUniqueOrThrow({ where: { id: second } })).mindset).toBe(2);
+    expect((await prisma.student.findUniqueOrThrow({ where: { id: third } })).mindset).toBe(2);
+  });
+
+  it('rejects a draw roster that is not three distinct students', async () => {
+    const userId = await createUser();
+    const roster = await createRoster(userId);
+    await expect(drawAdventure(userId, [roster[0], roster[1]], 1, TEST_NOW)).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+    });
+    await expect(drawAdventure(userId, [roster[0], roster[0], roster[1]], 1, TEST_NOW)).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+    });
+    for (const member of roster) expect(await staminaOf(member)).toBe(2);
+  });
+
+  it('fails the whole draw when any teammate lacks stamina', async () => {
+    const userId = await createUser();
+    const roster = await createRoster(userId);
+    await prisma.student.update({ where: { id: roster[2] }, data: { stamina: 0 } });
+    await expect(drawAdventure(userId, roster, 1, TEST_NOW)).rejects.toMatchObject({
+      code: 'INSUFFICIENT_RESOURCE',
+    });
+    expect(await staminaOf(roster[0])).toBe(2);
+    expect(await staminaOf(roster[1])).toBe(2);
+    expect(await prisma.adventureLog.count({ where: { userId } })).toBe(0);
   });
 
   it('settles a scalar check with the student and talent-adjusted score', async () => {
     const userId = await createUser(0, 0);
-    const studentId = await createStudent(userId);
+    const roster = await createRoster(userId);
     const log = await prisma.adventureLog.create({
-      data: { userId, studentId, eventId: 'evt-test-check', tier: 2, seed: 7, choices: [], results: [] },
+      data: { userId, studentId: roster[0], studentIds: roster, eventId: 'evt-test-check', tier: 2, seed: 7, choices: [], results: [] },
     });
 
     const result = await chooseAdventure(userId, log.id, { optionIndex: 0 }, TEST_NOW);
@@ -157,37 +201,37 @@ describe('M3 adventure API service', () => {
 
   it('supports intel activation, preview, avoid without stamina, and accept with stamina', async () => {
     const userId = await createUser();
-    const studentId = await createStudent(userId);
+    const roster = await createRoster(userId);
     await prisma.userItem.create({ data: { userId, itemId: 'intel-slip', quantity: 1 } });
     await useItem(userId, { itemId: 'intel-slip' });
 
-    const preview = await drawAdventure(userId, studentId, 1, TEST_NOW);
+    const preview = await drawAdventure(userId, roster, 1, TEST_NOW);
     expect(preview.preview).toBe(true);
     expect(preview.event.choices).toBeNull();
-    expect((await prisma.student.findUniqueOrThrow({ where: { id: studentId } })).stamina).toBe(2);
+    for (const member of roster) expect(await staminaOf(member)).toBe(2);
 
     const avoided = await chooseAdventure(userId, preview.id, { action: 'avoid' }, TEST_NOW);
     expect(avoided.completed).toBe(true);
     expect(avoided.adventure.results[0]).toEqual({ status: 'AVOIDED' });
-    expect((await prisma.student.findUniqueOrThrow({ where: { id: studentId } })).stamina).toBe(2);
+    for (const member of roster) expect(await staminaOf(member)).toBe(2);
 
     await prisma.userItem.create({ data: { userId, itemId: 'intel-slip', quantity: 1 } });
     await useItem(userId, { itemId: 'intel-slip' });
-    const secondPreview = await drawAdventure(userId, studentId, 1, TEST_NOW);
+    const secondPreview = await drawAdventure(userId, roster, 1, TEST_NOW);
     const accepted = await chooseAdventure(userId, secondPreview.id, { action: 'accept' }, TEST_NOW);
     expect(accepted.completed).toBe(false);
     expect(accepted.adventure.event.choices).toEqual([{ index: 0, text: '收下奖励', available: true }]);
-    expect((await prisma.student.findUniqueOrThrow({ where: { id: studentId } })).stamina).toBe(1);
+    for (const member of roster) expect(await staminaOf(member)).toBe(1);
     await chooseAdventure(userId, secondPreview.id, { optionIndex: 0 }, TEST_NOW);
   });
 
   it('blocks a second draw while pending and exposes only owner logs', async () => {
     const userId = await createUser();
     const otherUserId = await createUser();
-    const studentId = await createStudent(userId);
-    const drawn = await drawAdventure(userId, studentId, 1, TEST_NOW);
+    const roster = await createRoster(userId);
+    const drawn = await drawAdventure(userId, roster, 1, TEST_NOW);
 
-    await expect(drawAdventure(userId, studentId, 1)).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
+    await expect(drawAdventure(userId, roster, 1)).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
     await expect(listAdventureLogs(otherUserId)).resolves.toEqual([]);
     await expect(chooseAdventure(otherUserId, drawn.id, { optionIndex: 0 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
@@ -198,13 +242,13 @@ describe('M3 adventure API service', () => {
       .post('/api/auth/register')
       .send({ username, password: 'pw-123456' });
     const session = unwrapOk<{ accessToken: string; me: { id: number } }>(registration);
-    const studentId = await createStudent(session.me.id);
+    const roster = await createRoster(session.me.id);
     const headers = { Authorization: `Bearer ${session.accessToken}` };
 
     const drawn = await request(app)
       .post('/api/adventures/draw')
       .set(headers)
-      .send({ studentId, tier: 1 });
+      .send({ roster, tier: 1 });
     expect(drawn.status).toBe(200);
     const adventure = unwrapOk<AdventureLogView>(drawn);
     const chosen = await request(app)

@@ -39,14 +39,14 @@ fade(cur)   = (1 − cur/100)^2                          // 收益递减因子
 - 种子派生：
 
 ```
-baseSeed = fnv1a32(`${userId}:${studentId}:${contestKey}:${serverNonce}`)
+baseSeed = fnv1a32(`${userId}:${contestKey}:${serverNonce}`)
 contestKey = story:cspj:4:ng0 | duel:{duelId} | pvp:{tournamentId}:{round}:{matchId}
 serverNonce = contest_records 表自增序号（防同参数重放得到相同结果）
 子流 = mulberry32(fnv1a32(`${hex(baseSeed)}:${label}`))   // label 见下
 ```
 
-- 子流标签（互不串扰，便于审计定位）：`order`（选题顺序 tiebreak）、`noise`（用时噪声）、`judge`（判定）、`misc`（特性/杂项）、`npc:i`（第 i 个 NPC 的全部随机）。
-- **审计回放**：战报存有 `seed`、`rngVersion` 与输入快照（题面实例、学员快照、NPC 参数），服务端可用同一函数序列逐位复现整场比赛。任何引擎改动若影响已存战报的可回放性，必须新增 `engineVersion` 并保留旧实现。
+- 子流标签（互不串扰，便于审计定位）：`order`（选题顺序 tiebreak）、`noise`（用时噪声）、`judge`（判定）、`misc`（特性/杂项）、`npc:teamIndex:memberIndex`（指定 NPC 队伍成员的全部随机）。
+- **审计回放**：战报存有 `seed`、`rngVersion` 与输入快照（题面实例、队伍成员快照、NPC 参数），服务端可用同一函数序列逐位复现整场比赛。任何引擎改动若影响已存战报的可回放性，必须新增 `engineVersion` 并保留旧实现。
 
 ---
 
@@ -60,14 +60,14 @@ serverNonce = contest_records 表自增序号（防同参数重放得到相同�
 1. 总纲 §8.1 明示「即时结算，逐题模拟」，解析式与之天然对应；
 2. 分钟 tick 需要 数百次/场 的 RNG 决策与状态分支，平衡调参困难、战报冗长不可读；
 3. 解析式把随机性集中在少数关键掷点（噪声、判定、特性），种子回放短小可审计；
-4. 计算量 O(题数 × 提交次数 × 选手数)，40 人 NPC 池 ×4 题毫秒级完成。
+4. 计算量 O(题数 × 提交次数 × 队员数)，NPC 队伍数 × 每队人数 × 题数在毫秒级完成。
 
-时间仍是硬约束资源：比赛有总时长 `duration_min`（仿真赛程时长，结算瞬时完成，不代表现实等待），选手在时长内按顺序攻题。
+时间仍是硬约束资源：比赛有总时长 `duration_min`（仿真赛程时长，结算瞬时完成，不代表现实等待），每名队员在各自独立时钟内按顺序攻题。
 
 ### 3.2 输入数据结构
 
 ```ts
-interface StudentSnapshot {          // 参赛学员快照（结算前冻结）
+interface ParticipantSnapshot {       // 参赛队员快照（结算前冻结）
   studentId: string;
   ds: number; dp: number; math: number; graph: number; greedy: number; string: number;
   code: number; thinking: number;
@@ -75,6 +75,13 @@ interface StudentSnapshot {          // 参赛学员快照（结算前冻结）
   focusCap: number;                   // 专注上限
   energy: number;                     // 入赛精力（≤ energy_max）
   traits: TraitInstance[];            // 天赋不在本引擎内生效，仅存档用
+}
+
+interface ContestTeam {
+  teamId: string;
+  side: 'HOME' | 'NPC';               // teams[0] 为玩家 HOME 队，其余为 NPC 队
+  userId: number | null;
+  members: ParticipantSnapshot[];     // 3~4 名；同场所有队伍人数相同
 }
 
 interface ProblemInstance {          // 由 problems.yaml 模板实例化（含 NG+ 变换、特性掷点结果）
@@ -94,22 +101,26 @@ interface ProblemInstance {          // 由 problems.yaml 模板实例化（含 
 interface RankedContestInput {
   kind: 'story';
   stageRef: { chapter: ChapterId; stageIndex: number; ngPlusLayer: number };
-  student: StudentSnapshot;
+  teams: ContestTeam[];               // [0] 玩家 HOME 队；[1..] NPC 队
   problems: ProblemInstance[];
   durationMin: number;
-  npcPoolParam: { size: number; meanLevel: number; spread: number };
+  npcPoolParam?: { size: number; meanLevel: number; spread: number }; // size=NPC 队伍数
   firstClearAvailable: boolean;
 }
 ```
 
+- `teams` 是完整的参赛队伍快照：玩家队固定为 `teams[0]`，其余队伍均为 NPC；每队成员数为 3~4 且同场一致。
+- 每名 `ParticipantSnapshot` 独立运行三缺口解题流程，拥有独立时钟、精力、心态与选题状态；队内不同成员可以随机选到同一道题并分别尝试。
+- 引擎先生成每名队员的时间线，再按题聚合为队伍结果；同一道题只计入队内最好的一份成绩，不能重复计分。
+
 ### 3.3 三缺口耗时模型
 
-对每道题、每名选手计算三个缺口：
+对每道题、每名队员独立计算三个缺口：
 
 ```
-gapDim   = reqD − student[dim]
-gapThink = reqM − student.thinking
-gapCode  = reqC − student.code           // 正值 = 学员不足；负值 = 学员溢出
+gapDim   = reqD − participant[dim]
+gapThink = reqM − participant.thinking
+gapCode  = reqC − participant.code       // 正值 = 学员不足；负值 = 学员溢出
 ```
 
 三个居中 sigmoid 乘数（常数见表）：
@@ -187,7 +198,7 @@ energy = max(0, energy − energyCost)                     // 允许恰好打到
 #### 3.6.1 AC 基础概率（思维 + 六维决定「能不能想出来」）
 
 ```
-margin = 8 + (student[dim] − reqD) + (student.thinking − reqM)
+margin = 8 + (participant[dim] − reqD) + (participant.thinking − reqM)
 Pac    = σ(0.15 × margin)
 ```
 
@@ -262,54 +273,80 @@ fail():   // WA 与判题 TLE 共用失败处理，仅 flavor 与个别 hook 不
   - `partial_override: none`（如 SPJ、大数据范围）或 `trap`（部分分陷阱）→ 0 分；
   - 其余未尝试或投入不足 → 0 分。
 
-### 3.7 AI 选题策略（含玩家学员，统一规则）
+### 3.7 AI 选题策略（每名队员独立，统一规则）
 
 ```
-每轮从「未尝试 且 energy ≥ Eneed」的题目中选优先级最高者：
+每名队员每轮从自己的「未尝试 且 energy ≥ Eneed」题目中按优先级随机选题：
 priority(p) = p.score / tEst(p, 当前 focus)
-并列时取 instanceId 字典序小者（保证确定性）。
+order 子流可对优先级施加随机扰动；队内不共享已尝试集合，允许撞题。
 ```
 
 - 选题本身不消耗时间（开场读题并入第一题用时）。
-- 被 SKIP_ENERGY 跳过的题仍留在候选集，精力不会回升（场内无回复），故自然形成「由易到难再回头」的行为。
-- 该贪心对所有选手一致，保证玩家与 NPC 公平。
+- 被 SKIP_ENERGY 跳过的题仍留在该队员的候选集，精力不会回升（场内无回复），故自然形成「由易到难再回头」的行为。
+- 所有队员使用同一策略与随机规则，玩家队与 NPC 队公平；同一队内成员各自选题，互不阻止对方尝试同题。
 
 ### 3.8 完整伪代码
 
 ```ts
 function simulateRankedContest(input: RankedContestInput, seed: u32): ContestReport {
   const rng = streams(seed);                          // §0.4 子流
-  const npcs  = input.npcPoolParam.map((p,i) => genNpc(p, i, rng.stream(`npc:${i}`)));
-  const all   = [input.student, ...npcs];
-  const results = all.map(s => simulateContestant(s, input.problems, input.durationMin,
-                                                  rng.stream('order'), rng));
-  const ranking = rank(results);                      // §3.11
-  return settle(input, results, ranking);             // §3.12–3.14
+  const timelines = input.teams.flatMap((team, teamIndex) =>
+    team.members.map((member, memberIndex) =>
+      simulateParticipant(member, input.problems, input.durationMin,
+                          rng.stream(`member:${teamIndex}:${memberIndex}`)),
+    ),
+  );
+
+  const teamResults: TeamResult[] = [];
+  let offset = 0;
+  for (const team of input.teams) {
+    teamResults.push(aggregateTeam(timelines.slice(offset, offset + team.members.length)));
+    offset += team.members.length;
+  }
+  const ranking = rankTeams(teamResults);             // score desc → penalty asc → teamIndex asc
+  return settle(input, timelines, teamResults, ranking); // §3.11–3.14
 }
 
-function simulateContestant(stu, probs, durationMin, orderRng, rng): ContestantResult {
-  let clock = durationMin, focus = 0, energy = stu.energy, mindset = stu.mindset;
+function simulateParticipant(participant, probs, durationMin, memberRng): ParticipantResult {
+  let clock = durationMin, focus = 0;
+  let energy = participant.energy, mindset = participant.mindset;
+  const resolved = new Set<string>();          // 每名队员独立；队内不共享
   const timeline: AttemptRecord[] = [];
   const remaining = () => probs.filter(p => !resolved.has(p.instanceId));
 
   while (clock > 0 && remaining().length > 0) {
-    const affordable = remaining().filter(p => energy >= eneed(p, stu));
+    const affordable = remaining().filter(p => energy >= eneed(p, participant));
     if (affordable.length === 0) {
       for (const p of remaining()) timeline.push(skipEnergyRecord(p));  // 各记弃题 −3 心态
       break;
     }
-    const p = argmaxByPriority(affordable, stu, focus, orderRng);
-    const r = resolveProblem(stu, p, clock, focus, energy, mindset, rng);
+    const p = chooseByPriorityAndRandomness(affordable, participant, focus, memberRng);
+    const r = resolveProblem(participant, p, clock, focus, energy, mindset, memberRng);
     apply(r): clock -= r.timeSpentMin; energy -= r.energyCost;
-              focus  = updateFocus(focus, r, mindset, stu.focusCap);
+              focus  = updateFocus(focus, r, mindset, participant.focusCap);
               mindset = clamp(mindset + r.mindsetDelta, -10, 10);
-              resolved.add(p.instanceId);
+              resolved.add(p.instanceId);       // 仅该队员的集合；其他队员可再次选择 p
     timeline.push(r);
   }
   return { timeline, totals, mindsetEnd: mindset };
 }
 
-function resolveProblem(stu, p, clockRemain, focus, energy, mindset, rng): AttemptRecord {
+function aggregateTeam(timelines: ParticipantTimeline[]): TeamResult {
+  const bestByProblem = new Map<string, TeamAttemptCandidate>();
+  timelines.forEach((timeline, memberIndex) => {
+    for (const attempt of timeline.attempts) {
+      const candidate = toTeamAttemptCandidate(attempt, memberIndex);
+      const incumbent = bestByProblem.get(attempt.problemInstanceId);
+      if (!incumbent || isBetter(candidate, incumbent)) bestByProblem.set(attempt.problemInstanceId, candidate);
+    }
+  });
+  return {
+    totalScore: sum([...bestByProblem.values()].map(a => a.scoreAwarded)),
+    rankingPenaltyMin: sum([...bestByProblem.values()].filter(a => a.accepted).map(a => a.minutesUsed)),
+  };
+}
+
+function resolveProblem(participant, p, clockRemain, focus, energy, mindset, rng): AttemptRecord {
   // 三缺口 → tEst → 噪声 → §3.6.2 提交流水线；返回 verdict ∈ {AC, UNFINISHED}
   // 及 timeSpentMin / energyCost / scoreAwarded / focusBefore/After / mindsetDelta / submissions
 }
@@ -341,8 +378,8 @@ function updateFocus(focus, r, mindset, cap): number {
 | `condition` | null/first_problem/anti_ak | hook 的条件包装 |
 
 条件语义：
-- `first_problem`：仅对该选手**本场尝试的第一题**生效；
-- `anti_ak`：仅当该题是该选手**最后一块拼图**（其余题均已 AC）时生效——玩家与 NPC 同受影响，用于拉开满分线。
+- `first_problem`：仅对该队员**本场尝试的第一题**生效；
+- `anti_ak`：仅当该题是该队员**最后一块拼图**（其余题均已 AC）时生效——玩家队与 NPC 队同受影响，用于拉开满分线。
 
 映射实例（完整表以 problems.yaml 为准）：
 
@@ -364,44 +401,51 @@ function updateFocus(focus, r, mindset, cap): number {
 | miracle-easy 灵光乍现 | colorful | condition:first_problem → time_k_mul:0.75, ac_prob_add:+0.25 |
 | chaos-domain 概率世界 | colorful | prob_amplify:0.5（P←P+0.5(P−0.5)，作用于一切判定概率）, noise_sigma_add:+0.10 |
 
-### 3.10 NPC 选手池生成
+### 3.10 NPC 队伍池生成
 
 目标：同场排名有意义——分布连续、头部尾部都存在、与玩家用**同一套引擎**结算（绝不为 NPC 单开简化公式）。
 
+- `stages.yaml` 的 `npc_pool.size` 表示 **NPC 队伍数**，不是 NPC 成员数；玩家队之外生成 `size` 支 NPC 队伍。
+- 每支 NPC 队伍的成员数严格等于该场 `roster_size`（3~4），并与玩家队人数相同；`mean_level` / `spread` 作用于每名 NPC 成员。
+- 生成完毕后，NPC 队伍与玩家队一起写入 `RankedContestInput.teams`：`teams[0]` 是玩家 HOME 队，其余为 `side: 'NPC'` 的队伍。
+
 ```
-level_i   = clamp(round(N(mean_level, spread)), 1, 100)
-dominant  = 均匀随机六维之一
-每个六维 a = clamp(round(level_i + N(0,3) + (a==dominant ? 5 : 0)), 1, 100)
-thinking  = clamp(round(level_i + N(0,3)), 1, 100)
-code      = clamp(round(level_i + N(0,3)), 1, 100)
-mindset   = clamp(round(N(+1, 3)), -5, 10)
-focus_cap = clamp(round(N(20 + 0.15·level_i, 5)), 5, 60)
-energy    = clamp(round(N(70, 8)), 40, 100)
-特性附着   P = clamp(0.08 + 0.002×level_i, 0.08, 0.30)；严重度按 §4.4 同一套 W_s 权重滚
-姓名      从 NPC 名池按 seed 抽取（名池属 NPC 模块，另文定义）
+for teamIndex in 1..npcPoolParam.size:
+  for memberIndex in 0..roster_size-1:
+    level_{teamIndex,memberIndex} = clamp(round(N(mean_level, spread)), 1, 100)
+    dominant = 均匀随机六维之一
+    每个六维 a = clamp(round(level + N(0,3) + (a==dominant ? 5 : 0)), 1, 100)
+    thinking = clamp(round(level + N(0,3)), 1, 100)
+    code = clamp(round(level + N(0,3)), 1, 100)
+    mindset = clamp(round(N(+1, 3)), -5, 10)
+    focus_cap = clamp(round(N(20 + 0.15·level, 5)), 5, 60)
+    energy = clamp(round(N(70, 8)), 40, 100)
+    特性附着 P = clamp(0.08 + 0.002×level, 0.08, 0.30)；严重度按 §4.4 同一套 W_s 权重滚
+    姓名 = 从 NPC 名池按 seed 抽取（名池属 NPC 模块，另文定义）
 ```
 
-- `mean_level` 按 §6.2 各章通关锚点下调 2–5 点设定（见 stages.yaml），保证推荐练度下「进前 8 通关」可达、「夺冠」需要超出锚点的培养。
-- NPC 随机全部来自子流 `npc:i`，审计时可单独重放某一名对手。
+- `mean_level` 按 §6.2 各章通关锚点下调 2–5 点设定（见 stages.yaml），保证推荐练度下「进前 8 队通关」可达、「夺冠」需要超出锚点的培养。
+- NPC 随机按 `npc:teamIndex:memberIndex` 派生子流，审计时可单独重放某支队伍中的某名成员。
 
-### 3.11 结算：得分、排名、奖励发放顺序
+### 3.11 结算：队伍得分、排名、奖励发放顺序
 
-**排名键**（ACM 习惯）：总分 desc → 罚时 asc → 场内稳定序号 asc。
-罚时 pen = Σ(已 AC 题目的 investedMin)（其中已含各次 20min 罚时）。
+**队伍计分**：同一道题只取队内最好的一份结果（得分高 → 用时短 → 队内 `memberIndex` 小）；队伍总分按各题最佳结果累加。只有最佳结果为 AC 时，该题的 `investedMin` 才计入队伍罚时。
 
-**通关判定**：`rank ≤ 8`——固定前 8 名，与 NPC 池规模解耦（与名次奖金门槛一致；终裁记录见集成审查）。
+**排名键**（ACM 习惯）：队伍总分 desc → 队伍罚时 asc → `teamIndex` asc。榜单每行对应一支队伍：`teams[0]` 为玩家 HOME 队，其余为 NPC 队。
+
+**通关判定**：玩家队 `teams[0]` 的 `rank ≤ 8`——固定前 8 支队伍，与 NPC 队伍数解耦（与名次奖金门槛一致；终裁记录见集成审查）。
 
 **发奖顺序**（严格按序执行，任一步失败不阻断后续，全部落账进战报）：
 
-1. 公示比分与名次；
-2. 首通判定：`firstClearAvailable && pass` → 发放首通奖（money = M[chapter]×S[关位] + 道具池抽取 + 正赛的里程碑 U[chapter]），标记该关已首通；
-3. 非首通的重复通关名次奖金（仅剧情层 NG+ 与二刷）：money = M[chapter] × 名次系数（冠军 0.3 / 亚军 0.2 / 第 3–8 名 0.1，其余 0）；需 pass 才有奖金；
+1. 公示队伍比分与名次；
+2. 首通判定：`firstClearAvailable && playerTeamRank <= 8` → 发放首通奖（money = M[chapter]×S[关位] + 道具池抽取 + 正赛的里程碑 U[chapter]），标记该关已首通；
+3. 非首通的重复通关名次奖金（仅剧情层 NG+ 与二刷）：按**玩家队名次**发放，money = M[chapter] × 名次系数（冠军 0.3 / 亚军 0.2 / 第 3–8 名 0.1，其余 0）；需玩家队通过才有奖金；
 4. 微量实战成长结算（§3.12）；
-5. 心态持久化（赛中变动 + 名次修正）；
-6. 精力扣账（赛后随现实时间恢复，恢复速率公式归养成系统文档）；
+5. 各队员心态持久化（赛中变动 + 名次修正）；
+6. 各出战队员精力扣账（赛后随现实时间恢复，恢复速率公式归养成系统文档）；
 7. 战报落库（contest_records）。
 
-体力消耗：剧情参赛每关固定 **stamina −2**（§4 授权"参赛按活动扣减"，此处取值 2，待 economy 校准确认）。PVP 由服务器定时代打，不扣玩家体力；历练对决按事件档 −1~−3。
+体力消耗按 `progression.md` §1.4：剧情参赛由**每名出战队员各自**扣减，第 1–4 章每人 `stamina −1`，第 5–8 章每人 `stamina −2`。PVP 由服务器定时代打，不扣玩家体力；历练对决按事件档 −1~−3。
 
 ### 3.12 微量实战成长（不可刷）
 
@@ -437,31 +481,23 @@ interface ContestReport {
   rngVersion: string;                 // 'mulberry32-v1'
   seed: string;                       // hex 种子
   kind: 'story' | 'custom';
-  userId: string;
-  studentId: string;
   stageRef?: { chapter: ChapterId; stageIndex: number; ngPlusLayer: number };
-  config: {                           // 输入快照，审计回放的完整依据
-    durationMin: number;
-    problems: ProblemInstance[];
-    npcPoolParam: { size: number; meanLevel: number; spread: number };
-    studentSnapshot: StudentSnapshot;
-  };
-  timeline: AttemptRecord[];
-  totals: {
-    score: number; solvedCount: number; attemptCount: number;
-    waCount: number; tleJudgeCount: number; skipEnergyCount: number;
-    totalTimeMin: number; penaltyMin: number;
-  };
-  ranking: RankRow[];
-  playerRank: number;
-  playerPercentile: number;           // (rank−1)/(N−1)
-  pass: boolean;
+  inputSnapshot: RankedContestInput;  // 含 teams、题目、NPC 队伍参数
+  questions: ProblemInstance[];
+  teams: ContestTeam[];               // 参与排名的队伍快照，teams[0] 为玩家队
+  participants: ParticipantTimeline[]; // 按 teams.flatMap(team => team.members) 排列
+  standings: RankingStanding[];       // 每支队伍一行，含 teamIndex/总分/rank
+  pass: boolean;                      // 等价于玩家队 standings.rank <= 8
   rewards: RewardLine[];              // 按 §3.11 发放顺序排列
   growth: GrowthDelta[];
-  mindsetStart: number; mindsetEnd: number;
-  energyStart: number; energyEnd: number;
-  focusTimeline: number[];            // 每题结算后的专注值
   createdAt: string;                  // ISO8601
+}
+
+interface ParticipantTimeline {
+  participant: ParticipantSnapshot;
+  attempts: AttemptRecord[];
+  totalEnergySpent: number;
+  finalMindset: number;
 }
 
 interface AttemptRecord {
@@ -477,10 +513,10 @@ interface AttemptRecord {
   notes: string[];                    // 特性触发、弃题原因等 flavor
 }
 
-interface RankRow {
-  contestantIndex: number;            // 0 = 玩家
-  name: string; isPlayer: boolean;
-  score: number; solvedCount: number; penaltyMin: number;
+interface RankingStanding {
+  teamIndex: number;                 // 0 = 玩家 HOME 队
+  totalScore: number;
+  rank: number;
 }
 
 type RewardLine =
@@ -502,21 +538,29 @@ interface GrowthDelta {
 
 ### 4.1 总流程
 
+双方输入均为 `{ members: ParticipantSnapshot[] }`，两侧人数相同且 `N = 3~4`。准备阶段锁定双方阵容，并为普通轮次准备每名成员的一道题（可用预制题替换己方出题轮次）。普通局数固定为 **`2N`**，每名成员恰好出题一局、答题一局。
+
+对第 `r` 局（1-based）令 `k = floor((r−1)/2)`，rotation 为：
+
+| 局别 | 出题方 | 答题方 |
+|---|---|---|
+| 奇数局 `r=2k+1` | `HOME[k mod N]` | `AWAY[(k+1) mod N]` |
+| 偶数局 `r=2k+2` | `AWAY[k mod N]` | `HOME[(k+1) mod N]` |
+
+以 `N=3` 为例，普通 6 局依次为：
+
 ```
-准备阶段：A、B 各自临场生成 2 题（可用预制题替换己方坐庄局题），锁定阵容
-   │
-   ├─ 第1局  A 坐庄 pA1 ──► B 作答 ──┐
-   ├─ 第2局  B 坐庄 pB1 ──► A 作答   │ 每局：解出 → 答题方 +1
-   ├─ 第3局  A 坐庄 pA2 ──► B 作答   │       未解出 → 出题方 +1
-   ├─ 第4局  B 坐庄 pB2 ──► A 作答 ──┘       （quality_scoring 启用时 +2）
-   │
-   └─ 4 局后比分？
-        ├─ 不平 → 胜负分明，结算
-        └─ 平局 → tiebreak 分流（§4.6）
+第1局 HOME[0] 出题 → AWAY[1] 答题    第2局 AWAY[0] 出题 → HOME[1] 答题
+第3局 HOME[1] 出题 → AWAY[2] 答题    第4局 AWAY[1] 出题 → HOME[2] 答题
+第5局 HOME[2] 出题 → AWAY[0] 答题    第6局 AWAY[2] 出题 → HOME[0] 答题
 ```
 
-轮次常量表：`[{setter:'A',answerer:'B',idx:1}, {setter:'B',answerer:'A',idx:1},
-{setter:'A',answerer:'B',idx:2}, {setter:'B',answerer:'A',idx:2}]`
+`N=4` 时继续按同一公式展开至第 8 局。每名成员的精力、心态独立结算；每局解出 → 答题方 +1，未解出 → 出题方 +1（`quality_scoring` 启用时未解出 +2）。普通 `2N` 局后：
+
+```
+不平 → 胜负分明，结算
+平局 → tiebreak 分流（§4.6）
+```
 
 ### 4.2 计分与【考察出题质量】
 
@@ -528,7 +572,7 @@ interface GrowthDelta {
 
 ### 4.3 出题端：出题能力 → 题目数值映射
 
-出题学员的 `setting`（记 q）与其主考六维值 V_dom 决定所生成题目：
+出题队员的 `setting`（记 q）与其主考六维值 V_dom 决定所生成题目：
 
 ```
 主考六维 v：出题者指定；系统自动时取其六维最大者（并列 → 种子随机取一）
@@ -557,7 +601,7 @@ b = [red:40, yellow:30, blue:18, purple:8, black:3, colorful:1]   归一化后 r
 |---|---|---|
 | 1 | 无专注积累 | `focus` 固定 0（S≡1.0），`updateFocus` 短路 |
 | 2 | 时钟换成局限时 | `T_round = timeLimitMin × 1.25`（生成式见 §4.3），超时即 UNFINISHED=未解出 |
-| 3 | 能力归属 | 三缺口用的六维/thinking/code 取**答题学员**；Eneed 从答题者 energy 中扣 |
+| 3 | 能力归属 | 三缺口用的六维/thinking/code 取**答题队员**；Eneed 从该队员 energy 中扣 |
 | 4 | 心态归属 | 判定的心态变化记在答题者身上；出题者心态不受该局影响 |
 | 5 | 开局能量不足 | 答题者 `energy < Eneed` → 直接判负该局（记 forfeit_energy，对方得分），不出伪流程 |
 
@@ -565,32 +609,35 @@ b = [red:40, yellow:30, blue:18, purple:8, black:3, colorful:1]   归一化后 r
 
 ### 4.5 对决中的精力
 
-- 答题消耗从答题学员的 `energy` 实时扣除（公式同 §3.5），跨局累计；历练事件随后可能用剩余精力做文章（by_energy）。
-- PVP 自动对决同样扣除（赛后照常离线恢复），防止无脑连战。
+- 答题消耗从每名答题队员自己的 `energy` 实时扣除（公式同 §3.5），跨该队员的出场局累计；历练事件随后可能用各队员剩余精力做文章（by_energy）。
+- PVP 自动对决同样按成员独立扣除（赛后照常离线恢复），防止无脑连战。
 
 ### 4.6 平局 tiebreak 分流（枚举 `tiebreak`）
 
-4 局比分配平后按对决配置的 `tiebreak` 字段分流：
+普通 `2N` 局比分配平后按对决配置的 `tiebreak` 字段分流：
 
 ```ts
-type TiebreakMode = 'sudden_death' | 'by_energy' | 'by_quality' | 'friendly';
-// PVP 固定 sudden_death；历练事件各自声明（events.yaml）
+type TiebreakMode = 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';
+// PVP 固定 SUDDEN_DEATH；历练事件各自声明（events.yaml）
 ```
 
-- **sudden_death（PVP 加赛·突然死亡）**
-  1. 第 5 局起每两局为一组：组内先 B 答新 A 题、再 A 答新 B 题（新题重新走 §4.3 临场生成；预制题已在准备阶段锁定，不得追加携带）。
-  2. 组内**恰有一方未解出 → 该方立即落败**（先失分者负）；双方同解出或同未解出 → 进下一组。
-  3. 连续 3 组未分出 → 终审链：比较双方全场所用题目 quality 总和（高者胜）→ 再同比较全场罚时合计（低者胜）→ 仍平 → 以 `seed` 奇偶裁决并在战报 `tiebreak.trail` 明示（可审计、非暗箱）。
-- **by_energy（比剩余精力）**：比较两名**答题侧**学员 4 局后的剩余 `energy`，高者胜；相等 → 按友好平局收场（见 friendly）。典型事件：R1「区域赛热身对抗」。
-- **by_quality（比出题质量）**：比较双方各自所出题目 `quality` 总和，高者胜；相等 → 友好收场。典型事件：OJ 出题委托类评审视角。
-- **friendly（友谊收场）**：不判胜负，双方各得小额 consolation money（金额由事件定义）。典型事件：G2「路人学员切磋」。
+所有比较均按**全队合计**：`ENERGY` 为该侧全部成员当前剩余精力之和，`QUALITY` 为该侧全部成员所出题质量之和，罚时为该侧全部答题局罚时之和。
+
+- **SUDDEN_DEATH（PVP 加赛·突然死亡）**
+  1. 普通局结束后，从 `r=2N+1` 起继续使用 §4.1 的 rotation；每一组按连续两局推进，出题/答题成员索引仍由 `k=floor((r−1)/2)` 公式决定。
+  2. 加赛题必须为 `source: GENERATED`，不得追加或携带预制题；每名答题成员仍独立运行解题流程。
+  3. 组内**恰有一方未解出 → 该方立即落败**（先失分者负）；双方同解出或同未解出 → 进下一组。
+  4. 连续 3 组未分出 → 终审链：比较双方全队所用题目 quality 总和（高者胜）→ 再比较双方全队罚时合计（低者胜）→ 仍平 → 以 `seed` 奇偶裁决并在战报 `tiebreakTrail` 明示（可审计、非暗箱）。
+- **ENERGY（比剩余精力）**：比较双方 `2N` 局后的全队剩余 `energy` 合计，高者胜；相等 → 按友好平局收场（见 FRIENDLY）。典型事件：R1「区域赛热身对抗」。
+- **QUALITY（比出题质量）**：比较双方各成员所出题目 `quality` 总和，高者胜；相等 → 友好收场。典型事件：OJ 出题委托类评审视角。
+- **FRIENDLY（友谊收场）**：不判胜负，双方各得小额 consolation money（金额由事件定义）。典型事件：G2「路人学员切磋」。
 
 ### 4.7 预制题替换规则（题库联动，总纲 §11）
 
-- **携带数量上限：2 道/人**（正好覆盖自己 2 个坐庄局）。
+- **携带数量上限：N 道/队**（N = 3~4，每名成员至多携带一道，正好覆盖该成员的出题局）。
 - **替换时机**：仅存在于**准备阶段**——对决创建后、第 1 局开始前，双方一次性锁定阵容（哪些局用预制题、用哪一道），此后不可更换、不可中途补充。
 - **质量保证机制**：
-  1. 只有**本人题库**中、由本人学员出题行动产出的预制题可携带；
+  1. 只有**本人题库**中、由本人队伍成员出题行动产出的预制题可携带；
   2. 携带上场门槛：`quality ≥ 40`（防摆烂带垃圾题凑数）；
   3. 替换后该局使用库存题的**完整存储数值**（D/M/C/dim/traits/quality 均以入库时定格为准，绝不重掷）——这就是"保证质量"的含义：把不确定的临场生成换成已知的好题；
   4. 同一道预制题在同一届 PVP 赛事内不可重复携带；对决结束后该题打上 `used_for_duel` 标记（不可再次带入对决，但仍可用于专项训练）。
@@ -604,47 +651,47 @@ interface DuelReport {
   engineVersion: string; rngVersion: string; seed: string;
   kind: 'pvp' | 'encounter';                  // PVP 淘汰赛 / 历练遭遇战
   encounterEventId?: string;                  // kind=encounter 时的 events.yaml 事件 id
-  sides: {
-    A: DuelSide;                              // 先手坐庄方
-    B: DuelSide;
-  };
-  qualityScoring: boolean;                    // 【考察出题质量】是否启用
-  tiebreak: TiebreakMode;
-  rounds: DuelRoundRecord[];                  // 4 局 + 可能的加赛局，按时间序
-  scoreAfterEachRound: { a: number; b: number }[];
-  winner: 'A' | 'B' | 'draw';
-  decidedBy: 'regular' | 'sudden_death' | 'by_energy' | 'by_quality' | 'friendly';
+  inputSnapshot: DuelInput;                   // home/away 两侧均为 { members }
+  qualityRuleOn: boolean;                     // 【考察出题质量】是否启用
+  tiebreak?: TiebreakMode;
+  rounds: DuelRoundRecord[];                  // 2N 普通局 + 可能的加赛局，按时间序
+  scores: { home: number; away: number };
+  scoreAfterEachRound: { home: number; away: number }[];
+  winnerSide: 'HOME' | 'AWAY' | 'DRAW';
+  decidedBy?: 'REGULAR' | 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';
   tiebreakTrail?: string[];                   // 终审链逐步记录（§4.6）
   rewards: RewardLine[];                      // 复用 ContestReport 的 RewardLine
   createdAt: string;
 }
 
-interface DuelSide {
-  userId: string;
-  studentSnapshot: StudentSnapshot;           // 含入场 energy/mindset
-  generatedProblems: ProblemInstance[];       // 临场生成题（§4.3 公式输出快照）
-  carriedProblems: CarriedProblemRef[];       // 预制题引用（可为空，≤2）
+interface DuelInput {
+  home: DuelSide;
+  away: DuelSide;
+  questions: ProblemInstance[];               // 前 2N 题覆盖普通局；加赛题必须 GENERATED
+  qualityRuleOn: boolean;
+  tiebreak?: TiebreakMode;
 }
 
-interface CarriedProblemRef {
-  bankProblemId: string;
-  replacedRoundIndex: number;                 // 替换哪个坐庄局（0-based）
-  qualitySnapshot: number;
+interface DuelSide {
+  members: ParticipantSnapshot[];             // N = 3~4，双方人数必须相同
 }
 
 interface DuelRoundRecord {
-  roundIndex: number;                         // 0..3（加赛续编 4,5,…）
-  setterSide: 'A' | 'B'; answererSide: 'A' | 'B';
+  roundNo: number;                            // 1-based；加赛沿 rotation 续编
+  setterSide: 'HOME' | 'AWAY';
+  answererSide: 'HOME' | 'AWAY';
+  setterMemberIndex: number;                  // §4.1 rotation
+  answererMemberIndex: number;                // §4.1 rotation
   problem: ProblemInstance;
-  problemSource: 'generated' | 'carried';
+  problemSource: 'GENERATED' | 'PREMADE';
   roundLimitMin: number;
   solved: boolean;
   forfeitEnergy: boolean;                     // 答题方开局精力不足直接判负
   submissions: number; timeSpentMin: number; penaltyMin: number;
-  energyCost: number;                         // 答题者支出
-  answererMindsetDelta: number;
-  scoreAwardedTo: 'setter' | 'answerer';
-  points: number;                             // 1 或（quality_scoring 且未解出时）2
+  energyCost: number;                         // 答题成员支出
+  answererMindsetDelta: number;               // 仅该成员变化
+  scoreAwardedTo: 'HOME' | 'AWAY';
+  scoreAwarded: number;                       // 1 或（qualityRuleOn 且未解出时）2
   notes: string[];
 }
 ```
@@ -666,14 +713,14 @@ interface DuelRoundRecord {
 | 专注 | Δ=round(0.06×invested×mf)；S(f)=1+0.5f/(f+20)；衰减 ×0.7−1（mindset≤0） |
 | mf | clamp(1+0.01×mindset, 0.2, 2.0) |
 | mindset 范围 | [-10, +10]（权威：student.md §5） |
-| 排名 | score desc → penalty asc → 稳定序；pass = rank ≤ 8 |
-| 名次奖金 | 冠军 0.3 / 亚军 0.2 / 3–8 名 0.1 × M[chapter] |
-| 剧情体力 | −2/关 |
-| NPC | level~N(mean,spread)；dominant +5；mindset~N(50,10)；focus_cap~N(20+0.15L,5) |
+| 排名 | 队伍总分 desc → 队伍罚时 asc → teamIndex asc；玩家队 rank ≤ 8 通过 |
+| 名次奖金 | 按玩家队名次：冠军 0.3 / 亚军 0.2 / 3–8 名 0.1 × M[chapter] |
+| 剧情体力 | 第1–4章每名队员 −1；第5–8章每名队员 −2 |
+| NPC | `npc_pool.size`=队伍数；每队 roster_size 名成员；level~N(mean,spread)；dominant +5；mindset~N(50,10)；focus_cap~N(20+0.15L,5) |
 | 出题端 | D=q±3 / M=0.92q / C=0.85q；quality=0.5q+0.3V_dom+0.2thinking；P_trait=0.10+0.0035q |
 | 严重度权重 | W_s = b_s×(1+0.006q)^s，b=[40,30,18,8,3,1] |
 | 局时限 | T_round = TL_generated × 1.25（clamp 45–160 由生成式保证） |
-| 预制题 | ≤2 道，quality ≥40，准备阶段锁，赛后 used_for_duel |
+| 预制题 | ≤N 道/队（每名成员至多一道），quality ≥40，准备阶段锁，赛后 used_for_duel |
 
 ## 6. 与 GAME-DESIGN.md 的差异备注（待总纲确认）
 

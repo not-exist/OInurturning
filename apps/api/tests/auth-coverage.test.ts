@@ -168,8 +168,13 @@ describe('auth coverage：改密/登出/注销/封禁', () => {
     const tournament = await prisma.pvpTournament.create({
       data: { name: '护栏赛', size: 8, registerEndsAt: new Date('2099-01-02T00:00:00.000Z'), autoStartAt: new Date('2099-01-03T00:00:00.000Z'), prizes: {}, config: {} },
     });
+    // roster 快照按队伍制契约存 ParticipantSnapshot[]（本用例不推进赛程，只需形状正确）
     await prisma.pvpRegistration.create({
-      data: { tournamentId: tournament.id, userId: session.me.id, roster: {} },
+      data: {
+        tournamentId: tournament.id,
+        userId: session.me.id,
+        roster: [1, 2, 3].map((studentId) => ({ side: 'HOME', userId: session.me.id, studentId, displayName: `队员 ${studentId}` })),
+      },
     });
 
     // REGISTERING/RUNNING 期间拒绝注销：PvpMatch 的参赛者 id 是无外键裸 Int，

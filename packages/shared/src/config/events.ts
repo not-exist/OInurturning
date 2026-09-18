@@ -27,10 +27,22 @@ const eventRequirementsSchema = z
   .passthrough();
 export type EventRequirements = z.infer<typeof eventRequirementsSchema>;
 
+/** 历练出题对决参数：局数由 party_size 推导（2N 局，每人出一题、答一题） */
+export const eventDuelSchema = z
+  .object({
+    opponent: z.string().min(1),
+    party_size: z.number().int().min(3).max(4),
+    quality_rule: z.boolean(),
+    tiebreak: z.string().min(1),
+  })
+  .passthrough();
+export type EventDuel = z.infer<typeof eventDuelSchema>;
+
 const eventOutcomeSchema = z
   .object({
     weight: z.number().finite().positive(),
     type: z.enum(EVENT_OUTCOME_TYPES),
+    duel: eventDuelSchema.optional(),
   })
   .passthrough();
 export type EventOutcome = z.infer<typeof eventOutcomeSchema>;
