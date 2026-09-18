@@ -1133,6 +1133,8 @@ export type BattleReplayEvent =
       type: 'QUESTION_START';
       durationMs: number;
       participantName: string;
+      /** 队内成员下标（0-based），前端多面板回放用于路由事件到对应队员面板 */
+      memberIndex?: number;
       questionIndex: number;
       problemInstanceId: string;
       dimension: string;
@@ -1143,6 +1145,8 @@ export type BattleReplayEvent =
       type: 'SUBMISSION';
       durationMs: number;
       participantName: string;
+      /** 队内成员下标（0-based），前端多面板回放用于路由事件到对应队员面板 */
+      memberIndex?: number;
       questionIndex: number;
       attemptNumber: number;
       verdict: ContestVerdict;
@@ -1156,6 +1160,8 @@ export type BattleReplayEvent =
       type: 'QUESTION_RESULT';
       durationMs: number;
       participantName: string;
+      /** 队内成员下标（0-based），前端多面板回放用于路由事件到对应队员面板 */
+      memberIndex?: number;
       questionIndex: number;
       verdict: Exclude<ContestVerdict, 'SKIP'> | 'SKIP';
       timeSpentMin: number;
