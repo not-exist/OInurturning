@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { BattleReplay as BattleReplayData, BattleReplayEvent } from '@oinur/shared';
 
 const SPEEDS = [1, 2, 4, 8] as const;
@@ -77,7 +77,470 @@ export function BattleWaiting({
   );
 }
 
+/** 检测回放事件流是否携带 memberIndex（新格式 → 多面板；旧格式 → 单面板 fallback）。 */
+function hasMemberIndex(replay: BattleReplayData): boolean {
+  return replay.events.some(
+    (event) =>
+      (event.type === 'QUESTION_START' || event.type === 'SUBMISSION' || event.type === 'QUESTION_RESULT') &&
+      event.memberIndex !== undefined,
+  );
+}
+
 export function BattleReplay({
+  replay,
+  onOpenReport,
+  onReturn,
+  onFinished,
+}: {
+  replay: BattleReplayData;
+  onOpenReport?: (recordId: string) => void;
+  onReturn?: () => void;
+  onFinished?: () => void;
+}): JSX.Element {
+  if (replay.format === 'RANKING' && hasMemberIndex(replay)) {
+    return (
+      <RankingParallelReplay
+        replay={replay}
+        onOpenReport={onOpenReport}
+        onReturn={onReturn}
+        onFinished={onFinished}
+      />
+    );
+  }
+  return (
+    <DuelReplay
+      replay={replay}
+      onOpenReport={onOpenReport}
+      onReturn={onReturn}
+      onFinished={onFinished}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 排名赛并行回放
+// ---------------------------------------------------------------------------
+
+interface MemberPanelState {
+  memberIndex: number;
+  displayName: string;
+  currentQuestionIndex: number | null;
+  currentDimension: string | null;
+  currentProblemId: string | null;
+  currentScore: number | null;
+  phase: 'IDLE' | 'THINKING' | 'SUBMITTING' | 'DONE';
+  submissions: { attemptNo: number; verdict: string; timeMin: number; penaltyMin: number }[];
+  questionVerdict: string | null;
+  totalScore: number;
+  energyAfter: number;
+  focusAfter: number;
+  mindsetAfter: number;
+  notes: string[];
+}
+
+function createEmptyMemberState(memberIndex: number, displayName: string): MemberPanelState {
+  return {
+    memberIndex,
+    displayName,
+    currentQuestionIndex: null,
+    currentDimension: null,
+    currentProblemId: null,
+    currentScore: null,
+    phase: 'IDLE',
+    submissions: [],
+    questionVerdict: null,
+    totalScore: 0,
+    energyAfter: 0,
+    focusAfter: 0,
+    mindsetAfter: 0,
+    notes: [],
+  };
+}
+
+/** 按 memberIndex 更新成员面板状态（不可变更新）。 */
+function applyEventToMembers(
+  states: Map<number, MemberPanelState>,
+  event: BattleReplayEvent,
+): Map<number, MemberPanelState> {
+  if (
+    event.type !== 'QUESTION_START' &&
+    event.type !== 'SUBMISSION' &&
+    event.type !== 'QUESTION_RESULT'
+  ) {
+    return states;
+  }
+  const mi = event.memberIndex;
+  if (mi === undefined) return states;
+
+  const existing = states.get(mi);
+  if (existing === undefined) return states;
+
+  const next = new Map(states);
+
+  switch (event.type) {
+    case 'QUESTION_START': {
+      next.set(mi, {
+        ...existing,
+        currentQuestionIndex: event.questionIndex,
+        currentDimension: event.dimension,
+        currentProblemId: event.problemInstanceId,
+        currentScore: event.score,
+        phase: 'THINKING',
+        submissions: [],
+        questionVerdict: null,
+        notes: [],
+      });
+      break;
+    }
+    case 'SUBMISSION': {
+      next.set(mi, {
+        ...existing,
+        phase: 'SUBMITTING',
+        submissions: [
+          ...existing.submissions,
+          {
+            attemptNo: event.attemptNumber,
+            verdict: event.verdict,
+            timeMin: event.submissionTimeMin,
+            penaltyMin: event.penaltyMin,
+          },
+        ],
+      });
+      break;
+    }
+    case 'QUESTION_RESULT': {
+      next.set(mi, {
+        ...existing,
+        phase: 'DONE',
+        questionVerdict: event.verdict,
+        totalScore: event.totalScore,
+        energyAfter: event.energyAfter,
+        focusAfter: event.focusAfter,
+        mindsetAfter: event.mindsetAfter,
+        notes: event.notes,
+      });
+      break;
+    }
+  }
+  return next;
+}
+
+function RankingParallelReplay({
+  replay,
+  onOpenReport,
+  onReturn,
+  onFinished,
+}: {
+  replay: BattleReplayData;
+  onOpenReport?: (recordId: string) => void;
+  onReturn?: () => void;
+  onFinished?: () => void;
+}): JSX.Element {
+  const events = replay.events;
+  const [cursor, setCursor] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [speed, setSpeed] = useState<ReplaySpeed>(1);
+  const [finished, setFinished] = useState(false);
+  const [memberStates, setMemberStates] = useState<Map<number, MemberPanelState>>(new Map());
+
+  const current = events[cursor];
+  const finish = events.at(-1)?.type === 'BATTLE_FINISH' ? events.at(-1) : undefined;
+
+  // 从事件流中收集队员元信息（memberIndex → displayName）。
+  const memberMeta = useMemo(() => {
+    const meta = new Map<number, string>();
+    for (const event of events) {
+      if (
+        (event.type === 'QUESTION_START' || event.type === 'SUBMISSION' || event.type === 'QUESTION_RESULT') &&
+        event.memberIndex !== undefined &&
+        !meta.has(event.memberIndex)
+      ) {
+        meta.set(event.memberIndex, event.participantName);
+      }
+    }
+    return meta;
+  }, [events]);
+
+  // 用 ref 跟踪上一次处理的 cursor，避免重复 apply。
+  const lastProcessedRef = useRef(-1);
+
+  // 重置状态（切换回放时）。
+  useEffect(() => {
+    setCursor(0);
+    setPaused(false);
+    setFinished(false);
+    setMemberStates(new Map());
+    lastProcessedRef.current = -1;
+  }, [replay.recordId]);
+
+  // 初始化成员面板（从 memberMeta 构建初始空状态）。
+  useEffect(() => {
+    if (memberMeta.size === 0) return;
+    setMemberStates((prev) => {
+      if (prev.size > 0) return prev;
+      const initial = new Map<number, MemberPanelState>();
+      for (const [mi, name] of memberMeta) {
+        initial.set(mi, createEmptyMemberState(mi, name));
+      }
+      return initial;
+    });
+  }, [memberMeta]);
+
+  // 处理当前事件：更新对应成员面板。
+  useEffect(() => {
+    if (cursor === lastProcessedRef.current) return;
+    lastProcessedRef.current = cursor;
+    const event = events[cursor];
+    if (event === undefined) return;
+    setMemberStates((prev) => applyEventToMembers(prev, event));
+  }, [cursor, events]);
+
+  // 自动推进游标。
+  useEffect(() => {
+    if (paused || finished || current === undefined) return undefined;
+    const effectiveSpeed = speed * BASE_PLAYBACK_RATE;
+    const duration = Math.max(100, current.durationMs / effectiveSpeed);
+    const timer = window.setTimeout(() => {
+      if (cursor + 1 < events.length) {
+        setCursor((value) => value + 1);
+      } else {
+        setFinished(true);
+      }
+    }, duration);
+    return () => window.clearTimeout(timer);
+  }, [cursor, current, events.length, finished, paused, speed]);
+
+  useEffect(() => {
+    if (finished) onFinished?.();
+  }, [finished, onFinished]);
+
+  const handleSkip = useCallback(() => {
+    // 跳过时一次性处理所有剩余事件，确保成员面板状态完整。
+    for (let i = cursor; i < events.length; i++) {
+      const event = events[i]!;
+      setMemberStates((prev) => applyEventToMembers(prev, event));
+    }
+    setCursor(Math.max(events.length - 1, 0));
+    setFinished(true);
+  }, [cursor, events]);
+
+  if (events.length === 0) {
+    return (
+      <section className="rounded border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+        回放数据为空，无法开始战斗演示。
+      </section>
+    );
+  }
+
+  const progress = finished ? 100 : Math.round(((cursor + 1) / events.length) * 100);
+  const sortedMembers = [...memberStates.values()].sort((a, b) => a.memberIndex - b.memberIndex);
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-5">
+      {/* 顶部标题栏 */}
+      <section className="overflow-hidden rounded border border-neutral-300 bg-white shadow-sm">
+        <div className="border-b bg-neutral-950 px-5 py-5 text-white">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">
+                Ranking Battle · Parallel View
+              </p>
+              <h1 className="mt-1 text-2xl font-semibold">{replay.title}</h1>
+            </div>
+            <span className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300">
+              {finished ? '战斗结束' : paused ? '已暂停' : '战斗进行中'}
+            </span>
+          </div>
+          {current?.type === 'BATTLE_START' && (
+            <p className="mt-4 text-sm text-neutral-300">
+              {current.homeName}
+              {current.awayName === undefined ? '' : ` 对阵 ${current.awayName}`}
+            </p>
+          )}
+        </div>
+
+        <div className="h-1 bg-neutral-200">
+          <div
+            className="h-full bg-blue-600 transition-[width] duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        <div className="p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">
+                {finished
+                  ? 'Final Result'
+                  : `Event ${Math.min(cursor + 1, events.length)} / ${events.length}`}
+              </p>
+              <h2 className="mt-1 text-xl font-semibold">
+                {finished ? '本场战斗完成' : current === undefined ? '准备中…' : '队员并行作战中'}
+              </h2>
+            </div>
+            {!finished && current !== undefined && (
+              <span className="rounded bg-neutral-100 px-3 py-1 text-sm text-neutral-600">
+                回放中
+              </span>
+            )}
+          </div>
+
+          {/* BATTLE_START / BATTLE_FINISH 全宽展示 */}
+          {current?.type === 'BATTLE_START' && !finished && (
+            <div className="mb-5 rounded border border-blue-200 bg-blue-50 p-6 text-center">
+              <p className="text-4xl">⚔️</p>
+              <p className="mt-3 text-lg font-semibold">{current.homeName}</p>
+              {current.awayName !== undefined && (
+                <p className="mt-1 text-sm text-neutral-600">VS {current.awayName}</p>
+              )}
+              <p className="mt-3 text-sm text-blue-800">双方准备完毕，比赛即将开始。</p>
+            </div>
+          )}
+
+          {/* 结算面板 */}
+          {finished && <FinishedPanel finish={finish} format={replay.format} />}
+
+          {/* 多面板并行展示 */}
+          {!finished && current?.type !== 'BATTLE_START' && (
+            <div
+              className="grid gap-4"
+              style={{
+                gridTemplateColumns: `repeat(${Math.min(sortedMembers.length, 4)}, minmax(0, 1fr))`,
+              }}
+            >
+              {sortedMembers.map((state) => (
+                <MemberPanel key={state.memberIndex} state={state} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 控制栏 */}
+      <ReplayControls
+        finished={finished}
+        paused={paused}
+        speed={speed}
+        recordId={replay.recordId}
+        onTogglePause={() => setPaused((value) => !value)}
+        onSkip={handleSkip}
+        onSpeedChange={setSpeed}
+        onOpenReport={onOpenReport}
+        onReturn={onReturn}
+      />
+    </div>
+  );
+}
+
+function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
+  return (
+    <div
+      className={`rounded border p-4 transition-colors duration-200 ${
+        state.phase === 'IDLE'
+          ? 'border-neutral-200 bg-neutral-50'
+          : state.phase === 'DONE'
+            ? state.questionVerdict === 'AC'
+              ? 'border-green-300 bg-green-50'
+              : 'border-amber-300 bg-amber-50'
+            : 'border-blue-300 bg-blue-50'
+      }`}
+    >
+      {/* 成员名与状态标识 */}
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="truncate text-sm font-semibold">{state.displayName}</span>
+        <span
+          className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
+            state.phase === 'IDLE'
+              ? 'bg-neutral-200 text-neutral-600'
+              : state.phase === 'DONE'
+                ? state.questionVerdict === 'AC'
+                  ? 'bg-green-200 text-green-800'
+                  : 'bg-amber-200 text-amber-800'
+                : 'bg-blue-200 text-blue-800'
+          }`}
+        >
+          {state.phase === 'IDLE'
+            ? '等待中'
+            : state.phase === 'THINKING'
+              ? '思考中'
+              : state.phase === 'SUBMITTING'
+                ? '编码中'
+                : state.questionVerdict === 'AC'
+                  ? '已通过'
+                  : '已结算'}
+        </span>
+      </div>
+
+      {/* 当前题目 */}
+      {state.currentQuestionIndex !== null && (
+        <div className="mb-3">
+          <p className="text-lg font-bold">第 {state.currentQuestionIndex + 1} 题</p>
+          <p className="text-xs text-neutral-600">
+            {state.currentDimension !== null ? (DIMENSION_LABEL[state.currentDimension] ?? state.currentDimension) : ''}
+            {state.currentScore !== null ? ` · ${state.currentScore} 分` : ''}
+          </p>
+        </div>
+      )}
+
+      {/* 提交记录 */}
+      {state.submissions.length > 0 && (
+        <div className="mb-3 space-y-1">
+          {state.submissions.map((sub) => (
+            <div key={sub.attemptNo} className="flex items-center justify-between text-xs">
+              <span className="text-neutral-600">#{sub.attemptNo}</span>
+              <span
+                className={`rounded px-1.5 py-0.5 font-medium ${
+                  sub.verdict === 'AC' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}
+              >
+                {VERDICT_LABEL[sub.verdict] ?? sub.verdict}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 题目结算后的数据 */}
+      {state.phase === 'DONE' && (
+        <div className="space-y-1 border-t border-neutral-200 pt-2 text-xs text-neutral-700">
+          <div className="flex justify-between">
+            <span>得分</span>
+            <span className="font-semibold">{state.totalScore}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>精力</span>
+            <span>{Math.floor(state.energyAfter)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>专注</span>
+            <span>{Math.floor(state.focusAfter)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>心态</span>
+            <span>
+              {state.mindsetAfter > 0 ? '+' : ''}
+              {state.mindsetAfter}
+            </span>
+          </div>
+          {state.notes.length > 0 && (
+            <p className="text-neutral-500">{state.notes.join('、')}</p>
+          )}
+        </div>
+      )}
+
+      {/* 等待中的占位 */}
+      {state.phase === 'IDLE' && state.currentQuestionIndex === null && (
+        <p className="text-xs text-neutral-400">等待比赛开始…</p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 对决/通用单面板回放（DUEL 或旧格式 RANKING fallback）
+// ---------------------------------------------------------------------------
+
+function DuelReplay({
   replay,
   onOpenReport,
   onReturn,
@@ -191,70 +654,109 @@ export function BattleReplay({
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded border border-neutral-200 bg-white px-4 py-3">
-        <div className="flex items-center gap-2 text-sm">
+      <ReplayControls
+        finished={finished}
+        paused={paused}
+        speed={speed}
+        recordId={replay.recordId}
+        onTogglePause={() => setPaused((value) => !value)}
+        onSkip={() => {
+          setCursor(Math.max(events.length - 1, 0));
+          setFinished(true);
+        }}
+        onSpeedChange={setSpeed}
+        onOpenReport={onOpenReport}
+        onReturn={onReturn}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 共享子组件
+// ---------------------------------------------------------------------------
+
+function ReplayControls({
+  finished,
+  paused,
+  speed,
+  recordId,
+  onTogglePause,
+  onSkip,
+  onSpeedChange,
+  onOpenReport,
+  onReturn,
+}: {
+  finished: boolean;
+  paused: boolean;
+  speed: ReplaySpeed;
+  recordId: string;
+  onTogglePause: () => void;
+  onSkip: () => void;
+  onSpeedChange: (speed: ReplaySpeed) => void;
+  onOpenReport?: (recordId: string) => void;
+  onReturn?: () => void;
+}): JSX.Element {
+  return (
+    <section className="flex flex-wrap items-center justify-between gap-3 rounded border border-neutral-200 bg-white px-4 py-3">
+      <div className="flex items-center gap-2 text-sm">
+        <button
+          type="button"
+          data-testid="replay-pause"
+          className="rounded border border-neutral-300 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={finished}
+          onClick={onTogglePause}
+        >
+          {paused ? '继续播放' : '暂停'}
+        </button>
+        {!finished && (
           <button
             type="button"
-            data-testid="replay-pause"
-            className="rounded border border-neutral-300 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={finished}
-            onClick={() => setPaused((value) => !value)}
+            data-testid="replay-skip"
+            className="rounded border border-neutral-300 px-3 py-2"
+            onClick={onSkip}
           >
-            {paused ? '继续播放' : '暂停'}
+            跳过回放
           </button>
-          {/* 跳过逐事件回放，直接到结算面板（长战斗回放可达数十分钟模拟时长） */}
-          {!finished && (
+        )}
+        <span className="text-neutral-500">速度</span>
+        {SPEEDS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            data-testid={`replay-speed-${value}x`}
+            className={`rounded px-2.5 py-1.5 text-xs ${speed === value ? 'bg-neutral-900 text-white' : 'border border-neutral-300 text-neutral-700'}`}
+            onClick={() => onSpeedChange(value)}
+          >
+            {value}x
+          </button>
+        ))}
+      </div>
+      {finished && (
+        <div className="flex flex-wrap gap-2">
+          {onOpenReport && (
             <button
               type="button"
-              data-testid="replay-skip"
-              className="rounded border border-neutral-300 px-3 py-2"
-              onClick={() => {
-                setCursor(Math.max(events.length - 1, 0));
-                setFinished(true);
-              }}
+              data-testid="replay-open-report"
+              className="rounded bg-neutral-900 px-3 py-2 text-sm text-white"
+              onClick={() => onOpenReport(recordId)}
             >
-              跳过回放
+              查看完整战报
             </button>
           )}
-          <span className="text-neutral-500">速度</span>
-          {SPEEDS.map((value) => (
+          {onReturn && (
             <button
-              key={value}
               type="button"
-              data-testid={`replay-speed-${value}x`}
-              className={`rounded px-2.5 py-1.5 text-xs ${speed === value ? 'bg-neutral-900 text-white' : 'border border-neutral-300 text-neutral-700'}`}
-              onClick={() => setSpeed(value)}
+              data-testid="replay-back"
+              className="rounded border border-neutral-300 px-3 py-2 text-sm"
+              onClick={onReturn}
             >
-              {value}x
+              返回
             </button>
-          ))}
+          )}
         </div>
-        {finished && (
-          <div className="flex flex-wrap gap-2">
-            {onOpenReport && (
-              <button
-                type="button"
-                data-testid="replay-open-report"
-                className="rounded bg-neutral-900 px-3 py-2 text-sm text-white"
-                onClick={() => onOpenReport(replay.recordId)}
-              >
-                查看完整战报
-              </button>
-            )}
-            {onReturn && (
-              <button
-                type="button"
-                data-testid="replay-back"
-                className="rounded border border-neutral-300 px-3 py-2 text-sm"
-                onClick={onReturn}
-              >
-                返回
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-    </div>
+      )}
+    </section>
   );
 }
 
