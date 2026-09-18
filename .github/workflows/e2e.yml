@@ -32,7 +32,7 @@ jobs:
       E2E_DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_e2e
       E2E_JWT_SECRET: ci-e2e-jwt-secret-0123456789abcdef-only
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.14.0

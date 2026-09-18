@@ -28,7 +28,7 @@ jobs:
       DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_test
       JWT_SECRET: ci-jwt-secret-0123456789abcdef-test-only
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.14.0
