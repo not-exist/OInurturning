@@ -1,11 +1,88 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+# Dependabot version updates.
+# Options reference:
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# `package-ecosystem` must be one of Dependabot's supported values (npm, docker,
+# docker-compose, github-actions, ...). The previous commit left the GitHub
+# template placeholder `package-ecosystem: ""` in place; the empty string is not
+# in the allowed set, so Dependabot rejected the entire file and ran no updates.
+#
+# The ecosystems below were chosen from what actually exists in this repo:
+#   - pnpm workspace: root package.json + pnpm-workspace.yaml + pnpm-lock.yaml,
+#     workspaces apps/* and packages/*        -> "npm" at "/"
+#   - deploy/api.Dockerfile, deploy/web.Dockerfile (node:22-alpine, nginx:alpine)
+#                                             -> "docker" at "/deploy"
+#   - docker-compose.yml (root) and deploy/docker-compose.yml (mysql:8.4)
+#                                             -> "docker-compose" at "/" + "/deploy"
+#   - .github/workflows/test.yml, .github/workflows/e2e.yml
+#                                             -> "github-actions" at "/"
+#
+# Each ecosystem only scans the directory it points at (not recursively), so the
+# Dockerfiles and compose file under /deploy need their own entries.
 
 version: 2
+
 updates:
-  - package-ecosystem: "" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  # pnpm workspace. Pointing "npm" at the repo root is enough: Dependabot reads
+  # pnpm-workspace.yaml and updates every workspace package.json together with
+  # the shared pnpm-lock.yaml.
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Asia/Shanghai'
+    open-pull-requests-limit: 10
+    labels:
+      - 'dependencies'
+    groups:
+      # Roll routine bumps into one PR instead of one per package.
+      # Major bumps still arrive individually, so they stay reviewable.
+      minor-and-patch:
+        update-types:
+          - 'minor'
+          - 'patch'
+
+  # Base images in deploy/api.Dockerfile and deploy/web.Dockerfile. Dependabot
+  # matches any filename containing "dockerfile" (case-insensitive), so the
+  # <name>.Dockerfile naming used here is supported.
+  - package-ecosystem: 'docker'
+    directory: '/deploy'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Asia/Shanghai'
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
+
+  # Compose files are a separate ecosystem: the "docker" ecosystem only looks at
+  # Dockerfile/Containerfile and Kubernetes/Helm YAML, so it would never touch
+  # the `image: mysql:8.4` entries below.
+  - package-ecosystem: 'docker-compose'
+    directories:
+      - '/'
+      - '/deploy'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Asia/Shanghai'
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
+
+  # actions/checkout, actions/setup-node, actions/upload-artifact,
+  # pnpm/action-setup used by the CI workflows.
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Asia/Shanghai'
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
