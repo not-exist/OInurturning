@@ -153,7 +153,7 @@ jobs:
         run: grep 'tests/' typecheck.log | grep -v -E 'auth|pvp|story|adventure|academy|lecture|problems|items|students|training|infra|admin|journey-file' | grep -q . && exit 1 || exit 0
       - name: Upload typecheck logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: typecheck-log
           path: |
