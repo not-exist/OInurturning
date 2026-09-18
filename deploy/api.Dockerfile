@@ -1,5 +1,5 @@
 # ---- stage 1: 构建 ----
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
@@ -13,7 +13,7 @@ COPY docs/data docs/data
 RUN pnpm -C apps/api generate && pnpm -C apps/api build
 
 # ---- stage 2: 运行 ----
-FROM node:22-alpine
+FROM node:26-alpine
 WORKDIR /app
 ENV NODE_ENV=production CONFIG_DIR=/app/config
 # 镜像 pnpm workspace 布局：tsup 默认外置 dependencies，运行时需要
