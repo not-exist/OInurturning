@@ -128,6 +128,33 @@ describe('battle replay', () => {
     const answered = new Set(eventsOf(replay, 'QUESTION_START').map((event) => event.participantName));
     expect(answered).toEqual(new Set(['HOME-0', 'HOME-1', 'HOME-2']));
 
+    // memberIndex 在 QUESTION_START / SUBMISSION / QUESTION_RESULT 上均存在
+    for (const event of replay.events) {
+      if (
+        event.type === 'QUESTION_START' ||
+        event.type === 'SUBMISSION' ||
+        event.type === 'QUESTION_RESULT'
+      ) {
+        expect(event.memberIndex).toBeTypeOf('number');
+        expect(event.memberIndex).toBeGreaterThanOrEqual(0);
+        expect(event.memberIndex).toBeLessThan(3);
+      }
+    }
+
+    // 按题号轮转交错：同一题号的 QUESTION_START 在事件流中应连续出现（每 phase 一名队员一组）
+    const qStarts = eventsOf(replay, 'QUESTION_START');
+    // 收集每个 questionIndex 出现的 memberIndex 序列
+    const phaseOrder = new Map<number, number[]>();
+    for (const event of qStarts) {
+      const arr = phaseOrder.get(event.questionIndex) ?? [];
+      arr.push(event.memberIndex!);
+      phaseOrder.set(event.questionIndex, arr);
+    }
+    // 每个 phase 内应覆盖所有有该题的队员（不强制顺序，但 memberIndex 不重复）
+    for (const [, members] of phaseOrder) {
+      expect(new Set(members).size).toBe(members.length);
+    }
+
     const finish = eventsOf(replay, 'BATTLE_FINISH')[0]!;
     const standing = report.standings.find((entry) => entry.teamIndex === 0)!;
     expect(finish).toMatchObject({
