@@ -453,6 +453,8 @@ function RankingParallelReplay({
 function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
   return (
     <div
+      data-testid="replay-member-panel"
+      data-member-index={state.memberIndex}
       className={`rounded border p-4 transition-colors duration-200 ${
         state.phase === 'READY'
           ? 'border-neutral-200 bg-neutral-50'
