@@ -36,9 +36,8 @@ jobs:
       E2E_JWT_SECRET: ci-e2e-jwt-secret-0123456789abcdef-only
     steps:
       - uses: actions/checkout@v7
+      # 不传 version：由根 package.json 的 packageManager 决定，避免两处真源漂移
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10.14.0
       - uses: actions/setup-node@v7
         with:
           node-version: 26
