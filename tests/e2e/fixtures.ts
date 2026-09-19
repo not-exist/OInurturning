@@ -295,3 +295,21 @@ export async function recruitStudent(
   });
   return unwrap<{ id: number }>(reg.body, '招募').id;
 }
+
+/** 锦标赛默认阵容人数（赛事 config 未指定 rosterSize 时为 3）。 */
+export const DEFAULT_TOURNAMENT_ROSTER_SIZE = 3;
+
+/**
+ * 锦标赛选手装配（API 全包）：建号→注资（报名券×1）→开局 2 人 + 招募 1 人 = 3 人阵容。
+ * PVP 编排类 spec（pvp/records）共用，保持多账号 setup 口径一致。
+ */
+export async function setupTournamentPlayer(
+  request: APIRequestContext,
+  prefix = 'pvp',
+): Promise<TestAccount & { studentIds: number[] }> {
+  const account = await registerUser(request, prefix);
+  await fund(account.username, { money: 50000, items: { 'entry-ticket': 1 } });
+  await recruitStudent(request, account.accessToken);
+  const studentIds = await rosterIds(request, account.accessToken, DEFAULT_TOURNAMENT_ROSTER_SIZE);
+  return { ...account, studentIds };
+}

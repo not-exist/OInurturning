@@ -272,7 +272,11 @@ function BracketView({
               {matches
                 .filter((match) => match.round === round)
                 .map((match) => (
-                  <div key={match.id} className="border border-neutral-200 p-2 text-xs">
+                  <div
+                    key={match.id}
+                    data-testid={`pvp-match-${match.id}`}
+                    className="border border-neutral-200 p-2 text-xs"
+                  >
                     <p>
                       {match.homeUserId ?? '轮空'} {match.homeScore ?? '-'} :{' '}
                       {match.awayScore ?? '-'} {match.awayUserId ?? '轮空'}

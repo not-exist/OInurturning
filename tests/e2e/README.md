@@ -16,6 +16,7 @@
 | `specs/adventure.spec.ts` | 抽取→preview→分支→回避 |
 | `specs/story.spec.ts` | 进关→战报→返回/锁定关 |
 | `specs/pvp.spec.ts` | 锦标赛 8 人全周期+领奖 |
+| `specs/records.spec.ts` | 并行回放控制/战报直达/非法 id/PVP 对决战报 |
 | `specs/admin.spec.ts` | 建赛/公告/查用户/审计 |
 | `specs/settings.spec.ts` | 账户信息/改密/注销 |
 | `specs/full-journey.spec.ts` | **完整玩家旅程**（旗舰） |
