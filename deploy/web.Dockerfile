@@ -1,6 +1,7 @@
 FROM node:26-alpine AS build
 WORKDIR /app
-RUN corepack enable
+# node:26 镜像不再自带 corepack，直接装与 packageManager 一致的 pnpm
+RUN npm i -g pnpm@10.14.0
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/web/package.json apps/web/
