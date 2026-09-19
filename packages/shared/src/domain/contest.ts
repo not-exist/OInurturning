@@ -1122,6 +1122,8 @@ export type BattleReplayEvent =
   | {
       seq: number;
       type: 'BATTLE_START';
+      /** Presentation timestamp from replay start. Events with the same time play concurrently. */
+      timeMs?: number;
       durationMs: number;
       title: string;
       format: ContestFormat;
@@ -1131,10 +1133,14 @@ export type BattleReplayEvent =
   | {
       seq: number;
       type: 'QUESTION_START';
+      /** Presentation timestamp from replay start. Events with the same time play concurrently. */
+      timeMs?: number;
       durationMs: number;
       participantName: string;
       /** 队内成员下标（0-based），前端多面板回放用于路由事件到对应队员面板 */
       memberIndex?: number;
+      /** 并行回放阶段下标：同阶段的队员同时进入各自题目。 */
+      phaseIndex?: number;
       questionIndex: number;
       problemInstanceId: string;
       dimension: string;
@@ -1143,10 +1149,14 @@ export type BattleReplayEvent =
   | {
       seq: number;
       type: 'SUBMISSION';
+      /** Presentation timestamp from replay start. Events with the same time play concurrently. */
+      timeMs?: number;
       durationMs: number;
       participantName: string;
       /** 队内成员下标（0-based），前端多面板回放用于路由事件到对应队员面板 */
       memberIndex?: number;
+      /** 并行回放阶段下标：同阶段的队员同时进入各自题目。 */
+      phaseIndex?: number;
       questionIndex: number;
       attemptNumber: number;
       verdict: ContestVerdict;
@@ -1158,10 +1168,14 @@ export type BattleReplayEvent =
   | {
       seq: number;
       type: 'QUESTION_RESULT';
+      /** Presentation timestamp from replay start. Events with the same time play concurrently. */
+      timeMs?: number;
       durationMs: number;
       participantName: string;
       /** 队内成员下标（0-based），前端多面板回放用于路由事件到对应队员面板 */
       memberIndex?: number;
+      /** 并行回放阶段下标：同阶段的队员同时进入各自题目。 */
+      phaseIndex?: number;
       questionIndex: number;
       verdict: Exclude<ContestVerdict, 'SKIP'> | 'SKIP';
       timeSpentMin: number;
@@ -1213,6 +1227,8 @@ export type BattleReplayEvent =
   | {
       seq: number;
       type: 'BATTLE_FINISH';
+      /** Presentation timestamp from replay start. Events with the same time play concurrently. */
+      timeMs?: number;
       durationMs: number;
       winnerSide?: DuelWinnerSide;
       rank?: number;

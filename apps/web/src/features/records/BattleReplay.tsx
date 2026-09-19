@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 import type { BattleReplay as BattleReplayData, BattleReplayEvent } from '@oinur/shared';
 
 const SPEEDS = [1, 2, 4, 8] as const;
@@ -121,6 +121,26 @@ export function BattleReplay({
 // 排名赛并行回放
 // ---------------------------------------------------------------------------
 
+interface TimedReplayEvent {
+  event: BattleReplayEvent;
+  timeMs: number;
+}
+
+function replayEventTime(event: BattleReplayEvent): number | undefined {
+  return 'timeMs' in event && typeof event.timeMs === 'number' ? event.timeMs : undefined;
+}
+
+function buildTimedEvents(events: readonly BattleReplayEvent[]): TimedReplayEvent[] {
+  let legacyTimeMs = 0;
+  return events
+    .map((event) => {
+      const timeMs = replayEventTime(event) ?? legacyTimeMs;
+      legacyTimeMs += event.durationMs;
+      return { event, timeMs };
+    })
+    .sort((left, right) => left.timeMs - right.timeMs || left.event.seq - right.event.seq);
+}
+
 interface MemberPanelState {
   memberIndex: number;
   displayName: string;
@@ -128,7 +148,7 @@ interface MemberPanelState {
   currentDimension: string | null;
   currentProblemId: string | null;
   currentScore: number | null;
-  phase: 'IDLE' | 'THINKING' | 'SUBMITTING' | 'DONE';
+  phase: 'READY' | 'THINKING' | 'SUBMITTING' | 'DONE';
   submissions: { attemptNo: number; verdict: string; timeMin: number; penaltyMin: number }[];
   questionVerdict: string | null;
   totalScore: number;
@@ -146,7 +166,7 @@ function createEmptyMemberState(memberIndex: number, displayName: string): Membe
     currentDimension: null,
     currentProblemId: null,
     currentScore: null,
-    phase: 'IDLE',
+    phase: 'READY',
     submissions: [],
     questionVerdict: null,
     totalScore: 0,
@@ -237,14 +257,19 @@ function RankingParallelReplay({
   onFinished?: () => void;
 }): JSX.Element {
   const events = replay.events;
-  const [cursor, setCursor] = useState(0);
+  const timedEvents = useMemo(() => buildTimedEvents(events), [events]);
+  const [eventCursor, setEventCursor] = useState(0);
+  const [playheadMs, setPlayheadMs] = useState(0);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState<ReplaySpeed>(1);
   const [finished, setFinished] = useState(false);
-  const [memberStates, setMemberStates] = useState<Map<number, MemberPanelState>>(new Map());
 
-  const current = events[cursor];
+  const current = timedEvents[Math.max(0, eventCursor - 1)]?.event ?? events[0];
   const finish = events.at(-1)?.type === 'BATTLE_FINISH' ? events.at(-1) : undefined;
+  const totalDurationMs = Math.max(
+    1,
+    ...timedEvents.map(({ event, timeMs }) => timeMs + event.durationMs),
+  );
 
   // 从事件流中收集队员元信息（memberIndex → displayName）。
   const memberMeta = useMemo(() => {
@@ -261,68 +286,60 @@ function RankingParallelReplay({
     return meta;
   }, [events]);
 
-  // 用 ref 跟踪上一次处理的 cursor，避免重复 apply。
-  const lastProcessedRef = useRef(-1);
+  const memberStates = useMemo(() => {
+    const states = new Map<number, MemberPanelState>();
+    for (const [mi, name] of memberMeta) {
+      states.set(mi, createEmptyMemberState(mi, name));
+    }
+    let next = states;
+    for (let index = 0; index < eventCursor; index++) {
+      const event = timedEvents[index]?.event;
+      if (event !== undefined) next = applyEventToMembers(next, event);
+    }
+    return next;
+  }, [eventCursor, memberMeta, timedEvents]);
 
   // 重置状态（切换回放时）。
   useEffect(() => {
-    setCursor(0);
+    setEventCursor(0);
+    setPlayheadMs(0);
     setPaused(false);
     setFinished(false);
-    setMemberStates(new Map());
-    lastProcessedRef.current = -1;
   }, [replay.recordId]);
 
-  // 初始化成员面板（从 memberMeta 构建初始空状态）。
+  // 自动推进播放头。一次处理同一 timestamp 的所有事件，让多个成员真正并行进入同一阶段。
   useEffect(() => {
-    if (memberMeta.size === 0) return;
-    setMemberStates((prev) => {
-      if (prev.size > 0) return prev;
-      const initial = new Map<number, MemberPanelState>();
-      for (const [mi, name] of memberMeta) {
-        initial.set(mi, createEmptyMemberState(mi, name));
-      }
-      return initial;
-    });
-  }, [memberMeta]);
+    if (paused || finished) return undefined;
+    const nextTimed = timedEvents[eventCursor];
+    if (nextTimed === undefined) {
+      setFinished(true);
+      return undefined;
+    }
 
-  // 处理当前事件：更新对应成员面板。
-  useEffect(() => {
-    if (cursor === lastProcessedRef.current) return;
-    lastProcessedRef.current = cursor;
-    const event = events[cursor];
-    if (event === undefined) return;
-    setMemberStates((prev) => applyEventToMembers(prev, event));
-  }, [cursor, events]);
-
-  // 自动推进游标。
-  useEffect(() => {
-    if (paused || finished || current === undefined) return undefined;
     const effectiveSpeed = speed * BASE_PLAYBACK_RATE;
-    const duration = Math.max(100, current.durationMs / effectiveSpeed);
+    const delay = Math.max(40, (nextTimed.timeMs - playheadMs) / effectiveSpeed);
     const timer = window.setTimeout(() => {
-      if (cursor + 1 < events.length) {
-        setCursor((value) => value + 1);
-      } else {
-        setFinished(true);
+      const targetTime = nextTimed.timeMs;
+      let nextCursor = eventCursor;
+      while (nextCursor < timedEvents.length && timedEvents[nextCursor]!.timeMs <= targetTime) {
+        nextCursor += 1;
       }
-    }, duration);
+      setPlayheadMs(targetTime);
+      setEventCursor(nextCursor);
+      if (nextCursor >= timedEvents.length) setFinished(true);
+    }, delay);
     return () => window.clearTimeout(timer);
-  }, [cursor, current, events.length, finished, paused, speed]);
+  }, [eventCursor, finished, paused, playheadMs, speed, timedEvents]);
 
   useEffect(() => {
     if (finished) onFinished?.();
   }, [finished, onFinished]);
 
   const handleSkip = useCallback(() => {
-    // 跳过时一次性处理所有剩余事件，确保成员面板状态完整。
-    for (let i = cursor; i < events.length; i++) {
-      const event = events[i]!;
-      setMemberStates((prev) => applyEventToMembers(prev, event));
-    }
-    setCursor(Math.max(events.length - 1, 0));
+    setEventCursor(timedEvents.length);
+    setPlayheadMs(totalDurationMs);
     setFinished(true);
-  }, [cursor, events]);
+  }, [timedEvents.length, totalDurationMs]);
 
   if (events.length === 0) {
     return (
@@ -332,8 +349,9 @@ function RankingParallelReplay({
     );
   }
 
-  const progress = finished ? 100 : Math.round(((cursor + 1) / events.length) * 100);
+  const progress = finished ? 100 : Math.round((Math.min(playheadMs, totalDurationMs) / totalDurationMs) * 100);
   const sortedMembers = [...memberStates.values()].sort((a, b) => a.memberIndex - b.memberIndex);
+  const gridColumns = Math.max(1, Math.min(sortedMembers.length, 4));
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -348,7 +366,7 @@ function RankingParallelReplay({
               <h1 className="mt-1 text-2xl font-semibold">{replay.title}</h1>
             </div>
             <span className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300">
-              {finished ? '战斗结束' : paused ? '已暂停' : '战斗进行中'}
+              {finished ? '战斗结束' : paused ? '已暂停' : '全员并行作战中'}
             </span>
           </div>
           {current?.type === 'BATTLE_START' && (
@@ -372,7 +390,7 @@ function RankingParallelReplay({
               <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">
                 {finished
                   ? 'Final Result'
-                  : `Event ${Math.min(cursor + 1, events.length)} / ${events.length}`}
+                  : `Timeline ${Math.min(Math.round(playheadMs), totalDurationMs)} / ${Math.round(totalDurationMs)} ms`}
               </p>
               <h2 className="mt-1 text-xl font-semibold">
                 {finished ? '本场战斗完成' : current === undefined ? '准备中…' : '队员并行作战中'}
@@ -380,20 +398,20 @@ function RankingParallelReplay({
             </div>
             {!finished && current !== undefined && (
               <span className="rounded bg-neutral-100 px-3 py-1 text-sm text-neutral-600">
-                回放中
+                同步回放中
               </span>
             )}
           </div>
 
-          {/* BATTLE_START / BATTLE_FINISH 全宽展示 */}
-          {current?.type === 'BATTLE_START' && !finished && (
+          {/* BATTLE_START 全宽展示 */}
+          {current?.type === 'BATTLE_START' && eventCursor <= 1 && !finished && (
             <div className="mb-5 rounded border border-blue-200 bg-blue-50 p-6 text-center">
               <p className="text-4xl">⚔️</p>
               <p className="mt-3 text-lg font-semibold">{current.homeName}</p>
               {current.awayName !== undefined && (
                 <p className="mt-1 text-sm text-neutral-600">VS {current.awayName}</p>
               )}
-              <p className="mt-3 text-sm text-blue-800">双方准备完毕，比赛即将开始。</p>
+              <p className="mt-3 text-sm text-blue-800">全员准备完毕，比赛即将并行开始。</p>
             </div>
           )}
 
@@ -401,11 +419,11 @@ function RankingParallelReplay({
           {finished && <FinishedPanel finish={finish} format={replay.format} />}
 
           {/* 多面板并行展示 */}
-          {!finished && current?.type !== 'BATTLE_START' && (
+          {!finished && !(current?.type === 'BATTLE_START' && eventCursor <= 1) && (
             <div
               className="grid gap-4"
               style={{
-                gridTemplateColumns: `repeat(${Math.min(sortedMembers.length, 4)}, minmax(0, 1fr))`,
+                gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
               }}
             >
               {sortedMembers.map((state) => (
@@ -436,7 +454,7 @@ function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
   return (
     <div
       className={`rounded border p-4 transition-colors duration-200 ${
-        state.phase === 'IDLE'
+        state.phase === 'READY'
           ? 'border-neutral-200 bg-neutral-50'
           : state.phase === 'DONE'
             ? state.questionVerdict === 'AC'
@@ -450,7 +468,7 @@ function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
         <span className="truncate text-sm font-semibold">{state.displayName}</span>
         <span
           className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
-            state.phase === 'IDLE'
+            state.phase === 'READY'
               ? 'bg-neutral-200 text-neutral-600'
               : state.phase === 'DONE'
                 ? state.questionVerdict === 'AC'
@@ -459,8 +477,8 @@ function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
                 : 'bg-blue-200 text-blue-800'
           }`}
         >
-          {state.phase === 'IDLE'
-            ? '等待中'
+          {state.phase === 'READY'
+            ? '准备就绪'
             : state.phase === 'THINKING'
               ? '思考中'
               : state.phase === 'SUBMITTING'
@@ -528,9 +546,9 @@ function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
         </div>
       )}
 
-      {/* 等待中的占位 */}
-      {state.phase === 'IDLE' && state.currentQuestionIndex === null && (
-        <p className="text-xs text-neutral-400">等待比赛开始…</p>
+      {/* 准备阶段占位 */}
+      {state.phase === 'READY' && state.currentQuestionIndex === null && (
+        <p className="text-xs text-neutral-400">准备就绪，即将并行开始…</p>
       )}
     </div>
   );
