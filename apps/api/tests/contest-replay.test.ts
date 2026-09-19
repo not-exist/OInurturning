@@ -141,18 +141,29 @@ describe('battle replay', () => {
       }
     }
 
-    // 按题号轮转交错：同一题号的 QUESTION_START 在事件流中应连续出现（每 phase 一名队员一组）
+    // 按阶段并行：同一 phase 的 QUESTION_START 同一时间触发，且成员不重复。
     const qStarts = eventsOf(replay, 'QUESTION_START');
-    // 收集每个 questionIndex 出现的 memberIndex 序列
-    const phaseOrder = new Map<number, number[]>();
+    const phaseOrder = new Map<number, { members: number[]; times: number[] }>();
     for (const event of qStarts) {
-      const arr = phaseOrder.get(event.questionIndex) ?? [];
-      arr.push(event.memberIndex!);
-      phaseOrder.set(event.questionIndex, arr);
+      expect(event.phaseIndex).toBeTypeOf('number');
+      expect(event.timeMs).toBeTypeOf('number');
+      const entry = phaseOrder.get(event.phaseIndex!) ?? { members: [], times: [] };
+      entry.members.push(event.memberIndex!);
+      entry.times.push(event.timeMs!);
+      phaseOrder.set(event.phaseIndex!, entry);
     }
-    // 每个 phase 内应覆盖所有有该题的队员（不强制顺序，但 memberIndex 不重复）
-    for (const [, members] of phaseOrder) {
-      expect(new Set(members).size).toBe(members.length);
+    for (const [, entry] of phaseOrder) {
+      expect(new Set(entry.members).size).toBe(entry.members.length);
+      expect(new Set(entry.times).size).toBe(1);
+    }
+
+    // 事件流按展示时间排序，而不是按「某个成员完整打完再轮到下一个成员」串行排序。
+    for (let index = 1; index < replay.events.length; index++) {
+      const current = replay.events[index]!;
+      const previous = replay.events[index - 1]!;
+      const currentTime = 'timeMs' in current ? (current.timeMs ?? 0) : 0;
+      const previousTime = 'timeMs' in previous ? (previous.timeMs ?? 0) : 0;
+      expect(currentTime).toBeGreaterThanOrEqual(previousTime);
     }
 
     const finish = eventsOf(replay, 'BATTLE_FINISH')[0]!;
