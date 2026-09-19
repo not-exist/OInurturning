@@ -5,6 +5,7 @@ defaults:
   stamina_cost_by_chapter: {cspj: 1, csps: 1, noip: 1, province: 1, noi: 2, ctt: 2, cts: 2, ioi: 2}
   pass_rank_max: 8
   roster_size: 4
+  first_clear_fixed_items: [{item: drumstick-bento, count: 1}]
 stages:
   - chapter: cspj
     stage_index: 1

@@ -28,6 +28,8 @@ defaults:
   roster_size: 4                              # 每关出战学员数；玩家队伍与每支 NPC 队伍人数必须相同。
                                               # story 逐关读取 `stage.roster_size ?? defaults.roster_size`，单关可覆盖；
                                               # 历练对决固定 3 人（events.yaml party_size），PVP 由赛事 config.rosterSize 决定。
+  first_clear_fixed_items:                    # 每关首通固定发放的道具（全章统一，progression.md §1.6）：
+    - { item: drumstick-bento, count: 1 }     #   鸡腿便当 ×1（+5 体力食物，items.yaml 定义）；NG+ 各层首通独立发放、不参与稀有度上移。
   # 题目实例化规则：
   #   * problem_slots 各组按序抽取，同一场内模板不重复（池不足时允许复用）；
   #   * 带 chance 的组为概率附加题（超纲题），未触发则本场少一题；

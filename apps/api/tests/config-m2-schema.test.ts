@@ -43,6 +43,10 @@ describe('M2 configuration schemas', () => {
       expect(result.data.stages[0]?.problem_slots[0]).toMatchObject({ tier: 'cspj', count: 3 });
       expect(result.data.full_clear.unlocks).toBe('ng_plus');
       expect(result.data.ng_plus.layer_cap).toBeNull();
+      // 每关首通固定道具（鸡腿便当 ×1）：defaults 必填键
+      expect(result.data.defaults.first_clear_fixed_items).toEqual([
+        { item: 'drumstick-bento', count: 1 },
+      ]);
     }
   });
 
@@ -79,5 +83,15 @@ describe('M2 configuration schemas', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues.some((issue) => issue.path.join('.') === 'stages.0.first_clear.items.chance')).toBe(true);
+  });
+
+  it('rejects stage defaults missing first_clear_fixed_items', () => {
+    const config = structuredClone(stages) as Record<string, unknown>;
+    delete (config.defaults as Record<string, unknown>).first_clear_fixed_items;
+
+    const result = stagesConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.some((issue) => issue.path.join('.') === 'defaults.first_clear_fixed_items')).toBe(true);
   });
 });

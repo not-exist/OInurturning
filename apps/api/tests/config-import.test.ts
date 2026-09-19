@@ -2,9 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { parse as parseYaml } from 'yaml';
 import {
   economyConfigSchema,
   itemsFileSchema,
+  stagesConfigSchema,
   talentsFileSchema,
   type ItemDef,
   type TalentDef,
@@ -74,7 +76,7 @@ const goodEconomy: Record<string, unknown> = {
     },
   },
   onboarding: {
-    money: 1000,
+    money: 2500,
     reputation: 10,
     students: [{ quality: 'good' }, { quality: 'common' }],
     items: [{ id: 'rename-card', count: 1 }],
@@ -262,6 +264,26 @@ describe('runSemanticChecks', () => {
     const errs = runSemanticChecks({ talents: [makeTalent({})], items: parsedItem, economy: bad });
     expect(errs.some((e) => e.message.includes('开局包道具重复'))).toBe(true);
   });
+
+  it('首通固定道具引用不存在报错（stages.defaults.first_clear_fixed_items）', () => {
+    const stages = stagesConfigSchema.parse(parseYaml(MINIMAL_STAGES));
+    const bad = {
+      ...stages,
+      defaults: { ...stages.defaults, first_clear_fixed_items: [{ item: 'ghost-food', count: 1 }] },
+    };
+    const errs = runSemanticChecks({
+      talents: [makeTalent({})],
+      items: parsedItem,
+      economy: parsedEconomy,
+      stages: bad,
+    });
+    expect(
+      errs.some(
+        (e) =>
+          e.path === 'defaults.first_clear_fixed_items.0.item' && e.message.includes('ghost-food'),
+      ),
+    ).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -324,7 +346,7 @@ recruitment:
     daily_price_cap: 800
     free_interval_hours: 24
 onboarding:
-  money: 1000
+  money: 2500
   reputation: 10
   students:
     - {quality: good}
@@ -382,6 +404,7 @@ defaults:
   stamina_cost_by_chapter: {cspj: 1, csps: 1, noip: 1, province: 1, noi: 2, ctt: 2, cts: 2, ioi: 2}
   pass_rank_max: 8
   roster_size: 4
+  first_clear_fixed_items: []
 stages:
   - chapter: cspj
     stage_index: 1

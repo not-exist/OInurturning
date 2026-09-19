@@ -136,6 +136,20 @@ items:
     sources: [商城]
     stack: 99
     description: 测试用体力药水。
+  - id: drumstick-bento
+    name: 鸡腿便当
+    category: functional
+    rarity: blue
+    effect:
+      desc: 立即恢复 5 点体力（不超过 5，即回满）。
+      kind: stamina_restore
+      amount: 5
+      target: single_student
+      usage_timing: 非比赛时段任意时刻
+    price: null
+    sources: [剧情模式关卡首通奖励]
+    stack: 99
+    description: 测试用鸡腿便当。
   - id: coffee
     name: 浓咖啡
     category: functional

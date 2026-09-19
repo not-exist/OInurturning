@@ -57,6 +57,7 @@ describe('story rewards and retries', () => {
     expect(first.record.rewards).toEqual(
       expect.arrayContaining([
         { type: 'first_clear_money', amount: 1 },
+        { type: 'first_clear_item', itemId: 'drumstick-bento', count: 1 },
         { type: 'milestone_item', itemId: 'rename-card', count: 1 },
       ]),
     );
@@ -67,9 +68,21 @@ describe('story rewards and retries', () => {
       Array.from({ length: ROSTER_SIZE }, () => 4),
     );
     expect(userAfterFirst.money).toBe(1);
+    // 首通固定道具（defaults.first_clear_fixed_items）入背包
+    expect(
+      await prisma.userItem.findUnique({
+        where: { userId_itemId: { userId: user.id, itemId: 'drumstick-bento' } },
+      }),
+    ).toMatchObject({ quantity: 1 });
 
     const second = await enterStoryStage(user.id, 'cspj:1', 0, roster, 'reward-entry-2');
     expect(second.firstClear).toBe(false);
+    expect(second.record.rewards.some((r) => r.type === 'first_clear_item')).toBe(false); // 复刷不再发固定/抽选道具
+    expect(
+      (await prisma.userItem.findUniqueOrThrow({
+        where: { userId_itemId: { userId: user.id, itemId: 'drumstick-bento' } },
+      })).quantity,
+    ).toBe(1); // 固定道具不随复刷累加
     for (const studentId of roster) {
       const afterSecond = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
       expect(afterSecond.stamina).toBeCloseTo(3, 3);

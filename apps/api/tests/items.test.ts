@@ -149,6 +149,27 @@ describe('POST /api/items/use 正例', () => {
     expect(await itemQuantity(u.userId, 'stamina-potion')).toBe(1);
   });
 
+  it('drumstick-bento：体力 +5 回满（clamp 5），不设每日限额', async () => {
+    const u = await createAuthedUser();
+    const id = await createStudent(u.userId, { stamina: 2 });
+    await giveItem(u.userId, 'drumstick-bento', 2);
+
+    const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'drumstick-bento', studentId: id }));
+    expect(view.stamina).toBeCloseTo(5, 3); // 2+5 → clamp 5（回满）
+
+    // 同日第 2 份仍可用（供给仅剧情首通限量，无每日限额）；已满则 clamp 保持 5、照常扣道具
+    const r2 = await use(u.token, { itemId: 'drumstick-bento', studentId: id });
+    expect(r2.status).toBe(200);
+    expect(unwrapOk<StudentView>(r2).stamina).toBeCloseTo(5, 3);
+    expect(await itemQuantity(u.userId, 'drumstick-bento')).toBe(0);
+
+    // 他人学员 → FORBIDDEN
+    const other = await createAuthedUser();
+    const foreign = await createStudent(other.userId, { stamina: 0 });
+    const r3 = await use(u.token, { itemId: 'drumstick-bento', studentId: foreign });
+    expect(r3.status).toBe(403);
+  });
+
   it('coffee：体力 +1，心态 −1，clamp，每日限 2 杯', async () => {
     const u = await createAuthedUser();
     const id = await createStudent(u.userId, { stamina: 3, mindset: 5 });

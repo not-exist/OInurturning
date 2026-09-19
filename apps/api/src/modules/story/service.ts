@@ -404,6 +404,10 @@ function buildRewards(
     });
     const item = pickRewardItem(stage, ngLevel, random, config.items);
     if (item !== undefined) rewards.push(item);
+    // 每关首通固定道具（defaults.first_clear_fixed_items）：NG+ 各层首通独立发放，不参与稀有度上移
+    for (const fixed of config.stageDefaults.first_clear_fixed_items) {
+      rewards.push({ type: 'first_clear_item', itemId: fixed.item, count: fixed.count });
+    }
     if (ngLevel === 0) {
       for (const milestone of stage.first_clear.milestone?.items ?? []) {
         rewards.push({ type: 'milestone_item', itemId: milestone.item, count: milestone.count });

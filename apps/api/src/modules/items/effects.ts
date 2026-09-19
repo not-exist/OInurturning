@@ -13,7 +13,7 @@ import type { MetaAggregate } from '../students/meta.js';
  * F-4 义务：items.yaml 的 effect 为异构 passthrough，本模块消费其子键（amount/attribute 等）
  * 时一律用 zod 严格收口——好数据通过、坏数据（字段写错/类型错）抛 VALIDATION_FAILED，绝不产生 NaN。
  *
- * M1 可用道具：calm-pill / milk-tea / stamina-potion / coffee / focus-engine /
+ * M1 可用道具：calm-pill / milk-tea / stamina-potion / drumstick-bento / coffee / focus-engine /
  *         直用书 book-thinking|book-coding|book-setting × 五档。
  * M1 不可用（VALIDATION_FAILED「该道具暂不可用」）：vigor-drink（energy_restore 20 需比赛场景，M1 无比赛）、
  *         升阶/洗练/礼盒/徽章/六维书/tag 类/advance-stone 等。
@@ -146,6 +146,8 @@ export function applyItemEffect(input: EffectApplyInput): EffectApplyResult {
       return milkTea(numericField(def.effect, 'amount', itemId), student, now);
     case 'stamina-potion':
       return staminaPotion(numericField(def.effect, 'amount', itemId), student, now);
+    case 'drumstick-bento':
+      return drumstickBento(numericField(def.effect, 'amount', itemId), student);
     case 'coffee':
       return coffee(coffeeField(def.effect, itemId), student, now);
     case 'focus-engine':
@@ -228,6 +230,18 @@ function staminaPotion(amount: number, s: Student, now: Date): EffectApplyResult
   return {
     patch: { stamina },
     counters: { ...c, staminaPotionDaily: used + 1, staminaPotionDailyKey: key },
+  };
+}
+
+/**
+ * 鸡腿便当：体力恢复 clamp [0, 5]（+5 即回满）。
+ * 不设每日限额——供给仅来自剧情关卡首通（每层每关 ×1，stages.yaml defaults），天然限量。
+ */
+function drumstickBento(amount: number, s: Student): EffectApplyResult {
+  const stamina = clamp(s.stamina + amount, 0, STAMINA_CAP);
+  return {
+    patch: { stamina },
+    counters: countersOf(s),
   };
 }
 

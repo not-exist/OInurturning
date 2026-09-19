@@ -340,6 +340,7 @@ k   = 2
 | focus-engine | 心流引擎 | focus_cap 永久 +10，每人最多 1 台【items.yaml 权威】。 |
 | milk-tea | 奶茶 | 心态 +2（不超过 +10）；每日限 2 杯；可代替扣钱化解事件 G8【items.yaml 权威】。 |
 | stamina-potion | 体力药水 | 立即恢复 3 点体力（不超过 5）；每日限 1 瓶【items.yaml 权威】。 |
+| drumstick-bento | 鸡腿便当 | 立即恢复 5 点体力（不超过 5，即回满）；不设每日限额——供给仅来自剧情首通（每层每关 ×1），天然限量【items.yaml 权威】。剧情模式每关首通固定发放 ×1（NG+ 各层首通独立发放，stages.yaml defaults 配置）。 |
 | coffee | 浓咖啡 | 立即恢复 1 点体力，心态 −1（咖啡因副作用）；每日限 2 杯【items.yaml 权威】。 |
 | direction-charm | 方向锁定符（新增） | 下一次洗练的结果**锁定指定家族**（在该家族内按常规稀有度权重抽取）；不改变保底计数。仅影响洗练（升阶本就必成功，无需锁定）。事件 R6 的发放/消耗载体。 |
 | legend-box | 传说礼盒 | 打开固定获得：advance-stone×4 + 200,000 钱（IOI 正赛首通唯一奖励，「大额结算金」的具体化；金额以 items.yaml/economy.yaml 为权威）。 |

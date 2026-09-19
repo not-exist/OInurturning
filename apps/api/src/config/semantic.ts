@@ -189,6 +189,16 @@ function checkStages(
     });
   });
 
+  stages.defaults.first_clear_fixed_items.forEach((reward, rewardIndex) => {
+    if (!itemIds.has(reward.item)) {
+      issues.push({
+        file: 'stages',
+        path: `defaults.first_clear_fixed_items.${rewardIndex}.item`,
+        message: `首通固定道具引用不存在：${reward.item}`,
+      });
+    }
+  });
+
   stages.full_clear.items.forEach((reward, rewardIndex) => {
     if (!itemIds.has(reward.item)) {
       issues.push({

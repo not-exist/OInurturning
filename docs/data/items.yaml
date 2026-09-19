@@ -276,6 +276,22 @@ items:
     stack: 99
     description: 浓缩葡萄糖加一点薄荷味。今天必须再战一场的时候，就靠它。
 
+  - id: drumstick-bento
+    name: 鸡腿便当
+    category: functional
+    rarity: blue
+    effect:
+      desc: 使用后使一名学员立即恢复 5 点体力（不超过上限 5，即回满）。
+      kind: stamina_restore
+      amount: 5
+      target: single_student
+      usage_timing: 非比赛时段任意时刻；不设每日限额（供给仅来自剧情首通，天然限量）
+    price: null
+    sources:
+      - 剧情模式关卡首通奖励（每关 ×1，NG+ 各层首通独立发放）
+    stack: 99
+    description: 通关庆祝餐。教练说到做到：题过了，鸡腿加上，饭管够。
+
   - id: coffee
     name: 浓咖啡
     category: functional
