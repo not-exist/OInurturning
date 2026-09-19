@@ -67,14 +67,16 @@ recruitment:
 
 # ----------------------------------------------------------------------
 # 新用户开局包（注册即发放，存量裸号由 grant-onboarding-backfill.ts 回填）
-# 设计论证：money=1000 覆盖「招第 3 人（N=2 common 价 547）+ 5~8 次基础训练 + 1 次刷新」，
-#   恰好跑通一轮循环；reputation=10 使开除 COMMON（−5）有真实代价感，
+# 设计论证：money=2500 覆盖「招第 3 人（N=2 common 价 547）+ 1 名 GOOD（N=2 good 价 821）
+#   + 10~13 次基础训练 + 1 次刷新」，开局即可双线扩张并留有训练余量；
+#   reputation=10 使开除 COMMON（−5）有真实代价感，
 #   同时 rep_mult=1.02 对讲课收入几乎无扰动；GOOD（V≈14）可打 CSP-J 前两关
 #   （recommended 10/13）并落在入门组讲课强接窗内，COMMON 作第二行动点。
 #   students 按序发放固定品质；items.id 须在 items.yaml 存在（启动语义校验）。
+#   关卡首通另有鸡腿便当 ×1（+5 体力食物）固定奖励，见 stages.yaml defaults。
 # ----------------------------------------------------------------------
 onboarding:
-  money: 1000
+  money: 2500
   reputation: 10
   students:
     - { quality: good }

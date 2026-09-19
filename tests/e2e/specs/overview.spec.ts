@@ -18,7 +18,7 @@ test.describe('总览与开局任务', () => {
 
     await page.goto('/');
     await expect(page.getByTestId('overview-page')).toBeVisible();
-    await expect(page.getByTestId('overview-wallet')).toContainText('金币 1000');
+    await expect(page.getByTestId('overview-wallet')).toContainText('金币 2500');
     await expect(page.getByTestId('overview-wallet')).toContainText('声誉 10');
     await expect(page.getByText('我的学员（2）')).toBeVisible();
     await expect(page.getByTestId('checklist-progress')).toHaveText('0/5');

@@ -94,7 +94,7 @@ describe('lecture gaps', () => {
 
   it('精确结算：beginner + V=20 + rep=0 → 72 金/1 誉/体力 3', async () => {
     const user = await register();
-    await prisma.user.update({ where: { id: user.userId }, data: { money: 0, reputation: 0 } }); // 开局包 1000 金/10 誉归零
+    await prisma.user.update({ where: { id: user.userId }, data: { money: 0, reputation: 0 } }); // 开局包 2500 金/10 誉归零
     const student = await makeStudent(user.userId, 20);
     const res = await request(app)
       .post('/api/academy/lectures')

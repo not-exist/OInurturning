@@ -94,6 +94,9 @@ export const stagesDefaultsSchema = z
     stamina_cost_by_chapter: z.record(z.enum(STAGE_CHAPTERS), positiveInt),
     pass_rank_max: positiveInt,
     roster_size: rosterSizeSchema,
+    /** 每关首通固定发放的道具（引用 items.yaml id；可为空数组＝不发放）。
+     *  与 first_clear.items 的稀有度抽选池互不影响；NG+ 各层首通照常发放、不参与稀有度上移。 */
+    first_clear_fixed_items: z.array(stageMilestoneItemSchema),
   })
   .strict();
 

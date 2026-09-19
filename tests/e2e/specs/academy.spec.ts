@@ -39,7 +39,7 @@ test.describe('高级学院', () => {
 
   test('金币不足时招募被拒并提示"金币不足"', async ({ page, request }) => {
     const account = await registerUser(request, 'acad');
-    // 开局包自带 1000 金：显式清零以覆盖“金币不足”分支
+    // 开局包自带 2500 金：显式清零以覆盖“金币不足”分支
     await fund(account.username, { money: 0 });
     await loginViaUI(page, account.username, account.password);
 

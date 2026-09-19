@@ -134,7 +134,7 @@ describe('GET /api/overview', () => {
     const user = await register();
     const ov = await fetchOverview(user.token);
 
-    expect(ov.me.money).toBe(1000);
+    expect(ov.me.money).toBe(2500);
     expect(ov.me.reputation).toBe(10);
     expect(ov.me.onboardedAt).toEqual(expect.any(String));
 

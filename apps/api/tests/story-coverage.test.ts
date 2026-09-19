@@ -278,6 +278,13 @@ describe('story coverage：首通与复刷', () => {
     expect(view.report.format).toBe('RANKING');
     expect(view.summary.format).toBe('RANKING');
     expect(view.rewards).toContainEqual({ type: 'first_clear_money', amount: expectedMoney });
+    // defaults.first_clear_fixed_items：每关首通固定发放鸡腿便当 ×1（docs/data 口径）
+    expect(view.rewards).toContainEqual({ type: 'first_clear_item', itemId: 'drumstick-bento', count: 1 });
+    expect(
+      await prisma.userItem.findUnique({
+        where: { userId_itemId: { userId: user.me.id, itemId: 'drumstick-bento' } },
+      }),
+    ).toMatchObject({ quantity: 1 });
 
     const after = await prisma.user.findUniqueOrThrow({ where: { id: user.me.id } });
     expect(after.money - before.money).toBe(expectedMoney);
@@ -386,6 +393,13 @@ describe('story coverage：NG+', () => {
     const record = await request(app).get(`/api/records/${data.record.id}`).set('Authorization', `Bearer ${user.accessToken}`);
     const rewards = unwrapOk<{ rewards: RewardLine[] }>(record).rewards;
     expect(rewards).toContainEqual({ type: 'first_clear_money', amount: Math.round(base * 1.5) });
+    // NG+ 各层首通独立发放 defaults.first_clear_fixed_items（鸡腿便当），不参与稀有度上移
+    expect(rewards).toContainEqual({ type: 'first_clear_item', itemId: 'drumstick-bento', count: 1 });
+    expect(
+      await prisma.userItem.findUnique({
+        where: { userId_itemId: { userId: user.me.id, itemId: 'drumstick-bento' } },
+      }),
+    ).toMatchObject({ quantity: 1 });
 
     const auth = { Authorization: `Bearer ${user.accessToken}` };
     const ng1 = unwrapOk<Array<{ stageKey: string; ngLevel: number }>>(await request(app).get('/api/story/progress?ngLevel=1').set(auth));

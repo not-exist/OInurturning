@@ -22,9 +22,9 @@ recruitment:
     free_interval_hours: 24
 
 # 开局包与 docs/data/economy.yaml 同值：注册链路在两种配置下行为一致，
-# 单测可直接断言 money=1000/reputation=10/学员 2 名（GOOD+COMMON）。
+# 单测可直接断言 money=2500/reputation=10/学员 2 名（GOOD+COMMON）。
 onboarding:
-  money: 1000
+  money: 2500
   reputation: 10
   students:
     - {quality: good}

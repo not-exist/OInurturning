@@ -28,12 +28,12 @@ async function register(): Promise<{ token: string; userId: number; username: st
 describe('onboarding grant', () => {
   beforeEach(resetUsers);
 
-  it('注册即发放：1000 金/10 誉/GOOD+COMMON/黄书×1+奶茶×2/5 人池/onboardedAt', async () => {
+  it('注册即发放：2500 金/10 誉/GOOD+COMMON/黄书×1+奶茶×2/5 人池/onboardedAt', async () => {
     const user = await register();
     const auth = { Authorization: `Bearer ${user.token}` };
 
     const me = unwrapOk<MeView>(await request(app).get('/api/users/me').set(auth));
-    expect(me.money).toBe(1000);
+    expect(me.money).toBe(2500);
     expect(me.reputation).toBe(10);
 
     const row = await prisma.user.findUniqueOrThrow({ where: { id: user.userId } });
@@ -77,6 +77,6 @@ describe('onboarding grant', () => {
       prisma.$transaction((tx) => grantOnboardingPackage(tx, bare.id)),
     ).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
     expect(await prisma.student.count({ where: { userId: bare.id } })).toBe(2);
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: bare.id } })).money).toBe(1000);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: bare.id } })).money).toBe(2500);
   });
 });
