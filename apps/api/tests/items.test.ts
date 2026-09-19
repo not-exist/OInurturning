@@ -149,7 +149,7 @@ describe('POST /api/items/use 正例', () => {
     expect(await itemQuantity(u.userId, 'stamina-potion')).toBe(1);
   });
 
-  it('drumstick-bento：体力 +5 回满（clamp 5），每日限 1 份', async () => {
+  it('drumstick-bento：体力 +5 回满（clamp 5），不设每日限额', async () => {
     const u = await createAuthedUser();
     const id = await createStudent(u.userId, { stamina: 2 });
     await giveItem(u.userId, 'drumstick-bento', 2);
@@ -157,11 +157,11 @@ describe('POST /api/items/use 正例', () => {
     const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'drumstick-bento', studentId: id }));
     expect(view.stamina).toBeCloseTo(5, 3); // 2+5 → clamp 5（回满）
 
-    // 第 2 份 → 每日限 1 → VALIDATION_FAILED（且不扣第 2 份）
+    // 同日第 2 份仍可用（供给仅剧情首通限量，无每日限额）；已满则 clamp 保持 5、照常扣道具
     const r2 = await use(u.token, { itemId: 'drumstick-bento', studentId: id });
-    expect(r2.status).toBe(400);
-    expect(unwrapErr(r2).code).toBe('VALIDATION_FAILED');
-    expect(await itemQuantity(u.userId, 'drumstick-bento')).toBe(1);
+    expect(r2.status).toBe(200);
+    expect(unwrapOk<StudentView>(r2).stamina).toBeCloseTo(5, 3);
+    expect(await itemQuantity(u.userId, 'drumstick-bento')).toBe(0);
 
     // 他人学员 → FORBIDDEN
     const other = await createAuthedUser();

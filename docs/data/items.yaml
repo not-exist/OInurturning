@@ -285,7 +285,7 @@ items:
       kind: stamina_restore
       amount: 5
       target: single_student
-      usage_timing: 非比赛时段；每名学员每日限用 1 份
+      usage_timing: 非比赛时段任意时刻；不设每日限额（供给仅来自剧情首通，天然限量）
     price: null
     sources:
       - 剧情模式关卡首通奖励（每关 ×1，NG+ 各层首通独立发放）

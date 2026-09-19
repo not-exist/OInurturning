@@ -70,7 +70,6 @@ function bookFields(eff: unknown, itemId: string): { attribute: string; amount: 
 export const MILK_TEA_DAILY_LIMIT = 2;
 export const COFFEE_DAILY_LIMIT = 2;
 export const STAMINA_POTION_DAILY_LIMIT = 1;
-export const DRUMSTICK_BENTO_DAILY_LIMIT = 1;
 export const FOCUS_ENGINE_MAX_USES = 1;
 export const BOOK_WEEK_CAP = 10;
 export const FOCUS_CAP_MAX = 100;
@@ -96,8 +95,6 @@ interface Counters {
   coffeeDailyKey?: string;
   staminaPotionDaily?: number;
   staminaPotionDailyKey?: string;
-  drumstickBentoDaily?: number;
-  drumstickBentoDailyKey?: string;
   bookWeek?: Record<string, number>;
   bookWeekKey?: string;
   focusEngineUsed?: number;
@@ -150,7 +147,7 @@ export function applyItemEffect(input: EffectApplyInput): EffectApplyResult {
     case 'stamina-potion':
       return staminaPotion(numericField(def.effect, 'amount', itemId), student, now);
     case 'drumstick-bento':
-      return drumstickBento(numericField(def.effect, 'amount', itemId), student, now);
+      return drumstickBento(numericField(def.effect, 'amount', itemId), student);
     case 'coffee':
       return coffee(coffeeField(def.effect, itemId), student, now);
     case 'focus-engine':
@@ -236,21 +233,15 @@ function staminaPotion(amount: number, s: Student, now: Date): EffectApplyResult
   };
 }
 
-/** 鸡腿便当：体力恢复 clamp [0, 5]（+5 即回满），每日限 1 份（counters.drumstickBentoDaily/drumstickBentoDailyKey） */
-function drumstickBento(amount: number, s: Student, now: Date): EffectApplyResult {
-  const c = countersOf(s);
-  const key = dayKey(now);
-  const used = dailyUsed(c, 'drumstickBentoDaily', 'drumstickBentoDailyKey', key);
-  if (used >= DRUMSTICK_BENTO_DAILY_LIMIT) {
-    throw new ApiError('VALIDATION_FAILED', {
-      resource: 'drumstick-bento',
-      reason: `每日限 ${DRUMSTICK_BENTO_DAILY_LIMIT} 份，今日已用 ${used} 份`,
-    });
-  }
+/**
+ * 鸡腿便当：体力恢复 clamp [0, 5]（+5 即回满）。
+ * 不设每日限额——供给仅来自剧情关卡首通（每层每关 ×1，stages.yaml defaults），天然限量。
+ */
+function drumstickBento(amount: number, s: Student): EffectApplyResult {
   const stamina = clamp(s.stamina + amount, 0, STAMINA_CAP);
   return {
     patch: { stamina },
-    counters: { ...c, drumstickBentoDaily: used + 1, drumstickBentoDailyKey: key },
+    counters: countersOf(s),
   };
 }
 

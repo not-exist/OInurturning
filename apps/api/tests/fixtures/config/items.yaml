@@ -141,11 +141,11 @@ items:
     category: functional
     rarity: blue
     effect:
-      desc: 立即恢复 5 点体力（不超过 5，即回满）；每名学员每日限用 1 份。
+      desc: 立即恢复 5 点体力（不超过 5，即回满）。
       kind: stamina_restore
       amount: 5
       target: single_student
-      usage_timing: 非比赛时段；每名学员每日限用 1 份
+      usage_timing: 非比赛时段任意时刻
     price: null
     sources: [剧情模式关卡首通奖励]
     stack: 99
