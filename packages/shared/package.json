@@ -8,6 +8,6 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "zod": "^3.25.67" },
+  "dependencies": { "zod": "^4.6.5" },
   "devDependencies": { "typescript": "^6.0.3" }
 }
