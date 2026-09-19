@@ -2,7 +2,9 @@ name: oinur
 
 services:
   mysql:
-    image: mysql:26.7
+    # 26.7 无法从 8.4 就地升级（MY-014060：非同一兼容谱系，且 8.4 不是其上一个 LTS），
+    # 需先按谱系逐级升级或改为 dump/restore 逻辑迁移，在此之前保持 8.4。
+    image: mysql:8.4
     container_name: oinur-mysql
     restart: unless-stopped
     environment:
