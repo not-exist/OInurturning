@@ -111,7 +111,7 @@ OInurturning/
 │           └── index.ts
 ├── deploy/
 │   ├── docker-compose.yml        # 生产编排（mysql + api + nginx，§10.1）
-│   ├── api.Dockerfile            # 多阶段构建：pnpm build → node:22-alpine 运行时
+│   ├── api.Dockerfile            # 多阶段构建：pnpm build → node:26-alpine 运行时
 │   ├── web.Dockerfile            # 多阶段构建：vite build → nginx:alpine 托管静态 + 内嵌反代配置
 │   ├── nginx.conf                # SPA fallback、/api 反代、安全响应头
 │   └── backup.sh                 # mysqldump 备份脚本（供 crontab 调用，§10.3）
@@ -1582,7 +1582,7 @@ volumes:
   dbdata:
 ```
 
-api.Dockerfile 要点：多阶段构建（node:22-alpine；stage1 pnpm install --frozen-lockfile + 构建 api/web/shared；stage2 仅拷贝产物 + prisma CLI），入口脚本先 `prisma migrate deploy` 再 `node dist/index.js`——迁移版本化，重复执行幂等。web.Dockerfile 内嵌反代配置与 nginx.conf 一致。
+api.Dockerfile 要点：多阶段构建（node:26-alpine；stage1 pnpm install --frozen-lockfile + 构建 api/web/shared；stage2 仅拷贝产物 + prisma CLI），入口脚本先 `prisma migrate deploy` 再 `node dist/index.js`——迁移版本化，重复执行幂等。web.Dockerfile 内嵌反代配置与 nginx.conf 一致。
 
 nginx.conf 核心段：
 

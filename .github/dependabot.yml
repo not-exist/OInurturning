@@ -10,7 +10,7 @@
 # The ecosystems below were chosen from what actually exists in this repo:
 #   - pnpm workspace: root package.json + pnpm-workspace.yaml + pnpm-lock.yaml,
 #     workspaces apps/* and packages/*        -> "npm" at "/"
-#   - deploy/api.Dockerfile, deploy/web.Dockerfile (node:22-alpine, nginx:alpine)
+#   - deploy/api.Dockerfile, deploy/web.Dockerfile (node:26-alpine, nginx:alpine)
 #                                             -> "docker" at "/deploy"
 #   - docker-compose.yml (root) and deploy/docker-compose.yml (mysql:8.4)
 #                                             -> "docker-compose" at "/" + "/deploy"
@@ -60,7 +60,7 @@ updates:
 
   # Compose files are a separate ecosystem: the "docker" ecosystem only looks at
   # Dockerfile/Containerfile and Kubernetes/Helm YAML, so it would never touch
-  # the `image: mysql:8.4` entries below.
+  # the `image: mysql:26.7` entries below.
   - package-ecosystem: 'docker-compose'
     directories:
       - '/'
