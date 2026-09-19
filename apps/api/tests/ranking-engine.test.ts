@@ -148,7 +148,7 @@ function memberScoreSum(report: ReturnType<typeof simulateRanking>, teamIndex: n
 }
 
 describe('ranking simulation and ordering', () => {
-  it('simulates every team member independently and keeps the flat member order', () => {
+  it('simulates team members cooperatively and keeps the flat member order', () => {
     const report = simulateRanking(rankingInput(), 17);
 
     expect(report.teams).toHaveLength(2);
@@ -222,6 +222,77 @@ describe('ranking simulation and ordering', () => {
     // 多人做同一题 → 队内成绩之和必然大于入账的队伍总分，证明没有重复计分
     expect(memberScoreSum(report, 0)).toBeGreaterThan(expectedTeamScore);
     expect(homeStanding?.totalScore).toBeLessThanOrEqual(memberScoreSum(report, 0));
+  });
+
+  it('team cooperation: members never select a problem the team has already passed', () => {
+    const cooperativeProblems = [
+      question({
+        instanceId: 'coop#a',
+        index: 0,
+        demand: 30,
+        thought: 28,
+        codeVolume: 20,
+        score: 100,
+        timeLimitMin: 30,
+      }),
+      question({
+        instanceId: 'coop#b',
+        index: 1,
+        dimension: 'DP',
+        demand: 60,
+        thought: 55,
+        codeVolume: 50,
+        score: 100,
+        timeLimitMin: 60,
+      }),
+    ];
+    const input = rankingInput({
+      teams: [
+        {
+          teamId: 'home',
+          side: 'HOME',
+          userId: 1,
+          members: [
+            { ...player(), displayName: 'Ace', abilities: abilities(95), studentId: 10 },
+            { ...player(), displayName: 'Helper·1', abilities: abilities(70), studentId: 11 },
+            { ...player(), displayName: 'Helper·2', abilities: abilities(70), studentId: 12 },
+          ],
+        },
+        npcTeam('npc:0', participant('NPC', 55)),
+      ],
+      problems: cooperativeProblems,
+      durationMin: 300,
+    });
+
+    let passedObserved = 0;
+    for (let seed = 0; seed < 24; seed += 1) {
+      const report = simulateRanking(input, seed);
+
+      for (let teamIndex = 0; teamIndex < report.teams.length; teamIndex += 1) {
+        const timelines = memberTimelines(report, teamIndex);
+        for (const target of cooperativeProblems) {
+          const attempts = timelines.flatMap((timeline) =>
+            timeline.attempts.filter((attempt) => attempt.problemInstanceId === target.instanceId),
+          );
+          const acFinishTimes = attempts
+            .filter((attempt) => attempt.verdict === 'AC')
+            .map((attempt) => attempt.startMin + attempt.minutesUsed);
+          if (acFinishTimes.length === 0) continue;
+          passedObserved += 1;
+
+          const firstPassMin = Math.min(...acFinishTimes);
+          for (const attempt of attempts) {
+            // 队内首通之后开始的作答不应存在：选题时该题已通过，队员不会再选
+            expect(
+              attempt.startMin,
+              `seed=${seed} team=${teamIndex} problem=${target.instanceId}`,
+            ).toBeLessThan(firstPassMin);
+          }
+        }
+      }
+    }
+    // 前提非空：24 个种子下必然出现过队内通过，否则上面的断言是空验证
+    expect(passedObserved).toBeGreaterThan(0);
   });
 
   it('uses score, AC time, and stable team index as the complete standings key', () => {

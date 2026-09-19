@@ -101,7 +101,7 @@ describe('M2 consolidated golden', () => {
 
     expect(stableSerialize(simulateRanking(rankingInput, 20260901))).toBe(stableSerialize(ranking));
     expect(stableSerialize(simulateDuel(duelInput, 20260901))).toBe(stableSerialize(duel));
-    expect(stableHash(ranking)).toBe('2087e0bc');
+    expect(stableHash(ranking)).toBe('8e39b133');
     expect(stableHash(duel)).toBe('247b5b9c');
   });
 

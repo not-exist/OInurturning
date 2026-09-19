@@ -40,7 +40,8 @@ describe('M2 configuration schemas', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.stages).toHaveLength(33);
-      expect(result.data.stages[0]?.problem_slots[0]).toMatchObject({ tier: 'cspj', count: 3 });
+      // CSP-J/CSP-S 各关固定 4 题（与现实 CSP 题量一致）
+      expect(result.data.stages[0]?.problem_slots[0]).toMatchObject({ tier: 'cspj', count: 4 });
       expect(result.data.full_clear.unlocks).toBe('ng_plus');
       expect(result.data.ng_plus.layer_cap).toBeNull();
       // 每关首通固定道具（鸡腿便当 ×1）：defaults 必填键

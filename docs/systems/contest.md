@@ -110,8 +110,8 @@ interface RankedContestInput {
 ```
 
 - `teams` 是完整的参赛队伍快照：玩家队固定为 `teams[0]`，其余队伍均为 NPC；每队成员数为 3~4 且同场一致。
-- 每名 `ParticipantSnapshot` 独立运行三缺口解题流程，拥有独立时钟、精力、心态与选题状态；队内不同成员可以随机选到同一道题并分别尝试。
-- 引擎先生成每名队员的时间线，再按题聚合为队伍结果；同一道题只计入队内最好的一份成绩，不能重复计分。
+- **队员协作选题**：队伍共享「队内已通过题集」。某题一旦被队内任何成员 AC，其他成员之后的选题不会再选择该题（进行中的作答不被打断）；每名成员仍在各自独立时钟上运行三缺口解题流程，拥有独立精力、专注与心态。
+- 引擎按事件驱动推进队伍模拟：队员在各自时钟上并行攻题，完成最早者先结算并更新队内共享状态；同一时刻完成按队内成员序号结算，保证确定性。随后按题聚合为队伍结果；同一道题只计入队内最好的一份成绩，不能重复计分。
 
 ### 3.3 三缺口耗时模型
 
@@ -273,28 +273,28 @@ fail():   // WA 与判题 TLE 共用失败处理，仅 flavor 与个别 hook 不
   - `partial_override: none`（如 SPJ、大数据范围）或 `trap`（部分分陷阱）→ 0 分；
   - 其余未尝试或投入不足 → 0 分。
 
-### 3.7 AI 选题策略（每名队员独立，统一规则）
+### 3.7 AI 选题策略（队内协作，统一规则）
 
 ```
-每名队员每轮从自己的「未尝试 且 energy ≥ Eneed」题目中按优先级随机选题：
+每名队员每轮从「自己未尝试 且 队内未通过 且 energy ≥ Eneed」的题目中按优先级随机选题：
 priority(p) = p.score / tEst(p, 当前 focus)
-order 子流可对优先级施加随机扰动；队内不共享已尝试集合，允许撞题。
+order 子流可对优先级施加随机扰动。
+协作规则：队内共享已通过题集——某题被任何队员 AC 后，其他队员之后的选题不会再选它
+（已在进行中的作答不受影响），避免全队反复消耗同一道已通过的题。
 ```
 
 - 选题本身不消耗时间（开场读题并入第一题用时）。
 - 被 SKIP_ENERGY 跳过的题仍留在该队员的候选集，精力不会回升（场内无回复），故自然形成「由易到难再回头」的行为。
-- 所有队员使用同一策略与随机规则，玩家队与 NPC 队公平；同一队内成员各自选题，互不阻止对方尝试同题。
+- 所有队员使用同一策略与随机规则，玩家队与 NPC 队公平；队内唯一的协作是共享已通过题集（已过不再选），不做其他干预。
 
 ### 3.8 完整伪代码
 
 ```ts
 function simulateRankedContest(input: RankedContestInput, seed: u32): ContestReport {
   const rng = streams(seed);                          // §0.4 子流
+  // 队内协作：按队模拟，队内共享「已通过题集」（§3.7）；玩家队与 NPC 队同规则
   const timelines = input.teams.flatMap((team, teamIndex) =>
-    team.members.map((member, memberIndex) =>
-      simulateParticipant(member, input.problems, input.durationMin,
-                          rng.stream(`member:${teamIndex}:${memberIndex}`)),
-    ),
+    simulateTeam(team, input.problems, input.durationMin, rng, teamIndex),
   );
 
   const teamResults: TeamResult[] = [];
@@ -307,28 +307,45 @@ function simulateRankedContest(input: RankedContestInput, seed: u32): ContestRep
   return settle(input, timelines, teamResults, ranking); // §3.11–3.14
 }
 
-function simulateParticipant(participant, probs, durationMin, memberRng): ParticipantResult {
-  let clock = durationMin, focus = 0;
-  let energy = participant.energy, mindset = participant.mindset;
-  const resolved = new Set<string>();          // 每名队员独立；队内不共享
-  const timeline: AttemptRecord[] = [];
-  const remaining = () => probs.filter(p => !resolved.has(p.instanceId));
+function simulateTeam(team, probs, durationMin, rng, teamIndex): ParticipantTimeline[] {
+  const members = team.members.map((m, i) => ({
+    ...initMemberState(m),                            // clock=0, focus=0, energy/mindset 入场值
+    rng: rng.stream(`member:${teamIndex}:${i}`),
+    remaining: new Set(probs.map(p => p.instanceId)), // 自己未尝试的题
+    timeline: [], busy: null,
+  }));
+  const teamPassed = new Set<string>();               // 队内已通过题集（协作唯一通道）
 
-  while (clock > 0 && remaining().length > 0) {
-    const affordable = remaining().filter(p => energy >= eneed(p, participant));
-    if (affordable.length === 0) {
-      for (const p of remaining()) timeline.push(skipEnergyRecord(p));  // 各记弃题 −3 心态
-      break;
+  for (;;) {
+    // 1) 空闲队员开题：候选 = 自己未尝试 ∩ 队内未通过 ∩ 精力可负担；按优先级选题后整题结算
+    for (const m of members) {
+      if (m.busy || m.clock >= durationMin) continue;
+      const affordable = m.remaining
+        .filter(id => !teamPassed.has(id))            // ★ 已通过的题不会再被选择
+        .filter(p => m.energy >= eneed(p, m));
+      if (affordable.length === 0) {
+        for (const p of m.remaining.filter(id => !teamPassed.has(id)))
+          m.timeline.push(skipEnergyRecord(p));       // 各记弃题 −3 心态（不耗时）
+        continue;
+      }
+      const p = chooseByPriorityAndRandomness(affordable, m, m.focus, m.rng);
+      const r = resolveProblem(m, p, durationMin - m.clock, m.focus, m.energy, m.mindset, m.rng);
+      m.busy = { p, r, start: m.clock, finish: m.clock + r.timeSpentMin };
     }
-    const p = chooseByPriorityAndRandomness(affordable, participant, focus, memberRng);
-    const r = resolveProblem(participant, p, clock, focus, energy, mindset, memberRng);
-    apply(r): clock -= r.timeSpentMin; energy -= r.energyCost;
-              focus  = updateFocus(focus, r, mindset, participant.focusCap);
-              mindset = clamp(mindset + r.mindsetDelta, -10, 10);
-              resolved.add(p.instanceId);       // 仅该队员的集合；其他队员可再次选择 p
-    timeline.push(r);
+    // 2) 推进到最早完成时刻并结算；同时刻按队内成员序号（确定性）
+    const next = min(m.busy?.finish ?? +∞);
+    if (next === +∞) break;
+    for (const m of members.filter(m => m.busy?.finish === next)) {
+      apply(m, m.busy.r): m.clock = next; m.energy -= r.energyCost;
+            m.focus = updateFocus(m.focus, r, m.mindset, m.focusCap);
+            m.mindset = clamp(m.mindset + r.mindsetDelta, -10, 10);
+            m.remaining.delete(m.busy.p.instanceId);
+      if (m.busy.r.verdict === 'AC') teamPassed.add(m.busy.p.instanceId);  // ★ 通过即共享
+      m.timeline.push(m.busy.r);
+      m.busy = null;
+    }
   }
-  return { timeline, totals, mindsetEnd: mindset };
+  return members.map(toTimeline);
 }
 
 function aggregateTeam(timelines: ParticipantTimeline[]): TeamResult {
@@ -504,6 +521,7 @@ interface AttemptRecord {
   problemInstanceId: string;
   verdict: 'AC' | 'UNFINISHED' | 'SKIP_ENERGY';
   submissions: number;                // 含 WA 与判题 TLE 的提交次数
+  startMin: number;                   // 该题在该队员独立时钟上的开始时刻；协作选题审计用
   timeSpentMin: number;               // 含罚时
   penaltyMin: number;                 // 其中 20min 罚时合计
   energyCost: number;

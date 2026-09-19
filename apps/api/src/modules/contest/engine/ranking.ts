@@ -1,6 +1,7 @@
 import {
   rankingInputSchema,
   rankingSeedSchema,
+  type ContestTeam,
   type FrozenSolveHooks,
   type ParticipantAttempt,
   type ParticipantSnapshot,
@@ -21,12 +22,6 @@ import {
   validateRankingReport,
 } from './report.js';
 
-interface ParticipantResult {
-  timeline: ParticipantTimeline;
-  totalScore: number;
-  rankingPenaltyMin: number;
-}
-
 /** 同一道题在队内的候选成绩；AC 才计入罚时（沿用 ACM 口径）。 */
 interface TeamAttemptCandidate {
   scoreAwarded: number;
@@ -44,11 +39,12 @@ function hooksFor(question: QuestionSnapshot): readonly FrozenSolveHooks[] {
   return question.traits.flatMap((trait) => trait.hooks);
 }
 
-function toTimelineAttempt(resolution: QuestionAttempt): ParticipantAttempt {
+function toTimelineAttempt(resolution: QuestionAttempt, startMin: number): ParticipantAttempt {
   return {
     problemInstanceId: resolution.problemInstanceId,
     questionIndex: resolution.questionIndex,
     verdict: resolution.verdict,
+    startMin,
     minutesUsed: resolution.timeSpentMin,
     penaltyMin: resolution.penaltyMin,
     focusGain: resolution.focusAfter - resolution.focusBefore,
@@ -104,105 +100,160 @@ function participantRng(seed: number, participantIndex: number): AttemptRng {
   };
 }
 
-function simulateParticipant(
-  participant: ParticipantSnapshot,
+/** 一名队员的队内协作模拟状态（独立时钟、精力、专注、心态与选题集合）。 */
+interface MemberSimulationState {
+  participant: ParticipantSnapshot;
+  rng: AttemptRng;
+  clockMin: number;
+  energy: number;
+  focus: number;
+  mindset: number;
+  /** 该队员尚未尝试过的题目位置（选题时再剔除队内已通过的题）。 */
+  remaining: Set<number>;
+  attempts: ParticipantAttempt[];
+  busy: {
+    position: number;
+    startMin: number;
+    finishMin: number;
+    resolution: QuestionAttempt;
+  } | null;
+}
+
+/**
+ * 队伍协作模拟（§3.7）：队员共享「队内已通过题集」——某题一旦被任何队员 AC，
+ * 其他队员在之后的选题中不会再选择它（进行中的作答不受影响）。
+ * 事件驱动：队员在各自时钟上并行攻题，完成时间最早者先结算并更新共享状态，
+ * 同一时刻完成按队内成员序号结算，保证确定性。
+ */
+function simulateTeam(
+  team: ContestTeam,
   questions: readonly QuestionSnapshot[],
   durationMin: number,
   seed: number,
-  participantIndex: number,
-): ParticipantResult {
-  const rng = participantRng(seed, participantIndex);
-  const remaining = new Set(questions.map((_, position) => position));
-  const accepted = new Set<number>();
-  const attempts: ParticipantAttempt[] = [];
-  let remainingClockMin = durationMin;
-   let energy = participant.energy ?? participant.energyMax;
-  let focus = 0;
-  let mindset = participant.mindset;
-  let totalScore = 0;
-  let rankingPenaltyMin = 0;
+  participantOffset: number,
+): ParticipantTimeline[] {
+  const members: MemberSimulationState[] = team.members.map((participant, memberIndex) => ({
+    participant,
+    rng: participantRng(seed, participantOffset + memberIndex),
+    clockMin: 0,
+    energy: participant.energy ?? participant.energyMax,
+    focus: 0,
+    mindset: participant.mindset,
+    remaining: new Set(questions.map((_, position) => position)),
+    attempts: [],
+    busy: null,
+  }));
+  const teamPassed = new Set<number>();
 
-  while (remainingClockMin > 0 && remaining.size > 0) {
-    const context = hookContext(attempts.length, accepted.size, questions.length);
-    const available = [...remaining].filter((position) => {
-      const question = questions[position]!;
-      return energy >= energyCost({ participant, question, hooks: hooksFor(question), hookContext: context });
-    });
+  for (;;) {
+    // 1) 空闲队员选题开题：候选 = 自己未尝试 且 队内未通过 且 精力可负担。
+    for (const member of members) {
+      if (member.busy !== null || member.clockMin >= durationMin) continue;
 
-    if (available.length === 0) {
-      const skipped = [...remaining].sort((left, right) => {
-        const instanceDifference = compareCodeUnits(questions[left]!.instanceId, questions[right]!.instanceId);
-        return instanceDifference === 0 ? left - right : instanceDifference;
+      const context = hookContext(member.attempts.length, teamPassed.size, questions.length);
+      const available = [...member.remaining].filter((position) => {
+        if (teamPassed.has(position)) return false;
+        const question = questions[position]!;
+        return (
+          member.energy >=
+          energyCost({ participant: member.participant, question, hooks: hooksFor(question), hookContext: context })
+        );
       });
 
-      for (const position of skipped) {
-        const question = questions[position]!;
-        const resolution = solveQuestion(
-          {
-            participant,
-            question,
-            availableEnergy: energy,
-            remainingClockMin,
-            focus,
-            mindset,
-            partialScores: question.partialScores,
-            hooks: hooksFor(question),
-            hookContext: hookContext(attempts.length, accepted.size, questions.length),
-          },
-          rng,
-        );
-        attempts.push(toTimelineAttempt(resolution));
-        energy = resolution.energyAfter;
-        focus = resolution.focusAfter;
-        mindset = resolution.mindsetAfter;
-        remaining.delete(position);
+      if (available.length === 0) {
+        // 剩余未通过题全部不可负担 → 逐题记 SKIP（不耗时），该队员随后离场。
+        const skipped = [...member.remaining]
+          .filter((position) => !teamPassed.has(position))
+          .sort((left, right) => {
+            const instanceDifference = compareCodeUnits(
+              questions[left]!.instanceId,
+              questions[right]!.instanceId,
+            );
+            return instanceDifference === 0 ? left - right : instanceDifference;
+          });
+
+        for (const position of skipped) {
+          const question = questions[position]!;
+          const resolution = solveQuestion(
+            {
+              participant: member.participant,
+              question,
+              availableEnergy: member.energy,
+              remainingClockMin: durationMin - member.clockMin,
+              focus: member.focus,
+              mindset: member.mindset,
+              partialScores: question.partialScores,
+              hooks: hooksFor(question),
+              hookContext: hookContext(member.attempts.length, teamPassed.size, questions.length),
+            },
+            member.rng,
+          );
+          member.attempts.push(toTimelineAttempt(resolution, member.clockMin));
+          member.energy = resolution.energyAfter;
+          member.focus = resolution.focusAfter;
+          member.mindset = resolution.mindsetAfter;
+          member.remaining.delete(position);
+        }
+        continue;
       }
-      break;
+
+      available.sort((left, right) =>
+        compareQuestionPriority(left, right, questions, member.participant, member.focus, context),
+      );
+      const selectedPosition = available[0]!;
+      const question = questions[selectedPosition]!;
+      const resolution = solveQuestion(
+        {
+          participant: member.participant,
+          question,
+          availableEnergy: member.energy,
+          remainingClockMin: durationMin - member.clockMin,
+          focus: member.focus,
+          mindset: member.mindset,
+          partialScores: question.partialScores,
+          hooks: hooksFor(question),
+          hookContext: context,
+        },
+        member.rng,
+      );
+
+      member.busy = {
+        position: selectedPosition,
+        startMin: member.clockMin,
+        finishMin: member.clockMin + resolution.timeSpentMin,
+        resolution,
+      };
     }
 
-    available.sort((left, right) =>
-      compareQuestionPriority(left, right, questions, participant, focus, context),
-    );
-    const selectedPosition = available[0]!;
-    const question = questions[selectedPosition]!;
-    const resolution = solveQuestion(
-      {
-        participant,
-        question,
-        availableEnergy: energy,
-        remainingClockMin,
-        focus,
-        mindset,
-        partialScores: question.partialScores,
-        hooks: hooksFor(question),
-        hookContext: context,
-      },
-      rng,
-    );
+    // 2) 推进到最早的完成时刻并结算（同时刻按成员序号，确定性）。
+    let nextFinishMin = Number.POSITIVE_INFINITY;
+    for (const member of members) {
+      if (member.busy !== null && member.busy.finishMin < nextFinishMin) {
+        nextFinishMin = member.busy.finishMin;
+      }
+    }
+    if (nextFinishMin === Number.POSITIVE_INFINITY) break;
 
-    attempts.push(toTimelineAttempt(resolution));
-    remaining.delete(selectedPosition);
-    remainingClockMin = Math.max(0, remainingClockMin - resolution.timeSpentMin);
-    energy = resolution.energyAfter;
-    focus = resolution.focusAfter;
-    mindset = resolution.mindsetAfter;
-    totalScore += resolution.scoreAwarded;
-    if (resolution.verdict === 'AC') {
-      accepted.add(selectedPosition);
-      rankingPenaltyMin += resolution.timeSpentMin;
+    for (const member of members) {
+      if (member.busy === null || member.busy.finishMin !== nextFinishMin) continue;
+      const { position, startMin, resolution } = member.busy;
+      member.attempts.push(toTimelineAttempt(resolution, startMin));
+      member.remaining.delete(position);
+      member.clockMin = nextFinishMin;
+      member.energy = resolution.energyAfter;
+      member.focus = resolution.focusAfter;
+      member.mindset = resolution.mindsetAfter;
+      if (resolution.verdict === 'AC') teamPassed.add(position);
+      member.busy = null;
     }
   }
 
-  return {
-    timeline: {
-      participant,
-      attempts,
-      totalEnergySpent: attempts.reduce((total, attempt) => total + attempt.energyCost, 0),
-      finalMindset: mindset,
-    },
-    totalScore,
-    rankingPenaltyMin,
-  };
+  return members.map((member) => ({
+    participant: member.participant,
+    attempts: member.attempts,
+    totalEnergySpent: member.attempts.reduce((total, attempt) => total + attempt.energyCost, 0),
+    finalMindset: member.mindset,
+  }));
 }
 
 function isBetterTeamAttempt(
@@ -272,18 +323,17 @@ export function simulateRanking(input: RankingInput, seed: number): RankingRepor
   const validatedSeed = rankingSeedSchema.parse(seed);
   const validatedInput = rankingInputSchema.parse(input);
   const questions = validatedInput.problems.map(cloneQuestionSnapshot);
-  const members = validatedInput.teams.flatMap((team) => team.members);
-  const results = members.map((participant, participantIndex) =>
-    simulateParticipant(participant, questions, validatedInput.durationMin, validatedSeed, participantIndex),
-  );
-  const timelines = results.map((result) => result.timeline);
 
-  let memberOffset = 0;
-  const teamResults = validatedInput.teams.map((team) => {
-    const slice = timelines.slice(memberOffset, memberOffset + team.members.length);
-    memberOffset += team.members.length;
-    return aggregateTeam(slice);
+  // 每支队伍内部协作选题（共享已通过题集）；玩家队与 NPC 队规则一致。
+  let participantOffset = 0;
+  const teamTimelines = validatedInput.teams.map((team) => {
+    const timelines = simulateTeam(team, questions, validatedInput.durationMin, validatedSeed, participantOffset);
+    participantOffset += team.members.length;
+    return timelines;
   });
+  const timelines = teamTimelines.flat();
+
+  const teamResults = teamTimelines.map((slice) => aggregateTeam(slice));
 
   const standings = buildStandings(teamResults);
   const playerRank = standings.find((standing) => standing.teamIndex === 0)?.rank ?? Number.POSITIVE_INFINITY;

@@ -6,6 +6,7 @@ import type {
   ParticipantSnapshot,
   RankingReport,
 } from '@oinur/shared';
+import { cloneQuestionSnapshot } from './engine/report.js';
 
 const INTRO_MS = 650;
 const QUESTION_START_MS = 420;
@@ -197,6 +198,8 @@ function buildRankingReplay(recordId: string, report: RankingReport, title: stri
     recordId,
     format: 'RANKING',
     title,
+    // 题目快照供前端「题目看板」展示难度与具体数值（旧战报无此字段，前端容错）。
+    questions: report.questions.map(cloneQuestionSnapshot),
     events,
   };
 }

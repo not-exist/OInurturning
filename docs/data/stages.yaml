@@ -53,7 +53,7 @@ stages:
     recommended_level: 10
     duration_min: 180
     problem_slots:
-      - { tier: cspj, count: 3 }
+      - { tier: cspj, count: 4 }               # CSP 固定 4 题（与现实 CSP 题量一致，不设超纲附加题）
     npc_pool: { size: 10, mean_level: 8, spread: 5 }
     first_clear:
       money: 500                              # 500 × 1.0
@@ -66,8 +66,7 @@ stages:
     recommended_level: 13
     duration_min: 240
     problem_slots:
-      - { tier: cspj, count: 3 }
-      - { tier: csps, count: 1, chance: 0.2 }   # 少量超纲题
+      - { tier: cspj, count: 4 }               # CSP 固定 4 题
     npc_pool: { size: 10, mean_level: 11, spread: 5 }
     first_clear:
       money: 650                              # 500 × 1.3
@@ -80,8 +79,7 @@ stages:
     recommended_level: 16
     duration_min: 240
     problem_slots:
-      - { tier: cspj, count: 3 }
-      - { tier: csps, count: 1, chance: 0.35 }
+      - { tier: cspj, count: 4 }               # CSP 固定 4 题
     npc_pool: { size: 10, mean_level: 14, spread: 6 }
     first_clear:
       money: 800                              # 500 × 1.6
@@ -94,8 +92,7 @@ stages:
     recommended_level: 19
     duration_min: 250
     problem_slots:
-      - { tier: cspj, count: 3 }
-      - { tier: csps, count: 1, chance: 0.5 }
+      - { tier: cspj, count: 4 }               # CSP 固定 4 题
     npc_pool: { size: 12, mean_level: 17, spread: 6 }
     first_clear:
       money: 1100                             # 500 × 2.2
@@ -111,7 +108,7 @@ stages:
     recommended_level: 25
     duration_min: 210
     problem_slots:
-      - { tier: csps, count: 3 }
+      - { tier: csps, count: 4 }               # CSP 固定 4 题（与现实 CSP 题量一致，不设超纲附加题）
     npc_pool: { size: 11, mean_level: 21, spread: 5 }
     first_clear:
       money: 1200                             # 1200 × 1.0
@@ -127,8 +124,7 @@ stages:
     recommended_level: 29
     duration_min: 280
     problem_slots:
-      - { tier: csps, count: 3 }
-      - { tier: noip, count: 1, chance: 0.2 }
+      - { tier: csps, count: 4 }               # CSP 固定 4 题
     npc_pool: { size: 12, mean_level: 26, spread: 6 }
     first_clear:
       money: 1560                             # 1200 × 1.3
@@ -144,8 +140,7 @@ stages:
     recommended_level: 33
     duration_min: 280
     problem_slots:
-      - { tier: csps, count: 3 }
-      - { tier: noip, count: 1, chance: 0.35 }
+      - { tier: csps, count: 4 }               # CSP 固定 4 题
     npc_pool: { size: 13, mean_level: 31, spread: 6 }
     first_clear:
       money: 1920                             # 1200 × 1.6
@@ -161,8 +156,7 @@ stages:
     recommended_level: 38
     duration_min: 290
     problem_slots:
-      - { tier: csps, count: 3 }
-      - { tier: noip, count: 1, chance: 0.5 }
+      - { tier: csps, count: 4 }               # CSP 固定 4 题
     npc_pool: { size: 13, mean_level: 35, spread: 7 }
     first_clear:
       money: 2640                             # 1200 × 2.2

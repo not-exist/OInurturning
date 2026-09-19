@@ -310,6 +310,8 @@ const participantAttemptShape = z
     problemInstanceId: z.string().min(1),
     questionIndex: z.number().int().nonnegative(),
     verdict: z.enum(['AC', 'SKIP', 'UNFINISHED']),
+    /** 该题在该队员独立时钟上的开始时刻（分钟）；协作选题审计用，与 teams 内成员序号共同确定时间线。 */
+    startMin: nonnegativeFinite,
     minutesUsed: nonnegativeFinite,
     penaltyMin: nonnegativeFinite,
     focusGain: finiteNumber,
@@ -1246,5 +1248,10 @@ export interface BattleReplay {
   recordId: string;
   format: ContestFormat;
   title: string;
+  /**
+   * 本场战斗的题目快照（排名赛必有；旧版回放可能缺失，前端需容错）。
+   * 用于战斗中的题目看板：展示题目难度与具体数值。
+   */
+  questions?: QuestionSnapshot[];
   events: BattleReplayEvent[];
 }

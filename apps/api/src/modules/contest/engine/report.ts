@@ -5,7 +5,7 @@ import {
   type RankingReport,
 } from '@oinur/shared';
 
-export const ENGINE_VERSION = 'ranking-v2' as const;
+export const ENGINE_VERSION = 'ranking-v3' as const;
 export const PASS_RANK_MAX = 8 as const;
 
 function encodeStable(value: unknown, active: WeakSet<object>): string {

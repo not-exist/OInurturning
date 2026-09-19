@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
-import type { BattleReplay as BattleReplayData, BattleReplayEvent } from '@oinur/shared';
+import type {
+  BattleReplay as BattleReplayData,
+  BattleReplayEvent,
+  QuestionSnapshot,
+} from '@oinur/shared';
 
 const SPEEDS = [1, 2, 4, 8] as const;
 const BASE_PLAYBACK_RATE = 0.5;
@@ -26,6 +30,57 @@ const DIMENSION_LABEL: Record<string, string> = {
 const SIDE_LABEL: Record<string, string> = {
   HOME: '主场',
   AWAY: '客场',
+};
+
+const TIER_LABEL: Record<string, string> = {
+  cspj: 'CSP-J',
+  csps: 'CSP-S',
+  noip: 'NOIP',
+  province: '省选',
+  noi: 'NOI',
+  ctt: 'CTT',
+  cts: 'CTS',
+  ioi: 'IOI',
+};
+
+const SEVERITY_LABEL: Record<string, string> = {
+  red: '红',
+  yellow: '黄',
+  blue: '蓝',
+  purple: '紫',
+  black: '黑',
+  colorful: '彩',
+};
+
+const SEVERITY_CLASS: Record<string, string> = {
+  red: 'bg-red-100 text-red-800',
+  yellow: 'bg-yellow-100 text-yellow-800',
+  blue: 'bg-blue-100 text-blue-800',
+  purple: 'bg-purple-100 text-purple-800',
+  black: 'bg-neutral-800 text-white',
+  colorful: 'bg-gradient-to-r from-pink-100 to-indigo-100 text-fuchsia-800',
+};
+
+const HOOK_LABEL: Record<string, string> = {
+  condition: '触发条件',
+  time_k_mul: '耗时乘数',
+  ac_prob_add: 'AC 概率加成',
+  tle_prob_add: '判题 TLE 概率加成',
+  wa_penalty_add: 'WA 罚时加成',
+  submit_time_add: '提交用时加成',
+  energy_cost_add: '精力消耗加成',
+  energy_per_submit_add: '每次提交精力消耗',
+  noise_sigma_add: '用时噪声 σ 加成',
+  noise_sigma_mul: '用时噪声 σ 乘数',
+  mindset_fail_add: '失败心态惩罚加成',
+  partial_override: '部分分规则',
+  think_weight_mul: '思维缺口权重乘数',
+  prob_amplify: '概率放大',
+};
+
+const HOOK_CONDITION_LABEL: Record<string, string> = {
+  first_problem: '队伍第一题',
+  anti_ak: '防 AK（仅剩 1 题未过）',
 };
 
 function formatMinutes(minutes: number): string {
@@ -299,6 +354,12 @@ function RankingParallelReplay({
     return next;
   }, [eventCursor, memberMeta, timedEvents]);
 
+  // 题目看板的队内协作状态（随播放进度更新）。
+  const questionStatuses = useMemo(
+    () => collectQuestionStatuses(timedEvents, eventCursor),
+    [eventCursor, timedEvents],
+  );
+
   // 重置状态（切换回放时）。
   useEffect(() => {
     setEventCursor(0);
@@ -402,6 +463,11 @@ function RankingParallelReplay({
               </span>
             )}
           </div>
+
+          {/* 题目看板：位于战斗标题与学员作战面板之间，展示题目难度与具体数值 */}
+          {replay.questions !== undefined && replay.questions.length > 0 && (
+            <QuestionBoard questions={replay.questions} statuses={questionStatuses} />
+          )}
 
           {/* BATTLE_START 全宽展示 */}
           {current?.type === 'BATTLE_START' && eventCursor <= 1 && !finished && (
@@ -551,6 +617,287 @@ function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
       {/* 准备阶段占位 */}
       {state.phase === 'READY' && state.currentQuestionIndex === null && (
         <p className="text-xs text-neutral-400">准备就绪，即将并行开始…</p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 题目看板：战斗中展示题目难度与具体数值，点击弹出选项卡查看详情
+// ---------------------------------------------------------------------------
+
+interface QuestionStatus {
+  started: boolean;
+  activeCount: number;
+  passedBy: string | null;
+  finishedNoAc: boolean;
+}
+
+/** 按回放进度（已播放事件，时间序）统计每道题的队内协作状态。 */
+function collectQuestionStatuses(
+  timedEvents: readonly TimedReplayEvent[],
+  cursor: number,
+): Map<number, QuestionStatus> {
+  const statuses = new Map<number, QuestionStatus>();
+  const ensure = (questionIndex: number): QuestionStatus => {
+    const status = statuses.get(questionIndex) ?? {
+      started: false,
+      activeCount: 0,
+      passedBy: null,
+      finishedNoAc: false,
+    };
+    statuses.set(questionIndex, status);
+    return status;
+  };
+
+  for (let index = 0; index < Math.min(cursor, timedEvents.length); index += 1) {
+    const event = timedEvents[index]!.event;
+    if (event.type === 'QUESTION_START') {
+      const status = ensure(event.questionIndex);
+      status.started = true;
+      status.activeCount += 1;
+    } else if (event.type === 'QUESTION_RESULT') {
+      const status = ensure(event.questionIndex);
+      status.activeCount = Math.max(0, status.activeCount - 1);
+      if (event.verdict === 'AC' && status.passedBy === null) {
+        status.passedBy = event.participantName;
+      }
+    }
+  }
+  return statuses;
+}
+
+function QuestionStatusChip({ status }: { status: QuestionStatus | undefined }): JSX.Element {
+  if (!status || !status.started) {
+    return <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">未开始</span>;
+  }
+  if (status.passedBy !== null) {
+    return (
+      <span
+        data-testid="question-status-passed"
+        className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800"
+      >
+        ✓ 已通过 · {status.passedBy}
+      </span>
+    );
+  }
+  if (status.activeCount > 0) {
+    return (
+      <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+        进行中 ×{status.activeCount}
+      </span>
+    );
+  }
+  return <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">未通过</span>;
+}
+
+function formatHookValue(key: string, value: string | number | boolean): string {
+  if (key === 'condition') return HOOK_CONDITION_LABEL[String(value)] ?? String(value);
+  if (key === 'partial_override') {
+    const override = String(value);
+    if (override === 'none') return '无部分分';
+    if (override === 'trap') return '部分分陷阱';
+    return '保留部分分';
+  }
+  return String(value);
+}
+
+function QuestionDetailModal({
+  question,
+  status,
+  onClose,
+}: {
+  question: QuestionSnapshot;
+  status: QuestionStatus | undefined;
+  onClose: () => void;
+}): JSX.Element {
+  const [tab, setTab] = useState<'数值' | '特性'>('数值');
+  const tier = question.tier !== undefined ? (TIER_LABEL[question.tier] ?? question.tier) : undefined;
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        data-testid="replay-question-modal"
+        className="w-full max-w-lg overflow-hidden rounded border border-neutral-300 bg-white shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-5 py-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">Problem Detail</p>
+            <h3 className="mt-0.5 text-lg font-semibold">第 {question.index + 1} 题</h3>
+            <p className="mt-0.5 text-xs text-neutral-500">{question.instanceId}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <QuestionStatusChip status={status} />
+            <button
+              type="button"
+              data-testid="replay-question-modal-close"
+              className="rounded border border-neutral-300 px-2 py-1 text-xs"
+              onClick={onClose}
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+
+        <div className="flex border-b border-neutral-200">
+          {(['数值', '特性'] as const).map((entry) => (
+            <button
+              key={entry}
+              type="button"
+              data-testid={`replay-question-tab-${entry}`}
+              className={`px-5 py-2.5 text-sm font-medium ${
+                tab === entry
+                  ? 'border-b-2 border-neutral-900 text-neutral-900'
+                  : 'text-neutral-500 hover:text-neutral-800'
+              }`}
+              onClick={() => setTab(entry)}
+            >
+              {entry}
+              {entry === '特性' && question.traits.length > 0 ? `（${question.traits.length}）` : ''}
+            </button>
+          ))}
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto p-5">
+          {tab === '数值' ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Metric label="难度档位" value={tier ?? '—'} />
+              <Metric label="主考方向" value={DIMENSION_LABEL[question.dimension] ?? question.dimension} />
+              <Metric label="六维需求 D" value={String(question.demand)} />
+              <Metric label="思维量 M" value={String(question.thought)} />
+              <Metric label="代码量 C" value={String(question.codeVolume)} />
+              <Metric label="分值" value={`${question.score} 分`} />
+              <Metric label="参考用时" value={formatMinutes(question.timeLimitMin)} />
+              <Metric label="部分分" value={question.partialScores ? '可得部分分' : '无部分分'} />
+              <Metric label="来源" value={question.source === 'PREMADE' ? '预制题' : '临场生成'} />
+              {question.quality !== undefined ? (
+                <Metric label="题目质量" value={String(question.quality)} />
+              ) : null}
+            </div>
+          ) : question.traits.length === 0 ? (
+            <p className="text-sm text-neutral-500">本题没有附着特性。</p>
+          ) : (
+            <div className="space-y-3">
+              {question.traits.map((trait, traitIndex) => (
+                <div key={`${trait.traitId}-${traitIndex}`} className="rounded border border-neutral-200 p-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-xs font-medium ${SEVERITY_CLASS[trait.severity] ?? 'bg-neutral-100 text-neutral-700'}`}
+                    >
+                      {SEVERITY_LABEL[trait.severity] ?? trait.severity}
+                    </span>
+                    <span className="text-sm font-medium">{trait.traitId}</span>
+                  </div>
+                  {trait.hooks.length > 0 && (
+                    <dl className="mt-2 space-y-1">
+                      {trait.hooks.map((hook, hookIndex) =>
+                        Object.entries(hook).map(([key, value]) => (
+                          <div
+                            key={`${hookIndex}-${key}`}
+                            className="flex items-center justify-between text-xs"
+                          >
+                            <dt className="text-neutral-500">{HOOK_LABEL[key] ?? key}</dt>
+                            <dd className="font-medium">{formatHookValue(key, value)}</dd>
+                          </div>
+                        )),
+                      )}
+                    </dl>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuestionBoard({
+  questions,
+  statuses,
+}: {
+  questions: readonly QuestionSnapshot[];
+  statuses: Map<number, QuestionStatus>;
+}): JSX.Element {
+  const [openInstanceId, setOpenInstanceId] = useState<string | null>(null);
+  const openQuestion = questions.find((question) => question.instanceId === openInstanceId);
+
+  return (
+    <div data-testid="replay-question-board" className="mb-5">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-neutral-700">
+          题目看板
+          <span className="ml-2 text-xs font-normal text-neutral-500">
+            队内协作：已被队友通过的题不会再被选择
+          </span>
+        </h3>
+        <span className="text-xs text-neutral-400">点击题目查看具体数值</span>
+      </div>
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(questions.length, 4))}, minmax(0, 1fr))` }}
+      >
+        {questions.map((question) => {
+          const status = statuses.get(question.index);
+          const tier = question.tier !== undefined ? (TIER_LABEL[question.tier] ?? question.tier) : undefined;
+          return (
+            <button
+              key={question.instanceId}
+              type="button"
+              data-testid={`replay-question-card-${question.index}`}
+              className={`rounded border p-3 text-left transition-colors hover:border-neutral-400 ${
+                status?.passedBy
+                  ? 'border-green-300 bg-green-50'
+                  : status && status.activeCount > 0
+                    ? 'border-blue-300 bg-blue-50'
+                    : 'border-neutral-200 bg-white'
+              }`}
+              onClick={() => setOpenInstanceId(question.instanceId)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold">第 {question.index + 1} 题</span>
+                {tier !== undefined && (
+                  <span className="rounded bg-neutral-900 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                    {tier}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-neutral-600">
+                {DIMENSION_LABEL[question.dimension] ?? question.dimension} · {question.score} 分 ·
+                参考 {Math.ceil(question.timeLimitMin)} 分钟
+              </p>
+              <p className="mt-1 font-mono text-[11px] text-neutral-500">
+                D {question.demand} / M {question.thought} / C {question.codeVolume}
+                {question.traits.length > 0 ? ` · 特性×${question.traits.length}` : ''}
+              </p>
+              <div className="mt-2">
+                <QuestionStatusChip status={status} />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {openQuestion !== undefined && (
+        <QuestionDetailModal
+          question={openQuestion}
+          status={statuses.get(openQuestion.index)}
+          onClose={() => setOpenInstanceId(null)}
+        />
       )}
     </div>
   );
