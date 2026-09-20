@@ -39,7 +39,7 @@ import {
   type TrainingLogView,
   type TrainingResult,
 } from '../../lib/hooks';
-import { statScale } from '../students/StudentVisuals';
+import { StaminaCells, statScale } from '../students/StudentVisuals';
 
 type Tab = TrainingKind;
 
@@ -85,8 +85,6 @@ const DIM_BOOK: Record<DimensionKey, string> = {
   GREEDY: 'greedy',
   STRING: 'string',
 };
-
-const STAMINA_PIPS = [0, 1, 2, 3, 4];
 
 export function TrainingPage(): JSX.Element {
   const studentsQ = useStudents();
@@ -184,7 +182,7 @@ export function TrainingPage(): JSX.Element {
                   <span className="truncate text-sm font-semibold">{s.name}</span>
                   <Numeral value={`V ${s.v}`} className="shrink-0 text-xs text-fg-dim" />
                 </span>
-                <StaminaPips value={s.stamina} />
+                <StaminaCells stamina={s.stamina} />
                 <span className="text-[11px] text-fg-faint">
                   {QUALITY_LABEL[s.qualityTier]} · 精力 {floor(s.energy)}/{floor(s.energyMax)}
                 </span>
@@ -361,7 +359,7 @@ export function TrainingPage(): JSX.Element {
             </div>
             <div className="space-y-1.5 border-t border-ink-600/60 pt-3">
               <KeyVal k="体力">
-                <StaminaPips value={chosen.stamina} />
+                <StaminaCells stamina={chosen.stamina} />
               </KeyVal>
               <KeyVal k="精力">
                 {floor(chosen.energy)}/{floor(chosen.energyMax)}
@@ -443,27 +441,6 @@ function ProblemOption({
       <span className="shrink-0 text-fg-dim">{DIMENSION_LABEL[problem.dominantDim]}</span>
       <span className="numeral shrink-0 text-fg">Q {problem.quality}</span>
     </label>
-  );
-}
-
-/** 体力 5 格 + 当前格回充进度（分母恒为 5，不除精力上限） */
-function StaminaPips({ value }: { value: number }): JSX.Element {
-  const full = floor(value);
-  const frac = value - full;
-  return (
-    <span className="flex items-center gap-1">
-      <span className="flex gap-0.5">
-        {STAMINA_PIPS.map((i) => (
-          <span key={i} className="relative block h-1.5 w-4 bg-ink-700">
-            <span
-              className="absolute inset-y-0 left-0 bg-good-400"
-              style={{ width: i < full ? '100%' : i === full ? `${Math.round(frac * 100)}%` : '0%' }}
-            />
-          </span>
-        ))}
-      </span>
-      <span className="tnum text-[11px] text-fg-dim">{full}/5</span>
-    </span>
   );
 }
 

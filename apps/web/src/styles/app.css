@@ -100,6 +100,7 @@
   --color-tier-ioi: #e8fbff;
 
   --radius-panel: 2px;
+  --hud-h: 3rem;
 
   --animate-halo: halo 3.6s ease-in-out infinite;
   --animate-flow: flow 6s linear infinite;
@@ -110,8 +111,8 @@
     0%,
     100% {
       box-shadow:
-        0 0 0 1px color-mix(in oklab, var(--color-rarity-colorful) 45%, transparent),
-        0 0 18px -6px color-mix(in oklab, var(--color-rarity-colorful) 55%, transparent);
+        0 0 0 1px color-mix(in oklab, var(--color-arc-400) 45%, transparent),
+        0 0 18px -6px color-mix(in oklab, var(--color-arc-400) 55%, transparent);
     }
     50% {
       box-shadow:
@@ -325,6 +326,11 @@
 
   .hairline {
     @apply border-ink-600/60 border-t;
+  }
+
+  /* 空态：无信号简报，不是缺文件虚线框 */
+  .empty-briefing {
+    @apply panel panel-corners border-dashed border-cyber-400/25 bg-ink-850/40 px-6 py-10 text-center;
   }
 }
 

@@ -72,7 +72,7 @@ export function Card({
   return (
     <Cmp
       className={`panel transition-[border-color,transform,box-shadow] duration-200 ${
-        as === 'button' || as === 'label' ? 'cursor-pointer' : ''
+        as === 'button' || as === 'label' ? 'cursor-pointer hover:-translate-y-px' : ''
       } ${
         selected
           ? 'border-cyber-400/70 shadow-[0_0_24px_-12px_var(--color-cyber-400)]'
@@ -316,9 +316,11 @@ export function Empty({
   action?: ReactNode;
 }): JSX.Element {
   return (
-    <div className="border border-dashed border-ink-600 bg-ink-850/40 px-6 py-10 text-center">
-      <Icon icon={icon} className="mx-auto mb-3 size-7 text-fg-faint" />
-      <p className="font-medium text-fg-muted">{title}</p>
+    <div className="empty-briefing">
+      <span className="mx-auto mb-3 grid size-12 place-items-center border border-cyber-500/40 bg-cyber-400/10 text-cyber-300/70">
+        <Icon icon={icon} className="size-6" />
+      </span>
+      <p className="font-medium text-fg">{title}</p>
       {children !== undefined && (
         <p className="mx-auto mt-1 max-w-sm text-sm text-fg-dim">{children}</p>
       )}
