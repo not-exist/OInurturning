@@ -38,34 +38,43 @@ export function unwrapErr(res: request.Response): { code: string; message: strin
  * - 仅清理与测试相关的核心表，公告需显式清理（SET NULL 关系不随用户级联）
  *
  * 注意：User 删除会级联大多数业务表，但为速度与确定性，显式列出关键表并行删除
+ *
+ * `FOREIGN_KEY_CHECKS` 是**会话级**变量，必须与删除语句跑在同一条连接上，
+ * 因此这里用交互式事务（回调形式）而非数组形式：数组形式的 `$transaction`
+ * 与外层的两条 `$executeRaw` 会从连接池里各自取连接，导致
+ *   1) 关闭外键检查对真正执行删除的那条连接不生效；
+ *   2) `SET ...=0` 永久残留在池中某条连接上，之后任何复用该连接的用例里
+ *      ON DELETE CASCADE / SET NULL 都会静默失效，产生孤儿行。
+ * Prisma 6 的 Rust engine 自带连接池，恰好掩盖了这一点；Prisma 7 改用
+ * driver adapter（mariadb pool）后连接复用模式变化，问题才显形。
  */
 export async function resetUsers(): Promise<void> {
-  // 使用事务 + 并行删除提升速度
-  // 外键检查临时关闭，避免级联顺序问题（模板字符串形式，符合安全规则）
-  await prisma.$executeRaw`SET FOREIGN_KEY_CHECKS=0`;
-  try {
-    await prisma.$transaction([
-      prisma.trainingLog.deleteMany({}),
-      prisma.lectureLog.deleteMany({}),
-      prisma.adventureLog.deleteMany({}),
-      prisma.contestRecord.deleteMany({}),
-      prisma.storyProgress.deleteMany({}),
-      prisma.pvpRewardGrant.deleteMany({}),
-      prisma.pvpRegistration.deleteMany({}),
-      prisma.pvpMatch.deleteMany({}),
-      prisma.problemLibraryEntry.deleteMany({}),
-      prisma.userItem.deleteMany({}),
-      prisma.studentTalent.deleteMany({}),
-      prisma.student.deleteMany({}),
-      prisma.recruitPool.deleteMany({}),
-      prisma.reputationLog.deleteMany({}),
-      prisma.adminAnnouncement.deleteMany({}),
-      prisma.adminAuditLog.deleteMany({}),
-      prisma.user.deleteMany({}),
-    ]);
-  } finally {
-    await prisma.$executeRaw`SET FOREIGN_KEY_CHECKS=1`;
-  }
+  await prisma.$transaction(async (tx) => {
+    // 外键检查临时关闭，避免级联顺序问题（模板字符串形式，符合安全规则）
+    await tx.$executeRaw`SET FOREIGN_KEY_CHECKS=0`;
+    try {
+      await tx.trainingLog.deleteMany({});
+      await tx.lectureLog.deleteMany({});
+      await tx.adventureLog.deleteMany({});
+      await tx.contestRecord.deleteMany({});
+      await tx.storyProgress.deleteMany({});
+      await tx.pvpRewardGrant.deleteMany({});
+      await tx.pvpRegistration.deleteMany({});
+      await tx.pvpMatch.deleteMany({});
+      await tx.problemLibraryEntry.deleteMany({});
+      await tx.userItem.deleteMany({});
+      await tx.studentTalent.deleteMany({});
+      await tx.student.deleteMany({});
+      await tx.recruitPool.deleteMany({});
+      await tx.reputationLog.deleteMany({});
+      await tx.adminAnnouncement.deleteMany({});
+      await tx.adminAuditLog.deleteMany({});
+      await tx.user.deleteMany({});
+    } finally {
+      // 同一连接上恢复，杜绝 FOREIGN_KEY_CHECKS=0 泄漏回连接池
+      await tx.$executeRaw`SET FOREIGN_KEY_CHECKS=1`;
+    }
+  });
 }
 
 /**

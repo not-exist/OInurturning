@@ -5,15 +5,15 @@ import { env } from '../config/env.js';
 const log: Prisma.LogLevel[] = env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'];
 
 /**
- * 双引擎支持：
- * - 缺省：Rust library engine（`prisma generate` 时需要下载 query engine 二进制）。
- * - `PRISMA_CLIENT_ENGINE_TYPE=client`：Rust-free query compiler（WASM）+
- *   `@prisma/adapter-mariadb` driver adapter，运行时不依赖任何引擎二进制
- *   （受限网络/离线环境可用；与 Prisma 7 的默认形态一致）。
- *   该模式下生成客户端需同时设置：
- *   `PRISMA_CLIENT_ENGINE_TYPE=client PRISMA_GENERATE_NO_ENGINE=1 prisma generate`。
+ * Prisma 7：Rust query engine 已移除，PrismaClient 必须显式传入 driver adapter。
+ * 这里统一使用 `@prisma/adapter-mariadb`（MySQL/MariaDB 协议兼容），
+ * 运行时不依赖任何引擎二进制，受限网络/离线环境同样可用。
+ *
+ * 说明：v6 时代的 `new PrismaClient({ datasources: { db: { url } } })` 回退分支
+ * 在 v7 已被删除（`datasources`/`datasourceUrl` 均不再受支持），故不再保留。
+ * CLI 侧的连接串改由 `apps/api/prisma.config.ts` 提供。
  */
-export const prisma =
-  process.env.PRISMA_CLIENT_ENGINE_TYPE === 'client'
-    ? new PrismaClient({ adapter: new PrismaMariaDb(env.DATABASE_URL), log })
-    : new PrismaClient({ datasources: { db: { url: env.DATABASE_URL } }, log });
+export const prisma = new PrismaClient({
+  adapter: new PrismaMariaDb(env.DATABASE_URL),
+  log,
+});

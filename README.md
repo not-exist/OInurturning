@@ -99,7 +99,9 @@ node scripts/dev-bootstrap.mjs   # 自动：占位引擎 + queryCompiler 模式 
 pnpm test
 ```
 
-原理：检测到 Prisma 二进制 CDN 不可达时，自动切换为 Rust-free queryCompiler（WASM）+ `@prisma/adapter-mariadb` 模式（`PRISMA_CLIENT_ENGINE_TYPE=client`），并从 npm 拉取 MySQL 5.7 社区二进制在本地启动。生产与常规开发仍使用 compose 的 MySQL 8.4，迁移 SQL 兼容。
+原理：Prisma 7 起客户端默认即 Rust-free（queryCompiler/WASM），运行时统一走 `@prisma/adapter-mariadb` driver adapter，不再需要 query engine 二进制；`prisma generate` 若因 CDN 不可达失败，bootstrap 会布置占位引擎绕过。数据库侧从 npm 拉取 MySQL 5.7 社区二进制在本地启动。生产与常规开发仍使用 compose 的 MySQL 8.4，迁移 SQL 兼容。
+
+> Prisma 7 说明：数据库连接串不再写在 `apps/api/prisma/schema.prisma` 的 `datasource` 块里，而由 `apps/api/prisma.config.ts` 提供（CLI 侧），运行时则由 `PrismaClient({ adapter })` 直接持有。
 
 ---
 
