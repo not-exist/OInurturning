@@ -73,7 +73,6 @@ export function AcademyLecturePage(): JSX.Element {
 
       {students.data.length === 0 && (
         <Empty
-          icon="🏫"
           title="还没有可以讲课的学员"
           action={
             <Link

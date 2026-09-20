@@ -70,7 +70,6 @@ export function ProblemLibraryPage(): JSX.Element {
 
       {students.data.length === 0 && (
         <Empty
-          icon="📝"
           title="还没有可以出题的学员"
           action={
             <Link
@@ -153,7 +152,7 @@ export function ProblemLibraryPage(): JSX.Element {
           <span data-testid="problem-count" className="text-xs text-neutral-500">{library.data.length}/120</span>
         </div>
         {library.data.length === 0 ? (
-          <Empty icon="🗒️" title="题库还是空的">
+          <Empty title="题库还是空的">
             用学员的出题能力创作第一道预制题。质量 ≥ 70 的题适合对决携带，绿色以上适合专项训练。
           </Empty>
         ) : (

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './styles/app.css';
-import { RequireAuth } from './app/guards';
+import { RequireAdmin, RequireAuth } from './app/guards';
 import { Layout } from './app/App';
 import { OverviewPage } from './features/overview/OverviewPage';
 import { LoginPage } from './features/auth/LoginPage';
@@ -58,7 +58,9 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/academy" element={<AcademyPage />} />
               <Route path="/academy/lecture" element={<AcademyLecturePage />} />
               <Route path="/problem-library" element={<ProblemLibraryPage />} />
-              <Route path="/admin" element={<AdminPage />} />
+              <Route element={<RequireAdmin />}>
+                <Route path="/admin" element={<AdminPage />} />
+              </Route>
               <Route path="/pvp" element={<PvpPage />} />
               <Route path="/story" element={<StoryPage />} />
               <Route path="/adventure" element={<AdventurePage />} />

@@ -60,7 +60,7 @@ export function InventoryPage(): JSX.Element {
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">背包</h1>
       {items.length === 0 ? (
-        <Empty icon="🎒" title="背包空空如也">
+        <Empty title="背包空空如也">
           目前还没有任何道具。参加剧情比赛、历练或前往高级学院讲课，都会让背包充实起来。
         </Empty>
       ) : (

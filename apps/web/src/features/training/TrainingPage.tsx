@@ -127,7 +127,6 @@ export function TrainingPage(): JSX.Element {
         <h2 className="mb-2 text-sm font-semibold text-neutral-500">选择学员</h2>
         {students.length === 0 ? (
           <Empty
-            icon="🎓"
             title="还没有学员"
             action={
               <Link
@@ -450,7 +449,7 @@ function LogsList({
     );
   }
   if (items.length === 0) {
-    return <Empty icon="📝" title="暂无训练记录" />;
+    return <Empty title="暂无训练记录" />;
   }
   return (
     <div>
