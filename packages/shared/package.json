@@ -9,6 +9,6 @@
     "typecheck": "tsc --noEmit",
     "test": "echo \"shared: no unit tests, typecheck only\" && tsc --noEmit"
   },
-  "dependencies": { "zod": "^3.25.67" },
+  "dependencies": { "zod": "^4.6.5" },
   "devDependencies": { "typescript": "^6.0.3" }
 }
