@@ -1,1 +1,357 @@
 @import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+ * 自托管字体（CSP 只允许 'self'，禁止外链；latin 子集合计 38KB）
+ * 中文由系统栈接管（Chakra Petch / JetBrains Mono 均无 CJK 字形）。
+ * ------------------------------------------------------------------------ */
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/fonts/chakra-petch-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/fonts/chakra-petch-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/fonts/chakra-petch-700.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-var.woff2') format('woff2');
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Art Direction：深夜机房 · 算法指挥中心
+ * 近黑冷底 + 单色科技线 + 稀有度作为画面唯一高饱和光源。
+ * ------------------------------------------------------------------------ */
+@theme {
+  --font-sans: 'Chakra Petch', system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-display: 'Chakra Petch', system-ui, 'PingFang SC', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  /* 底色分层 */
+  --color-ink-950: #05070b;
+  --color-ink-900: #0a0d12;
+  --color-ink-850: #0d1219;
+  --color-ink-800: #11161f;
+  --color-ink-750: #151c27;
+  --color-ink-700: #1a2230;
+  --color-ink-600: #232d3d;
+  --color-ink-500: #2e3b4e;
+
+  /* 前景层级 */
+  --color-fg: #e6edf7;
+  --color-fg-muted: #9db0c8;
+  --color-fg-dim: #6d8098;
+  --color-fg-faint: #4a5a70;
+
+  /* 强调：电光青（主）+ 弧光紫（次）。红保留给错误与负向。 */
+  --color-cyber-300: #86f2ff;
+  --color-cyber-400: #2fdcf5;
+  --color-cyber-500: #12b6d4;
+  --color-cyber-600: #0b7f97;
+  --color-arc-300: #c6a8ff;
+  --color-arc-400: #a681ff;
+  --color-arc-500: #8b5cf6;
+  --color-arc-600: #6d3fd8;
+
+  /* 语义 */
+  --color-good-400: #3ddc97;
+  --color-good-500: #1eb87a;
+  --color-warn-400: #ffb340;
+  --color-warn-500: #e08c14;
+  --color-bad-400: #ff5d6c;
+  --color-bad-500: #e03848;
+  --color-ice-400: #6ea8ff;
+
+  /* 全局稀有度（GAME-DESIGN §5）：灰 = 廉价/有瑕疵，彩 = 全服稀缺 */
+  --color-rarity-gray: #8b98ab;
+  --color-rarity-yellow: #f5c542;
+  --color-rarity-green: #47d16c;
+  --color-rarity-blue: #4c9dff;
+  --color-rarity-purple: #b062ff;
+  --color-rarity-colorful: #ff7ad9;
+
+  /* 题目特性严重度（独立阶梯，毒性递增，red 最轻）：Ⅰ..Ⅵ 刻度 */
+  --color-sev-red: #d9594c;
+  --color-sev-yellow: #d8b23c;
+  --color-sev-blue: #5b9bd5;
+  --color-sev-purple: #9b6fd4;
+  --color-sev-black: #3a4353;
+  --color-sev-colorful: #ff7ad9;
+
+  /* 难度 8 档：同一色相明度递进（章节顺序），不借稀有度六色 */
+  --color-tier-cspj: #4b6b7a;
+  --color-tier-csps: #5d8497;
+  --color-tier-noip: #6f9db4;
+  --color-tier-province: #82b7d1;
+  --color-tier-noi: #95d0ea;
+  --color-tier-ctt: #a8e2f7;
+  --color-tier-cts: #c3eeff;
+  --color-tier-ioi: #e8fbff;
+
+  --radius-panel: 2px;
+
+  --animate-halo: halo 3.6s ease-in-out infinite;
+  --animate-flow: flow 6s linear infinite;
+  --animate-rise: rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
+
+  @keyframes halo {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--color-rarity-colorful) 45%, transparent),
+        0 0 18px -6px color-mix(in oklab, var(--color-rarity-colorful) 55%, transparent);
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--color-cyber-400) 55%, transparent),
+        0 0 34px -4px color-mix(in oklab, var(--color-cyber-400) 60%, transparent);
+    }
+  }
+  @keyframes flow {
+    to {
+      background-position: 200% center;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 font-sans text-fg antialiased;
+    /* 机房底噪：细网格 + 双色冷光晕 */
+    background-image:
+      radial-gradient(
+        1200px 620px at 78% -10%,
+        color-mix(in oklab, var(--color-cyber-500) 12%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        900px 520px at 8% 4%,
+        color-mix(in oklab, var(--color-arc-500) 10%, transparent),
+        transparent 72%
+      ),
+      linear-gradient(
+        to right,
+        color-mix(in oklab, var(--color-ink-500) 22%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--color-ink-500) 22%, transparent) 1px,
+        transparent 1px
+      );
+    background-size:
+      100% 100%,
+      100% 100%,
+      44px 44px,
+      44px 44px;
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight;
+  }
+
+  button,
+  select,
+  input {
+    font: inherit;
+    color: inherit;
+  }
+
+  select {
+    @apply border-ink-600 bg-ink-800 text-fg border;
+  }
+
+  option {
+    background-color: var(--color-ink-800);
+    color: var(--color-fg);
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--color-cyber-400);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-cyber-400);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-cyber-400) 40%, transparent);
+    color: #fff;
+  }
+
+  * {
+    scrollbar-color: var(--color-ink-500) transparent;
+    scrollbar-width: thin;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-ink-600);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-500);
+    background-clip: content-box;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 组件级语义类：面板 / 材质层级 / 稀有度光效 / 刻度
+ * ------------------------------------------------------------------------ */
+@layer components {
+  /* 面板：1px 半透明描边 + 极轻玻璃，不用圆角塑料风 */
+  .panel {
+    @apply border-ink-600/80 bg-ink-800/55 relative border backdrop-blur-[2px];
+    border-radius: var(--radius-panel);
+  }
+
+  .panel-hd {
+    @apply border-ink-600/70 flex items-center justify-between gap-3 border-b px-4 py-2.5;
+  }
+
+  /* 面板四角刻度（指挥中心取向） */
+  .panel-corners::before,
+  .panel-corners::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-color: var(--color-cyber-500);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  .panel-corners::before {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid;
+    border-left: 2px solid;
+  }
+  .panel-corners::after {
+    right: -1px;
+    bottom: -1px;
+    border-right: 2px solid;
+    border-bottom: 2px solid;
+  }
+
+  /* 区块标题：小号等宽 + 字距 */
+  .eyebrow {
+    @apply text-fg-faint font-mono text-[11px] tracking-[0.24em] uppercase;
+  }
+
+  /* 稀有度文字：彩档走流动渐变 */
+  .rainbow-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(100deg, #ff7ad9, #ffd166, #7ff3ff, #a681ff, #ff7ad9);
+    background-size: 200% auto;
+    animation: flow 6s linear infinite;
+  }
+
+  /* 招募品质档 = 材质层级（不复用稀有度色相） */
+  .mat-common {
+    @apply border-ink-600 bg-ink-850/70;
+  }
+  .mat-good {
+    @apply border-fg-dim/60 bg-ink-800/60;
+  }
+  .mat-elite {
+    @apply border-cyber-500/60 bg-ink-800/70;
+    box-shadow: inset 0 0 26px -12px color-mix(in oklab, var(--color-cyber-400) 60%, transparent);
+  }
+  .mat-genius {
+    @apply border-arc-400/70 bg-ink-800/70;
+    animation: var(--animate-halo);
+  }
+
+  /* 数值轨道（心态 / 精力 / 体力） */
+  .meter {
+    @apply bg-ink-700 relative h-1.5 w-full overflow-hidden;
+  }
+
+  .hairline {
+    @apply border-ink-600/60 border-t;
+  }
+}
+
+@layer utilities {
+  /* 巨型数字：等宽 + 表格数字，避免跳动 */
+  .numeral {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 扫描线覆盖（装饰，必须不影响交互） */
+  .scanlines {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0 3px,
+      color-mix(in oklab, #000 26%, transparent) 3px 4px
+    );
+    opacity: 0.3;
+  }
+}
+
+/* 无障碍：尊重系统减动效设置（动画一律降级为静态终态） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
