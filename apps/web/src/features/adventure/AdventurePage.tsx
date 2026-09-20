@@ -1,141 +1,314 @@
-import { useState, type JSX } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
+import { Dices, Search, Swords, TriangleAlert, UserRound } from 'lucide-react';
+import type { BattleReplay as BattleReplayData } from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
-import { BattleReplay, BattleWaiting } from '../records/BattleReplay';
+import { BattleReplay } from '../records/BattleReplay';
 import {
   useAdventureLogs,
   useChooseAdventure,
   useDrawAdventure,
   useInventory,
+  useOverview,
   useStudents,
   useUseItem,
   type AdventureLogView,
 } from '../../lib/hooks';
-import { rarityChip } from '../../lib/rarity';
-import { Empty } from '../../components/ui';
+import {
+  ADVENTURE_STATUS_LABEL,
+  EVENT_ONESHOT,
+  contestSideLabel,
+  eventCategoryLabel,
+  signed,
+} from '../../lib/labels';
+import {
+  RARITY_BORDER,
+  RARITY_FILL,
+  RARITY_GLOW,
+  normRarity,
+  rarityChip,
+  rarityLabel,
+  rarityText,
+} from '../../lib/rarity';
+import { GLYPH, Icon, NAV_ICON, eventCategoryIcon, itemIcon } from '../../components/icons';
+import {
+  Btn,
+  Chip,
+  Empty,
+  ErrorNote,
+  HoverCard,
+  InlineLoader,
+  PageHeader,
+  Panel,
+} from '../../components/ui';
 import { RosterPicker } from '../../components/RosterPicker';
 
 const ROSTER_SIZE = 3;
+const INVESTMENT_TIERS = [1, 2, 3] as const;
+const INTEL_ITEM = 'intel-slip';
 
-const RARITY_LABEL: Record<string, string> = {
-  gray: '灰',
-  yellow: '黄',
-  green: '绿',
-  blue: '蓝',
-  purple: '紫',
-  colorful: '彩',
-};
+/** 对决类事件 3 人各自出题答题；其余事件队友只出体力，结算只落在队长身上。 */
+function partyMode(category: string): { label: string; hint: string } {
+  return category === 'duel'
+    ? { label: '全队出战', hint: '三名队员各出一题、各答一题，独立扣精力与心态' }
+    : { label: '仅队长', hint: '只有队长参与判定，队友仅承担体力投入' };
+}
 
-function resultRecord(value: unknown): Record<string, unknown> {
+function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 }
 
-function resultLabel(value: unknown): string {
-  const result = resultRecord(value);
-  if (result.status === 'AVOIDED') return '已回避，未消耗体力。';
-  const rewards = Array.isArray(result.rewards) ? result.rewards : [];
-  const rewardText = rewards
-    .map((reward) => {
-      const item = resultRecord(reward);
-      if (item.type === 'money') return `钱 ${Number(item.amount) > 0 ? '+' : ''}${item.amount}`;
-      if (item.type === 'reputation')
-        return `声誉 ${Number(item.amount) > 0 ? '+' : ''}${item.amount}`;
-      if (item.type === 'item') return `道具 ${item.itemId} ×${item.count}`;
-      if (item.type === 'consume_item') return `消耗 ${item.itemId} ×${item.count}`;
-      if (item.type === 'buff') return '获得临时增益';
-      return null;
-    })
-    .filter((text): text is string => text !== null);
-  const check = resultRecord(result.check);
-  const checkText =
-    typeof check.skill === 'string' ? `检定 ${check.success ? '通过' : '未通过'}` : null;
+/** 悬浮卡内容行（HoverCard 的 tooltip 是 <span>，内容只用 span 保持合法嵌套） */
+function HoverRow({ k, children }: { k: string; children: ReactNode }): JSX.Element {
   return (
-    [checkText, ...rewardText].filter((text): text is string => text !== null).join(' · ') ||
-    '事件已结算。'
+    <span className="flex items-baseline justify-between gap-3 text-xs">
+      <span className="text-fg-dim">{k}</span>
+      <span className="tnum text-right text-fg">{children}</span>
+    </span>
   );
+}
+
+function pips(value: number): JSX.Element {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[1, 2, 3].map((slot) => (
+        <span
+          key={slot}
+          aria-hidden
+          className={`h-2.5 w-1.5 ${slot <= value ? 'bg-warn-400' : 'bg-ink-600'}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** 事件结果 → 中文化摘要（奖励行类型见 adventure/service.ts 的 rewardLines） */
+function rewardText(raw: unknown, namedItem: (itemId: string) => string): string | null {
+  const line = asRecord(raw);
+  const amount = typeof line.amount === 'number' ? line.amount : 0;
+  const count = typeof line.count === 'number' ? line.count : 1;
+  switch (line.type) {
+    case 'money':
+      return `金币 ${signed(amount)}`;
+    case 'reputation':
+      return `声誉 ${signed(amount)}`;
+    case 'win_streak_bonus':
+      return `连胜奖励 金币 +${amount}`;
+    case 'item':
+      return `获得${namedItem(String(line.itemId))}×${count}`;
+    case 'consume_item':
+      return `消耗${namedItem(String(line.itemId))}×${count}`;
+    case 'bank_problem':
+      return '题库收录 1 题';
+    case 'buff':
+      return '获得临时增益';
+    default:
+      return null;
+  }
+}
+
+function settleText(log: AdventureLogView, namedItem: (itemId: string) => string): string {
+  if (log.status === 'PENDING') return ADVENTURE_STATUS_LABEL.PENDING;
+  const result = asRecord(log.results[log.results.length - 1]);
+  if (result.status === 'AVOIDED') return '已回避';
+  const parts: string[] = [];
+  if (typeof result.duelWinnerSide === 'string') {
+    parts.push(
+      result.duelWinnerSide === 'DRAW'
+        ? '对决平局'
+        : `对决 ${contestSideLabel(result.duelWinnerSide)}取胜`,
+    );
+  }
+  const check = asRecord(result.check);
+  if (typeof check.success === 'boolean') parts.push(check.success ? '检定通过' : '检定未通过');
+  for (const reward of Array.isArray(result.rewards) ? result.rewards : []) {
+    const text = rewardText(reward, namedItem);
+    if (text !== null) parts.push(text);
+  }
+  return parts.length > 0 ? parts.join(' · ') : '事件已结算';
 }
 
 function EventCard({
   adventure,
+  pending,
+  money,
+  namedItem,
+  held,
   onChoice,
   onPreview,
-  pending,
 }: {
   adventure: AdventureLogView;
+  pending: boolean;
+  money: number | undefined;
+  namedItem: (itemId: string) => string;
+  held: (itemId: string) => boolean;
   onChoice: (optionIndex: number) => void;
   onPreview: (action: 'accept' | 'avoid') => void;
-  pending: boolean;
 }): JSX.Element {
-  const choices = adventure.event.choices;
+  const { event } = adventure;
+  const rarity = normRarity(event.rarity);
+  const mode = partyMode(event.category);
+  const oneshot = EVENT_ONESHOT[event.code];
+  const choices = event.choices;
+  const thresholds = (choices ?? []).filter(
+    (choice) => choice.requiresItem !== undefined || choice.costMoney !== undefined,
+  );
+
   return (
-    <section className="border border-neutral-300 bg-white p-5" aria-labelledby="active-event">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-neutral-200 pb-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-            {adventure.event.code} · 体力 {adventure.tier}
-          </p>
-          <h2 id="active-event" className="mt-1 text-xl font-semibold">
-            {adventure.event.name}
-          </h2>
-        </div>
+    <section
+      className={`panel animate-rise ${rarity === 'RAINBOW' ? 'animate-halo' : ''}`}
+      aria-labelledby="active-event"
+    >
+      <div className="flex flex-wrap items-start gap-4 border-b border-ink-600/70 p-4">
         <span
-          className={`rounded px-2 py-1 text-xs font-medium ${rarityChip(adventure.event.rarity)}`}
+          className={`flex size-12 shrink-0 items-center justify-center border ${RARITY_BORDER[rarity]} ${RARITY_FILL[rarity]} ${RARITY_GLOW[rarity]}`}
         >
-          {RARITY_LABEL[adventure.event.rarity] ?? adventure.event.rarity}
+          <Icon icon={eventCategoryIcon(event.category)} className="size-5" />
         </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <HoverCard
+              width="w-80"
+              content={
+                <span className="block space-y-1.5">
+                  <span className="block text-xs font-semibold text-fg">{event.name}</span>
+                  <HoverRow k="类别">{eventCategoryLabel(event.category)}</HoverRow>
+                  <HoverRow k="稀有度">{rarityLabel(event.rarity)}</HoverRow>
+                  <HoverRow k="体力档">×{event.staminaCost}</HoverRow>
+                  <HoverRow k="出战方式">{mode.label}</HoverRow>
+                  <HoverRow k="事件编号">{event.code}</HoverRow>
+                  {thresholds.length > 0 && (
+                    <span className="block pt-1 text-[11px] text-fg-dim">
+                      分支门槛：
+                      {thresholds
+                        .map((choice) =>
+                          [
+                            choice.requiresItem === undefined
+                              ? ''
+                              : `需${namedItem(choice.requiresItem)}`,
+                            choice.costMoney === undefined ? '' : `金币 ${choice.costMoney}`,
+                          ]
+                            .filter((part) => part !== '')
+                            .join(' / '),
+                        )
+                        .join('；')}
+                    </span>
+                  )}
+                </span>
+              }
+            >
+              <h2 id="active-event" className="text-base font-semibold text-fg">
+                {event.name}
+              </h2>
+            </HoverCard>
+            <span className={`px-1.5 py-0.5 text-[11px] ${rarityChip(event.rarity)}`}>
+              {rarityLabel(event.rarity)}
+            </span>
+            <Chip>{eventCategoryLabel(event.category)}</Chip>
+            <Chip>
+              {pips(event.staminaCost)}
+              体力 ×{event.staminaCost}
+            </Chip>
+            <Chip icon={event.category === 'duel' ? Swords : UserRound}>{mode.label}</Chip>
+            {oneshot !== undefined && (
+              <Chip icon={TriangleAlert} className="border-warn-400/60 bg-warn-400/10 text-warn-400">
+                不可重复 · {oneshot}
+              </Chip>
+            )}
+          </div>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-muted">{event.description}</p>
+          <p className="mt-1 text-[11px] text-fg-dim">{mode.hint}</p>
+        </div>
       </div>
-      <p className="mt-4 max-w-2xl text-sm leading-6 text-neutral-700">
-        {adventure.event.description}
-      </p>
 
       {adventure.preview ? (
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-neutral-200 pt-4">
-          <button
-            type="button"
-            className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50"
+        <div className="flex flex-wrap items-center gap-2 p-4">
+          <p className="mr-auto text-xs text-fg-dim">
+            情报已揭示事件本身，但分支仍未知：接受将投入全队体力，回避则安全退出（本次不消耗体力）。
+          </p>
+          <Btn
+            variant="primary"
             data-testid="adventure-accept"
             disabled={pending}
             onClick={() => onPreview('accept')}
           >
             接受历练
-          </button>
-          <button
-            type="button"
-            className="rounded border border-neutral-300 px-4 py-2 text-sm disabled:opacity-50"
-            data-testid="adventure-avoid"
-            disabled={pending}
-            onClick={() => onPreview('avoid')}
-          >
+          </Btn>
+          <Btn data-testid="adventure-avoid" disabled={pending} onClick={() => onPreview('avoid')}>
             回避
-          </button>
+          </Btn>
         </div>
       ) : adventure.status === 'PENDING' && choices !== null ? (
-        <div className="mt-5 space-y-2 border-t border-neutral-200 pt-4">
-          {choices.map((choice) => (
-            <button
-              key={choice.index}
-              type="button"
-              data-testid={`adventure-choice-${choice.index}`}
-              disabled={!choice.available || pending}
-              className="flex w-full items-center justify-between gap-3 rounded border border-neutral-300 px-3 py-3 text-left text-sm hover:border-neutral-900 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
-              onClick={() => onChoice(choice.index)}
-            >
-              <span>{choice.text}</span>
-              <span className="shrink-0 text-xs text-neutral-500">
-                {choice.costMoney === undefined ? '' : `钱 ${choice.costMoney}`}
-                {choice.requiresItem === undefined ? '' : ` · ${choice.requiresItem}`}
-                {!choice.available ? ' · 暂不可用' : ''}
-              </span>
-            </button>
-          ))}
+        <div className="space-y-2 p-4">
+          {choices.map((choice) => {
+            const missingItem =
+              choice.requiresItem !== undefined && !held(choice.requiresItem);
+            const shortMoney =
+              choice.costMoney !== undefined && money !== undefined && money < choice.costMoney;
+            const blocked = !choice.available || missingItem || shortMoney;
+            const reason = !choice.available
+              ? '暂不可用'
+              : missingItem
+                ? '缺道具'
+                : shortMoney
+                  ? '金币不足'
+                  : null;
+            return (
+              <button
+                key={choice.index}
+                type="button"
+                data-testid={`adventure-choice-${choice.index}`}
+                disabled={blocked || pending}
+                onClick={() => onChoice(choice.index)}
+                className={`flex w-full items-center justify-between gap-3 border px-3 py-2.5 text-left text-sm transition-colors ${
+                  blocked
+                    ? 'cursor-not-allowed border-ink-600/60 bg-ink-850/40 text-fg-faint'
+                    : 'border-ink-600 bg-ink-800/40 text-fg hover:border-cyber-400/60 hover:bg-cyber-400/5'
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center border border-ink-600 font-mono text-[11px] text-fg-dim">
+                    {choice.index + 1}
+                  </span>
+                  <span className="min-w-0">{choice.text}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2 text-[11px]">
+                  {choice.costMoney !== undefined && (
+                    <span className={shortMoney ? 'text-bad-400' : 'text-warn-400'}>
+                      <Icon icon={GLYPH.money} className="mr-1 inline size-3" />
+                      金币 {choice.costMoney}
+                    </span>
+                  )}
+                  {choice.requiresItem !== undefined && (
+                    <span className={missingItem ? 'text-bad-400' : 'text-fg-muted'}>
+                      <Icon
+                        icon={itemIcon(choice.requiresItem)}
+                        className="mr-1 inline size-3"
+                      />
+                      需持有{namedItem(choice.requiresItem)} · 选用后消耗
+                    </span>
+                  )}
+                  {reason !== null && <span className="text-fg-faint">{reason}</span>}
+                </span>
+              </button>
+            );
+          })}
+          {pending && (
+            <div className="pt-1">
+              <InlineLoader>服务端正在结算本次抉择…</InlineLoader>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="mt-5 border-t border-neutral-200 pt-4 text-sm text-neutral-700">
-          {adventure.results.map((result, index) => (
-            <p key={index}>{resultLabel(result)}</p>
-          ))}
+        <div className="space-y-1 p-4">
+          <p className="text-sm text-fg-muted">{settleText(adventure, namedItem)}</p>
+          <p className="text-[11px] text-fg-dim">
+            {adventure.status === 'RESOLVED'
+              ? '事件已结算，结果计入上方记录。'
+              : '等待下一步抉择。'}
+          </p>
         </div>
       )}
     </section>
@@ -146,6 +319,7 @@ export function AdventurePage(): JSX.Element {
   const students = useStudents();
   const inventory = useInventory();
   const logs = useAdventureLogs();
+  const overview = useOverview();
   const draw = useDrawAdventure();
   const choose = useChooseAdventure();
   const activate = useUseItem();
@@ -153,16 +327,11 @@ export function AdventurePage(): JSX.Element {
   const [roster, setRoster] = useState<number[]>([]);
   const [tier, setTier] = useState<1 | 2 | 3>(1);
   const [active, setActive] = useState<AdventureLogView>();
-  const [battleReplay, setBattleReplay] = useState<import('@oinur/shared').BattleReplay>();
+  const [battleReplay, setBattleReplay] = useState<BattleReplayData>();
   const [intelReady, setIntelReady] = useState(false);
 
   if (students.isPending || inventory.isPending || logs.isPending) {
-    return (
-      <div className="flex items-center gap-2 text-neutral-500">
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
-        加载历练数据…
-      </div>
-    );
+    return <InlineLoader>正在接入历练频道…</InlineLoader>;
   }
   if (
     students.isError ||
@@ -173,24 +342,16 @@ export function AdventurePage(): JSX.Element {
     !logs.data
   ) {
     return (
-      <div className="space-y-2 text-sm text-red-600">
-        <p>历练数据加载失败：{apiErrorMessage(students.error ?? inventory.error ?? logs.error)}</p>
-        <button
-          className="rounded border px-3 py-1 text-xs"
-          onClick={() => {
-            void students.refetch();
-            void inventory.refetch();
-            void logs.refetch();
-          }}
-        >
-          重试
-        </button>
-      </div>
+      <ErrorNote
+        onRetry={() => {
+          void students.refetch();
+          void inventory.refetch();
+          void logs.refetch();
+        }}
+      >
+        历练数据读取失败：{apiErrorMessage(students.error ?? inventory.error ?? logs.error)}
+      </ErrorNote>
     );
-  }
-
-  if (choose.isPending) {
-    return <BattleWaiting label="服务端正在结算遭遇，若触发对决将传回战斗回放…" />;
   }
 
   if (battleReplay !== undefined) {
@@ -203,46 +364,48 @@ export function AdventurePage(): JSX.Element {
     );
   }
 
-  const rosterReady = roster.length === ROSTER_SIZE;
-  const pending = active ?? logs.data.find((log) => log.status === 'PENDING');
-  const intel = inventory.data.find((item) => item.itemId === 'intel-slip');
-  const drawError = draw.isError ? '抽取失败，请检查体力或当前待处理事件。' : null;
-  const chooseError = choose.isError ? '结算失败，请检查选项条件。' : null;
+  const items = new Map(inventory.data.map((item) => [item.itemId, item]));
+  const namedItem = (itemId: string): string => {
+    const name = items.get(itemId)?.name;
+    return name === undefined ? '道具' : `「${name}」`;
+  };
+  const held = (itemId: string): boolean => (items.get(itemId)?.quantity ?? 0) > 0;
+  const money = overview.data?.me.money;
 
-  const drawEvent = () => {
+  const rosterReady = roster.length === ROSTER_SIZE;
+  const activeLog = active ?? logs.data.find((log) => log.status === 'PENDING');
+  const hasPending = activeLog?.status === 'PENDING';
+  const intelHeld = items.get(INTEL_ITEM)?.quantity ?? 0;
+
+  const drawEvent = (): void => {
     if (!rosterReady) return;
     draw.mutate({ roster, tier }, { onSuccess: (result) => setActive(result) });
   };
-  const chooseEvent = (input: { action?: 'accept' | 'avoid'; optionIndex?: number }) => {
-    if (pending === undefined) return;
+  const chooseEvent = (input: { action?: 'accept' | 'avoid'; optionIndex?: number }): void => {
+    if (activeLog === undefined) return;
     choose.mutate(
-      { id: pending.id, ...input },
+      { id: activeLog.id, ...input },
       {
         onSuccess: (result) => {
-          if (result.replay !== undefined) {
-            setBattleReplay(result.replay);
-            setActive(undefined);
-          } else {
-            setActive(result.completed ? undefined : result.adventure);
-          }
+          setActive(result.adventure);
+          // 接受/回避都会让服务端清掉情报标记，界面同步回到未激活态。
+          if (input.action !== undefined) setIntelReady(false);
+          if (result.replay !== undefined) setBattleReplay(result.replay);
         },
       },
     );
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="border-b border-neutral-300 pb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-          Adventure Log
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold">历练</h1>
-        <p className="mt-2 text-sm text-neutral-500">
-          把体力投入一次未知遭遇，带回资源、成长或新的线索。
-        </p>
-      </div>
+    <div data-testid="adventure-page" className="mx-auto max-w-5xl space-y-5">
+      <PageHeader
+        eyebrow="Adventure Log"
+        title="历练"
+        description="投入体力换一次未知遭遇：资源、成长，或一场必须现场解决的对决。"
+        actions={<Chip icon={UserRound}>3 人小队 · 队长带队</Chip>}
+      />
 
-      <section className="grid gap-4 border-b border-neutral-200 pb-5 md:grid-cols-[1fr_auto] md:items-end">
+      <Panel title="出发准备" eyebrow="Departure" corners>
         <RosterPicker
           students={students.data}
           selectedIds={roster}
@@ -251,105 +414,163 @@ export function AdventurePage(): JSX.Element {
           onChange={setRoster}
           dataTestIdPrefix="adventure-roster"
         />
-        <div>
-          <span className="mb-2 block text-sm text-neutral-500">投入体力</span>
-          <div className="flex gap-1">
-            {([1, 2, 3] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                data-testid={`adventure-tier-${value}`}
-                aria-pressed={tier === value}
-                className={`min-w-12 rounded border px-3 py-2 text-sm ${tier === value ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white'}`}
-                onClick={() => setTier(value)}
-              >
-                {value}
-              </button>
-            ))}
+
+        <div className="mt-4 grid gap-4 border-t border-ink-600/60 pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div>
+            <span className="eyebrow mb-2 block">投入体力</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {INVESTMENT_TIERS.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  data-testid={`adventure-tier-${value}`}
+                  aria-pressed={tier === value}
+                  className={`flex items-center gap-2 border px-3 py-1.5 text-sm transition-colors ${
+                    tier === value
+                      ? 'border-cyber-400/70 bg-cyber-400/15 text-cyber-300'
+                      : 'border-ink-600 bg-ink-800/40 text-fg-dim hover:border-ink-500 hover:text-fg'
+                  }`}
+                  onClick={() => setTier(value)}
+                >
+                  {pips(value)}
+                  <span className="tnum">×{value}</span>
+                </button>
+              ))}
+              <span className="ml-1 text-[11px] text-fg-dim">
+                抽取即扣除全队各 {tier} 点体力
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Btn
+              variant="primary"
+              data-testid="adventure-draw"
+              disabled={!rosterReady || hasPending || draw.isPending}
+              onClick={drawEvent}
+            >
+              {draw.isPending ? (
+                <InlineLoader>抽取中…</InlineLoader>
+              ) : (
+                <>
+                  <Icon icon={Dices} className="size-4" />
+                  开始历练
+                </>
+              )}
+            </Btn>
+            <Btn
+              variant={intelReady ? 'primary' : 'ghost'}
+              data-testid="adventure-intel"
+              disabled={intelReady || intelHeld < 1 || activate.isPending}
+              onClick={() =>
+                activate.mutate({ itemId: INTEL_ITEM }, { onSuccess: () => setIntelReady(true) })
+              }
+            >
+              <Icon icon={Search} className="size-4" />
+              {intelReady ? '情报已激活' : `激活情报条（${intelHeld}）`}
+            </Btn>
           </div>
         </div>
-      </section>
+
+        {!rosterReady && (
+          <p className="mt-3 text-xs text-fg-dim">
+            选择 3 名学员组成小队后方可出发（当前 {roster.length}/{ROSTER_SIZE}）。
+          </p>
+        )}
+        {!intelReady && intelHeld < 1 && (
+          <p className="mt-2 text-[11px] text-fg-dim">
+            未持有情报条：抽取会立刻结算并扣除体力，无法先看事件再决定。
+          </p>
+        )}
+        <div className="mt-3 space-y-2">
+          {draw.isError && (
+            <ErrorNote>
+              <span data-testid="adventure-draw-error">
+                抽取失败：{apiErrorMessage(draw.error)}
+              </span>
+            </ErrorNote>
+          )}
+          {choose.isError && (
+            <ErrorNote>
+              <span data-testid="adventure-choose-error">
+                结算失败：{apiErrorMessage(choose.error)}
+              </span>
+            </ErrorNote>
+          )}
+          {activate.isError && (
+            <ErrorNote>情报激活失败：{apiErrorMessage(activate.error)}</ErrorNote>
+          )}
+        </div>
+      </Panel>
 
       {students.data.length < ROSTER_SIZE && (
-        <Empty title="至少需要 3 名学员出发">
+        <Empty
+          icon={GLYPH.student}
+          title={`至少需要 ${ROSTER_SIZE} 名学员出发`}
+          action={
+            <Btn variant="primary" onClick={() => navigate('/academy')}>
+              前往高级学院招募
+            </Btn>
+          }
+        >
           历练为 3 人小队，招募满 3 名学员后即可投入体力探索未知事件。
         </Empty>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          data-testid="adventure-draw"
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-          disabled={!rosterReady || pending !== undefined || draw.isPending}
-          onClick={drawEvent}
-        >
-          {draw.isPending ? '抽取中…' : '开始历练'}
-        </button>
-        <button
-          type="button"
-          className={`rounded border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 ${intelReady ? 'border-blue-600 text-blue-700' : 'border-neutral-300'}`}
-          data-testid="adventure-intel"
-          disabled={intelReady || (intel?.quantity ?? 0) < 1 || activate.isPending}
-          onClick={() =>
-            activate.mutate({ itemId: 'intel-slip' }, { onSuccess: () => setIntelReady(true) })
-          }
-        >
-          {intelReady ? '情报已激活' : `激活情报 · ${intel?.quantity ?? 0}`}
-        </button>
-        {drawError && (
-          <span data-testid="adventure-draw-error" className="text-sm text-red-600">
-            {drawError}
-          </span>
-        )}
-        {chooseError && (
-          <span data-testid="adventure-choose-error" className="text-sm text-red-600">
-            {chooseError}
-          </span>
-        )}
-      </div>
-
-      {pending && (
+      {activeLog !== undefined && (
         <EventCard
-          adventure={pending}
+          adventure={activeLog}
           pending={choose.isPending}
+          money={money}
+          namedItem={namedItem}
+          held={held}
           onPreview={(action) => chooseEvent({ action })}
           onChoice={(optionIndex) => chooseEvent({ optionIndex })}
         />
       )}
 
-      <section>
-        <div className="mb-3 flex items-baseline justify-between border-b border-neutral-300 pb-2">
-          <h2 className="text-lg font-semibold">历练记录</h2>
-          <span className="text-xs text-neutral-500">最近 {logs.data.length} 条</span>
-        </div>
+      <Panel
+        title="历练记录"
+        eyebrow="Logs"
+        bodyClassName="p-0"
+        actions={<span className="text-xs text-fg-dim">最近 {logs.data.length} 条</span>}
+      >
         {logs.data.length === 0 ? (
-          <p className="text-sm text-neutral-500">暂无记录。</p>
+          <div className="p-4">
+            <Empty icon={NAV_ICON.adventure} title="暂无历练记录">
+              投入体力抽取事件后，结果会按时间倒序记录在此。
+            </Empty>
+          </div>
         ) : (
-          <ul
-            data-testid="adventure-logs"
-            className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white"
-          >
-            {logs.data.map((log) => (
-              <li
-                key={log.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 text-sm"
-              >
-                <div>
-                  <span className="font-medium">{log.event.name}</span>
-                  <span className="ml-2 text-xs text-neutral-500">
-                    {log.event.code} · 体力 {log.tier}
+          <ul data-testid="adventure-logs" className="divide-y divide-ink-600/50">
+            {logs.data.map((log) => {
+              const summary = settleText(log, namedItem);
+              const pendingLog = log.status === 'PENDING';
+              return (
+                <li key={log.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+                  <Icon
+                    icon={eventCategoryIcon(log.event.category)}
+                    className={`size-4 shrink-0 ${pendingLog ? 'text-warn-400' : rarityText(log.event.rarity)}`}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-fg">{log.event.name}</span>
+                    <span className="mt-0.5 block text-[11px] text-fg-dim">
+                      {eventCategoryLabel(log.event.category)} · {rarityLabel(log.event.rarity)} ·
+                      体力 ×{log.tier}
+                    </span>
                   </span>
-                </div>
-                <div className="text-right text-xs text-neutral-500">
-                  <span>{log.status === 'PENDING' ? '待处理' : resultLabel(log.results[0])}</span>
-                  <time className="ml-3">{new Date(log.createdAt).toLocaleString()}</time>
-                </div>
-              </li>
-            ))}
+                  <span className="text-right text-xs">
+                    <span className={pendingLog ? 'text-warn-400' : 'text-fg-muted'}>{summary}</span>
+                    <time className="mt-0.5 block text-[11px] text-fg-faint">
+                      {new Date(log.createdAt).toLocaleString()}
+                    </time>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }
