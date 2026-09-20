@@ -114,7 +114,7 @@ export function Layout(): JSX.Element {
                       to={item.to}
                       end={item.end}
                       className={({ isActive }) =>
-                        `relative flex shrink-0 items-center gap-2 px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
+                        `relative flex shrink-0 cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
                           isActive
                             ? 'bg-cyber-400/10 text-cyber-300'
                             : 'text-fg-dim hover:bg-ink-700/60 hover:text-fg'
@@ -179,7 +179,7 @@ export function Layout(): JSX.Element {
             <button
               data-testid="logout-btn"
               onClick={() => void logout()}
-              className="flex items-center gap-1 border border-ink-600 px-2 py-1 text-fg-dim transition-colors hover:border-ink-500 hover:text-fg"
+              className="flex cursor-pointer items-center gap-1 border border-ink-600 px-2 py-1 text-fg-dim transition-colors hover:border-ink-500 hover:text-fg"
             >
               <Icon icon={LogOut} className="size-3.5" />
               登出

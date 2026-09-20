@@ -34,6 +34,7 @@ import {
   TalentSlot,
   mindsetBaseline,
   staminaIntervalMin,
+  statScale,
 } from './StudentVisuals';
 
 /** 学员档案：雷达 + 九维 + 天赋槽 + 改名 / 开除。 */
@@ -74,6 +75,10 @@ export function StudentDetailPage(): JSX.Element {
   const renameCards = invQ.data?.find((i) => i.itemId === RENAME_CARD_ID)?.quantity ?? 0;
   const baseline = mindsetBaseline(s.talents, defs);
   const regenMin = staminaIntervalMin(s.staminaRegen);
+  const abilityScale = statScale([
+    ...ABILITY_ROWS.map((r) => s[r.field]),
+    ...SIX_DIMS.map((d) => s[d.field]),
+  ]);
 
   return (
     <div className="space-y-4" data-testid="student-detail-page">
@@ -176,7 +181,7 @@ export function StudentDetailPage(): JSX.Element {
         </dl>
       </section>
 
-      <Panel title="九维能力" eyebrow="ABILITY MATRIX">
+      <Panel title="九维能力" eyebrow="能力">
         <div className="grid gap-x-8 gap-y-2.5 lg:grid-cols-2">
           {ABILITY_ROWS.map((row) => (
             <AbilityRow
@@ -184,6 +189,7 @@ export function StudentDetailPage(): JSX.Element {
               label={ABILITY_LABEL[row.key]}
               icon={DIMENSION_ICON[row.key]}
               value={s[row.field]}
+              scale={abilityScale}
             />
           ))}
         </div>
@@ -194,12 +200,13 @@ export function StudentDetailPage(): JSX.Element {
               label={DIMENSION_LABEL[dim.key]}
               icon={DIMENSION_ICON[dim.key]}
               value={s[dim.field]}
+              scale={abilityScale}
             />
           ))}
         </div>
       </Panel>
 
-      <Panel title="天赋" eyebrow="TALENTS" actions={<Chip>{s.talents.length} 枚</Chip>}>
+      <Panel title="天赋" eyebrow="天赋槽" actions={<Chip>{s.talents.length} 枚</Chip>}>
         {s.talents.length === 0 ? (
           <p className="text-sm text-fg-faint">该学员暂无天赋，可通过历练与洗练获得。</p>
         ) : (
@@ -222,7 +229,7 @@ export function StudentDetailPage(): JSX.Element {
         open={dismissOpen}
         onClose={() => setDismissOpen(false)}
         title={`确认开除 ${s.name}？`}
-        eyebrow="DISMISS"
+        eyebrow="开除"
         width="max-w-md"
         testId="dismiss-dialog"
       >
@@ -277,17 +284,19 @@ function AbilityRow({
   label,
   icon,
   value,
+  scale,
 }: {
   label: string;
   icon: LucideIcon;
   value: number;
+  scale: number;
 }): JSX.Element {
   return (
     <div className="flex items-center gap-2.5">
       <Icon icon={icon} className="size-3.5 shrink-0 text-fg-faint" />
       <span className="w-16 shrink-0 truncate text-xs text-fg-dim">{label}</span>
       <span className="min-w-0 flex-1">
-        <Meter value={value} max={100} className="bg-cyber-400/70" />
+        <Meter value={value} max={scale} className="bg-cyber-400/70" />
       </span>
       <span className="w-8 shrink-0 text-right font-mono text-sm text-fg">{floor(value)}</span>
     </div>

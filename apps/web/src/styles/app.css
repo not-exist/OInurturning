@@ -167,12 +167,12 @@
       ),
       linear-gradient(
         to right,
-        color-mix(in oklab, var(--color-ink-500) 22%, transparent) 1px,
+        color-mix(in oklab, var(--color-ink-500) 8%, transparent) 1px,
         transparent 1px
       ),
       linear-gradient(
         to bottom,
-        color-mix(in oklab, var(--color-ink-500) 22%, transparent) 1px,
+        color-mix(in oklab, var(--color-ink-500) 8%, transparent) 1px,
         transparent 1px
       );
     background-size:
@@ -195,6 +195,15 @@
   input {
     font: inherit;
     color: inherit;
+  }
+
+  button:not(:disabled),
+  a,
+  [role='button'],
+  [role='tab'],
+  [role='radio'],
+  label {
+    cursor: pointer;
   }
 
   select {
@@ -281,7 +290,7 @@
 
   /* 区块标题：小号等宽 + 字距 */
   .eyebrow {
-    @apply text-fg-faint font-mono text-[11px] tracking-[0.24em] uppercase;
+    @apply text-fg-faint font-mono text-[11px] tracking-[0.14em];
   }
 
   /* 稀有度文字：彩档走流动渐变 */
@@ -297,10 +306,11 @@
     @apply border-ink-600 bg-ink-850/70;
   }
   .mat-good {
-    @apply border-fg-dim/60 bg-ink-800/60;
+    @apply border-ice-400/50 bg-ink-800/70;
+    box-shadow: inset 0 0 20px -12px color-mix(in oklab, var(--color-ice-400) 45%, transparent);
   }
   .mat-elite {
-    @apply border-cyber-500/60 bg-ink-800/70;
+    @apply border-cyber-500/70 bg-ink-800/70;
     box-shadow: inset 0 0 26px -12px color-mix(in oklab, var(--color-cyber-400) 60%, transparent);
   }
   .mat-genius {

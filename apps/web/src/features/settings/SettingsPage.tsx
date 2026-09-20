@@ -61,10 +61,10 @@ export function SettingsPage(): JSX.Element {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader eyebrow="Coach Profile" title="用户设置" />
+      <PageHeader eyebrow="教练档案" title="用户设置" />
 
       <section data-testid="settings-me" className="panel panel-corners mb-5 p-4">
-        <p className="eyebrow mb-1">Account</p>
+        <p className="eyebrow mb-1">账户</p>
         <h2 className="mb-4 text-sm font-semibold">账户信息</h2>
         <div className="mb-4 flex items-center gap-3">
           <span className="flex size-9 items-center justify-center border border-cyber-500/60 bg-cyber-400/10 text-cyber-300">
@@ -107,7 +107,7 @@ export function SettingsPage(): JSX.Element {
       </section>
 
       <Panel
-        eyebrow="Security"
+        eyebrow="安全"
         title="修改密码"
         className="mb-5"
         bodyClassName="p-4"

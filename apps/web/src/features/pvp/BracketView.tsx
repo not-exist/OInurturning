@@ -10,13 +10,13 @@ function recordPath(apiUrl: string): string {
 }
 
 /**
- * 队名一律走中文：自己用账号名，其他选手用「选手 #id」兜底，
- * 绝不把 homeUserId 裸数字当队名。
+ * 队名一律走中文：自己用账号名，其他选手用「选手 id」兜底。
+ * PvpMatchView 没有 displayName，绝不把 homeUserId 裸数字当队名。
  */
 function teamLabel(userId: number | null, meId: number | undefined, meName: string | undefined): string {
   if (userId === null) return '轮空';
   if (meId !== undefined && userId === meId) return meName ?? '我的队伍';
-  return `选手 #${userId}`;
+  return `选手 ${userId}`;
 }
 
 function MatchCard({

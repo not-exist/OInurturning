@@ -193,7 +193,10 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
             去学员页改名
           </Link>
         ) : (
-          <span className="inline-flex items-center gap-1.5 border border-ink-600 bg-ink-800/70 px-2.5 py-1.5 text-xs text-fg-dim">
+          <span
+            aria-disabled="true"
+            className="inline-flex cursor-not-allowed items-center gap-1.5 border border-ink-600 bg-ink-800/70 px-2.5 py-1.5 text-xs text-fg-dim"
+          >
             <Icon icon={Lock} className="size-3.5" />
             {reason}
           </span>

@@ -82,7 +82,7 @@ export function AcademyLecturePage(): JSX.Element {
   return (
     <div data-testid="lecture-page" className="space-y-5">
       <PageHeader
-        eyebrow="ACADEMY · LECTURE"
+        eyebrow="讲课"
         title="讲课"
         description="带学员承接不同层级的训练营课程：达标直讲稳拿全额，未达标可强接，但讲砸不发钱还倒扣声誉。"
         actions={<ActionLinkBack />}
@@ -109,7 +109,7 @@ export function AcademyLecturePage(): JSX.Element {
         <div className="space-y-5">
           <Panel
             title="讲座档位"
-            eyebrow="Audience tier"
+            eyebrow="档位"
             bodyClassName="p-4 space-y-4"
             actions={
               <Chip icon={Timer}>
@@ -197,7 +197,7 @@ export function AcademyLecturePage(): JSX.Element {
             )}
           </Panel>
 
-          <Panel title="授课台" eyebrow="Board" bodyClassName="p-4">
+          <Panel title="授课台" eyebrow="授课台" bodyClassName="p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-fg-muted">
                 {selectedStudent !== undefined && selectedTier !== undefined ? (
@@ -261,7 +261,7 @@ export function AcademyLecturePage(): JSX.Element {
           </Panel>
         </div>
 
-        <Panel title="讲课记录" eyebrow="Timeline" bodyClassName="p-4">
+        <Panel title="讲课记录" eyebrow="记录" bodyClassName="p-4">
           {logs.data.length === 0 ? (
             <p className="border border-dashed border-ink-600 bg-ink-850/40 px-4 py-8 text-center text-sm text-fg-dim">
               暂无记录。

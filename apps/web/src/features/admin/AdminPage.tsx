@@ -56,7 +56,7 @@ export function AdminPage(): JSX.Element {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        eyebrow="Operations"
+        eyebrow="运营"
         title="管理端"
         description="赛事编排、公告发布、用户处置与审计留痕。"
       />
@@ -163,7 +163,7 @@ function TournamentForm(): JSX.Element {
   };
 
   return (
-    <Panel eyebrow="Create" title="创建赛事" bodyClassName="p-4">
+    <Panel eyebrow="创建" title="创建赛事" bodyClassName="p-4">
       <form className="space-y-3" onSubmit={submit}>
         <input
           data-testid="admin-t-name"
@@ -248,7 +248,7 @@ function AnnouncementForm(): JSX.Element {
     );
   };
   return (
-    <Panel eyebrow="Broadcast" title="发布公告" bodyClassName="p-4">
+    <Panel eyebrow="广播" title="发布公告" bodyClassName="p-4">
       <form className="space-y-3" onSubmit={submit}>
         <input
           data-testid="admin-a-title"

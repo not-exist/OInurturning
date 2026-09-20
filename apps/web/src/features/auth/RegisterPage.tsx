@@ -42,14 +42,14 @@ export function RegisterPage(): JSX.Element {
 
   return (
     <AuthFrame
-      eyebrow="New Coach"
+      eyebrow="注册"
       title="开办你的训练营"
       bullets={[
         { icon: Coins, title: '开局资源', desc: '2500 金 + 2 名学员（1 良好 1 普通）+ 2 杯奶茶。' },
         { icon: UserPlus, title: '第一步：招到第 3 人', desc: '三名学员才够组队出战，剧情与历练都在等你。' },
         { icon: ArrowRight, title: '一条主线走到 IOI', desc: '8 章 33 关、8 档赛事，全通解锁 NG+ 与传奇教练勋章。' },
       ]}
-      statusLines={['NEW COACH · 注册即发放开局包']}
+      statusLines={['新教练 · 注册即发放开局包']}
       footer={
         <>
           已有账号？

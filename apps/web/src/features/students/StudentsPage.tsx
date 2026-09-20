@@ -36,7 +36,7 @@ export function StudentsPage(): JSX.Element {
     <div className="space-y-5" data-testid="students-page">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="eyebrow mb-1">ROSTER · 在营名册</p>
+          <p className="eyebrow mb-1">在营名册</p>
           <h1 className="text-2xl font-semibold tracking-tight">学员管理</h1>
           <p className="mt-1 text-sm text-fg-muted">
             共 {students.length} 名在营学员 · 品质档决定开除代价与培养上限
@@ -67,7 +67,7 @@ function StudentCard({ s, defs }: { s: StudentView; defs: Map<string, TalentDefV
     <Link
       to={`/students/${s.id}`}
       data-testid="student-card"
-      className={`block border p-3.5 transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-cyber-400/50 ${QUALITY_MATERIAL[s.qualityTier]}`}
+      className={`block cursor-pointer border p-3.5 transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-cyber-400/50 ${QUALITY_MATERIAL[s.qualityTier]}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

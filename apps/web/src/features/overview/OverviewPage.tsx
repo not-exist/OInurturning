@@ -24,6 +24,7 @@ import {
   type TalentDefView,
 } from '../../lib/hooks';
 import {
+  CHECKLIST_BADGE_LABEL,
   ADVENTURE_STATUS_LABEL,
   CONTEST_FORMAT_LABEL,
   CONTEST_RECORD_TYPE_LABEL,
@@ -85,14 +86,18 @@ export function OverviewPage(): JSX.Element {
     setClaimMsg(null);
     claim.mutate(undefined, {
       onSuccess: (r) =>
-        setClaimMsg(r.already ? '该徽章此前已入档，无需重复领取。' : `领取成功，徽章 ${r.badge} 已入档。`),
+        setClaimMsg(
+          r.already
+            ? '该徽章此前已入档，无需重复领取。'
+            : `领取成功，${CHECKLIST_BADGE_LABEL[r.badge] ?? '徽章'}已入档。`,
+        ),
     });
   }
 
   return (
     <div className="space-y-5" data-testid="overview-page">
       <PageHeader
-        eyebrow="COMMAND DECK · 教练台"
+        eyebrow="教练台"
         title="欢迎回来，教练"
         description={`${reputationTitle(rep)} · 在营 ${ov.students.total} 名学员 · 候选池 ${ov.pool.count} 人待选`}
         actions={
@@ -126,7 +131,7 @@ export function OverviewPage(): JSX.Element {
             剧情已通关 {ov.story.clearedStages}/{ov.story.totalStages} 关
           </span>
         </WalletStat>
-        <WalletStat icon={GLYPH.stamina} tone="text-warn-400">
+        <WalletStat icon={RefreshCw} tone="text-warn-400">
           <span className="eyebrow">候选池</span>{' '}
           <span className="numeral text-2xl text-fg">{ov.pool.count}</span>
           <span className="mt-1 flex items-center gap-1 text-[11px] text-fg-dim">
@@ -140,7 +145,7 @@ export function OverviewPage(): JSX.Element {
         <div className="space-y-5 xl:col-span-8">
           <Panel
             title="开局任务"
-            eyebrow="ONBOARDING"
+            eyebrow="开局"
             corners
             actions={
               <span className="flex items-baseline gap-2">
@@ -161,7 +166,9 @@ export function OverviewPage(): JSX.Element {
                 <p className="flex flex-wrap items-center gap-2 text-sm text-fg-muted">
                   已领取：
                   <span className="font-mono text-fg">{ov.checklist.rewardBadge}</span>
-                  <Chip className="border-good-400/50 text-good-400">已完成</Chip>
+                  <Chip className="border-good-400/50 text-good-400">
+                    {CHECKLIST_BADGE_LABEL[ov.checklist.rewardBadge] ?? '已完成'}
+                  </Chip>
                 </p>
               ) : (
                 <div className="flex flex-wrap items-center gap-3">
@@ -173,7 +180,7 @@ export function OverviewPage(): JSX.Element {
                   >
                     {claim.isPending ? '领取中…' : '领取徽章'}
                   </Btn>
-                  <Chip>{ov.checklist.rewardBadge}</Chip>
+                  <Chip>{CHECKLIST_BADGE_LABEL[ov.checklist.rewardBadge] ?? ov.checklist.rewardBadge}</Chip>
                   {!allDone && (
                     <span className="text-xs text-fg-faint">
                       完成全部 5 项任务后可领取
@@ -190,7 +197,7 @@ export function OverviewPage(): JSX.Element {
 
           <Panel
             title="最近动态"
-            eyebrow="ACTIVITY"
+            eyebrow="动态"
             actions={<span className="text-[11px] text-fg-faint">训练 · 讲课 · 历练 · 赛事</span>}
           >
             {feed.length === 0 ? (
@@ -229,7 +236,7 @@ export function OverviewPage(): JSX.Element {
         <div className="space-y-5 xl:col-span-4">
           <Panel
             title={`我的学员（${ov.students.total}）`}
-            eyebrow="ROSTER"
+            eyebrow="名册"
             bodyClassName="p-0"
             actions={
               <Link to="/students" className="text-xs text-fg-dim transition-colors hover:text-cyber-300">
@@ -272,7 +279,7 @@ export function OverviewPage(): JSX.Element {
 
           <Panel
             title="招募池"
-            eyebrow="RECRUIT"
+            eyebrow="招募"
             actions={
               <Link to="/academy" className="text-xs text-fg-dim transition-colors hover:text-cyber-300">
                 去招募
@@ -300,7 +307,7 @@ export function OverviewPage(): JSX.Element {
 
           <Panel
             title="剧情进度"
-            eyebrow="STORY"
+            eyebrow="剧情"
             actions={
               <Link to="/story" className="text-xs text-fg-dim transition-colors hover:text-cyber-300">
                 剧情模式
@@ -336,7 +343,7 @@ export function OverviewPage(): JSX.Element {
             )}
           </Panel>
 
-          <Panel title="公告板" eyebrow="BULLETIN" bodyClassName="divide-y divide-ink-600/60 p-0">
+          <Panel title="公告板" eyebrow="公告" bodyClassName="divide-y divide-ink-600/60 p-0">
             {ov.announcements.length === 0 ? (
               <p className="px-4 py-5 text-sm text-fg-faint">暂无公告。</p>
             ) : (

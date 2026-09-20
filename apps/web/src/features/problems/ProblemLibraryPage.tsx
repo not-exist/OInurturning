@@ -229,7 +229,7 @@ function ProblemRow({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <HoverCard content={<ProblemDetail problem={problem} />} width="w-80">
             <span className="text-sm font-semibold text-fg underline decoration-ink-500 decoration-dotted underline-offset-4">
-              {problem.name}
+              {formatProblemName(problem)}
             </span>
           </HoverCard>
           <span className={`border px-1.5 py-0.5 text-[11px] ${rarityChip(norm)}`}>{rarityLabel(norm)}</span>
@@ -276,7 +276,7 @@ function ProblemDetail({ problem }: { problem: ProblemView }): JSX.Element {
   return (
     <span className="block space-y-2">
       <span className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-fg">{problem.name}</span>
+        <span className="text-sm font-semibold text-fg">{formatProblemName(problem)}</span>
         <span className={`border px-1.5 py-0.5 text-[11px] ${rarityChip(problem.rarity)}`}>
           {rarityLabel(problem.rarity)}
         </span>
@@ -311,6 +311,14 @@ function ProblemDetail({ problem }: { problem: ProblemView }): JSX.Element {
       </span>
     </span>
   );
+}
+
+/** 后端名形如「原创题·DS·Q14」，展示时把维度短码换成中文维名 */
+function formatProblemName(problem: ProblemView): string {
+  if (/^原创题·[A-Z]+·Q\d+$/.test(problem.name)) {
+    return `原创题 · ${DIMENSION_LABEL[problem.dominantDim]} · Q${problem.quality}`;
+  }
+  return problem.name;
 }
 
 /** 出题失败的人话分支（STATE_CONFLICT 既可能是日限，也可能是全库容量） */
