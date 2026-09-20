@@ -11,8 +11,8 @@ const tournamentSchema = z
     size: z.union([z.literal(8), z.literal(16), z.literal(32)]),
     registerEndsAt: z.coerce.date(),
     autoStartAt: z.coerce.date(),
-    prizes: z.record(z.unknown()).default({}),
-    config: z.record(z.unknown()).default({}),
+    prizes: z.record(z.string(), z.unknown()).default({}),
+    config: z.record(z.string(), z.unknown()).default({}),
   })
   .strict();
 
@@ -59,7 +59,7 @@ adminRouter.patch('/pvp-tournaments/:id', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
-    const parsed = z.object({ prizes: z.record(z.unknown()) }).strict().safeParse(req.body);
+    const parsed = z.object({ prizes: z.record(z.string(), z.unknown()) }).strict().safeParse(req.body);
     if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
     res.json({ ok: true, data: await service.updateTournamentPrizes(req.user!.id, id, parsed.data.prizes) });
   } catch (error) {
