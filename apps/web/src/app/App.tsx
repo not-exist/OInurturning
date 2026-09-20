@@ -1,13 +1,14 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { JSX, ReactNode } from 'react';
-import { LogOut, Sparkles } from 'lucide-react';
+import { LogOut, Sparkles, TriangleAlert } from 'lucide-react';
 import { apiFetch, setAccessToken } from '../lib/api';
 import { useAuthStore } from '../lib/auth-store';
 import { useOverview } from '../lib/hooks';
 import { nextReputationTitle, reputationTitle } from '../lib/rarity';
 import { Icon, NAV_ICON, type LucideIcon } from '../components/icons';
 import { RollingNumber } from '../components/ui';
+import { StaminaCells } from '../features/students/StudentVisuals';
 
 interface NavItem {
   to: string;
@@ -82,8 +83,11 @@ export function Layout(): JSX.Element {
 
   const reputation = me?.reputation ?? 0;
   const nextTitle = nextReputationTitle(reputation);
-  const stamina = overview.data?.students.items.reduce((sum, s) => sum + Math.floor(s.stamina), 0);
-  const staminaMax = (overview.data?.students.items.length ?? 0) * 5;
+  const roster = overview.data?.students.items ?? [];
+  const stamina = roster.reduce((sum, s) => sum + Math.floor(s.stamina), 0);
+  const staminaMax = roster.length * 5;
+  // 有人体力低于 1 点：训练 / 剧情 / 历练都会被拦，HUD 直接点名
+  const staminaShort = roster.some((s) => Math.floor(s.stamina) < 1);
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
@@ -149,31 +153,40 @@ export function Layout(): JSX.Element {
           className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-ink-600/70 bg-ink-950/80 px-4 py-2 backdrop-blur"
         >
           <dl className="flex flex-wrap items-center gap-x-6 gap-y-1">
-            <HudStat label="金币">
-              <RollingNumber value={overview.data?.me.money ?? me?.money ?? 0} />
+            <HudStat label="金币" hero>
+              <RollingNumber value={overview.data?.me.money ?? me?.money ?? 0} className="text-cyber-300" />
             </HudStat>
             <HudStat label="声誉">
-              <RollingNumber value={reputation} />
-              <span className="ml-1.5 text-[10px] text-fg-faint">
+              <RollingNumber value={reputation} className="text-arc-300" />
+              <span className="ml-1.5 text-[10px] text-fg-dim">
                 {reputationTitle(reputation)}
                 {nextTitle !== null ? ` · 距${nextTitle.label} ${nextTitle.gap}` : ''}
               </span>
             </HudStat>
-            <HudStat label="学员">
+            <HudStat label="学员" quiet>
               <span className="tnum">
                 {overview.data?.students.total ?? '—'}
               </span>
             </HudStat>
             <HudStat label="体力">
-              <span className="tnum">
-                {stamina === undefined ? '—' : `${stamina}/${staminaMax}`}
+              <span className="flex items-center gap-2">
+                <span className={`tnum ${staminaShort ? 'text-warn-400' : 'text-fg'}`}>
+                  {stamina === undefined ? '—' : `${stamina}/${staminaMax}`}
+                </span>
+                <StaminaCells stamina={Math.min(5, Math.floor((stamina ?? 0) / 5))} />
+                {staminaShort && (
+                  <span className="flex items-center gap-1 text-[10px] text-warn-400">
+                    <Icon icon={TriangleAlert} className="size-3" />
+                    体力不足
+                  </span>
+                )}
               </span>
             </HudStat>
           </dl>
 
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1.5 text-fg-muted">
-              <span className="size-1.5 animate-pulse-dot rounded-full bg-good-400" aria-hidden />
+              <span className="size-1.5 rounded-full bg-good-400" aria-hidden />
               {me?.username}
             </span>
             <button
@@ -196,11 +209,25 @@ export function Layout(): JSX.Element {
   );
 }
 
-function HudStat({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+function HudStat({
+  label,
+  hero = false,
+  quiet = false,
+  children,
+}: {
+  label: string;
+  hero?: boolean;
+  quiet?: boolean;
+  children: ReactNode;
+}): JSX.Element {
   return (
     <div className="flex items-baseline gap-2">
-      <dt className="text-[10px] tracking-[0.14em] text-fg-faint uppercase">{label}</dt>
-      <dd className="font-display text-sm text-fg">{children}</dd>
+      <dt className={`text-[10px] tracking-[0.14em] ${quiet ? 'text-fg-dim' : 'text-fg-dim'} uppercase`}>
+        {label}
+      </dt>
+      <dd className={`font-display ${hero ? 'text-base text-cyber-300' : quiet ? 'text-sm text-fg-muted' : 'text-sm text-fg'}`}>
+        {children}
+      </dd>
     </div>
   );
 }

@@ -76,11 +76,11 @@ export const RARITY_FILL: Record<Rarity, string> = {
 /** 图标光效（稀有度是画面唯一高饱和光源） */
 export const RARITY_GLOW: Record<Rarity, string> = {
   GRAY: '',
-  YELLOW: 'shadow-[0_0_14px_-6px_var(--color-rarity-yellow)]',
-  GREEN: 'shadow-[0_0_14px_-6px_var(--color-rarity-green)]',
-  BLUE: 'shadow-[0_0_16px_-6px_var(--color-rarity-blue)]',
-  PURPLE: 'shadow-[0_0_18px_-6px_var(--color-rarity-purple)]',
-  RAINBOW: 'shadow-[0_0_22px_-6px_var(--color-rarity-colorful)]',
+  YELLOW: 'shadow-[0_0_20px_-2px_var(--color-rarity-yellow)]',
+  GREEN: 'shadow-[0_0_22px_-2px_var(--color-rarity-green)]',
+  BLUE: 'shadow-[0_0_26px_-1px_var(--color-rarity-blue)]',
+  PURPLE: 'shadow-[0_0_32px_0_var(--color-rarity-purple)]',
+  RAINBOW: 'shadow-[0_0_36px_0_var(--color-rarity-colorful)]',
 };
 
 /** 徽章：1px 描边 + 透明底 + 稀有度色文字 */
