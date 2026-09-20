@@ -399,13 +399,13 @@ export function AdventurePage(): JSX.Element {
   return (
     <div data-testid="adventure-page" className="mx-auto max-w-5xl space-y-5">
       <PageHeader
-        eyebrow="Adventure Log"
+        eyebrow="历练"
         title="历练"
         description="投入体力换一次未知遭遇：资源、成长，或一场必须现场解决的对决。"
         actions={<Chip icon={UserRound}>3 人小队 · 队长带队</Chip>}
       />
 
-      <Panel title="出发准备" eyebrow="Departure" corners>
+      <Panel title="出发准备" eyebrow="出发" corners>
         <RosterPicker
           students={students.data}
           selectedIds={roster}
@@ -531,7 +531,7 @@ export function AdventurePage(): JSX.Element {
 
       <Panel
         title="历练记录"
-        eyebrow="Logs"
+        eyebrow="记录"
         bodyClassName="p-0"
         actions={<span className="text-xs text-fg-dim">最近 {logs.data.length} 条</span>}
       >

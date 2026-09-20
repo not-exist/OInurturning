@@ -186,6 +186,24 @@ export function StaminaCells({ stamina, className = '' }: { stamina: number; cla
 // ---------------------------------------------------------------------------
 
 const RADAR_R = 34;
+/** 六维条 / 雷达共用：中前期按 30 起量，成长后跟最高维走，封顶 100 */
+export function statScale(values: number[]): number {
+  return Math.min(100, Math.max(30, ...values));
+}
+
+const RADAR_SHORT: Record<(typeof SIX_DIMS)[number]['key'], string> = {
+  DS: '数据',
+  DP: '动态',
+  MATH: '数学',
+  GRAPH: '图论',
+  GREEDY: '贪心',
+  STRING: '字符',
+};
+
+/** 百分比效果值（带符号，负值用真减号） */
+function signedPercent(v: number): string {
+  return `${v >= 0 ? '+' : '−'}${Math.abs(v)}%`;
+}
 
 function radarXY(index: number, ratio: number): [number, number] {
   const angle = ((index * 60 - 90) * Math.PI) / 180;
@@ -209,10 +227,13 @@ export function RadarChart({
   size?: number;
   className?: string;
 }): JSX.Element {
-  const ratios = SIX_DIMS.map((d) => Math.max(0, Math.min(1, s[d.field] / 100)));
+  // 量程随学员成长动态变化（下限 30）：按 100 归一化会让中前期学员的雷达缩成一个点
+  const values = SIX_DIMS.map((d) => s[d.field]);
+  const scale = statScale(values);
+  const ratios = values.map((v) => Math.max(0, Math.min(1, v / scale)));
   return (
     <svg
-      viewBox="0 0 100 100"
+      viewBox="-12 -10 124 120"
       width={size}
       height={size}
       role="img"
@@ -236,6 +257,22 @@ export function RadarChart({
       {ratios.map((r, i) => {
         const [x, y] = radarXY(i, r);
         return <circle key={SIX_DIMS[i].key} cx={x} cy={y} r={1.3} className="fill-cyber-300" />;
+      })}
+      {SIX_DIMS.map((dim, i) => {
+        const [x, y] = radarXY(i, 1.32);
+        return (
+          <text
+            key={dim.key}
+            x={x}
+            y={y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            className="fill-fg-dim"
+            fontSize={7}
+          >
+            {RADAR_SHORT[dim.key]}
+          </text>
+        );
       })}
     </svg>
   );
@@ -288,7 +325,7 @@ export function TalentSlot({ def }: { def: TalentDefView }): JSX.Element {
               {talentStatLabel(effect.stat)}
               <span className="ml-1 text-fg-faint">{TALENT_MODE_LABEL[effect.mode] ?? '修正'}</span>
               <span className="ml-1.5 font-mono text-fg">
-                {effect.mode === 'percent' ? `+${effect.value}%` : signed(effect.value)}
+                {effect.mode === 'percent' ? signedPercent(effect.value) : signed(effect.value)}
               </span>
             </li>
           ))}
@@ -382,6 +419,7 @@ export function StudentHover({
 // ---------------------------------------------------------------------------
 
 export function DimBars({ s, className = '' }: { s: StudentView; className?: string }): JSX.Element {
+  const scale = statScale(SIX_DIMS.map((d) => s[d.field]));
   return (
     <div className={`grid grid-cols-2 gap-x-3 gap-y-1.5 ${className}`}>
       {SIX_DIMS.map((dim) => (
@@ -390,7 +428,7 @@ export function DimBars({ s, className = '' }: { s: StudentView; className?: str
             <span className="truncate text-fg-faint">{DIMENSION_LABEL[dim.key]}</span>
             <span className="font-mono text-fg-muted">{floor(s[dim.field])}</span>
           </div>
-          <Meter value={s[dim.field]} max={100} className="bg-cyber-400/70" trackClassName="bg-ink-700/80" />
+          <Meter value={s[dim.field]} max={scale} className="bg-cyber-400/70" trackClassName="bg-ink-700/80" />
         </div>
       ))}
     </div>

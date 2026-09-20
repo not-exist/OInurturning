@@ -14,7 +14,7 @@ function rewardText(reward: PvpRewardLine, itemName: (itemId: string) => string)
 
 function grantOwner(userId: number, meId: number | undefined, meName: string | undefined): string {
   if (meId !== undefined && userId === meId) return meName ?? '我的队伍';
-  return `选手 #${userId}`;
+  return `选手 ${userId}`;
 }
 
 /** 赛事奖励公示：名次榜单 + 领取（只有自己的份额可领取） */

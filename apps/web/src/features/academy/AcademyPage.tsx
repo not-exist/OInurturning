@@ -71,7 +71,7 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
   return (
     <div data-testid="academy-page" className="space-y-5">
       <PageHeader
-        eyebrow="ACADEMY · RECRUIT"
+        eyebrow="候选池"
         title="高级学院"
         description="候选档案的隐性档位不可见：气质判读与招募费是仅有的线索，招募费越高越值得下注。"
         actions={<ActionLink to="/academy/lecture">前往讲课台</ActionLink>}
@@ -161,9 +161,9 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
           可以等下一次免费重掷，或立刻花金币重建候选池。
         </Empty>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {pool.candidates.map((c, index) => (
-            <li key={c.tempId} className="flex">
+            <li key={c.tempId} className="flex w-full max-w-md">
               <CandidateCard
                 c={c}
                 index={index}

@@ -66,6 +66,11 @@ export const QUALITY_LABEL: Record<QualityTier, string> = {
   GENIUS: '天才',
 };
 
+/** 开局任务徽章 id 是服务端字面量 `rookie-done`；未领取态用中文，已领取态必须原样输出（e2e 断言 `已领取：rookie-done`） */
+export const CHECKLIST_BADGE_LABEL: Record<string, string> = {
+  'rookie-done': '新秀徽章',
+};
+
 export const STUDENT_STATUS_LABEL: Record<StudentStatus, string> = {
   ACTIVE: '在营',
   DISMISSED: '已开除',

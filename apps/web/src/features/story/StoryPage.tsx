@@ -32,6 +32,15 @@ function ngLabel(layer: number): string {
   return layer === 0 ? '一周目' : `NG+ ${layer}`;
 }
 
+/** `cspj:1` →「CSP-J 第 1 关」；解析失败时退回「第 n 关」，不把裸 id 打到可见文案。 */
+function stageNumberLabel(stageKey: string, ordinal: number): string {
+  const sep = stageKey.lastIndexOf(':');
+  const tier = sep === -1 ? '' : stageKey.slice(0, sep);
+  const parsed = sep === -1 ? Number.NaN : Number(stageKey.slice(sep + 1));
+  const index = Number.isInteger(parsed) && parsed > 0 ? parsed : ordinal;
+  return isTier(tier) ? `${tierLabel(tier)} 第 ${index} 关` : `第 ${index} 关`;
+}
+
 /** 悬浮卡内容行（HoverCard 的 tooltip 是 <span>，内容只用 span 保持合法嵌套） */
 function HoverRow({ k, children }: { k: string; children: ReactNode }): JSX.Element {
   return (
@@ -92,16 +101,34 @@ function StageNode({
         ? '体力不足'
         : null;
   const StateIcon = stage.cleared ? CircleCheck : stage.unlocked ? Target : Lock;
+  const state = stage.cleared ? 'cleared' : stage.unlocked ? 'open' : 'locked';
 
   return (
-    <li className="relative flex flex-wrap items-center gap-4 py-3 pl-10">
-      <span aria-hidden className="absolute top-0 bottom-0 left-3 w-px bg-ink-600/70" />
+    <li
+      className={`relative mb-1.5 flex flex-wrap items-center gap-4 py-3 pr-3 pl-11 last:mb-0 ${
+        state === 'cleared'
+          ? 'border border-good-400/25 bg-good-400/[0.06]'
+          : state === 'open'
+            ? 'border border-cyber-400/40 bg-cyber-400/[0.08]'
+            : 'border border-ink-600/50 bg-ink-900/55'
+      }`}
+    >
       <span
-        className={`absolute left-0 flex size-6 items-center justify-center border bg-ink-900 ${
-          stage.cleared
-            ? 'border-good-400/60 text-good-400'
-            : stage.unlocked
-              ? 'border-cyber-400/60 text-cyber-300'
+        aria-hidden
+        className={`absolute top-0 bottom-0 left-[1.125rem] w-px ${
+          state === 'cleared'
+            ? 'bg-good-400/35'
+            : state === 'open'
+              ? 'bg-cyber-400/40'
+              : 'bg-ink-600/50'
+        }`}
+      />
+      <span
+        className={`absolute left-2 flex size-6 items-center justify-center border bg-ink-900 ${
+          state === 'cleared'
+            ? 'border-good-400/70 text-good-400'
+            : state === 'open'
+              ? 'border-cyber-400/70 text-cyber-300'
               : 'border-ink-600 text-fg-faint'
         }`}
       >
@@ -110,7 +137,11 @@ function StageNode({
 
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[11px] text-fg-faint">
+          <span
+            className={`font-mono text-[11px] ${
+              state === 'open' ? 'text-cyber-400' : state === 'cleared' ? 'text-good-400/80' : 'text-fg-faint'
+            }`}
+          >
             {String(ordinal).padStart(2, '0')}
           </span>
           <HoverCard
@@ -120,7 +151,7 @@ function StageNode({
                 <span className="block text-xs font-semibold text-fg">
                   {name}
                 </span>
-                <HoverRow k="关卡编号">{stage.stageKey}</HoverRow>
+                <HoverRow k="关卡编号">{stageNumberLabel(stage.stageKey, ordinal)}</HoverRow>
                 <HoverRow k="推荐等级">{stage.recommendedLevel ?? '—'}</HoverRow>
                 <HoverRow k="比赛时长">{stage.durationMin ?? '—'} 分钟</HoverRow>
                 <HoverRow k="体力消耗">×{cost}</HoverRow>
@@ -136,7 +167,13 @@ function StageNode({
               </span>
             }
           >
-            <span className="cursor-help font-medium text-fg">{name}</span>
+            <span
+              className={`cursor-help font-medium ${
+                state === 'open' ? 'text-fg' : state === 'cleared' ? 'text-fg-muted' : 'text-fg-faint'
+              }`}
+            >
+              {name}
+            </span>
           </HoverCard>
           {stage.cleared && (
             <ToneChip className="border-good-400/50 bg-good-400/10 text-good-400">
@@ -150,11 +187,15 @@ function StageNode({
           )}
           {blocked === '未解锁' && <Chip icon={Lock}>未解锁</Chip>}
         </span>
-        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-dim">
+        <span
+          className={`mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] ${
+            state === 'open' ? 'text-fg-dim' : 'text-fg-faint'
+          }`}
+        >
           <span>推荐等级 {stage.recommendedLevel ?? '—'}</span>
           <span>{stage.durationMin ?? '—'} 分钟</span>
           <span>{rosterSize} 人团体赛</span>
-          <span className="text-warn-400">体力 ×{cost}</span>
+          <span className={state === 'locked' ? 'text-fg-faint' : 'text-warn-400'}>体力 ×{cost}</span>
           {stage.clearCount > 0 && <span>已通关 {stage.clearCount} 次</span>}
         </span>
       </span>
@@ -239,7 +280,7 @@ export function StoryPage(): JSX.Element {
   return (
     <div data-testid="story-page" className="mx-auto max-w-5xl space-y-5">
       <PageHeader
-        eyebrow="Contest Circuit"
+        eyebrow="赛程"
         title="剧情模式"
         description="八个赛季阶梯，33 关赛事。每关 4 人团体赛，名次达标即推进。"
         actions={
@@ -270,7 +311,7 @@ export function StoryPage(): JSX.Element {
       />
 
       <Panel
-        eyebrow="Lineup"
+        eyebrow="阵容"
         title="出战阵容"
         corners
         actions={

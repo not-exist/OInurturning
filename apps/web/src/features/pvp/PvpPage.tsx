@@ -82,7 +82,7 @@ export function PvpPage(): JSX.Element {
   if (basePending || tournamentPending) {
     return (
       <div className="space-y-5" data-testid="pvp-page">
-        <PageHeader eyebrow="PVP Circuit" title="PVP 锦标赛" />
+        <PageHeader eyebrow="锦标赛" title="PVP 锦标赛" />
         <InlineLoader>正在接入赛事频道…</InlineLoader>
       </div>
     );
@@ -108,7 +108,7 @@ export function PvpPage(): JSX.Element {
   if (baseError || tournamentError) {
     return (
       <div className="space-y-5" data-testid="pvp-page">
-        <PageHeader eyebrow="PVP Circuit" title="PVP 锦标赛" />
+        <PageHeader eyebrow="锦标赛" title="PVP 锦标赛" />
         <ErrorNote
           onRetry={() => {
             void tournaments.refetch();
@@ -134,7 +134,7 @@ export function PvpPage(): JSX.Element {
   return (
     <div className="space-y-5" data-testid="pvp-page">
       <PageHeader
-        eyebrow="PVP Circuit"
+        eyebrow="锦标赛"
         title="PVP 锦标赛"
         description="组队报名 → 到点自动开赛 → 单败淘汰；对阵双方可回看当场战报。"
         actions={

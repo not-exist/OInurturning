@@ -72,6 +72,8 @@ export function Card({
   return (
     <Cmp
       className={`panel transition-[border-color,transform,box-shadow] duration-200 ${
+        as === 'button' || as === 'label' ? 'cursor-pointer' : ''
+      } ${
         selected
           ? 'border-cyber-400/70 shadow-[0_0_24px_-12px_var(--color-cyber-400)]'
           : 'hover:border-ink-500'
@@ -133,7 +135,7 @@ export function Btn({
   return (
     <button
       type="button"
-      className={`inline-flex items-center justify-center gap-1.5 border font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`inline-flex cursor-pointer items-center justify-center gap-1.5 border font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:border-ink-600 disabled:bg-ink-800/50 disabled:text-fg-faint disabled:opacity-100 disabled:hover:bg-ink-800/50 disabled:hover:text-fg-faint ${
         size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'
       } ${BTN_VARIANT[variant]} ${className}`}
       {...rest}
@@ -155,7 +157,7 @@ export function ActionLink({
   return (
     <Link
       to={to}
-      className={`inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-medium transition-colors ${
+      className={`inline-flex cursor-pointer items-center gap-1.5 border px-3 py-1.5 text-sm font-medium transition-colors ${
         variant === 'primary'
           ? 'border-cyber-400/60 bg-cyber-400/15 text-cyber-300 hover:bg-cyber-400/25'
           : 'border-ink-600 text-fg-muted hover:border-ink-500 hover:text-fg'
