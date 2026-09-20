@@ -35,15 +35,23 @@ export function sessionFor(u: User): { accessToken: string; refreshToken: string
   return { accessToken: signAccess(claims), refreshToken: signRefresh(claims), me: toMeView(u) };
 }
 
-export function refreshCookie(token: string): string {
+/**
+ * Refresh Cookie 必须按浏览器实际访问协议决定 Secure：
+ * - HTTPS（含受信任反代转发的 HTTPS）始终 Secure；
+ * - 显式 HTTP 的本地/自托管环境不带 Secure，否则浏览器会静默拒收 Cookie，刷新页面必然登出。
+ *
+ * 生产部署仍应由 TLS 终结层提供 HTTPS；HTTP 不会因这里的兼容行为变成安全连接。
+ */
+export function refreshCookie(token: string, secure: boolean): string {
   const parts = [`${REFRESH_COOKIE}=${token}`, 'Path=/api/auth', 'HttpOnly', 'SameSite=Strict'];
-  if (env.NODE_ENV === 'production') parts.push('Secure');
+  if (secure) parts.push('Secure');
   parts.push(`Max-Age=${7 * 24 * 3600}`);
   return parts.join('; ');
 }
 
-export function clearRefreshCookie(): string {
+export function clearRefreshCookie(secure: boolean): string {
   const parts = [`${REFRESH_COOKIE}=`, 'Path=/api/auth', 'HttpOnly', 'SameSite=Strict', 'Max-Age=0'];
+  if (secure) parts.push('Secure');
   return parts.join('; ');
 }
 

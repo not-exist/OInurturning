@@ -28,10 +28,15 @@ import type { ApiEnvelope } from '@oinur/shared';
 export interface AppOptions {
   /** 默认在 NODE_ENV=test 时跳过限流；429 专项测试可显式传 false 开启 */
   skipRateLimit?: boolean;
+  /** 测试可覆盖反向代理协议识别；生产值来自 TRUST_PROXY_HOPS。 */
+  trustProxyHops?: number;
 }
 
 export function createApp(opts: AppOptions = {}): express.Express {
   const app = express();
+  // 仅信任配置数量的本地/容器反代。req.secure 因而能读取真实 HTTPS 协议，
+  // 同时避免直连 API 时任意 X-Forwarded-* 头影响鉴权 Cookie 或限流 IP。
+  app.set('trust proxy', opts.trustProxyHops ?? env.TRUST_PROXY_HOPS);
   app.disable('x-powered-by');
   app.use(helmet());
   app.use(express.json({ limit: '256kb' }));

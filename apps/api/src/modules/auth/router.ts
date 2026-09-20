@@ -20,7 +20,7 @@ function parse<T extends z.ZodTypeAny>(schema: T, body: unknown): z.infer<T> {
 authRouter.post('/register', async (req, res, next) => {
   try {
     const s = await svc.register(parse(CredentialsSchema, req.body));
-    res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken));
+    res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken, req.secure));
     res.json({ ok: true, data: { accessToken: s.accessToken, me: s.me } });
   } catch (e) { next(e); }
 });
@@ -28,7 +28,7 @@ authRouter.post('/register', async (req, res, next) => {
 authRouter.post('/login', async (req, res, next) => {
   try {
     const s = await svc.login(parse(CredentialsSchema, req.body));
-    res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken));
+    res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken, req.secure));
     res.json({ ok: true, data: { accessToken: s.accessToken, me: s.me } });
   } catch (e) { next(e); }
 });
@@ -36,7 +36,7 @@ authRouter.post('/login', async (req, res, next) => {
 authRouter.post('/logout', requireAuth, async (req, res, next) => {
   try {
     await svc.bumpTokenVersionAndLogout(req.user!.id);
-    res.setHeader('Set-Cookie', svc.clearRefreshCookie());
+    res.setHeader('Set-Cookie', svc.clearRefreshCookie(req.secure));
     res.json({ ok: true, data: null });
   } catch (e) { next(e); }
 });
@@ -45,7 +45,7 @@ authRouter.put('/password', requireAuth, async (req, res, next) => {
   try {
     const { oldPassword, newPassword } = parse(ChangePasswordSchema, req.body);
     await svc.changePassword(req.user!.id, oldPassword, newPassword);
-    res.setHeader('Set-Cookie', svc.clearRefreshCookie());
+    res.setHeader('Set-Cookie', svc.clearRefreshCookie(req.secure));
     res.json({ ok: true, data: null }); // tokenVersion+1 → 所有旧 token 失效，前端跳登录
   } catch (e) { next(e); }
 });
@@ -57,7 +57,7 @@ authRouter.post('/deactivate', requireAuth, async (req, res, next) => {
     if (!user.passwordHash || !(await bcrypt.compare(password, user.passwordHash)))
       throw new ApiError('INVALID_CREDENTIALS', { field: 'password' });
     await svc.deactivate(req.user!.id);
-    res.setHeader('Set-Cookie', svc.clearRefreshCookie());
+    res.setHeader('Set-Cookie', svc.clearRefreshCookie(req.secure));
     res.json({ ok: true, data: null });
   } catch (e) { next(e); }
 });
@@ -73,7 +73,7 @@ authRouter.post('/refresh', async (req, res, next) => {
     if (!user || !user.passwordHash || user.bannedAt || user.tokenVersion !== claims.tv)
       throw new ApiError('UNAUTHENTICATED');
     const s = svc.sessionFor(user);
-    res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken));
+    res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken, req.secure));
     res.json({ ok: true, data: { accessToken: s.accessToken, me: s.me } });
   } catch (e) {
     // TokenExpiredError 继承自 JsonWebTokenError，无需单列；

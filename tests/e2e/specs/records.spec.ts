@@ -49,6 +49,22 @@ test.describe('战报与战斗回放', () => {
     // 回放出现：并行视图专属标题证明走了多面板分支（而非单面板 fallback）
     await expect(page.getByTestId('replay-skip')).toBeVisible();
     await expect(page.getByText('Ranking Battle · Parallel View')).toBeVisible();
+
+    // #48：题目卡弹窗的内部选项卡/内容点击不能被遮罩视为关闭操作。
+    await expect(page.getByTestId('replay-question-board')).toBeVisible();
+    await page.getByTestId('replay-question-card-0').click();
+    const questionModal = page.getByTestId('replay-question-modal');
+    await expect(questionModal).toBeVisible();
+    await questionModal.getByTestId('replay-question-tab-特性').click();
+    await expect(questionModal).toBeVisible();
+    await expect(questionModal.getByTestId('replay-question-tab-特性')).toHaveClass(
+      /border-neutral-900/,
+    );
+    await questionModal.getByText('Problem Detail').click();
+    await expect(questionModal).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(questionModal).toBeHidden();
+
     // 开场 BATTLE_START 全屏后切出 4 队员面板
     const panels = page.getByTestId('replay-member-panel');
     await expect(panels).toHaveCount(4);
