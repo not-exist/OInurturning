@@ -312,3 +312,31 @@
 已裁决：九维**保持精确可见**；服务端**仅**在 `toPoolView()` 出参剥离 `qualityTier` 与 `talents`（不动存储结构，`recruit()` 落库仍需这两个字段）。`GET /api/academy/pool` **继续返回精确 `attrs`** —— `lecture.spec.ts` 的 `recruitAtLeast` / `recruitInWindow` 依赖它构造定向学员，剥离会让 3 个讲课核心用例只能删除或要求新增 `?minV=` 过滤参数。
 
 > 每个提交必须通过 `pnpm -r typecheck && pnpm -r lint && pnpm -r build`；全部完成后再 push。
+
+---
+
+## 8. 实施记录（2026-09-20 完成）
+
+**分支**：`feat/frontend-rewrite`（未 push）。三条验收线全部达成：
+
+| 验收线 | 结果 |
+|---|---|
+| `pnpm -r typecheck && pnpm -r lint && pnpm -r build` | 全绿 |
+| `pnpm e2e`（51 用例） | **51 passed**（3.5 min，workers=1） |
+| 零 emoji / 零裸 key / 零调试元数据 | 对 12 条路由（含 `?details=1` 战报）抓 `body.innerText` 审计：全部 clean；`neutral-*` 旧灰阶类 0 处 |
+
+**6 个真实缺陷**：1（彩档双轨）2（招募前泄品质/天赋）3（品质配色三套）4（心态无刻度）5（回放 O(n²)）6（过期端点注释与降级分支）7（背包白名单漏鸡腿便当）8（招募池重掷静默招错人）全部修复。
+
+### 与计划的偏差（5 项，均已在代码注释/提交信息中说明）
+
+1. **天赋来源 `acquiredVia` 未渲染**：该字段只存在于 `StudentTalent` 表，未在任何前端消费的出参里（`StudentView.talents` 是 `string[]`）。按"唯一批准的后端改动"边界，未扩字段；`labels.ts` 相应表已删除以免留死代码。
+2. **洗练保底计数 `counters.reroll` 未渲染**：服务端当前没有任何代码写入该计数器（洗练功能未落地），渲染会永远显示 0。`CountersView` 已按真实落库形状（`milkTea/coffeeDaily/staminaPotionDaily/bookWeek(*Key)`/`focusEngineUsed`）修正。
+3. **道具可用性真源比计划更彻底**：新增 zod-free 模块 `@oinur/shared/item-usage`（`USABLE_ITEM_IDS` 21 件 + `ITEM_USE_LIMITS`），**API 的 `effects.ts` 与前端共用同一常量**（删掉本地重复常量与 `isDirectBook`，行为不变）；为此 shared 新开 `./item-usage` 与 `./enums` 子路径，避免前端经 barrel 把 config 的 zod schema 打进浏览器包（实测 +82KB → 保持 437KB 基线）。
+4. **战报拆分粒度更细**：实际拆为 `records/{shared,ranking,duel}/` 19 个文件（最大 320 行），比计划的 3 个子模块多出 `bits/rewards/useReplayPlayback` 与 `ranking|duel` 各自的 `*Report`；`BattleReplay.tsx` 只剩 61 行的视图选择 + 继续对外导出 `BattleReplay`/`BattleWaiting`。
+5. **PVP 奖励公示的未持有道具显示「未知道具」**：`/api/items` 只回已持有道具，前端拿不到 81 件名录。要显示全名需服务端补道具目录端点（不在本次范围）。
+
+### 遗留待办（本次不动）
+
+- 计划 §5 三条已知冲突（C1 事件的 `tag-card`、蓝紫书周限数值裁定、招募价写回）均按原口径处理，未改后端。
+- 前端包 548KB / gzip 162KB（lucide 图标 + 页面重写，比改写前 +111KB）。若要压回，做**路由级代码分割**（`React.lazy` + Suspense）或按需 `dynamicIconImports`，评估后可另开提交。
+- `/admin` 审计表保留原始动作码（`TOURNAMENT_CREATE` 等）作为审计追溯字段（e2e 逐字断言依赖它），中文标签并列显示。
