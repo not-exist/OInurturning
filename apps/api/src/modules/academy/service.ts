@@ -64,8 +64,14 @@ function readCandidates(pool: RecruitPool): CandidatePayload[] {
   return pool.candidates as unknown as CandidatePayload[];
 }
 
+/**
+ * 候选**出参**：招募前品质档与天赋必须隐性（student.md §3.6）——品质档直接暴露会诱导刷池，
+ * 天赋更可由家族链确定性反推品质档。存储结构不动（recruit() 落库仍需这两个字段）。
+ */
+export type CandidatePublicView = Omit<CandidatePayload, 'qualityTier' | 'talents'>;
+
 export interface PoolView {
-  candidates: CandidatePayload[];
+  candidates: CandidatePublicView[];
   generatedAt: string;
   refreshesToday: number;
   /** 当前再手动刷新一次的价格（04:00 日界重置后从 k=0 重新计） */
@@ -75,7 +81,15 @@ export interface PoolView {
 function toPoolView(pool: RecruitPool, now: Date): PoolView {
   const k = pool.refreshDayKey === dayKey(now) ? pool.refreshesToday : 0;
   return {
-    candidates: readCandidates(pool),
+    // 只暴露：位置编号 / 姓名 / 性别 / 气质 / 九维 / 价格（价格分级本身就是设计内的推断线索）
+    candidates: readCandidates(pool).map(({ tempId, name, sex, hint, attrs, price }) => ({
+      tempId,
+      name,
+      sex,
+      hint,
+      attrs,
+      price,
+    })),
     generatedAt: pool.generatedAt.toISOString(),
     refreshesToday: k,
     refreshPrice: refreshPrice(recruitmentCfg().manual_refresh, k),

@@ -2,13 +2,12 @@ import { useState, type JSX } from 'react';
 import type { StudentView } from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
 import {
-  CATEGORY_LABEL,
-  rarityBadge,
-  rarityText,
   useInventory,
   useStudents,
   useUseItem,
 } from '../../lib/hooks';
+import { ITEM_CATEGORY_LABEL } from '../../lib/labels';
+import { rarityChip, rarityText } from '../../lib/rarity';
 import type { ItemView } from '../../lib/hooks';
 import { Link } from 'react-router';
 import { Empty, InlineLoader } from '../../components/ui';
@@ -69,7 +68,7 @@ export function InventoryPage(): JSX.Element {
           {groups.map((g) => (
             <section key={g.cat}>
               <h2 className="mb-2 text-sm font-semibold text-neutral-500">
-                {CATEGORY_LABEL[g.cat] ?? g.cat}
+                {ITEM_CATEGORY_LABEL[g.cat] ?? g.cat}
               </h2>
               <ul className="space-y-2">
                 {g.items.map((item) => (
@@ -102,7 +101,7 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium">{item.name}</span>
-            <span className={`rounded px-1.5 py-0.5 text-xs ${rarityBadge(item.rarity)}`}>
+            <span className={`rounded px-1.5 py-0.5 text-xs ${rarityChip(item.rarity)}`}>
               {rarityText(item.rarity)}
             </span>
             <span className="text-xs text-neutral-400">×{item.quantity}</span>

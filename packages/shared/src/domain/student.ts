@@ -14,15 +14,24 @@ export type StudentStatus = (typeof STUDENT_STATUSES)[number];
 
 /**
  * 稀疏计数器（Student.counters Json 列，M1-R4）：缺省键即 0。
- * milkTea 为当日键（每日限 2 杯，04:00 日界重置）、bookWeek 为本周直用书增益合计（≤10，周界重置），
- * 周期锚点由使用方在读写时按 clock 工具比对并重置。
+ * 周期键（`*Key`）是 reset 锚点：04:00 日界 / ISO 周界由使用方在读写时按 clock 工具比对，
+ * 键值不匹配即视为 0（见 apps/api/src/modules/items/effects.ts）。
  */
 export interface CountersView {
-  reroll?: number; // 洗练保底计数（≥20 触发保底后清零）
-  vigorUsed?: number; // 精力药剂已用次数（每人最多 3 次）
-  focusEngineUsed?: number; // 心流引擎已用次数（每人最多 2 次）
-  milkTea?: number; // 当日奶茶杯数（每日限 2）
-  bookWeek?: number; // 本周书籍增益合计（每周 ≤ 10 点）
+  /** 心流引擎已用台数（每人 1 台） */
+  focusEngineUsed?: number;
+  /** 当日奶茶杯数（每日 2 杯） */
+  milkTea?: number;
+  milkTeaKey?: string;
+  /** 当日浓咖啡杯数（每日 2 杯） */
+  coffeeDaily?: number;
+  coffeeDailyKey?: string;
+  /** 当日体力药水瓶数（每日 1 瓶） */
+  staminaPotionDaily?: number;
+  staminaPotionDailyKey?: string;
+  /** 本周各直用书科目增益合计（单学员 × 单属性 ≤10 点） */
+  bookWeek?: Record<string, number>;
+  bookWeekKey?: string;
 }
 
 /** V 值计算输入：六维 + code/thinking（student.md §1） */

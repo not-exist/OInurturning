@@ -304,10 +304,17 @@ describe('POST /api/academy/refresh', () => {
 describe('POST /api/academy/recruit', () => {
   beforeEach(resetUsers);
 
+  /** 出参已剥离 qualityTier/talents（§3.6 招募前隐性），断言落库内容须直接读池行 */
+  async function storedCandidates(userId: number): Promise<CandidatePayload[]> {
+    const row = await prisma.recruitPool.findUniqueOrThrow({ where: { userId } });
+    return row.candidates as unknown as CandidatePayload[];
+  }
+
   it('招募：扣钱（重算价=快照价）→ 建学员+天赋落库 → 池减员', async () => {
     const u = await createAuthedUser(10_000);
     const pool = await getPool(u.token);
     const target = pool.candidates[0]!;
+    const targetStored = (await storedCandidates(u.userId)).find((c) => c.tempId === target.tempId)!;
 
     const res = await request(app)
       .post('/api/academy/recruit')
@@ -315,9 +322,9 @@ describe('POST /api/academy/recruit', () => {
       .send({ tempId: target.tempId });
     const view = unwrapOk<{ id: number; name: string; qualityTier: string; talents: string[]; mindset: number }>(res);
     expect(view.name).toBe(target.name);
-    expect(view.qualityTier).toBe(target.qualityTier);
+    expect(view.qualityTier).toBe(targetStored.qualityTier);
     expect(view.mindset).toBe(2);
-    expect(view.talents).toEqual(target.talents.map((t) => t.talentId));
+    expect(view.talents).toEqual(targetStored.talents.map((t) => t.talentId));
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: u.userId } });
     expect(user.money).toBe(10_000 - target.price);
@@ -326,9 +333,9 @@ describe('POST /api/academy/recruit', () => {
       where: { id: view.id },
       include: { talents: true },
     });
-    expect(student.qualityTier).toBe(target.qualityTier);
+    expect(student.qualityTier).toBe(targetStored.qualityTier);
     expect(student.talents.map((t) => t.talentId).sort()).toEqual(
-      target.talents.map((t) => t.talentId).sort(),
+      targetStored.talents.map((t) => t.talentId).sort(),
     );
     for (const t of student.talents) expect(t.acquiredVia).toBe('RECRUIT');
 
@@ -348,7 +355,8 @@ describe('POST /api/academy/recruit', () => {
     const before = (await prisma.user.findUniqueOrThrow({ where: { id: u.userId } })).money;
 
     const second = pool.candidates[1]!;
-    const mult = { COMMON: 1.0, GOOD: 1.5, ELITE: 2.5, GENIUS: 5.0 }[second.qualityTier];
+    const secondStored = (await storedCandidates(u.userId)).find((c) => c.tempId === second.tempId)!;
+    const mult = { COMMON: 1.0, GOOD: 1.5, ELITE: 2.5, GENIUS: 5.0 }[secondStored.qualityTier];
     const expected = Math.round(738 * mult); // round(300×1.35³)=738
     const res = await request(app)
       .post('/api/academy/recruit')

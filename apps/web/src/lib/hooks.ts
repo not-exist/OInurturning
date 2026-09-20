@@ -5,11 +5,32 @@ import type {
   ContestRecordView,
   DimensionKey,
   MeView,
-  QualityTier,
   Rarity,
+  StoryOverview,
+  StoryProgressView,
   StudentView,
 } from '@oinur/shared';
 import { apiFetch } from './api';
+import type { LectureTierId, TrainingKind } from './labels';
+
+/**
+ * 数据层：wire 视图类型 + 查询/变更 hooks。
+ * 展示映射一律在 lib/labels.ts（文案）与 lib/rarity.ts（色彩），本文件不再掺展示逻辑。
+ *
+ * 缓存分级（staleTime）：
+ * - 钱包/背包/学员等玩家态 30s，且默认不在窗口聚焦时重取（见 main.tsx）：
+ *   `pvp/*` 服务端每次推进都要 `SELECT ... FOR UPDATE` 行锁，聚焦重取会在同一把锁上排队；
+ * - 静态配置（天赋目录/题库/讲课档位）5min；
+ * - 战报与回放不可变，Infinity。
+ * - 招募池例外：任何一次 GET 跨过免费刷新时刻或日界都会整池重掷，故永不自动重取
+ *   （只在招募/手动刷新成功后显式失效），详见 useAcademyPool。
+ */
+const STALE = {
+  wallet: 30_000,
+  list: 30_000,
+  config: 300_000,
+  immutable: Infinity,
+} as const;
 
 // ---------------------------------------------------------------------------
 // 领域视图类型（API 返回；shared 未导出的补于此）
@@ -34,10 +55,8 @@ export interface CandidatePayload {
   tempId: string;
   name: string;
   sex: 'MALE' | 'FEMALE';
-  qualityTier: QualityTier;
   hint: string;
   attrs: CandidateAttrs;
-  talents: { talentId: string }[];
   price: number;
 }
 
@@ -121,8 +140,6 @@ export interface AdventureChoiceResult {
   completed: boolean;
   replay?: BattleReplay;
 }
-
-export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
 
 export interface LectureTierView {
   id: LectureTierId;
@@ -257,12 +274,14 @@ export interface PvpRewardGrantView {
   claimable: boolean;
 }
 
+/** 天赋目录行（GET /api/talents；family 用于家族标签与净化链位置） */
 export interface TalentDefView {
   id: string;
   name: string;
   rarity: Rarity;
   kind: 'positive' | 'negative';
   description: string;
+  family: string | null;
   effects: { stat: string; mode: string; value: number }[];
 }
 
@@ -279,100 +298,6 @@ export interface ProblemView {
 export interface CreateProblemResult extends ProblemView {
   cost: number;
   staminaAfter: number;
-}
-
-// ---------------------------------------------------------------------------
-// 展示辅助（全局唯一；稀有度/品质/类别/维度/性别中文映射）
-// ---------------------------------------------------------------------------
-
-export const DIMENSION_LABEL: Record<DimensionKey, string> = {
-  DS: '数据结构',
-  DP: '动态规划',
-  MATH: '数学',
-  GRAPH: '图论',
-  GREEDY: '贪心',
-  STRING: '字符串',
-};
-
-export const QUALITY_LABEL: Record<QualityTier, string> = {
-  COMMON: '普通',
-  GOOD: '良好',
-  ELITE: '精英',
-  GENIUS: '天才',
-};
-
-export const SEX_LABEL: Record<'MALE' | 'FEMALE', string> = {
-  MALE: '男',
-  FEMALE: '女',
-};
-
-export const CATEGORY_LABEL: Record<string, string> = {
-  nurture: '养成',
-  book: '书籍',
-  functional: '功能',
-  contest: '竞赛',
-  quest: '任务',
-  material: '材料',
-};
-
-export const RARITY_LABEL: Record<Rarity, string> = {
-  GRAY: '灰',
-  YELLOW: '黄',
-  GREEN: '绿',
-  BLUE: '蓝',
-  PURPLE: '紫',
-  RAINBOW: '彩',
-};
-
-/** 材质色（通用着色） */
-export const RARITY_TEXT: Record<Rarity, string> = {
-  GRAY: 'text-neutral-500',
-  YELLOW: 'text-yellow-600',
-  GREEN: 'text-green-600',
-  BLUE: 'text-blue-600',
-  PURPLE: 'text-purple-600',
-  RAINBOW: 'text-fuchsia-600',
-};
-
-/** 徽标/边框用背景色（浅底深字） */
-export const RARITY_BADGE: Record<Rarity, string> = {
-  GRAY: 'bg-neutral-200 text-neutral-700',
-  YELLOW: 'bg-yellow-100 text-yellow-700',
-  GREEN: 'bg-green-100 text-green-700',
-  BLUE: 'bg-blue-100 text-blue-700',
-  PURPLE: 'bg-purple-100 text-purple-700',
-  RAINBOW: 'bg-fuchsia-100 text-fuchsia-700',
-};
-
-/** 归一化稀有度：API 对 items/talents 返回配置小写（如 gray），共享类型为大写 Rarity；统一大写 */
-function normRarity(r: string): Rarity {
-  const up = r.toUpperCase();
-  return (up in RARITY_TEXT ? up : 'GRAY') as Rarity;
-}
-
-/** 稀有度中文文案 */
-export function rarityLabel(r: string): string {
-  return RARITY_LABEL[normRarity(r)];
-}
-
-/** 稀有度文字着色 */
-export function rarityText(r: string): string {
-  return RARITY_TEXT[normRarity(r)];
-}
-
-/** 稀有度徽标底色 */
-export function rarityBadge(r: string): string {
-  return RARITY_BADGE[normRarity(r)];
-}
-
-/** 展示层 floor：能力值为浮点累积值 */
-export function floor(v: number): number {
-  return Math.floor(v);
-}
-
-/** 心态：四舍五入到整数点展示 */
-export function round(v: number): number {
-  return Math.round(v);
 }
 
 /** 当前时间的 tick（倒计时展示用，缺省每秒刷新） */
@@ -394,6 +319,7 @@ export function useMe() {
   return useQuery({
     queryKey: ['me'],
     queryFn: () => apiFetch<MeView>('/api/users/me'),
+    staleTime: STALE.wallet,
   });
 }
 
@@ -456,6 +382,7 @@ export function useOverview() {
   return useQuery({
     queryKey: ['overview'],
     queryFn: () => apiFetch<OverviewView>('/api/overview'),
+    staleTime: STALE.list,
   });
 }
 
@@ -482,7 +409,7 @@ export interface TrainingLogView {
   id: number;
   studentId: number | null;
   studentName: string;
-  kind: 'basic' | 'directed' | 'specialized';
+  kind: TrainingKind;
   dim: DimensionKey;
   delta: number;
   rareGains: RareGain[];
@@ -500,16 +427,10 @@ export interface TrainingLogPage {
 
 export interface TrainingLogFilters {
   studentId?: number;
-  kind?: 'basic' | 'directed' | 'specialized';
+  kind?: TrainingKind;
   limit?: number;
   cursor?: number;
 }
-
-export const TRAINING_KIND_LABEL: Record<TrainingLogView['kind'], string> = {
-  basic: '基础',
-  directed: '定向',
-  specialized: '专项',
-};
 
 export function useTrainingLogs(filters: TrainingLogFilters = {}) {
   return useQuery({
@@ -522,6 +443,7 @@ export function useTrainingLogs(filters: TrainingLogFilters = {}) {
     ],
     // 翻页时保留上一页，LogsList 自行拼接累积
     placeholderData: (prev) => prev,
+    staleTime: STALE.list,
     queryFn: () => {
       const p = new URLSearchParams();
       if (filters.studentId !== undefined) p.set('studentId', String(filters.studentId));
@@ -542,6 +464,7 @@ export function useStudents() {
   return useQuery({
     queryKey: ['students'],
     queryFn: () => apiFetch<StudentView[]>('/api/students'),
+    staleTime: STALE.list,
   });
 }
 
@@ -550,6 +473,7 @@ export function useStudent(id: number | undefined) {
     queryKey: ['student', id],
     queryFn: () => apiFetch<StudentView>(`/api/students/${id}`),
     enabled: id != null,
+    staleTime: STALE.list,
   });
 }
 
@@ -585,23 +509,35 @@ export function useDismissStudent() {
   });
 }
 
+/** 天赋目录（全量 61 条，含 family 与 effects；静态配置，5min 内不重取） */
 export function useTalentDefs() {
-  // 后端暂无 GET /api/talents（见报告 CONCERNS）；预留契约，返回空即优雅降级
   return useQuery({
     queryKey: ['talents'],
     queryFn: () => apiFetch<TalentDefView[]>('/api/talents'),
-    retry: false,
+    staleTime: STALE.config,
   });
 }
 
 // ---------------------------------------------------------------------------
-// 招募
+// 招募与讲课
 // ---------------------------------------------------------------------------
 
+/**
+ * 招募候选池。
+ *
+ * ⚠️ 永不自动重取是**正确性要求**，不是性能优化：服务端 getPool 一旦跨过
+ * free_interval_hours 或日界，任意一次 GET 都会整池重掷，而 tempId 是位置编号（c0..c4），
+ * 重掷后编号复用 → 「看着旧卡点新人」会静默招错人。因此只在
+ * 招募成功 / 手动刷新（下方 mutation）后显式失效重取；页面另需比对 generatedAt
+ * 变化并作废当前选中项。
+ */
 export function useAcademyPool() {
   return useQuery({
     queryKey: ['academy'],
     queryFn: () => apiFetch<PoolView>('/api/academy/pool'),
+    staleTime: STALE.immutable,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -626,6 +562,7 @@ export function useRecruit() {
         body: JSON.stringify({ tempId }),
       }),
     onSuccess: () => {
+      // 候选价按在册人数重算，招募后必须重取整池（价格快照禁止跨招募缓存）
       qc.invalidateQueries({ queryKey: ['academy'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
@@ -638,6 +575,7 @@ export function useLectureTiers() {
   return useQuery({
     queryKey: ['lecture-tiers'],
     queryFn: () => apiFetch<LectureTierView[]>('/api/academy/lecture-tiers'),
+    staleTime: STALE.config,
   });
 }
 
@@ -645,6 +583,7 @@ export function useLectureLogs() {
   return useQuery({
     queryKey: ['lecture-logs'],
     queryFn: () => apiFetch<LectureResultView[]>('/api/academy/lectures'),
+    staleTime: STALE.list,
   });
 }
 
@@ -675,13 +614,14 @@ export function useTeachLecture() {
 }
 
 // ---------------------------------------------------------------------------
-// 背包
+// 背包与道具
 // ---------------------------------------------------------------------------
 
 export function useInventory() {
   return useQuery({
     queryKey: ['items'],
     queryFn: () => apiFetch<ItemView[]>('/api/items'),
+    staleTime: STALE.wallet,
   });
 }
 
@@ -703,10 +643,15 @@ export function useUseItem() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// 历练
+// ---------------------------------------------------------------------------
+
 export function useAdventureLogs() {
   return useQuery({
     queryKey: ['adventure-logs'],
     queryFn: () => apiFetch<AdventureLogView[]>('/api/adventures/logs'),
+    staleTime: STALE.list,
   });
 }
 
@@ -766,19 +711,12 @@ export interface DirectedTrainInput {
   bookItemId?: string;
 }
 
-export function useProblems() {
-  // 后端暂无 GET /api/problems（见报告 CONCERNS）；预留契约，返回空即优雅降级
-  return useQuery({
-    queryKey: ['problems'],
-    queryFn: () => apiFetch<ProblemView[]>('/api/problems'),
-    retry: false,
-  });
-}
-
+/** 账号级题库（GET /api/problem-library；与 /api/problems 同源，数据层只留这一个） */
 export function useProblemLibrary() {
   return useQuery({
     queryKey: ['problem-library'],
     queryFn: () => apiFetch<ProblemView[]>('/api/problem-library'),
+    staleTime: STALE.config,
   });
 }
 
@@ -792,7 +730,6 @@ export function useCreateProblem() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['problem-library'] });
-      qc.invalidateQueries({ queryKey: ['problems'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
@@ -806,15 +743,72 @@ export function useDeleteProblem() {
     mutationFn: (id: number) => apiFetch<null>(`/api/problem-library/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['problem-library'] });
-      qc.invalidateQueries({ queryKey: ['problems'] });
     },
   });
 }
+
+export function useBasicTrain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: number) =>
+      apiFetch<TrainingResult>('/api/training/basic', {
+        method: 'POST',
+        body: JSON.stringify({ studentId }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['training-logs'] });
+    },
+  });
+}
+
+export function useDirectedTrain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DirectedTrainInput) =>
+      apiFetch<TrainingResult>('/api/training/directed', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['items'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['training-logs'] });
+    },
+  });
+}
+
+export function useSpecializedTrain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, problemId }: { studentId: number; problemId: number }) =>
+      apiFetch<TrainingResult>('/api/training/specialized', {
+        method: 'POST',
+        body: JSON.stringify({ studentId, problemId }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['problem-library'] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['training-logs'] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 管理端
+// ---------------------------------------------------------------------------
 
 export function useAdminTournaments() {
   return useQuery({
     queryKey: ['admin-tournaments'],
     queryFn: () => apiFetch<TournamentView[]>('/api/admin/tournaments'),
+    staleTime: STALE.list,
   });
 }
 
@@ -880,6 +874,7 @@ export function useAdminAnnouncements() {
   return useQuery({
     queryKey: ['admin-announcements'],
     queryFn: () => apiFetch<AnnouncementView[]>('/api/admin/announcements'),
+    staleTime: STALE.list,
   });
 }
 
@@ -887,6 +882,7 @@ export function useAdminUsers(query: string) {
   return useQuery({
     queryKey: ['admin-users', query],
     queryFn: () => apiFetch<UserAdminView[]>(`/api/admin/users?query=${encodeURIComponent(query)}`),
+    staleTime: STALE.list,
   });
 }
 
@@ -908,13 +904,19 @@ export function useAdminAudits() {
   return useQuery({
     queryKey: ['admin-audits'],
     queryFn: () => apiFetch<AuditView[]>('/api/admin/audits'),
+    staleTime: STALE.list,
   });
 }
+
+// ---------------------------------------------------------------------------
+// PVP
+// ---------------------------------------------------------------------------
 
 export function usePvpTournaments() {
   return useQuery({
     queryKey: ['pvp-tournaments'],
     queryFn: () => apiFetch<PvpTournamentView[]>('/api/pvp/tournaments'),
+    staleTime: STALE.list,
   });
 }
 
@@ -925,30 +927,39 @@ export function usePvpRegistration(tournamentId: number | undefined) {
       apiFetch<PvpRegistrationView>(`/api/pvp/tournaments/${tournamentId}/registration`),
     enabled: tournamentId !== undefined,
     retry: false,
+    staleTime: STALE.list,
   });
 }
 
-export function usePvpTournamentDetail(tournamentId: number | undefined) {
+/**
+ * 赛事详情/对阵表/奖励公示。
+ * `terminal = true`（已结束或已取消）后不再重取：服务端每次推进都拿行锁并全量跑奖励 upsert，
+ * 终态数据不会再变，重取只有锁竞争成本。
+ */
+export function usePvpTournamentDetail(tournamentId: number | undefined, terminal = false) {
   return useQuery({
     queryKey: ['pvp-detail', tournamentId],
     queryFn: () => apiFetch<PvpTournamentDetailView>(`/api/pvp/tournaments/${tournamentId}`),
     enabled: tournamentId !== undefined,
+    staleTime: terminal ? STALE.immutable : STALE.list,
   });
 }
 
-export function usePvpBracket(tournamentId: number | undefined) {
+export function usePvpBracket(tournamentId: number | undefined, terminal = false) {
   return useQuery({
     queryKey: ['pvp-bracket', tournamentId],
     queryFn: () => apiFetch<PvpMatchView[]>(`/api/pvp/tournaments/${tournamentId}/bracket`),
     enabled: tournamentId !== undefined,
+    staleTime: terminal ? STALE.immutable : STALE.list,
   });
 }
 
-export function usePvpRewards(tournamentId: number | undefined) {
+export function usePvpRewards(tournamentId: number | undefined, terminal = false) {
   return useQuery({
     queryKey: ['pvp-rewards', tournamentId],
     queryFn: () => apiFetch<PvpRewardGrantView[]>(`/api/pvp/tournaments/${tournamentId}/rewards`),
     enabled: tournamentId !== undefined,
+    staleTime: terminal ? STALE.immutable : STALE.list,
   });
 }
 
@@ -992,88 +1003,9 @@ export function useRegisterPvp() {
   });
 }
 
-export function useBasicTrain() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (studentId: number) =>
-      apiFetch<TrainingResult>('/api/training/basic', {
-        method: 'POST',
-        body: JSON.stringify({ studentId }),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['students'] });
-      qc.invalidateQueries({ queryKey: ['me'] });
-      qc.invalidateQueries({ queryKey: ['overview'] });
-      qc.invalidateQueries({ queryKey: ['training-logs'] });
-    },
-  });
-}
-
-export function useDirectedTrain() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: DirectedTrainInput) =>
-      apiFetch<TrainingResult>('/api/training/directed', {
-        method: 'POST',
-        body: JSON.stringify(input),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['students'] });
-      qc.invalidateQueries({ queryKey: ['items'] });
-      qc.invalidateQueries({ queryKey: ['me'] });
-      qc.invalidateQueries({ queryKey: ['overview'] });
-      qc.invalidateQueries({ queryKey: ['training-logs'] });
-    },
-  });
-}
-
-export function useSpecializedTrain() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ studentId, problemId }: { studentId: number; problemId: number }) =>
-      apiFetch<TrainingResult>('/api/training/specialized', {
-        method: 'POST',
-        body: JSON.stringify({ studentId, problemId }),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['students'] });
-      qc.invalidateQueries({ queryKey: ['problems'] });
-      qc.invalidateQueries({ queryKey: ['me'] });
-      qc.invalidateQueries({ queryKey: ['overview'] });
-      qc.invalidateQueries({ queryKey: ['training-logs'] });
-    },
-  });
-}
-
 // ---------------------------------------------------------------------------
 // 剧情与战报
 // ---------------------------------------------------------------------------
-
-export interface StoryStageProgress {
-  stageKey: string;
-  ngLevel: number;
-  name?: string;
-  recommendedLevel?: number;
-  durationMin?: number;
-  staminaCost?: number;
-  unlocked: boolean;
-  cleared: boolean;
-  clearCount: number;
-  bestRank: number | null;
-  firstClearAt: string | null;
-}
-
-export interface StoryChapterView {
-  chapter: string;
-  stages: StoryStageProgress[];
-}
-
-export interface StoryOverview {
-  ngLevel: number;
-  chapters: StoryChapterView[];
-  ngPlusUnlocked: boolean;
-  maxUnlockedNgLevel: number;
-}
 
 export interface StoryEntryResult {
   record: ContestRecordView;
@@ -1086,6 +1018,7 @@ export function useStoryOverview(ngLevel = 0) {
   return useQuery({
     queryKey: ['story-overview', ngLevel],
     queryFn: () => apiFetch<StoryOverview>(`/api/story/overview?ngLevel=${ngLevel}`),
+    staleTime: STALE.list,
   });
 }
 
@@ -1093,8 +1026,8 @@ export function useStoryProgress(ngLevel?: number) {
   const query = ngLevel === undefined ? '' : `?ngLevel=${ngLevel}`;
   return useQuery({
     queryKey: ['story-progress', ngLevel ?? 'all'],
-    queryFn: () =>
-      apiFetch<import('@oinur/shared').StoryProgressView[]>(`/api/story/progress${query}`),
+    queryFn: () => apiFetch<StoryProgressView[]>(`/api/story/progress${query}`),
+    staleTime: STALE.list,
   });
 }
 
@@ -1129,18 +1062,24 @@ export function useEnterStoryStage() {
   });
 }
 
+/** 战报不可变：一次取到即终态 */
 export function useContestRecord(recordId: string | undefined) {
   return useQuery({
     queryKey: ['contest-record', recordId],
     queryFn: () => apiFetch<ContestRecordView>(`/api/records/${recordId}`),
     enabled: recordId !== undefined,
+    retry: false,
+    staleTime: STALE.immutable,
   });
 }
 
+/** 回放不可变：一次取到即终态 */
 export function useContestReplay(recordId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ['contest-replay', recordId],
     queryFn: () => apiFetch<BattleReplay>(`/api/records/${recordId}/replay`),
     enabled: recordId !== undefined && enabled,
+    retry: false,
+    staleTime: STALE.immutable,
   });
 }

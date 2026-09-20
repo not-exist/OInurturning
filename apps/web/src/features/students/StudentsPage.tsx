@@ -2,7 +2,10 @@ import { Link } from 'react-router';
 import type { JSX } from 'react';
 import type { DimensionKey, StudentView } from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
-import { DIMENSION_LABEL, QUALITY_LABEL, floor, round, useStudents } from '../../lib/hooks';
+import {
+  useStudents,
+} from '../../lib/hooks';
+import { DIMENSION_LABEL, QUALITY_LABEL, floor, round } from '../../lib/labels';
 import { ActionLink, Empty } from '../../components/ui';
 
 const DIMS: Record<DimensionKey, keyof StudentView> = {

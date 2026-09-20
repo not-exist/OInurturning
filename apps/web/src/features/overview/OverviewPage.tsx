@@ -2,15 +2,11 @@ import { useState, type JSX } from 'react';
 import { Link } from 'react-router';
 import { apiErrorMessage } from '../../lib/api';
 import {
-  DIMENSION_LABEL,
-  QUALITY_LABEL,
-  TRAINING_KIND_LABEL,
-  floor,
-  round,
   useClaimChecklist,
   useNow,
   useOverview,
 } from '../../lib/hooks';
+import { DIMENSION_LABEL, QUALITY_LABEL, TRAINING_KIND_LABEL, floor, round } from '../../lib/labels';
 import type { ChecklistStepView } from '../../lib/hooks';
 import { Empty, InlineLoader } from '../../components/ui';
 

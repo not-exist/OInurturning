@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import { apiErrorMessage } from '../../lib/api';
 import { BattleReplay, BattleWaiting } from '../records/BattleReplay';
 import {
-  rarityBadge,
   useAdventureLogs,
   useChooseAdventure,
   useDrawAdventure,
@@ -12,6 +11,7 @@ import {
   useUseItem,
   type AdventureLogView,
 } from '../../lib/hooks';
+import { rarityChip } from '../../lib/rarity';
 import { Empty } from '../../components/ui';
 import { RosterPicker } from '../../components/RosterPicker';
 
@@ -81,7 +81,7 @@ function EventCard({
           </h2>
         </div>
         <span
-          className={`rounded px-2 py-1 text-xs font-medium ${rarityBadge(adventure.event.rarity)}`}
+          className={`rounded px-2 py-1 text-xs font-medium ${rarityChip(adventure.event.rarity)}`}
         >
           {RARITY_LABEL[adventure.event.rarity] ?? adventure.event.rarity}
         </span>

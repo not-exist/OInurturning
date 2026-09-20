@@ -9,6 +9,7 @@ import type {
   ItemEffectKind,
   ProblemSeverity,
   ProblemTier,
+  QualityTier,
   Rarity,
   TalentEffectStat,
 } from '@oinur/shared';
@@ -56,6 +57,14 @@ export const ABILITY_LABEL: Record<AbilityKey, string> = {
 };
 
 export const SEX_LABEL: Record<'MALE' | 'FEMALE', string> = { MALE: '男', FEMALE: '女' };
+
+/** 招募品质档（材质层级视觉在 rarity.ts QUALITY_MATERIAL） */
+export const QUALITY_LABEL: Record<QualityTier, string> = {
+  COMMON: '普通',
+  GOOD: '良好',
+  ELITE: '精英',
+  GENIUS: '天才',
+};
 
 export const STUDENT_STATUS_LABEL: Record<StudentStatus, string> = {
   ACTIVE: '在营',
