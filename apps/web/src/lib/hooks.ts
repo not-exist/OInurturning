@@ -525,7 +525,7 @@ export function useTalentDefs() {
 /**
  * 招募候选池。
  *
- * ⚠️ 永不自动重取是**正确性要求**，不是性能优化：服务端 getPool 一旦跨过
+ * 永不自动重取是**正确性要求**，不是性能优化：服务端 getPool 一旦跨过
  * free_interval_hours 或日界，任意一次 GET 都会整池重掷，而 tempId 是位置编号（c0..c4），
  * 重掷后编号复用 → 「看着旧卡点新人」会静默招错人。因此只在
  * 招募成功 / 手动刷新（下方 mutation）后显式失效重取；页面另需比对 generatedAt

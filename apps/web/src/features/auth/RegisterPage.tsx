@@ -29,7 +29,7 @@ export function RegisterPage(): JSX.Element {
       setMe(d.me);
       nav('/');
     } catch (e2) {
-      // ⚠️ 文案与 ERROR_TEXT 有意并存：e2e 断言的是这一版页面文案
+      //  文案与 ERROR_TEXT 有意并存：e2e 断言的是这一版页面文案
       setErr(
         e2 instanceof ApiCallError && e2.code === 'ALREADY_EXISTS'
           ? '用户名已被占用'
