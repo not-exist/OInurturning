@@ -21,7 +21,7 @@ export const problemTraitSchema = z
     family_note: z.string().optional(),
     condition: z.string().min(1).optional(),
     effect: z.string().min(1),
-    hooks: z.record(problemHookValueSchema),
+    hooks: z.record(z.string(), problemHookValueSchema),
   })
   .strict();
 export type ProblemTrait = z.infer<typeof problemTraitSchema>;

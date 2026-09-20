@@ -70,7 +70,7 @@ export type ItemDef = z.infer<typeof itemDefSchema>;
 
 export const itemsFileSchema = z
   .object({
-    meta: z.record(z.unknown()).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
     items: z.array(itemDefSchema).min(1),
   })
   .strict();
