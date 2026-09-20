@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type {
   BattleReplay as BattleReplayData,
   BattleReplayEvent,
@@ -206,25 +206,23 @@ function createEmptyMemberState(memberIndex: number, displayName: string): Membe
   };
 }
 
-/** 按 memberIndex 更新成员面板状态（不可变更新）。 */
+/** 按 memberIndex 原地推进成员面板状态（成员对象仍为不可变替换）。 */
 function applyEventToMembers(
-  states: Map<number, MemberPanelState>,
+  next: Map<number, MemberPanelState>,
   event: BattleReplayEvent,
-): Map<number, MemberPanelState> {
+): void {
   if (
     event.type !== 'QUESTION_START' &&
     event.type !== 'SUBMISSION' &&
     event.type !== 'QUESTION_RESULT'
   ) {
-    return states;
+    return;
   }
   const mi = event.memberIndex;
-  if (mi === undefined) return states;
+  if (mi === undefined) return;
 
-  const existing = states.get(mi);
-  if (existing === undefined) return states;
-
-  const next = new Map(states);
+  const existing = next.get(mi);
+  if (existing === undefined) return;
 
   switch (event.type) {
     case 'QUESTION_START': {
@@ -271,7 +269,35 @@ function applyEventToMembers(
       break;
     }
   }
-  return next;
+}
+
+/**
+ * 增量重放：只把 (已应用游标, 当前游标] 区间的事件推进到既有状态上。
+ * 旧实现每个 tick 都从 0 重放全部事件（O(n²)）：4 人并行赛与 2N 局对决的事件数
+ * 随回合线性增长，长局会明显掉帧。同一游标重复渲染直接命中缓存（StrictMode 安全）；
+ * 游标回退或换场次时重建。
+ */
+function useIncrementalReplay<S>(
+  timeline: readonly TimedReplayEvent[],
+  cursor: number,
+  replayKey: string,
+  init: () => S,
+  step: (state: S, event: BattleReplayEvent) => void,
+): S {
+  const box = useRef<{ key: string; applied: number; state: S } | null>(null);
+  if (box.current === null || box.current.key !== replayKey || box.current.applied > cursor) {
+    box.current = { key: replayKey, applied: 0, state: init() };
+  }
+  const current = box.current;
+  if (current.applied < cursor) {
+    const end = Math.min(cursor, timeline.length);
+    for (let index = current.applied; index < end; index += 1) {
+      const event = timeline[index]?.event;
+      if (event !== undefined) step(current.state, event);
+    }
+    current.applied = end;
+  }
+  return current.state;
 }
 
 function RankingParallelReplay({
@@ -315,23 +341,25 @@ function RankingParallelReplay({
     return meta;
   }, [events]);
 
-  const memberStates = useMemo(() => {
-    const states = new Map<number, MemberPanelState>();
-    for (const [mi, name] of memberMeta) {
-      states.set(mi, createEmptyMemberState(mi, name));
-    }
-    let next = states;
-    for (let index = 0; index < eventCursor; index++) {
-      const event = timedEvents[index]?.event;
-      if (event !== undefined) next = applyEventToMembers(next, event);
-    }
-    return next;
-  }, [eventCursor, memberMeta, timedEvents]);
+  const memberStates = useIncrementalReplay(
+    timedEvents,
+    eventCursor,
+    replay.recordId,
+    () => {
+      const states = new Map<number, MemberPanelState>();
+      for (const [mi, name] of memberMeta) states.set(mi, createEmptyMemberState(mi, name));
+      return states;
+    },
+    applyEventToMembers,
+  );
 
-  // 题目看板的队内协作状态（随播放进度更新）。
-  const questionStatuses = useMemo(
-    () => collectQuestionStatuses(timedEvents, eventCursor),
-    [eventCursor, timedEvents],
+  // 题目看板的队内协作状态（随播放进度增量更新）。
+  const questionStatuses = useIncrementalReplay(
+    timedEvents,
+    eventCursor,
+    replay.recordId,
+    () => new Map<number, QuestionStatus>(),
+    applyEventToQuestionStatus,
   );
 
   // 重置状态（切换回放时）。
@@ -606,37 +634,28 @@ interface QuestionStatus {
   passedBy: string | null;
 }
 
-/** 按回放进度（已播放事件，时间序）统计每道题的队内协作状态。 */
-function collectQuestionStatuses(
-  timedEvents: readonly TimedReplayEvent[],
-  cursor: number,
-): Map<number, QuestionStatus> {
-  const statuses = new Map<number, QuestionStatus>();
-  const ensure = (questionIndex: number): QuestionStatus => {
-    const status = statuses.get(questionIndex) ?? {
-      started: false,
-      activeCount: 0,
-      passedBy: null,
-    };
-    statuses.set(questionIndex, status);
-    return status;
+/** 单事件推进：每道题的队内协作状态（QUESTION_START 计入进行中，AC 记录首个通过者）。 */
+function applyEventToQuestionStatus(
+  statuses: Map<number, QuestionStatus>,
+  event: BattleReplayEvent,
+): void {
+  if (event.type !== 'QUESTION_START' && event.type !== 'QUESTION_RESULT') return;
+  const status = statuses.get(event.questionIndex) ?? {
+    started: false,
+    activeCount: 0,
+    passedBy: null,
   };
+  statuses.set(event.questionIndex, status);
 
-  for (let index = 0; index < Math.min(cursor, timedEvents.length); index += 1) {
-    const event = timedEvents[index]!.event;
-    if (event.type === 'QUESTION_START') {
-      const status = ensure(event.questionIndex);
-      status.started = true;
-      status.activeCount += 1;
-    } else if (event.type === 'QUESTION_RESULT') {
-      const status = ensure(event.questionIndex);
-      status.activeCount = Math.max(0, status.activeCount - 1);
-      if (event.verdict === 'AC' && status.passedBy === null) {
-        status.passedBy = event.participantName;
-      }
-    }
+  if (event.type === 'QUESTION_START') {
+    status.started = true;
+    status.activeCount += 1;
+    return;
   }
-  return statuses;
+  status.activeCount = Math.max(0, status.activeCount - 1);
+  if (event.verdict === 'AC' && status.passedBy === null) {
+    status.passedBy = event.participantName;
+  }
 }
 
 function QuestionStatusChip({ status }: { status: QuestionStatus | undefined }): JSX.Element {
