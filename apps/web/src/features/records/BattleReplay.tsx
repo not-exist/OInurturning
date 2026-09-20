@@ -747,11 +747,13 @@ function QuestionDetailModal({
           </div>
         </div>
 
-        <div className="flex border-b border-neutral-200">
+        <div role="tablist" className="flex border-b border-neutral-200">
           {(['数值', '特性'] as const).map((entry) => (
             <button
               key={entry}
               type="button"
+              role="tab"
+              aria-selected={tab === entry}
               data-testid={`replay-question-tab-${entry}`}
               className={`px-5 py-2.5 text-sm font-medium ${
                 tab === entry
@@ -1087,6 +1089,7 @@ function ReplayControls({
             key={value}
             type="button"
             data-testid={`replay-speed-${value}x`}
+            aria-pressed={speed === value}
             className={`rounded px-2.5 py-1.5 text-xs ${speed === value ? 'bg-neutral-900 text-white' : 'border border-neutral-300 text-neutral-700'}`}
             onClick={() => onSpeedChange(value)}
           >

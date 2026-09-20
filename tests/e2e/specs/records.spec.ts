@@ -55,10 +55,12 @@ test.describe('战报与战斗回放', () => {
     await page.getByTestId('replay-question-card-0').click();
     const questionModal = page.getByTestId('replay-question-modal');
     await expect(questionModal).toBeVisible();
+    // 选中态用语义属性断言（而非 Tailwind utility 名），换色不再需要改测试
     await questionModal.getByTestId('replay-question-tab-特性').click();
     await expect(questionModal).toBeVisible();
-    await expect(questionModal.getByTestId('replay-question-tab-特性')).toHaveClass(
-      /border-neutral-900/,
+    await expect(questionModal.getByTestId('replay-question-tab-特性')).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
     await questionModal.getByText('Problem Detail').click();
     await expect(questionModal).toBeVisible();
@@ -77,12 +79,12 @@ test.describe('战报与战斗回放', () => {
     await expect(page.getByTestId('replay-pause')).toHaveText('暂停');
     await expect(page.getByText('全员并行作战中')).toBeVisible();
 
-    // 变速档位齐全且可切换（8x 置亮）
+    // 变速档位齐全且可切换（8x 选中态用 aria-pressed 表达）
     for (const speed of [1, 2, 4, 8]) {
       await expect(page.getByTestId(`replay-speed-${speed}x`)).toBeVisible();
     }
     await page.getByTestId('replay-speed-8x').click();
-    await expect(page.getByTestId('replay-speed-8x')).toHaveClass(/bg-neutral-900/);
+    await expect(page.getByTestId('replay-speed-8x')).toHaveAttribute('aria-pressed', 'true');
 
     // 跳过→结算面板→返回剧情（查看完整战报链路由 story.spec 覆盖）
     await page.getByTestId('replay-skip').click();
