@@ -21,6 +21,21 @@ async function registerAndGetCookies(): Promise<{ token: string; cookies: string
   };
 }
 
+describe('refresh Cookie 的传输协议', () => {
+  it('HTTP 不带 Secure，受信任 HTTPS 反代请求带 Secure', async () => {
+    const direct = await request(app).post('/api/auth/register').send(U);
+    expect(setCookies(direct).find((cookie) => cookie.startsWith('oinur_rt='))).not.toContain('Secure');
+
+    const proxiedApp = createApp({ trustProxyHops: 1 });
+    const proxied = await request(proxiedApp)
+      .post('/api/auth/register')
+      .set('X-Forwarded-Proto', 'https')
+      .send({ username: 'sess-proxy', password: U.password });
+    expect(proxied.status).toBe(200);
+    expect(setCookies(proxied).find((cookie) => cookie.startsWith('oinur_rt='))).toContain('Secure');
+  });
+});
+
 describe('POST /api/auth/refresh', () => {
   it('携带刷新 Cookie → 新 accessToken + 新 Cookie（轮换）', async () => {
     const { cookies } = await registerAndGetCookies();

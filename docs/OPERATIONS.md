@@ -96,6 +96,12 @@ rsync -a /var/backups/oinur/ backup@offsite:/var/backups/oinur/
 
 命中返回统一信封 `{"ok":false,"error":{"code":"RATE_LIMITED"}}`（429）。若将来多实例，限流桶需换 Redis 存储（TECH-DESIGN §12 T7 升级路径）。
 
+## 5.1 登录态与 HTTPS
+
+刷新登录态依赖 `oinur_rt` HttpOnly Cookie。API 会根据实际请求协议设置 `Secure`：HTTPS（包括可信反代转发的 HTTPS）必带 `Secure`；直接 HTTP 仅用于本地或临时自托管兼容，**不具备传输安全性**。
+
+生产环境必须在公网入口终结 TLS。若 nginx 前还有一层反代，设置 `TRUST_PROXY_HOPS` 为可信代理层数（本仓 `deploy/docker-compose.yml` 的 nginx → API 默认值为 `1`），并确保外层传递 `X-Forwarded-Proto: https`。部署后以“登录 → 浏览器刷新 → 仍处于已登录页面”验收。
+
 ## 6. 管理员初始化
 
 ```bash

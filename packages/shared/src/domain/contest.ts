@@ -1246,5 +1246,10 @@ export interface BattleReplay {
   recordId: string;
   format: ContestFormat;
   title: string;
+  /**
+   * 本场战斗的题目快照（排名赛必有；旧版回放可能缺失，前端需容错）。
+   * 用于战斗中的题目看板：展示题目难度与具体数值。
+   */
+  questions?: QuestionSnapshot[];
   events: BattleReplayEvent[];
 }

@@ -30,6 +30,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # nginx 是 API 前唯一的可信反代；保留外层 HTTPS 协议供 refresh Cookie 判定。
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       JWT_SECRET: ${JWT_SECRET:?set in .env}
       LOG_LEVEL: ${LOG_LEVEL:-info}

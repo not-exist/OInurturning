@@ -11,7 +11,7 @@ let refreshing: Promise<boolean> | null = null;
 async function tryRefresh(): Promise<boolean> {
   refreshing ||= (async () => {
     try {
-      const res = await fetch('/api/auth/refresh', { method: 'POST' });
+      const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
       const body = (await res.json()) as ApiEnvelope<{ accessToken: string; me: MeView }>;
       if (!body.ok) return false;
       accessToken = body.data.accessToken;
@@ -37,6 +37,8 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const doCall = () =>
     fetch(path, {
       ...init,
+      // 认证依赖 HttpOnly refresh Cookie；明确要求浏览器在同源代理和未来的受控跨源部署中携带它。
+      credentials: 'include',
       headers: {
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),

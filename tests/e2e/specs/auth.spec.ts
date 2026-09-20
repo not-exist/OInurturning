@@ -14,6 +14,21 @@ test.describe('认证', () => {
     await expect(page.getByTestId('logout-btn')).toBeVisible();
   });
 
+  test('刷新页面后使用 refresh Cookie 恢复登录态', async ({ page }) => {
+    const username = uniqueName('auth-reload');
+    await page.goto('/register');
+    await page.getByTestId('register-username').fill(username);
+    await page.getByTestId('register-password').fill(DEFAULT_PASSWORD);
+    await page.getByTestId('register-submit').click();
+    await page.waitForURL('/');
+
+    // access token 仅存内存；此处必须通过 HttpOnly refresh Cookie 重建会话。
+    await page.reload();
+    await expect(page).toHaveURL('/');
+    await expect(page.getByText(username)).toBeVisible();
+    await expect(page.getByTestId('logout-btn')).toBeVisible();
+  });
+
   test('重复注册同一用户名提示"用户名已被占用"', async ({ page }) => {
     const username = uniqueName('auth-dup');
     await page.goto('/register');

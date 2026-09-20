@@ -121,6 +121,10 @@ describe('battle replay', () => {
 
     const start = eventsOf(replay, 'BATTLE_START')[0]!;
     expect(start.format).toBe('RANKING');
+    // 题目看板使用报告快照，但不得把回放展示层暴露为同一份可变引用。
+    expect(replay.questions).toEqual(report.questions);
+    expect(replay.questions).not.toBe(report.questions);
+    expect(replay.questions?.[0]).not.toBe(report.questions[0]);
     // 队名组合全部队员，而不是只显示第一个人
     for (const entry of teams[0]!.members) expect(start.homeName).toContain(entry.displayName);
 

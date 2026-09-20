@@ -4,6 +4,8 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
+  /** 可信反向代理层数；用于恢复原始协议并生成正确的 Secure Cookie。 */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET 至少 32 字节随机'),
   BCRYPT_COST: z.coerce.number().int().min(10).max(14).default(12),
