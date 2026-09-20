@@ -4,44 +4,18 @@ import type {
   BattleReplayEvent,
   QuestionSnapshot,
 } from '@oinur/shared';
+import {
+  contestSideLabel,
+  dimensionLabel,
+  roundReasonLabel,
+  tierLabel,
+  verdictLabel,
+} from '../../lib/labels';
 
 const SPEEDS = [1, 2, 4, 8] as const;
 const BASE_PLAYBACK_RATE = 0.5;
 
 type ReplaySpeed = (typeof SPEEDS)[number];
-
-const VERDICT_LABEL: Record<string, string> = {
-  AC: '通过',
-  WA: '答案错误',
-  TLE: '判题超时',
-  UNFINISHED: '未完成',
-  SKIP: '跳过',
-};
-
-const DIMENSION_LABEL: Record<string, string> = {
-  DS: '数据结构',
-  DP: '动态规划',
-  MATH: '数学',
-  GRAPH: '图论',
-  GREEDY: '贪心',
-  STRING: '字符串',
-};
-
-const SIDE_LABEL: Record<string, string> = {
-  HOME: '主场',
-  AWAY: '客场',
-};
-
-const TIER_LABEL: Record<string, string> = {
-  cspj: 'CSP-J',
-  csps: 'CSP-S',
-  noip: 'NOIP',
-  province: '省选',
-  noi: 'NOI',
-  ctt: 'CTT',
-  cts: 'CTS',
-  ioi: 'IOI',
-};
 
 const SEVERITY_LABEL: Record<string, string> = {
   red: '红',
@@ -562,7 +536,7 @@ function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
         <div className="mb-3">
           <p className="text-lg font-bold">第 {state.currentQuestionIndex + 1} 题</p>
           <p className="text-xs text-neutral-600">
-            {state.currentDimension !== null ? (DIMENSION_LABEL[state.currentDimension] ?? state.currentDimension) : ''}
+            {state.currentDimension !== null ? dimensionLabel(state.currentDimension) : ''}
             {state.currentScore !== null ? ` · ${state.currentScore} 分` : ''}
           </p>
         </div>
@@ -579,7 +553,7 @@ function MemberPanel({ state }: { state: MemberPanelState }): JSX.Element {
                   sub.verdict === 'AC' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                 }`}
               >
-                {VERDICT_LABEL[sub.verdict] ?? sub.verdict}
+                {verdictLabel(sub.verdict)}
               </span>
             </div>
           ))}
@@ -710,7 +684,7 @@ function QuestionDetailModal({
   onClose: () => void;
 }): JSX.Element {
   const [tab, setTab] = useState<'数值' | '特性'>('数值');
-  const tier = question.tier !== undefined ? (TIER_LABEL[question.tier] ?? question.tier) : undefined;
+  const tier = question.tier !== undefined ? tierLabel(question.tier) : undefined;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -777,7 +751,7 @@ function QuestionDetailModal({
           {tab === '数值' ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <Metric label="难度档位" value={tier ?? '—'} />
-              <Metric label="主考方向" value={DIMENSION_LABEL[question.dimension] ?? question.dimension} />
+              <Metric label="主考方向" value={dimensionLabel(question.dimension)} />
               <Metric label="六维需求 D" value={String(question.demand)} />
               <Metric label="思维量 M" value={String(question.thought)} />
               <Metric label="代码量 C" value={String(question.codeVolume)} />
@@ -856,7 +830,7 @@ function QuestionBoard({
       >
         {questions.map((question) => {
           const status = statuses.get(question.index);
-          const tier = question.tier !== undefined ? (TIER_LABEL[question.tier] ?? question.tier) : undefined;
+          const tier = question.tier !== undefined ? tierLabel(question.tier) : undefined;
           return (
             <button
               key={question.instanceId}
@@ -880,7 +854,7 @@ function QuestionBoard({
                 )}
               </div>
               <p className="mt-1 text-xs text-neutral-600">
-                {DIMENSION_LABEL[question.dimension] ?? question.dimension} · {question.score} 分 ·
+                {dimensionLabel(question.dimension)} · {question.score} 分 ·
                 参考 {Math.ceil(question.timeLimitMin)} 分钟
               </p>
               <p className="mt-1 font-mono text-[11px] text-neutral-500">
@@ -1151,7 +1125,7 @@ function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): JSX.Ele
             <p className="text-sm text-blue-800">{event.participantName} 正在处理题目</p>
             <p className="mt-2 text-2xl font-semibold">第 {event.questionIndex + 1} 题</p>
             <p className="mt-2 text-sm text-neutral-700">
-              {DIMENSION_LABEL[event.dimension] ?? event.dimension} · {event.problemInstanceId} ·{' '}
+              {dimensionLabel(event.dimension)} · {event.problemInstanceId} ·{' '}
               {event.score} 分
             </p>
           </div>
@@ -1168,7 +1142,7 @@ function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): JSX.Ele
             </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Metric label="判定" value={VERDICT_LABEL[event.verdict] ?? event.verdict} />
+            <Metric label="判定" value={verdictLabel(event.verdict)} />
             <Metric label="提交时间" value={formatMinutes(event.submissionTimeMin)} />
             <Metric label="罚时" value={formatMinutes(event.penaltyMin)} />
           </div>
@@ -1182,7 +1156,7 @@ function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): JSX.Ele
             <span
               className={`rounded px-3 py-1 text-sm font-medium ${verdictClass(event.verdict)}`}
             >
-              {VERDICT_LABEL[event.verdict] ?? event.verdict}
+              {verdictLabel(event.verdict)}
             </span>
             <span className="text-sm text-neutral-500">{event.participantName}</span>
           </div>
@@ -1205,7 +1179,7 @@ function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): JSX.Ele
         <div className="rounded border border-purple-200 bg-purple-50 p-6 text-center">
           <p className="text-sm text-purple-800">第 {event.roundNo} 局</p>
           <p className="mt-2 text-xl font-semibold">
-            {event.setterName} 出题 → {SIDE_LABEL[event.answererSide]}答题
+            {event.setterName} 出题 → {contestSideLabel(event.answererSide)}答题
           </p>
           <p className="mt-3 text-sm text-neutral-600">{event.participantName} 正在接战</p>
           <p className="mt-1 text-xs text-neutral-500">题目 {event.questionInstanceId}</p>
@@ -1218,7 +1192,7 @@ function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): JSX.Ele
             <span
               className={`rounded px-3 py-1 text-sm font-medium ${event.solved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}
             >
-              {event.solved ? '答题成功' : (VERDICT_LABEL[event.reason] ?? event.reason)}
+              {event.solved ? '答题成功' : (roundReasonLabel(event.reason))}
             </span>
             <span className="text-sm text-neutral-500">
               {event.setterName} 出题 → {event.answererName} 答题
@@ -1227,7 +1201,7 @@ function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): JSX.Ele
           <div className="grid gap-3 sm:grid-cols-3">
             <Metric
               label="本局得分"
-              value={`${SIDE_LABEL[event.scoreAwardedTo]} +${event.scoreAwarded}`}
+              value={`${contestSideLabel(event.scoreAwardedTo)} +${event.scoreAwarded}`}
             />
             <Metric label="用时" value={formatMinutes(event.timeSpentMin)} />
             <Metric label="精力消耗" value={`-${Math.floor(event.energyCost)}`} />
