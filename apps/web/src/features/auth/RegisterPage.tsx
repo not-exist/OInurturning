@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type JSX } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Coins, UserPlus } from 'lucide-react';
 import { apiFetch, setAccessToken, ApiCallError } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth-store';
 import type { MeView } from '@oinur/shared';
@@ -44,15 +44,12 @@ export function RegisterPage(): JSX.Element {
     <AuthFrame
       eyebrow="New Coach"
       title="开办你的训练营"
-      lead={
-        <>
-          <span>开局 2500 金</span>
-          <span className="text-ink-500">/</span>
-          <span>2 名学员</span>
-          <span className="text-ink-500">/</span>
-          <span>1 本黄级教材 + 2 杯奶茶</span>
-        </>
-      }
+      bullets={[
+        { icon: Coins, title: '开局资源', desc: '2500 金 + 2 名学员（1 良好 1 普通）+ 2 杯奶茶。' },
+        { icon: UserPlus, title: '第一步：招到第 3 人', desc: '三名学员才够组队出战，剧情与历练都在等你。' },
+        { icon: ArrowRight, title: '一条主线走到 IOI', desc: '8 章 33 关、8 档赛事，全通解锁 NG+ 与传奇教练勋章。' },
+      ]}
+      statusLines={['NEW COACH · 注册即发放开局包']}
       footer={
         <>
           已有账号？

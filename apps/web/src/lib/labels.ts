@@ -397,6 +397,58 @@ export function traitName(traitId: string): string {
   return PROBLEM_TRAITS[traitId]?.name ?? traitId;
 }
 
+/**
+ * 题目特性冻结 hook 键（contest.md §3.9）：题目详情「特性」页展示，禁止直出 snake_case。
+ * 14 键 + condition / partial_override 两个枚举键。
+ */
+export const HOOK_LABEL: Record<string, string> = {
+  condition: '触发条件',
+  time_k_mul: '用时系数',
+  ac_prob_add: 'AC 概率',
+  tle_prob_add: '超时概率',
+  wa_penalty_add: 'WA 罚时',
+  submit_time_add: '提交加时',
+  energy_cost_add: '精力开销',
+  energy_per_submit_add: '每次提交精力',
+  noise_sigma_add: '用时噪声',
+  noise_sigma_mul: '用时波动',
+  mindset_fail_add: '失败心态',
+  partial_override: '部分分',
+  think_weight_mul: '思维权重',
+  prob_amplify: '概率放大',
+};
+
+export const HOOK_CONDITION_LABEL: Record<string, string> = {
+  first_problem: '仅首题',
+  anti_ak: '仅最后一块拼图',
+};
+
+export const PARTIAL_OVERRIDE_LABEL: Record<string, string> = {
+  none: '无部分分',
+  trap: '部分分归零',
+  keep: '保留部分分',
+};
+
+export function hookLabel(key: string): string {
+  return HOOK_LABEL[key] ?? key;
+}
+
+/** hook 值人话化：概率类转百分比、乘区带 ×、罚时带分钟，其余带符号原值 */
+export function hookValueLabel(key: string, value: string | number | boolean): string {
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  if (key === 'condition') return HOOK_CONDITION_LABEL[String(value)] ?? String(value);
+  if (key === 'partial_override') return PARTIAL_OVERRIDE_LABEL[String(value)] ?? String(value);
+  if (typeof value !== 'number') return String(value);
+  if (key.endsWith('_prob_add')) {
+    return `${value >= 0 ? '+' : '−'}${Math.round(Math.abs(value) * 100)}%`;
+  }
+  if (key.endsWith('_mul')) return `×${value}`;
+  if (key.endsWith('_time_add') || key === 'wa_penalty_add') {
+    return `${value >= 0 ? '+' : '−'}${Math.abs(value)} 分钟`;
+  }
+  return `${value >= 0 ? '+' : ''}${value}`;
+}
+
 // ---------------------------------------------------------------------------
 // 竞赛 / 战报
 // ---------------------------------------------------------------------------
