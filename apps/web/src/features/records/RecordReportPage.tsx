@@ -1,14 +1,15 @@
 import { useEffect, useState, type JSX } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
-import type {
-  ContestRecordView,
-  ContestReport,
-  ContestTeam,
-  ParticipantTimeline,
-  RewardLine,
-} from '@oinur/shared';
-import { BattleReplay, BattleWaiting } from './BattleReplay';
+import { ArrowLeft, Share2 } from 'lucide-react';
+import type { ContestRecordView } from '@oinur/shared';
+import { Btn, ErrorNote, PageHeader } from '../../components/ui';
+import { Icon } from '../../components/icons';
+import { CONTEST_FORMAT_LABEL, CONTEST_RECORD_TYPE_LABEL, tierLabel } from '../../lib/labels';
 import { useContestRecord, useContestReplay } from '../../lib/hooks';
+import { BattleReplay, BattleWaiting } from './BattleReplay';
+import { growthText, rewardLineText, useItemName } from './shared/rewards';
+import { RankingReport, teamName } from './ranking/RankingReport';
+import { DuelReport } from './duel/DuelReport';
 
 const BACK_TARGET: Record<ContestRecordView['type'], { to: string; label: string }> = {
   STORY: { to: '/story', label: '返回剧情' },
@@ -16,232 +17,38 @@ const BACK_TARGET: Record<ContestRecordView['type'], { to: string; label: string
   PVP: { to: '/pvp', label: '返回 PVP' },
 };
 
-export function RecordReportPage(): JSX.Element {
-  const { recordId } = useParams();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const detailsOnly = searchParams.get('details') === '1';
-  const query = useContestRecord(recordId);
-  const replayQuery = useContestReplay(recordId, !detailsOnly);
-  const [replayFinished, setReplayFinished] = useState(detailsOnly);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    setReplayFinished(detailsOnly);
-  }, [detailsOnly, recordId]);
-
-  if (query.isPending || (!detailsOnly && replayQuery.isPending)) {
-    return <BattleWaiting label={detailsOnly ? '加载完整战报…' : '服务端正在传回战斗回放…'} />;
-  }
-  if (
-    query.isError ||
-    query.data === undefined ||
-    (!detailsOnly && (replayQuery.isError || replayQuery.data === undefined))
-  ) {
-    return (
-      <div className="space-y-2 text-sm text-red-600">
-        <p>
-          {replayQuery.isError && !detailsOnly
-            ? '战斗回放加载失败。'
-            : '战报不存在、已失效或无权访问。'}
-        </p>
-        <button
-          className="rounded border px-3 py-1 text-xs"
-          onClick={() => {
-            void query.refetch();
-            if (!detailsOnly) void replayQuery.refetch();
-          }}
-        >
-          重试
-        </button>
-      </div>
-    );
-  }
-
-  if (!detailsOnly && !replayFinished && replayQuery.data !== undefined) {
-    return <BattleReplay replay={replayQuery.data} onFinished={() => setReplayFinished(true)} />;
-  }
-
-  const record = query.data;
-  const report = record.report;
-  const back = BACK_TARGET[record.type] ?? BACK_TARGET.STORY;
-
-  async function share(): Promise<void> {
-    const text = buildShareText(record);
-    const shareData = { title: 'OInurturning 战报', text };
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-        setCopied(true);
-      } else {
-        await copyText(text);
-        setCopied(true);
-      }
-    } catch {
-      // 用户取消分享或复制失败，不打断浏览
-      setCopied(false);
-    }
-  }
-
-  return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-            Contest Report
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold">
-            {report.format === 'RANKING' ? '排名赛战报' : '出题对决战报'}
-          </h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            {record.stageKey ?? record.type} · {record.createdAt}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {copied && <span className="text-xs text-green-700">分享文案已复制 ✓</span>}
-          <button
-            type="button"
-            data-testid="record-share"
-            className="rounded bg-neutral-900 px-3 py-2 text-sm text-white disabled:opacity-60"
-            onClick={() => void share()}
-          >
-            分享战报
-          </button>
-          <button
-            type="button"
-            data-testid="record-back"
-            className="rounded border border-neutral-300 bg-white px-3 py-2 text-sm"
-            onClick={() => navigate(back.to)}
-          >
-            {back.label}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-x-6 gap-y-2 border-b pb-4 text-xs text-neutral-500">
-        <span>Engine {report.engineVersion}</span>
-        <span>RNG {report.rngVersion}</span>
-        <span>Seed {report.seed}</span>
-        <span>Snapshot {report.snapshotHash}</span>
-      </div>
-
-      {report.format === 'RANKING' ? (
-        <RankingReport report={report} />
-      ) : (
-        <DuelReport report={report} />
-      )}
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">结算</h2>
-        <div className="rounded border border-neutral-200 bg-white px-4 py-3 text-sm">
-          {report.rewards.length === 0 && report.growth.length === 0 ? (
-            <p className="text-neutral-500">本场无额外奖励。</p>
-          ) : (
-            <div className="space-y-2">
-              {report.rewards.map((reward, index) => (
-                <p key={`${reward.type}-${index}`}>{rewardLineText(reward)}</p>
-              ))}
-              {report.growth.map((growth, index) => (
-                <p key={`${growth.attr}-${index}`}>
-                  实战成长：{growth.attr} +{growth.delta}
-                  {growth.sourceProblem ? `（${growth.sourceProblem}）` : ''}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
-  );
+/** 关卡行：stageKey（如 cspj:1）翻成「CSP-J 第 1 关」；无法解析时只显示记录类型 */
+function stageLine(record: ContestRecordView): string {
+  const typeLabel = CONTEST_RECORD_TYPE_LABEL[record.type] ?? '对局';
+  if (record.stageKey === null) return typeLabel;
+  const [tier, stage] = record.stageKey.split(':');
+  if (tier === undefined || stage === undefined) return typeLabel;
+  return `${typeLabel} · ${tierLabel(tier)} 第 ${stage} 关`;
 }
 
-/** 队名：由成员名组合（排名表/时间线分组展示用）。 */
-function teamName(team: ContestTeam): string {
-  return team.members.map((member) => member.displayName).join('、');
-}
-
-/** 排名赛按队伍切分扁平的 participants（顺序恒为 teams.flatMap(members)）。 */
-function teamTimelines(report: Extract<ContestReport, { format: 'RANKING' }>): {
-  teamIndex: number;
-  team: ContestTeam;
-  timelines: ParticipantTimeline[];
-}[] {
-  let offset = 0;
-  return report.teams.map((team, teamIndex) => {
-    const timelines = report.participants.slice(offset, offset + team.members.length);
-    offset += team.members.length;
-    return { teamIndex, team, timelines };
-  });
-}
-
-function rewardLineText(reward: RewardLine): string {
-  switch (reward.type) {
-    case 'first_clear_money':
-      return `首通奖金：金币 +${reward.amount}`;
-    case 'first_clear_item':
-      return `首通道具：${reward.itemId} ×${reward.count}`;
-    case 'milestone_item':
-      return `章节里程碑：${reward.itemId} ×${reward.count}`;
-    case 'rank_bonus_money':
-      return `名次奖金（#${reward.rank}）：金币 +${reward.amount}`;
-  }
-}
-
-/** 生成可粘贴/分享的战报文案（不依赖登录态外链，纯文本摘要） */
+/** 分享文案：纯文本摘要，不含任何调试元数据 */
 function buildShareText(record: ContestRecordView): string {
   const report = record.report;
-  const title = report.format === 'RANKING' ? '【OI 战报·排名赛】' : '【OI 战报·出题对决】';
-  const when = new Date(record.createdAt).toLocaleString();
-  const where = record.stageKey ?? record.type;
-  const id = record.id;
-  const url =
-    typeof window !== 'undefined' ? `${window.location.origin}/records/${id}` : `/records/${id}`;
-
-  const lines: string[] = [title];
+  const lines = [
+    report.format === 'RANKING' ? '【OI 战报 · 排名赛】' : '【OI 战报 · 出题对决】',
+    `${stageLine(record)} · ${new Date(record.createdAt).toLocaleString()}`,
+  ];
   if (report.format === 'RANKING') {
-    const playerTeam = report.teams[0];
-    const player = playerTeam === undefined ? '我方' : teamName(playerTeam);
     const standing = report.standings.find((entry) => entry.teamIndex === 0);
-    const rank = standing?.rank ?? '-';
-    const total = standing?.totalScore ?? 0;
-    const count = report.teams.length;
-    lines.push(`${where} · ${when}`);
+    const playerTeam = report.teams[0];
     lines.push(
-      `${player} 出战：最终第 ${rank} 名 / ${count} 支队伍，总分 ${total}，${report.pass ? '达成通关线 ✅' : '未达通关线 ❌'}`,
+      `${playerTeam === undefined ? '我方' : teamName(playerTeam)} 出战：第 ${standing?.rank ?? '—'} 名 / ${report.teams.length} 支队伍 · 总分 ${standing?.totalScore ?? 0} · ${report.pass ? '达成通关线' : '未达通关线'}`,
     );
-    const playerAttempts = teamTimelines(report)[0]?.timelines.flatMap((t) => t.attempts) ?? [];
-    const ac = playerAttempts.filter((attempt) => attempt.verdict === 'AC').length;
-    const skipped = playerAttempts.filter((attempt) => attempt.verdict === 'SKIP').length;
-    const unfinished = playerAttempts.filter((attempt) => attempt.verdict === 'UNFINISHED').length;
-    const detail = [`AC ${ac}`];
-    if (skipped > 0) detail.push(`跳过 ${skipped}`);
-    if (unfinished > 0) detail.push(`未完成 ${unfinished}`);
-    lines.push(`答题：${detail.join(' / ')}`);
   } else {
-    const winner = report.winnerSide === 'HOME' ? '主场' : '客场';
-    lines.push(`${where} · ${when}`);
-    lines.push(`对决结果：主场 ${report.scores.home} : ${report.scores.away} 客场 · ${winner}胜`);
-    const rounds = report.rounds
-      .map(
-        (round) =>
-          `第${round.roundNo}局 ${round.setterSide}出题→${round.answererSide}：${round.reason}（+${round.scoreAwarded}）`,
-      )
-      .join('；');
-    lines.push(`对局：${rounds}`);
+    const winner =
+      report.winnerSide === 'HOME' ? '我方胜' : report.winnerSide === 'AWAY' ? '对手胜' : '平局';
+    lines.push(`比分 ${report.scores.home} : ${report.scores.away} · ${winner}`);
   }
-
-  const rewardCount = record.summary?.rewards?.length ?? report.rewards.length;
-  if (rewardCount > 0) {
-    const rewardsText = (record.summary?.rewards ?? report.rewards)
-      .map((reward) => rewardLineText(reward))
-      .join('；');
-    lines.push(`奖励：${rewardsText}`);
-  }
-  lines.push('');
-  lines.push(
-    `Engine ${report.engineVersion} · RNG ${report.rngVersion} · Seed ${report.seed} · Snapshot ${report.snapshotHash}`,
-  );
-  lines.push(`完整战报：${url}`);
+  const url =
+    typeof window === 'undefined'
+      ? `/records/${record.id}`
+      : `${window.location.origin}/records/${record.id}`;
+  lines.push('', `完整战报：${url}`);
   return lines.join('\n');
 }
 
@@ -260,152 +67,154 @@ async function copyText(text: string): Promise<void> {
   document.body.removeChild(textarea);
 }
 
-function RankingReport({
-  report,
-}: {
-  report: Extract<ContestReport, { format: 'RANKING' }>;
-}): JSX.Element {
-  const mine = report.standings.find((standing) => standing.teamIndex === 0);
-  const teams = teamTimelines(report);
-
+/** 调试元数据只进折叠区，不上主视 */
+function TechDetails({ record }: { record: ContestRecordView }): JSX.Element {
+  const report = record.report;
   return (
-    <>
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Metric label="排名" value={`#${mine?.rank ?? '-'}`} />
-        <Metric label="总分" value={String(mine?.totalScore ?? 0)} />
-        <Metric label="参赛队伍" value={String(report.teams.length)} />
-        <Metric label="结果" value={report.pass ? '通过' : '未通过'} />
-      </div>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">排名</h2>
-        <div className="overflow-x-auto rounded border border-neutral-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b bg-neutral-50 text-xs uppercase text-neutral-500">
-              <tr>
-                <th className="px-4 py-3">名次</th>
-                <th className="px-4 py-3">队伍</th>
-                <th className="px-4 py-3">分数</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.standings.map((standing) => {
-                const team = report.teams[standing.teamIndex];
-                return (
-                  <tr key={standing.teamIndex} className="border-b last:border-b-0">
-                    <td className="px-4 py-3">{standing.rank}</td>
-                    <td className="px-4 py-3">
-                      {team === undefined ? '-' : teamName(team)}
-                      {standing.teamIndex === 0 ? '（我方）' : ''}
-                    </td>
-                    <td className="px-4 py-3">{standing.totalScore}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+    <details className="panel px-4 py-2.5 text-xs">
+      <summary className="cursor-pointer text-fg-dim">技术详情</summary>
+      <dl className="mt-2 grid gap-x-6 gap-y-1 font-mono text-[11px] sm:grid-cols-2">
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-faint">回放记录</dt>
+          <dd className="truncate text-fg-muted">{record.id}</dd>
         </div>
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">答题时间线</h2>
-        <div className="space-y-4">
-          {teams.map(({ teamIndex, team, timelines }) => (
-            <div key={teamIndex} className="space-y-3">
-              <h3 className="text-sm font-medium">
-                {teamName(team)}
-                {teamIndex === 0 ? '（我方）' : ''}
-              </h3>
-              {timelines.map((timeline) => (
-                <div
-                  key={timeline.participant.displayName}
-                  className="overflow-x-auto rounded border border-neutral-200 bg-white"
-                >
-                  <div className="border-b px-4 py-3 font-medium">
-                    {timeline.participant.displayName}
-                  </div>
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="border-b bg-neutral-50 text-xs text-neutral-500">
-                      <tr>
-                        <th className="px-4 py-2">题目</th>
-                        <th className="px-4 py-2">结果</th>
-                        <th className="px-4 py-2">用时</th>
-                        <th className="px-4 py-2">精力</th>
-                        <th className="px-4 py-2">心态</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {timeline.attempts.map((attempt) => (
-                        <tr key={attempt.problemInstanceId} className="border-b last:border-b-0">
-                          <td className="px-4 py-2">{attempt.problemInstanceId}</td>
-                          <td className="px-4 py-2">{attempt.verdict}</td>
-                          <td className="px-4 py-2">{Math.ceil(attempt.minutesUsed)} min</td>
-                          <td className="px-4 py-2">-{attempt.energyCost}</td>
-                          <td className="px-4 py-2">
-                            {attempt.mindsetDelta > 0 ? '+' : ''}
-                            {attempt.mindsetDelta}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </div>
-          ))}
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-faint">战报版本</dt>
+          <dd className="tnum text-fg-muted">{report.reportVersion}</dd>
         </div>
-      </section>
-    </>
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-faint">引擎版本</dt>
+          <dd className="truncate text-fg-muted">{report.engineVersion}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-faint">随机源</dt>
+          <dd className="truncate text-fg-muted">{report.rngVersion}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-faint">随机种子</dt>
+          <dd className="tnum text-fg-muted">{report.seed}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-faint">快照校验</dt>
+          <dd className="tnum truncate text-fg-muted">{report.snapshotHash}</dd>
+        </div>
+      </dl>
+    </details>
   );
 }
 
-function DuelReport({
-  report,
-}: {
-  report: Extract<ContestReport, { format: 'DUEL' }>;
-}): JSX.Element {
-  return (
-    <section>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Metric label="主场" value={String(report.scores.home)} />
-        <Metric label="客场" value={String(report.scores.away)} />
-        <Metric label="结果" value={report.winnerSide} />
+export function RecordReportPage(): JSX.Element {
+  const { recordId } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const detailsOnly = searchParams.get('details') === '1';
+  const query = useContestRecord(recordId);
+  const replayQuery = useContestReplay(recordId, !detailsOnly);
+  const [replayFinished, setReplayFinished] = useState(detailsOnly);
+  const [shared, setShared] = useState(false);
+  const itemName = useItemName();
+
+  useEffect(() => {
+    setReplayFinished(detailsOnly);
+    setShared(false);
+  }, [detailsOnly, recordId]);
+
+  if (query.isPending || (!detailsOnly && replayQuery.isPending)) {
+    return <BattleWaiting label={detailsOnly ? '正在取回完整战报…' : '服务端正在传回战斗回放…'} />;
+  }
+
+  if (
+    query.isError ||
+    query.data === undefined ||
+    (!detailsOnly && (replayQuery.isError || replayQuery.data === undefined))
+  ) {
+    const replayFailed = !detailsOnly && replayQuery.isError;
+    return (
+      <div className="mx-auto max-w-3xl space-y-3 py-10">
+        <h1 className="text-xl font-semibold">战报不可用</h1>
+        <ErrorNote
+          onRetry={() => {
+            void query.refetch();
+            if (!detailsOnly) void replayQuery.refetch();
+          }}
+        >
+          {replayFailed ? '战斗回放加载失败。' : '战报不存在、已失效或无权访问。'}
+        </ErrorNote>
       </div>
-      <div className="mt-6 overflow-x-auto rounded border border-neutral-200 bg-white">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b bg-neutral-50 text-xs text-neutral-500">
-            <tr>
-              <th className="px-4 py-3">局</th>
-              <th className="px-4 py-3">出题方</th>
-              <th className="px-4 py-3">答题方</th>
-              <th className="px-4 py-3">结果</th>
-              <th className="px-4 py-3">得分</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.rounds.map((round) => (
-              <tr key={round.roundNo} className="border-b last:border-b-0">
-                <td className="px-4 py-3">{round.roundNo}</td>
-                <td className="px-4 py-3">{round.setterSide}</td>
-                <td className="px-4 py-3">{round.answererSide}</td>
-                <td className="px-4 py-3">{round.reason}</td>
-                <td className="px-4 py-3">
-                  {round.scoreAwardedTo} +{round.scoreAwarded}
-                </td>
-              </tr>
+    );
+  }
+
+  if (!detailsOnly && !replayFinished && replayQuery.data !== undefined) {
+    return <BattleReplay replay={replayQuery.data} onFinished={() => setReplayFinished(true)} />;
+  }
+
+  const record = query.data;
+  const report = record.report;
+  const back = BACK_TARGET[record.type] ?? BACK_TARGET.STORY;
+  const rewards = record.rewards.length > 0 ? record.rewards : report.rewards;
+  const growth = report.growth;
+
+  async function share(): Promise<void> {
+    try {
+      await copyText(buildShareText(record));
+      setShared(true);
+    } catch {
+      // 分享失败不打断浏览
+      setShared(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-5">
+      <PageHeader
+        eyebrow={`${CONTEST_RECORD_TYPE_LABEL[record.type]} · ${CONTEST_FORMAT_LABEL[report.format]}`}
+        title={report.format === 'RANKING' ? '排名赛战报' : '出题对决战报'}
+        description={`${stageLine(record)} · ${new Date(record.createdAt).toLocaleString()}`}
+        actions={
+          <>
+            {shared && <span className="text-xs text-good-400">分享文案已复制</span>}
+            <Btn variant="primary" data-testid="record-share" onClick={() => void share()}>
+              <Icon icon={Share2} className="size-3.5" />
+              分享战报
+            </Btn>
+            <Btn data-testid="record-back" onClick={() => navigate(back.to)}>
+              <Icon icon={ArrowLeft} className="size-3.5" />
+              {back.label}
+            </Btn>
+          </>
+        }
+      />
+
+      <TechDetails record={record} />
+
+      {report.format === 'RANKING' ? (
+        <RankingReport report={report} />
+      ) : (
+        <DuelReport report={report} />
+      )}
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold">结算</h2>
+        {rewards.length === 0 && growth.length === 0 ? (
+          <p className="panel px-4 py-3 text-sm text-fg-dim">本场无额外奖励。</p>
+        ) : (
+          <ul className="panel divide-y divide-ink-600/50 px-4 py-1">
+            {rewards.map((reward, index) => (
+              <li
+                key={`${reward.type}-${index}`}
+                className="flex items-center gap-2 py-2 text-sm text-fg-muted"
+              >
+                {rewardLineText(reward, itemName)}
+              </li>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }): JSX.Element {
-  return (
-    <div className="rounded border border-neutral-200 bg-white px-4 py-3">
-      <p className="text-xs text-neutral-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+            {growth.map((entry, index) => (
+              <li key={`${entry.attr}-${index}`} className="py-2 text-sm text-good-400">
+                实战成长 · {growthText(entry)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
