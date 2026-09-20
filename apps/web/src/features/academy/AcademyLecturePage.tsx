@@ -1,5 +1,6 @@
 import { useState, type JSX } from 'react';
 import { Link } from 'react-router';
+import { GraduationCap, Timer } from 'lucide-react';
 import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import {
   useLectureLogs,
@@ -7,8 +8,35 @@ import {
   useStudents,
   useTeachLecture,
 } from '../../lib/hooks';
-import { lectureTierLabel, type LectureTierId } from '../../lib/labels';
-import { Empty } from '../../components/ui';
+import type { StudentView } from '@oinur/shared';
+import type { LectureResultView, LectureTierView } from '../../lib/hooks';
+import { lectureTierLabel, signed, type LectureTierId } from '../../lib/labels';
+import { Icon, NAV_ICON } from '../../components/icons';
+import {
+  Btn,
+  Card,
+  Chip,
+  Empty,
+  ErrorNote,
+  InlineLoader,
+  Meter,
+  Numeral,
+  PageHeader,
+  Panel,
+} from '../../components/ui';
+
+/** 强接下限 = 门槛 − 8（apps/api/src/modules/academy/lecture.ts:144），窗口 = [门槛−8, 门槛) */
+const FORCE_FLOOR_GAP = 8;
+const STAMINA_COST = 2;
+const DAILY_LIMIT = '每日 3 场 · 同一学员 2 场';
+
+/** 服务端 STATE_CONFLICT 的 reason → 人话（无映射时退回通用文案） */
+const LECTURE_CONFLICT_TEXT: Record<string, string> = {
+  'daily lecture limit reached': '今日讲课次数已达上限',
+  'student daily lecture limit reached': '该学员今日讲课次数已达上限',
+  'teaching value below forced-taking floor': '能力值低于强接下限，无法承接该档位',
+  'force flag required below threshold': '未达门槛：请先勾选强接',
+};
 
 export function AcademyLecturePage(): JSX.Element {
   const students = useStudents();
@@ -20,12 +48,7 @@ export function AcademyLecturePage(): JSX.Element {
   const [force, setForce] = useState(false);
 
   if (students.isPending || tiers.isPending || logs.isPending) {
-    return (
-      <div className="flex items-center gap-2 text-neutral-500">
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
-        加载讲课数据…
-      </div>
-    );
+    return <InlineLoader>正在整理讲课名册…</InlineLoader>;
   }
   if (
     students.isError ||
@@ -36,19 +59,15 @@ export function AcademyLecturePage(): JSX.Element {
     !logs.data
   ) {
     return (
-      <div className="space-y-2 text-sm text-red-600">
-        <p>讲课数据加载失败：{apiErrorMessage(students.error ?? tiers.error ?? logs.error)}</p>
-        <button
-          className="rounded border px-3 py-1 text-xs"
-          onClick={() => {
-            void students.refetch();
-            void tiers.refetch();
-            void logs.refetch();
-          }}
-        >
-          重试
-        </button>
-      </div>
+      <ErrorNote
+        onRetry={() => {
+          void students.refetch();
+          void tiers.refetch();
+          void logs.refetch();
+        }}
+      >
+        讲课数据读取中断：{apiErrorMessage(students.error ?? tiers.error ?? logs.error)}
+      </ErrorNote>
     );
   }
 
@@ -58,26 +77,25 @@ export function AcademyLecturePage(): JSX.Element {
   const canForce =
     selectedStudent !== undefined &&
     selectedTier !== undefined &&
-    selectedStudent.v < selectedTier.threshold &&
-    selectedStudent.v >= selectedTier.threshold - 8;
+    withinForceWindow(selectedStudent.v, selectedTier.threshold);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="border-b border-neutral-300 pb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-          Academy Lecture
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold">讲课</h1>
-        <p className="mt-2 text-sm text-neutral-500">用学员的综合能力承接不同层级的训练营课程。</p>
-      </div>
+    <div data-testid="lecture-page" className="space-y-5">
+      <PageHeader
+        eyebrow="ACADEMY · LECTURE"
+        title="讲课"
+        description="带学员承接不同层级的训练营课程：达标直讲稳拿全额，未达标可强接，但讲砸不发钱还倒扣声誉。"
+        actions={<ActionLinkBack />}
+      />
 
       {students.data.length === 0 && (
         <Empty
+          icon={GraduationCap}
           title="还没有可以讲课的学员"
           action={
             <Link
               to="/academy"
-              className="inline-block rounded bg-neutral-900 px-4 py-2 text-sm text-white"
+              className="inline-flex items-center gap-1.5 border border-cyber-400/60 bg-cyber-400/15 px-3 py-1.5 text-sm font-medium text-cyber-300 hover:bg-cyber-400/25"
             >
               前往高级学院招募
             </Link>
@@ -87,119 +105,365 @@ export function AcademyLecturePage(): JSX.Element {
         </Empty>
       )}
 
-      <section className="grid gap-4 border-b border-neutral-200 pb-5 md:grid-cols-2">
-        <label className="text-sm">
-          <span className="mb-2 block text-neutral-500">主讲学员</span>
-          <select
-            data-testid="lecture-student"
-            className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
-            value={selectedStudentId ?? ''}
-            onChange={(event) => setStudentId(Number(event.target.value))}
-          >
-            {students.data.map((student) => (
-              <option key={student.id} value={student.id}>
-                {student.name} · V {student.v} · 体力 {Math.floor(student.stamina)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-2 block text-neutral-500">受众档位</span>
-          <select
-            data-testid="lecture-tier"
-            className="w-full rounded border border-neutral-300 bg-white px-3 py-2"
-            value={tier}
-            onChange={(event) => {
-              setTier(event.target.value as LectureTierId);
-              setForce(false);
-            }}
-          >
-            {tiers.data.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {lectureTierLabel(entry.id)} · 门槛 V{entry.threshold}
-              </option>
-            ))}
-          </select>
-        </label>
-      </section>
-
-      <section className="border border-neutral-300 bg-white p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm">
-            <span className="font-medium">{selectedStudent?.name ?? '暂无学员'}</span>
-            <span className="ml-3 text-neutral-500">
-              当前 V {selectedStudent?.v ?? '-'} · 目标门槛 V {selectedTier?.threshold ?? '-'} ·
-              体力消耗 2
-            </span>
-          </div>
-          <button
-            type="button"
-            data-testid="lecture-teach"
-            className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-            disabled={
-              selectedStudentId === undefined || selectedTier === undefined || teach.isPending
-            }
-            onClick={() =>
-              selectedStudentId !== undefined &&
-              teach.mutate({ studentId: selectedStudentId, tier, force: force && canForce })
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_23rem]">
+        <div className="space-y-5">
+          <Panel
+            title="讲座档位"
+            eyebrow="Audience tier"
+            bodyClassName="p-4 space-y-4"
+            actions={
+              <Chip icon={Timer}>
+                体力消耗 {STAMINA_COST} · {DAILY_LIMIT}
+              </Chip>
             }
           >
-            {teach.isPending ? '结算中…' : '开始讲课'}
-          </button>
-        </div>
-        {canForce && (
-          <label className="mt-4 flex items-center gap-2 border-t border-neutral-200 pt-3 text-sm text-amber-800">
-            <input
-              data-testid="lecture-force"
-              type="checkbox"
-              checked={force}
-              onChange={(event) => setForce(event.target.checked)}
-            />
-            强接此档位，接受讲砸或折扣结算风险
-          </label>
-        )}
-        {teach.isError && (
-          <p data-testid="lecture-error" className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {teach.error instanceof ApiCallError && teach.error.code === 'INSUFFICIENT_RESOURCE'
-              ? '体力不足，稍等恢复或使用体力药水'
-              : `讲课未能开始：${apiErrorMessage(teach.error)}`}
-          </p>
-        )}
-      </section>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block text-sm">
+                <span className="mb-2 block text-fg-dim">主讲学员</span>
+                <select
+                  data-testid="lecture-student"
+                  className="w-full border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-fg outline-none transition-colors focus-visible:border-cyber-400/70 [&>option]:bg-ink-900"
+                  value={selectedStudentId ?? ''}
+                  onChange={(event) => setStudentId(Number(event.target.value))}
+                >
+                  {students.data.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name} · V {student.v} · 体力 {Math.floor(student.stamina)}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-      <section>
-        <div className="mb-3 flex items-baseline justify-between border-b border-neutral-300 pb-2">
-          <h2 className="text-lg font-semibold">讲课记录</h2>
-          <span className="text-xs text-neutral-500">最近 {logs.data.length} 条</span>
-        </div>
-        {logs.data.length === 0 ? (
-          <p className="text-sm text-neutral-500">暂无记录。</p>
-        ) : (
-          <ul data-testid="lecture-logs" className="divide-y divide-neutral-200 border-y border-neutral-200 bg-white">
-            {logs.data.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 text-sm"
+              <label className="block text-sm">
+                <span className="mb-2 block text-fg-dim">受众档位</span>
+                <select
+                  data-testid="lecture-tier"
+                  className="w-full border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-fg outline-none transition-colors focus-visible:border-cyber-400/70 [&>option]:bg-ink-900"
+                  value={tier}
+                  onChange={(event) => {
+                    setTier(event.target.value as LectureTierId);
+                    setForce(false);
+                  }}
+                >
+                  {tiers.data.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {lectureTierLabel(entry.id)} · 门槛 V{entry.threshold}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <ul className="grid gap-2 sm:grid-cols-3 xl:grid-cols-5">
+              {tiers.data.map((entry) => (
+                <li key={entry.id}>
+                  <TierCard
+                    entry={entry}
+                    active={entry.id === tier}
+                    onPick={() => {
+                      setTier(entry.id);
+                      setForce(false);
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+
+            {selectedTier !== undefined && (
+              <div className="border border-ink-600/70 bg-ink-850/40 p-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="eyebrow">能力比对</p>
+                    <p className="mt-1 text-sm text-fg-muted">
+                      <span className="text-fg">{selectedStudent?.name ?? '暂无学员'}</span>
+                      <span className="ml-2">
+                        综合能力 V <Numeral value={selectedStudent?.v ?? 0} /> / 门槛 V{' '}
+                        {selectedTier.threshold}
+                      </span>
+                    </p>
+                  </div>
+                  {selectedStudent !== undefined && <StandingBadge student={selectedStudent} tier={selectedTier} />}
+                </div>
+                <Meter
+                  value={Math.min(selectedStudent?.v ?? 0, selectedTier.threshold)}
+                  max={selectedTier.threshold}
+                  className={standingFill(selectedStudent?.v ?? 0, selectedTier.threshold)}
+                  trackClassName="bg-ink-700 mt-3"
+                />
+                <p className="mt-2 text-[11px] text-fg-faint">
+                  {standingNote(selectedStudent?.v ?? 0, selectedTier.threshold)}
+                </p>
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="授课台" eyebrow="Board" bodyClassName="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-fg-muted">
+                {selectedStudent !== undefined && selectedTier !== undefined ? (
+                  <>
+                    由 <span className="text-fg">{selectedStudent.name}</span> 主讲
+                    <span className="mx-1.5 text-ink-500">/</span>
+                    {lectureTierLabel(selectedTier.id)}
+                    <span className="mx-1.5 text-ink-500">/</span>
+                    基础报酬 {selectedTier.baseMoney} 金 · {selectedTier.baseReputation} 声誉
+                  </>
+                ) : (
+                  '先选择主讲学员与受众档位。'
+                )}
+              </p>
+              <Btn
+                data-testid="lecture-teach"
+                variant="primary"
+                disabled={
+                  selectedStudentId === undefined || selectedTier === undefined || teach.isPending
+                }
+                onClick={() =>
+                  selectedStudentId !== undefined &&
+                  teach.mutate({ studentId: selectedStudentId, tier, force: force && canForce })
+                }
               >
-                <div>
-                  <span className="font-medium">{lectureTierLabel(entry.tier)}</span>
-                  <span className="ml-2 text-xs text-neutral-500">V {entry.teachingValue}</span>
-                </div>
-                <div className="text-right text-xs">
-                  <span className={entry.success ? 'text-green-700' : 'text-red-700'}>
-                    {entry.success ? '成功' : '讲砸'} · 钱 {entry.money >= 0 ? '+' : ''}
-                    {entry.money} · 声誉 {entry.reputation >= 0 ? '+' : ''}
-                    {entry.reputation}
+                <Icon icon={NAV_ICON.lecture} className="size-3.5" />
+                {teach.isPending ? '结算中…' : '开始讲课'}
+              </Btn>
+            </div>
+
+            {canForce && (
+              <label className="mt-4 flex items-start gap-2 border-t border-ink-600/60 pt-3 text-sm text-warn-400">
+                <input
+                  data-testid="lecture-force"
+                  type="checkbox"
+                  className="mt-0.5 size-3.5 accent-warn-400"
+                  checked={force}
+                  onChange={(event) => setForce(event.target.checked)}
+                />
+                <span>
+                  强接此档位
+                  <span className="ml-2 text-fg-dim">
+                    成功按 60% 结算；讲砸不发钱、倒扣声誉，学员心态 −2
                   </span>
-                  <time className="ml-3 text-neutral-500">
-                    {new Date(entry.createdAt).toLocaleString()}
-                  </time>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                </span>
+              </label>
+            )}
+
+            {teach.isError && (
+              <div data-testid="lecture-error" className="mt-3">
+                <ErrorNote>讲课未能开始：{lectureErrorText(teach.error)}</ErrorNote>
+              </div>
+            )}
+
+            {teach.isSuccess && teach.data !== undefined && (
+              <ResultStrip
+                result={teach.data}
+                studentName={students.data.find((s) => s.id === teach.data?.studentId)?.name ?? '学员'}
+              />
+            )}
+          </Panel>
+        </div>
+
+        <Panel title="讲课记录" eyebrow="Timeline" bodyClassName="p-4">
+          {logs.data.length === 0 ? (
+            <p className="border border-dashed border-ink-600 bg-ink-850/40 px-4 py-8 text-center text-sm text-fg-dim">
+              暂无记录。
+            </p>
+          ) : (
+            <ul data-testid="lecture-logs" className="space-y-2">
+              {logs.data.map((entry) => (
+                <LectureLogItem
+                  key={entry.id}
+                  entry={entry}
+                  studentName={students.data.find((s) => s.id === entry.studentId)?.name ?? '未知学员'}
+                />
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
     </div>
   );
+}
+
+function ActionLinkBack(): JSX.Element {
+  return (
+    <Link
+      to="/academy"
+      className="inline-flex items-center gap-1.5 border border-ink-600 px-3 py-1.5 text-sm text-fg-muted transition-colors hover:border-ink-500 hover:text-fg"
+    >
+      <Icon icon={NAV_ICON.academy} className="size-3.5" />
+      高级学院
+    </Link>
+  );
+}
+
+function TierCard({
+  entry,
+  active,
+  onPick,
+}: {
+  entry: LectureTierView;
+  active: boolean;
+  onPick: () => void;
+}): JSX.Element {
+  return (
+    <Card
+      as="button"
+      aria-pressed={active}
+      onClick={onPick}
+      className={`w-full px-3 py-2 text-left ${active ? 'border-cyber-400/70 bg-cyber-400/10' : ''}`}
+    >
+      <span className="block text-xs text-fg-muted">{lectureTierLabel(entry.id)}</span>
+      <span className="numeral mt-0.5 block text-lg text-fg">V {entry.threshold}</span>
+      <span className="mt-0.5 block text-[11px] text-fg-faint">
+        基础金 {entry.baseMoney} · 声誉 {entry.baseReputation}
+      </span>
+      <span className={`mt-1 block text-[11px] ${entry.available ? 'text-good-400' : 'text-fg-faint'}`}>
+        {entry.available ? '有学员可承接' : '暂无学员够格'}
+      </span>
+    </Card>
+  );
+}
+
+function withinForceWindow(v: number, threshold: number): boolean {
+  return v >= threshold - FORCE_FLOOR_GAP && v < threshold;
+}
+
+function standingFill(v: number, threshold: number): string {
+  if (v >= threshold) return 'bg-good-400';
+  if (v >= threshold - FORCE_FLOOR_GAP) return 'bg-warn-400';
+  return 'bg-bad-400';
+}
+
+function standingNote(v: number, threshold: number): string {
+  if (v >= threshold) {
+    return `高于门槛每 5 点追加 20% 报酬（上限 +100%）；当前 V ${v}，门槛 V ${threshold}。`;
+  }
+  if (v >= threshold - FORCE_FLOOR_GAP) {
+    return `处于强接窗口（V ≥ ${threshold - FORCE_FLOOR_GAP}）：勾选强接后成功按 60% 结算，讲砸不发钱并倒扣声誉。`;
+  }
+  return `低于强接下限 V ${threshold - FORCE_FLOOR_GAP}，无法承接该档位。`;
+}
+
+function StandingBadge({ student, tier }: { student: StudentView; tier: LectureTierView }): JSX.Element {
+  if (student.v >= tier.threshold) {
+    return (
+      <span className="border border-good-400/50 bg-good-400/10 px-2 py-1 text-xs text-good-400">
+        达标 · 可直讲
+      </span>
+    );
+  }
+  if (withinForceWindow(student.v, tier.threshold)) {
+    return (
+      <span className="border border-warn-400/50 bg-warn-400/10 px-2 py-1 text-xs text-warn-400">
+        需强接 · 有讲砸风险
+      </span>
+    );
+  }
+  return (
+    <span className="border border-bad-400/50 bg-bad-400/10 px-2 py-1 text-xs text-bad-400">
+      能力不足 · 低于强接下限
+    </span>
+  );
+}
+
+function ResultStrip({
+  result,
+  studentName,
+}: {
+  result: LectureResultView;
+  studentName: string;
+}): JSX.Element {
+  const ok = result.success;
+  return (
+    <div
+      className={`animate-rise mt-3 flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border px-3 py-2.5 text-sm ${
+        ok ? 'border-cyber-500/50 bg-cyber-400/10' : 'border-warn-400/50 bg-warn-400/10'
+      }`}
+    >
+      <span
+        className={`font-display text-base font-semibold tracking-wide ${ok ? 'text-cyber-300' : 'text-warn-400'}`}
+      >
+        {ok ? '成功' : '讲砸'}
+      </span>
+      <span className="text-fg-muted">
+        {studentName}
+        <span className="mx-1.5 text-ink-500">/</span>
+        {lectureTierLabel(result.tier)}
+        {result.forced && <span className="ml-1.5 text-warn-400">强接</span>}
+      </span>
+      <span className="tnum text-fg-dim">
+        授课值 V {result.teachingValue} / 门槛 {result.threshold}
+      </span>
+      <span className={`tnum ${result.money > 0 ? 'text-good-400' : 'text-fg-dim'}`}>
+        金 {signed(result.money)}
+      </span>
+      <span className={`tnum ${result.reputation >= 0 ? 'text-good-400' : 'text-bad-400'}`}>
+        声誉 {signed(result.reputation)}
+      </span>
+      {result.staminaAfter !== null && <span className="tnum text-fg-dim">体力 {result.staminaAfter}</span>}
+    </div>
+  );
+}
+
+function LectureLogItem({
+  entry,
+  studentName,
+}: {
+  entry: LectureResultView;
+  studentName: string;
+}): JSX.Element {
+  return (
+    <li className="panel relative px-3 py-2.5 text-sm">
+      <span
+        aria-hidden
+        className={`absolute inset-y-0 left-0 w-[2px] ${entry.success ? 'bg-cyber-400/70' : 'bg-warn-400/70'}`}
+      />
+      <div className="flex items-center justify-between gap-3">
+        <span className={`font-medium ${entry.success ? 'text-cyber-300' : 'text-warn-400'}`}>
+          {entry.success ? '成功' : '讲砸'}
+        </span>
+        <time className="text-[11px] text-fg-faint" dateTime={entry.createdAt}>
+          {fmtTime(entry.createdAt)}
+        </time>
+      </div>
+      <p className="mt-1 truncate text-xs text-fg-muted">
+        {studentName}
+        <span className="mx-1.5 text-ink-500">/</span>
+        {lectureTierLabel(entry.tier)}
+        {entry.forced && <span className="ml-1.5 text-warn-400">强接</span>}
+      </p>
+      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-fg-dim">
+        <span className="tnum">
+          V {entry.teachingValue} / 门槛 {entry.threshold}
+        </span>
+        <span className={`tnum ${entry.money > 0 ? 'text-good-400' : ''}`}>金 {signed(entry.money)}</span>
+        <span className={`tnum ${entry.reputation < 0 ? 'text-bad-400' : ''}`}>
+          声誉 {signed(entry.reputation)}
+        </span>
+      </p>
+    </li>
+  );
+}
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function lectureErrorText(e: unknown): string {
+  if (e instanceof ApiCallError) {
+    if (e.code === 'INSUFFICIENT_RESOURCE') return `体力不足（需 ${STAMINA_COST} 点），稍等恢复或使用体力药水`;
+    const details = e.details;
+    if (typeof details === 'object' && details !== null && 'reason' in details) {
+      const reason = (details as { reason?: unknown }).reason;
+      if (typeof reason === 'string') {
+        const mapped = LECTURE_CONFLICT_TEXT[reason];
+        if (mapped !== undefined) return mapped;
+      }
+    }
+  }
+  return apiErrorMessage(e);
 }
