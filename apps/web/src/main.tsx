@@ -22,7 +22,23 @@ import { ProblemLibraryPage } from './features/problems/ProblemLibraryPage';
 import { AdminPage } from './features/admin/AdminPage';
 import { PvpPage } from './features/pvp/PvpPage';
 
-const qc = new QueryClient();
+/**
+ * 全局查询策略：
+ * - `refetchOnWindowFocus: false`：默认开启会让每次路由往返/切标签页全量重拉；且 `pvp/*`
+ *   服务端每次推进都要 `SELECT ... FOR UPDATE` 行锁，聚焦重取会在同一把锁上串行排队。
+ *   招募池更需要它——跨过免费刷新时刻的任意一次 GET 都会整池重掷（见 useAcademyPool）。
+ * - staleTime 分级写在各 hook（钱包/背包 30s、静态配置 5min、战报 Infinity）。
+ */
+const qc = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

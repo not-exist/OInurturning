@@ -11,7 +11,7 @@ import {
   usePvpRewards,
   useClaimPvpReward,
   usePvpTournaments,
-  useProblems,
+  useProblemLibrary,
   useRegisterPvp,
   useStudents,
   type PvpRegistrationView,
@@ -23,7 +23,7 @@ import type { StudentView } from '@oinur/shared';
 export function PvpPage(): JSX.Element {
   const tournaments = usePvpTournaments();
   const students = useStudents();
-  const problems = useProblems();
+  const problems = useProblemLibrary();
   const inventory = useInventory();
   const [tournamentId, setTournamentId] = useState<number>();
   const [roster, setRoster] = useState<number[]>([]);
@@ -110,7 +110,7 @@ export function PvpPage(): JSX.Element {
   const rosterReady = roster.length === rosterSize;
   const selectedRegistration = registration.data;
   const tickets = inventory.data.find((item) => item.itemId === 'entry-ticket')?.quantity ?? 0;
-  const eligibleProblems = problems.data.filter((problem) => problem.quality >= 40);
+  const eligibleProblems = (problems.data ?? []).filter((problem) => problem.quality >= 40);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

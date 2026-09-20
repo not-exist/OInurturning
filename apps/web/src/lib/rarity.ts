@@ -1,10 +1,6 @@
-import {
-  RARITIES,
-  type ProblemSeverity,
-  type ProblemTier,
-  type QualityTier,
-  type Rarity,
-} from '@oinur/shared';
+import type { ProblemSeverity, ProblemTier, QualityTier, Rarity } from '@oinur/shared';
+// 前端一律只从 zod-free 子路径取运行时值：经 barrel 会连带把 config 的 zod schema 打进浏览器包
+import { RARITIES } from '@oinur/shared/enums';
 import { TIER_ORDER } from './labels';
 
 /**
@@ -93,6 +89,16 @@ export function rarityChip(r: string): string {
   return `border ${RARITY_BORDER[k]} ${RARITY_FILL[k]} ${RARITY_TEXT[k]}`;
 }
 
+/** 稀有度文字着色（容错：wire 上双轨大小写皆可） */
+export function rarityText(r: string): string {
+  return RARITY_TEXT[normRarity(r)];
+}
+
+/** 稀有度中文名（容错） */
+export function rarityLabel(r: string): string {
+  return RARITY_LABEL[normRarity(r)];
+}
+
 // ---------------------------------------------------------------------------
 // 题目特性严重度（毒性阶梯，Ⅰ–Ⅵ 刻度；与「提交判定错误态」空间分离）
 // ---------------------------------------------------------------------------
@@ -169,15 +175,8 @@ export function isTier(v: string): v is ProblemTier {
 }
 
 // ---------------------------------------------------------------------------
-// 招募品质档 = 材质层级（不复用稀有度色相）
+// 招募品质档 = 材质层级（不复用稀有度色相；中文名见 labels.ts）
 // ---------------------------------------------------------------------------
-
-export const QUALITY_LABEL: Record<QualityTier, string> = {
-  COMMON: '普通',
-  GOOD: '良好',
-  ELITE: '精英',
-  GENIUS: '天才',
-};
 
 export const QUALITY_MATERIAL: Record<QualityTier, string> = {
   COMMON: 'mat-common',

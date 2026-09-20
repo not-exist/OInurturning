@@ -2,22 +2,21 @@ import { useState, type JSX } from 'react';
 import { Link } from 'react-router';
 import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import {
-  DIMENSION_LABEL,
-  rarityBadge,
-  rarityLabel,
   useCreateProblem,
   useDeleteProblem,
   useProblemLibrary,
   useStudents,
   type ProblemView,
 } from '../../lib/hooks';
+import { DIMENSION_LABEL } from '../../lib/labels';
+import { rarityChip, rarityLabel } from '../../lib/rarity';
 import type { DimensionKey } from '@oinur/shared';
 import { Empty } from '../../components/ui';
 
 const DIMENSIONS: DimensionKey[] = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'];
 
 function rarityClass(rarity: ProblemView['rarity']): string {
-  return rarityBadge(rarity);
+  return rarityChip(rarity);
 }
 
 export function ProblemLibraryPage(): JSX.Element {

@@ -1,14 +1,11 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import {
-  QUALITY_LABEL,
-  SEX_LABEL,
-  floor,
-  rarityBadge,
   useAcademyPool,
   useRecruit,
   useRefreshPool,
 } from '../../lib/hooks';
+import { SEX_LABEL, floor } from '../../lib/labels';
 import type { CandidatePayload, PoolView } from '../../lib/hooks';
 import { Empty } from '../../components/ui';
 
@@ -51,11 +48,21 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
   const refresh = useRefreshPool();
   const [msg, setMsg] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [poolRotated, setPoolRotated] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // ⚠️ 重掷守卫：tempId 是位置编号（c0..c4），整池重掷后编号复用——沿用旧响应里的
+  // tempId 会静默招到另一个人（扣款、落库、HTTP 200 全都正常）。generatedAt 一变即提示。
+  const lastGeneratedAt = useRef(pool.generatedAt);
+  useEffect(() => {
+    if (lastGeneratedAt.current === pool.generatedAt) return;
+    lastGeneratedAt.current = pool.generatedAt;
+    setPoolRotated(true);
+  }, [pool.generatedAt]);
 
   const freeAt = new Date(pool.generatedAt).getTime() + FREE_REFRESH_HOURS * HOUR_MS;
   const freeLeftMs = Math.max(0, freeAt - now);
@@ -81,6 +88,12 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
         </div>
       </div>
 
+      {poolRotated && (
+        <p data-testid="pool-rotated" className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          候选池已刷新，请重新确认候选人再招募。
+        </p>
+      )}
+
       {msg && (
         <p data-testid="pool-msg" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {msg}
@@ -88,7 +101,7 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
       )}
 
       {pool.candidates.length === 0 ? (
-        <Empty icon="🧑‍💻" title="候选池暂时没有学员">
+        <Empty title="候选池暂时没有学员">
           可以稍后等免费刷新，或立即花金币手动刷新。
         </Empty>
       ) : (
@@ -116,11 +129,10 @@ function CandidateCard({
         <span className="font-semibold">
           {c.name} <span className="text-xs text-neutral-400">{SEX_LABEL[c.sex]}</span>
         </span>
-        <span className={`rounded px-2 py-0.5 text-xs ${qualityBadge(c.qualityTier)}`}>
-          {QUALITY_LABEL[c.qualityTier]}
-        </span>
+        {/* 招募前品质档必须隐性（student.md §3.6）：只显示三档气质，不显示品质徽章与天赋 */}
+        <span className="text-xs text-neutral-500">{c.hint}</span>
       </div>
-      <p className="mb-2 text-xs text-neutral-500">{c.hint}</p>
+      <p className="mb-2 text-xs text-neutral-500">九维能力（精确值）</p>
       <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-neutral-500">
         {Object.entries(attrRows(c)).map(([k, v]) => (
           <div key={k} className="flex justify-between">
@@ -129,13 +141,11 @@ function CandidateCard({
           </div>
         ))}
       </div>
-      <p className="mb-3 text-xs text-neutral-400">
-        天赋：{c.talents.length > 0 ? c.talents.map((t) => t.talentId).join(', ') : '无'}
-      </p>
       <button
         data-testid="recruit-btn"
         className="w-full rounded bg-neutral-900 px-3 py-2 text-sm text-white disabled:opacity-60"
         disabled={recruit.isPending}
+        title="招募费随在营学员数浮动，以实际扣款为准"
         onClick={() =>
           recruit.mutate(c.tempId, {
             onSuccess: () => onError(null),
@@ -161,21 +171,6 @@ function attrRows(c: CandidatePayload): Record<string, number> {
     思维: c.attrs.thinking,
     出题: c.attrs.setting,
   };
-}
-
-function qualityBadge(t: CandidatePayload['qualityTier']): string {
-  switch (t) {
-    case 'COMMON':
-      return rarityBadge('GRAY');
-    case 'GOOD':
-      return rarityBadge('YELLOW');
-    case 'ELITE':
-      return rarityBadge('GREEN');
-    case 'GENIUS':
-      return rarityBadge('PURPLE');
-    default:
-      return rarityBadge('GRAY');
-  }
 }
 
 function errText(e: unknown): string {

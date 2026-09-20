@@ -6,17 +6,9 @@ import {
   useLectureTiers,
   useStudents,
   useTeachLecture,
-  type LectureTierId,
 } from '../../lib/hooks';
+import { lectureTierLabel, type LectureTierId } from '../../lib/labels';
 import { Empty } from '../../components/ui';
-
-const TIER_LABEL: Record<LectureTierId, string> = {
-  beginner: '入门组',
-  junior: '普及组',
-  senior: '提高组',
-  provincial: '省选组',
-  national: '国家队集训队',
-};
 
 export function AcademyLecturePage(): JSX.Element {
   const students = useStudents();
@@ -125,7 +117,7 @@ export function AcademyLecturePage(): JSX.Element {
           >
             {tiers.data.map((entry) => (
               <option key={entry.id} value={entry.id}>
-                {TIER_LABEL[entry.id]} · 门槛 V{entry.threshold}
+                {lectureTierLabel(entry.id)} · 门槛 V{entry.threshold}
               </option>
             ))}
           </select>
@@ -191,7 +183,7 @@ export function AcademyLecturePage(): JSX.Element {
                 className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 text-sm"
               >
                 <div>
-                  <span className="font-medium">{TIER_LABEL[entry.tier]}</span>
+                  <span className="font-medium">{lectureTierLabel(entry.tier)}</span>
                   <span className="ml-2 text-xs text-neutral-500">V {entry.teachingValue}</span>
                 </div>
                 <div className="text-right text-xs">

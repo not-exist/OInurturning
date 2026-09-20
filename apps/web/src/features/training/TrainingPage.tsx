@@ -3,21 +3,16 @@ import { Link } from 'react-router';
 import type { DimensionKey, StudentView } from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
 import {
-  DIMENSION_LABEL,
-  QUALITY_LABEL,
-  TRAINING_KIND_LABEL,
-  floor,
-  rarityBadge,
-  rarityText,
-  round,
   useBasicTrain,
   useDirectedTrain,
   useInventory,
-  useProblems,
+  useProblemLibrary,
   useSpecializedTrain,
   useStudents,
   useTrainingLogs,
 } from '../../lib/hooks';
+import { DIMENSION_LABEL, QUALITY_LABEL, TRAINING_KIND_LABEL, floor, round } from '../../lib/labels';
+import { rarityChip, rarityText } from '../../lib/rarity';
 import type { ProblemView, RareGain, TrainingLogView, TrainingResult } from '../../lib/hooks';
 import { Empty } from '../../components/ui';
 
@@ -45,7 +40,7 @@ const GAIN_LABEL: Record<RareGain['stat'], string> = {
 export function TrainingPage(): JSX.Element {
   const studentsQ = useStudents();
   const inv = useInventory();
-  const problems = useProblems();
+  const problems = useProblemLibrary();
   const basic = useBasicTrain();
   const directed = useDirectedTrain();
   const specialized = useSpecializedTrain();
@@ -351,7 +346,7 @@ function ProblemRow({
         onChange={onSelect}
       />
       <span className="font-medium">{p.name}</span>
-      <span className={`rounded px-1.5 py-0.5 text-xs ${rarityBadge(p.rarity)}`}>
+      <span className={`rounded px-1.5 py-0.5 text-xs ${rarityChip(p.rarity)}`}>
         {rarityText(p.rarity)}
       </span>
       <span className="text-xs text-neutral-500">{DIMENSION_LABEL[p.dominantDim]}</span>

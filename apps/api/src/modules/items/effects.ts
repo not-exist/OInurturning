@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ITEM_USE_LIMITS, USABLE_ITEM_ID_SET } from '@oinur/shared';
 import type { Student } from '@prisma/client';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
@@ -63,15 +64,10 @@ function bookFields(eff: unknown, itemId: string): { attribute: string; amount: 
 }
 
 // ---------------------------------------------------------------------------
-// M1 道具限制（items.yaml 未提供机器可读的独立限额字段，此处为兜底常量；
-// 数值权威：docs/systems/student.md §8 / items.yaml effect.usage_timing 描述）
+// 道具限额与白名单：唯一真源在 @oinur/shared（前端经子路径共用同一常量，
+// 杜绝前端自维护白名单的历史缺陷）。
 // ---------------------------------------------------------------------------
 
-export const MILK_TEA_DAILY_LIMIT = 2;
-export const COFFEE_DAILY_LIMIT = 2;
-export const STAMINA_POTION_DAILY_LIMIT = 1;
-export const FOCUS_ENGINE_MAX_USES = 1;
-export const BOOK_WEEK_CAP = 10;
 export const FOCUS_CAP_MAX = 100;
 
 /** 直用书科目键 → Student 列名（items.yaml 的 coding→code 列，string 维记作 str） */
@@ -80,9 +76,6 @@ const BOOK_ATTR_COLUMNS: Record<string, keyof Student> = {
   coding: 'code',
   setting: 'setting',
 };
-
-/** 六维书专属（定向训练耗材），非 M1 直接可用 */
-const DIRECT_BOOK_ATTRS = new Set(Object.keys(BOOK_ATTR_COLUMNS));
 
 // ---------------------------------------------------------------------------
 // 计数器读写（稀疏 Json，04:00 日界 / ISO 周界由 clock 比对重置）
@@ -133,11 +126,23 @@ export interface EffectApplyInput {
   now: Date;
 }
 
-/** 按 itemId 向效果层分派（M1 范围）；不可用/非法 → ApiError VALIDATION_FAILED */
+/** 按 itemId 向效果层分派；白名单外/非法 → ApiError VALIDATION_FAILED */
 export function applyItemEffect(input: EffectApplyInput): EffectApplyResult {
   const { itemId, student, meta, now } = input;
   const def = getConfig()?.items[itemId];
   if (!def) throw new ApiError('NOT_FOUND', { resource: 'item', itemId });
+
+  // 改名卡走改名端点消耗，不经 use
+  if (itemId === 'rename-card') {
+    throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '改名卡需通过改名接口使用' });
+  }
+
+  // 可用性唯一真源：@oinur/shared USABLE_ITEM_IDS（81 件中 21 件，与前端共用）。
+  // 不在表内一律「暂不可用」——典型：vigor-drink（energy_restore 属比赛场景，M1 无赛事）、
+  // 升阶石/洗练券/礼盒/徽章/tag 类道具/六维书（定向训练耗材）。
+  if (!USABLE_ITEM_ID_SET.has(itemId)) {
+    throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '该道具暂不可用' });
+  }
 
   switch (itemId) {
     case 'calm-pill':
@@ -152,29 +157,10 @@ export function applyItemEffect(input: EffectApplyInput): EffectApplyResult {
       return coffee(coffeeField(def.effect, itemId), student, now);
     case 'focus-engine':
       return focusEngine(numericField(def.effect, 'amount', itemId), student);
-    case 'vigor-drink':
-      // M1 不可用：energy_restore 20 为比赛场景道具，M1 无比赛（集成裁定 M1-R9）
-      throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '该道具暂不可用' });
   }
 
-  // 直用书（book-thinking/coding/setting）× 五档
-  if (itemId.startsWith('book-') && isDirectBook(itemId)) {
-    return directBook(itemId, def.effect, student, meta, now);
-  }
-
-  // rename-card 由 rename 端点消耗，不可通过 use 直接使用
-  if (itemId === 'rename-card') {
-    throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '改名卡需通过改名接口使用' });
-  }
-
-  // M1 不可用（升阶/洗练/礼盒/徽章/tag 类/六维书）——后续里程碑实现
-  throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '该道具暂不可用' });
-}
-
-function isDirectBook(itemId: string): boolean {
-  // 形如 book-<subject>-<rarity>；仅 thinking/coding/setting 三个科目属 M1 直用（六维书为耗材）
-  const m = /^book-(.+)-\w+$/.exec(itemId);
-  return m ? DIRECT_BOOK_ATTRS.has(m[1]) : false;
+  // 白名单剩余项即直用书（book-thinking/coding/setting × 五档）；科目合法性由 directBook 内部收口
+  return directBook(itemId, def.effect, student, meta, now);
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -202,10 +188,10 @@ function milkTea(amount: number, s: Student, now: Date): EffectApplyResult {
   const c = countersOf(s);
   const key = dayKey(now);
   const used = dailyUsed(c, 'milkTea', 'milkTeaKey', key);
-  if (used >= MILK_TEA_DAILY_LIMIT) {
+  if (used >= ITEM_USE_LIMITS.milkTeaDaily) {
     throw new ApiError('VALIDATION_FAILED', {
       resource: 'milk-tea',
-      reason: `每日限 ${MILK_TEA_DAILY_LIMIT} 杯，今日已用 ${used} 杯`,
+      reason: `每日限 ${ITEM_USE_LIMITS.milkTeaDaily} 杯，今日已用 ${used} 杯`,
     });
   }
   const mindset = clamp(s.mindset + amount, MINDSET_MIN, MINDSET_MAX);
@@ -220,10 +206,10 @@ function staminaPotion(amount: number, s: Student, now: Date): EffectApplyResult
   const c = countersOf(s);
   const key = dayKey(now);
   const used = dailyUsed(c, 'staminaPotionDaily', 'staminaPotionDailyKey', key);
-  if (used >= STAMINA_POTION_DAILY_LIMIT) {
+  if (used >= ITEM_USE_LIMITS.staminaPotionDaily) {
     throw new ApiError('VALIDATION_FAILED', {
       resource: 'stamina-potion',
-      reason: `每日限 ${STAMINA_POTION_DAILY_LIMIT} 瓶，今日已用 ${used} 瓶`,
+      reason: `每日限 ${ITEM_USE_LIMITS.staminaPotionDaily} 瓶，今日已用 ${used} 瓶`,
     });
   }
   const stamina = clamp(s.stamina + amount, 0, STAMINA_CAP);
@@ -254,10 +240,10 @@ function coffee(
   const c = countersOf(s);
   const key = dayKey(now);
   const used = dailyUsed(c, 'coffeeDaily', 'coffeeDailyKey', key);
-  if (used >= COFFEE_DAILY_LIMIT) {
+  if (used >= ITEM_USE_LIMITS.coffeeDaily) {
     throw new ApiError('VALIDATION_FAILED', {
       resource: 'coffee',
-      reason: `每日限 ${COFFEE_DAILY_LIMIT} 杯，今日已用 ${used} 杯`,
+      reason: `每日限 ${ITEM_USE_LIMITS.coffeeDaily} 杯，今日已用 ${used} 杯`,
     });
   }
   const stamina = clamp(s.stamina + eff.amount, 0, STAMINA_CAP);
@@ -272,10 +258,10 @@ function coffee(
 function focusEngine(amount: number, s: Student): EffectApplyResult {
   const c = countersOf(s);
   const used = num(c, 'focusEngineUsed');
-  if (used >= FOCUS_ENGINE_MAX_USES) {
+  if (used >= ITEM_USE_LIMITS.focusEngineMaxUses) {
     throw new ApiError('VALIDATION_FAILED', {
       resource: 'focus-engine',
-      reason: `心流引擎每人限 ${FOCUS_ENGINE_MAX_USES} 台，已用 ${used} 台`,
+      reason: `心流引擎每人限 ${ITEM_USE_LIMITS.focusEngineMaxUses} 台，已用 ${used} 台`,
     });
   }
   if (s.focusCap >= FOCUS_CAP_MAX) {
@@ -312,12 +298,12 @@ function directBook(itemId: string, eff: unknown, s: Student, meta: MetaAggregat
 
   // 周限：同学员同属性合计 ≤ 10 点
   const weeklyUsed = bookWeek[attribute] ?? 0;
-  const weeklyHeadroom = BOOK_WEEK_CAP - weeklyUsed;
+  const weeklyHeadroom = ITEM_USE_LIMITS.bookWeekCap - weeklyUsed;
   if (weeklyHeadroom <= 0) {
     throw new ApiError('VALIDATION_FAILED', {
       resource: itemId,
       attribute,
-      reason: `该属性本周书籍增益已达上限 ${BOOK_WEEK_CAP} 点`,
+      reason: `该属性本周书籍增益已达上限 ${ITEM_USE_LIMITS.bookWeekCap} 点`,
     });
   }
 

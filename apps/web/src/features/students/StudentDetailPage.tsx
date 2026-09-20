@@ -3,19 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router';
 import type { DimensionKey, StudentView } from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
 import {
-  DIMENSION_LABEL,
-  QUALITY_LABEL,
-  SEX_LABEL,
-  floor,
-  rarityBadge,
-  rarityText,
-  round,
   useDismissStudent,
   useInventory,
   useRenameStudent,
   useStudent,
   useTalentDefs,
 } from '../../lib/hooks';
+import { DIMENSION_LABEL, QUALITY_LABEL, SEX_LABEL, floor, round } from '../../lib/labels';
+import { rarityChip, rarityText } from '../../lib/rarity';
 
 const DIMS: Record<DimensionKey, keyof StudentView> = {
   DS: 'ds',
@@ -96,7 +91,7 @@ export function StudentDetailPage(): JSX.Element {
         <div className="mb-2 flex items-center gap-2">
           <h2 className="text-lg font-bold">{s.name}</h2>
           <span
-            className={`rounded px-2 py-0.5 text-xs ${rarityBadge(qualityToRarity(s.qualityTier))}`}
+            className={`rounded px-2 py-0.5 text-xs ${rarityChip(qualityToRarity(s.qualityTier))}`}
           >
             {QUALITY_LABEL[s.qualityTier]}
           </span>
@@ -151,30 +146,19 @@ export function StudentDetailPage(): JSX.Element {
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{def?.name ?? tid}</span>
                     <span
-                      className={`rounded px-2 py-0.5 text-xs ${rarityBadge(def?.rarity ?? 'GRAY')}`}
+                      className={`rounded px-2 py-0.5 text-xs ${rarityChip(def?.rarity ?? 'GRAY')}`}
                     >
                       {rarityText(def?.rarity ?? 'GRAY')}
                     </span>
                   </div>
-                  {def ? (
-                    <>
-                      <p className="mt-1 text-xs text-neutral-500">{def.description}</p>
-                      <p className="mt-1 text-xs text-neutral-400">
-                        {def.effects.map((e) => `${e.stat} ${e.mode} ${e.value}`).join(' · ')}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="mt-1 text-xs text-neutral-400">（天赋详情接口待后端补充）</p>
-                  )}
+                  <p className="mt-1 text-xs text-neutral-500">{def?.description}</p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    {def?.effects.map((e) => `${e.stat} ${e.mode} ${e.value}`).join(' · ')}
+                  </p>
                 </li>
               );
             })}
           </ul>
-        )}
-        {talentsQ.isError && (
-          <p className="text-xs text-neutral-400">
-            天赋详情暂不可用（后端未提供 GET /api/talents）
-          </p>
         )}
       </section>
 
