@@ -6,7 +6,8 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": {
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"shared: no unit tests, typecheck only\" && tsc --noEmit"
   },
   "dependencies": { "zod": "^3.25.67" },
   "devDependencies": { "typescript": "^6.0.3" }

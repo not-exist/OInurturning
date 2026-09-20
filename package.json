@@ -8,7 +8,12 @@
   "scripts": {
     "dev": "pnpm -r --parallel --filter './apps/*' dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --if-present test",
+    "test:unit": "pnpm --filter @oinur/api test:unit",
+    "test:integration": "pnpm --filter @oinur/api test:integration",
+    "test:coverage": "pnpm --filter @oinur/api test:coverage",
+    "test:watch": "pnpm --filter @oinur/api test:watch",
+    "test:e2e": "pnpm --filter @oinur/api test:e2e",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",

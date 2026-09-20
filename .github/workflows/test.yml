@@ -61,17 +61,20 @@ jobs:
           cat typecheck-attrib.log
       - run: pnpm -r lint
       - run: pnpm -r build
-      - name: Unit tests
+      - name: Unit tests (pure, no DB, parallel)
         run: |
           set -o pipefail
           pnpm --filter @oinur/api test:unit -- --reporter=default --reporter=github-actions 2>&1 | tee unit-test.log
-      - name: Emit unit-test diagnostics
+      - name: Integration tests (DB, serial)
+        run: |
+          set -o pipefail
+          pnpm --filter @oinur/api test:integration -- --reporter=default --reporter=github-actions 2>&1 | tee integration-test.log
+      - name: Emit test diagnostics
         if: failure()
         run: |
           python3 - <<'EOF'
           def esc(s: str) -> str:
               return s.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-          # 1) generated Prisma client engine mode (library vs client/queryCompiler)
           import glob
           cands = glob.glob('node_modules/.pnpm/*.prisma+client*/node_modules/.prisma/client/schema.prisma')
           cands += [p for p in glob.glob('**/node_modules/.prisma/client/schema.prisma', recursive=True)]
@@ -83,25 +86,25 @@ jobs:
               print(f'::error title=prisma-client-mode::{esc(p + " :: " + " | ".join(head))[:900]}')
           if not cands:
               print('::error title=prisma-client-mode::no generated .prisma client found')
-          # 2) tail of the unit-test output
-          try:
-              lines = open('unit-test.log', errors='replace').read().splitlines()
-          except FileNotFoundError:
-              print('::error title=unit-test::tee produced no log (failed before vitest printed anything)')
-          else:
-              chunk, size = [], 0
-              for ln in lines[-70:]:
-                  esc_ln = esc(ln)
-                  if size + len(esc_ln) > 3400 and chunk:
-                      print(f'::error title=unit-test-tail::{esc(chr(10).join(chunk))}')
-                      chunk, size = [], 0
-                  chunk.append(ln); size += len(esc_ln) + 1
-              if chunk:
-                  print(f'::error title=unit-test-tail::{esc(chr(10).join(chunk))}')
+          for logfile, title in [('unit-test.log','unit-test'),('integration-test.log','integration-test')]:
+              try:
+                  lines = open(logfile, errors='replace').read().splitlines()
+              except FileNotFoundError:
+                  print(f'::error title={title}::tee produced no log')
+              else:
+                  chunk, size = [], 0
+                  for ln in lines[-70:]:
+                      esc_ln = esc(ln)
+                      if size + len(esc_ln) > 3400 and chunk:
+                          print(f'::error title={title}-tail::{esc(chr(10).join(chunk))}')
+                          chunk, size = [], 0
+                      chunk.append(ln); size += len(esc_ln) + 1
+                  if chunk:
+                      print(f'::error title={title}-tail::{esc(chr(10).join(chunk))}')
           EOF
-      - name: Cleanup unit-test log
+      - name: Cleanup test logs
         if: always()
-        run: rm -f unit-test.log
+        run: rm -f unit-test.log integration-test.log
       - name: locate-api-src
         if: failure()
         run: grep -q '^apps/api|' typecheck-attrib.log && grep '^apps/api|' typecheck-attrib.log | grep -q -v '|tests/' && exit 1 || exit 0
