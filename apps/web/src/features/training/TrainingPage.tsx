@@ -1,7 +1,32 @@
 import { useState, type JSX } from 'react';
-import { Link } from 'react-router';
+import { BookOpen, CircleCheck, Dumbbell, PenTool, Sparkles } from 'lucide-react';
 import type { DimensionKey, StudentView } from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
+import {
+  DIMENSION_LABEL,
+  QUALITY_LABEL,
+  TRAINING_KIND_LABEL,
+  floor,
+  round,
+  talentStatLabel,
+  type TrainingKind,
+} from '../../lib/labels';
+import { QUALITY_MATERIAL, rarityChip, rarityLabel } from '../../lib/rarity';
+import { DIMENSION_ICON, Icon, type LucideIcon } from '../../components/icons';
+import {
+  ActionLink,
+  Btn,
+  Card,
+  Chip,
+  Empty,
+  ErrorNote,
+  InlineLoader,
+  KeyVal,
+  Meter,
+  Numeral,
+  PageHeader,
+  Panel,
+} from '../../components/ui';
 import {
   useBasicTrain,
   useDirectedTrain,
@@ -10,16 +35,48 @@ import {
   useSpecializedTrain,
   useStudents,
   useTrainingLogs,
+  type ProblemView,
+  type TrainingLogView,
+  type TrainingResult,
 } from '../../lib/hooks';
-import { DIMENSION_LABEL, QUALITY_LABEL, TRAINING_KIND_LABEL, floor, round } from '../../lib/labels';
-import { rarityChip, rarityText } from '../../lib/rarity';
-import type { ProblemView, RareGain, TrainingLogView, TrainingResult } from '../../lib/hooks';
-import { Empty } from '../../components/ui';
 
-type Tab = 'basic' | 'directed' | 'specialized';
+type Tab = TrainingKind;
 
-/** 六维 → 六维书 subject 键（定向训练耗材；与 training DIM_META 一致） */
-const DIM_BOOK_SUBJECT: Record<DimensionKey, string> = {
+const TABS: Tab[] = ['basic', 'directed', 'specialized'];
+
+const KIND_ICON: Record<Tab, LucideIcon> = {
+  basic: Dumbbell,
+  directed: BookOpen,
+  specialized: PenTool,
+};
+
+/** 三条链路各自的收益说明与消耗（训练费随在营学员数上浮，不在此硬编码金额） */
+const MODULE_BLURB: Record<Tab, string> = {
+  basic: '随机提升六维之一，涨点平稳，适合日常打底。',
+  directed: '自选一维专攻短板；携带对应六维书可放大本次收益。',
+  specialized: '消耗一道预制题练真题手感，题目稀有度越高收益越大。',
+};
+
+const MODULE_COST: Record<Tab, string> = {
+  basic: '1 体力 + 训练费',
+  directed: '1 体力 + 训练费 + 六维书×1（可选）',
+  specialized: '1 体力 + 训练费 + 预制题×1',
+};
+
+const DIM_ORDER: DimensionKey[] = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'];
+
+/** 六维 → 学员视图字段（string 维在库内记作 str） */
+const DIM_FIELD: Record<DimensionKey, keyof StudentView> = {
+  DS: 'ds',
+  DP: 'dp',
+  MATH: 'math',
+  GRAPH: 'graph',
+  GREEDY: 'greedy',
+  STRING: 'str',
+};
+
+/** 六维 → 六维书 subject 键（定向训练耗材；与后端 DIM_META.bookSubject 一致） */
+const DIM_BOOK: Record<DimensionKey, string> = {
   DS: 'ds',
   DP: 'dp',
   MATH: 'math',
@@ -28,14 +85,7 @@ const DIM_BOOK_SUBJECT: Record<DimensionKey, string> = {
   STRING: 'string',
 };
 
-const GAIN_LABEL: Record<RareGain['stat'], string> = {
-  code: '代码',
-  thinking: '思维',
-  setting: '出题',
-  mindset: '心态',
-  focus_cap: '专注上限',
-  stamina_regen: '体力恢复',
-};
+const STAMINA_PIPS = [0, 1, 2, 3, 4];
 
 export function TrainingPage(): JSX.Element {
   const studentsQ = useStudents();
@@ -48,272 +98,308 @@ export function TrainingPage(): JSX.Element {
   const [studentId, setStudentId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('basic');
   const [dim, setDim] = useState<DimensionKey>('DS');
-  const [bookItemId, setBookItemId] = useState<string>('');
+  const [bookItemId, setBookItemId] = useState('');
   const [problemId, setProblemId] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const [result, setResult] = useState<(TrainingResult & { studentName: string }) | null>(null);
+  const [result, setResult] = useState<(TrainingResult & { studentName: string; kind: Tab }) | null>(null);
 
-  if (studentsQ.isLoading) {
+  if (studentsQ.isPending) return <InlineLoader>读取学员名册…</InlineLoader>;
+  if (studentsQ.isError || studentsQ.data === undefined) {
     return (
-      <div className="flex items-center gap-2 text-neutral-500">
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
-        加载学员中…
-      </div>
+      <ErrorNote onRetry={() => void studentsQ.refetch()}>
+        学员名册读取失败：{apiErrorMessage(studentsQ.error)}
+      </ErrorNote>
     );
   }
-  if (studentsQ.isError || !studentsQ.data) {
-    return (
-      <div className="space-y-2 text-sm text-red-600">
-        <p>学员数据加载失败：{apiErrorMessage(studentsQ.error)}</p>
-        <button
-          className="rounded border px-3 py-1 text-xs"
-          onClick={() => void studentsQ.refetch()}
-        >
-          重试
-        </button>
-      </div>
-    );
-  }
+
   const students = studentsQ.data;
   const chosen = students.find((s) => s.id === studentId) ?? null;
+  const dimBooks = (inv.data ?? []).filter((i) => i.itemId.startsWith(`book-${DIM_BOOK[dim]}-`));
+  const selectable = problems.data ?? [];
+  const pending = basic.isPending || directed.isPending || specialized.isPending;
+  const noStamina = chosen !== null && floor(chosen.stamina) < 1;
+  const runDisabled = pending || chosen === null || noStamina || (tab === 'specialized' && problemId === null);
 
-  const books = (inv.data ?? []).filter((i) => i.category === 'book' && isSixDimBook(i.itemId));
-  const dimBooks = books.filter((b) => b.itemId.startsWith(`book-${DIM_BOOK_SUBJECT[dim]}-`));
-  const selectableProblems = (problems.data ?? []).filter((p) => p.consumedAt === null);
-
-  function runBasic(): void {
-    if (!chosen) return;
-    basic.mutate(chosen.id, {
-      onSuccess: (r) => showResult(r, chosen),
-      onError: (e) => setMsg(errText(e)),
-    });
-  }
-
-  function runDirected(): void {
-    if (!chosen) return;
-    const bid = bookItemId === '' ? undefined : bookItemId;
-    directed.mutate(
-      { studentId: chosen.id, dim, bookItemId: bid },
-      {
-        onSuccess: (r) => showResult(r, chosen),
-        onError: (e) => setMsg(errText(e)),
-      },
-    );
-  }
-
-  function runSpecialized(): void {
-    if (!chosen || problemId == null) return;
-    specialized.mutate(
-      { studentId: chosen.id, problemId },
-      {
-        onSuccess: (r) => showResult(r, chosen),
-        onError: (e) => setMsg(errText(e)),
-      },
-    );
-  }
-
-  function showResult(r: TrainingResult, s: StudentView): void {
-    setResult({ ...r, studentName: s.name });
+  function showResult(r: TrainingResult, s: StudentView, kind: Tab): void {
+    setResult({ ...r, studentName: s.name, kind });
     setMsg(null);
   }
 
-  const pending = basic.isPending || directed.isPending || specialized.isPending;
+  function fail(e: unknown): void {
+    setMsg(apiErrorMessage(e));
+  }
+
+  function run(): void {
+    if (chosen === null || runDisabled) return;
+    if (tab === 'basic') {
+      basic.mutate(chosen.id, { onSuccess: (r) => showResult(r, chosen, 'basic'), onError: fail });
+    } else if (tab === 'directed') {
+      const book = bookItemId === '' ? undefined : bookItemId;
+      directed.mutate(
+        { studentId: chosen.id, dim, ...(book !== undefined ? { bookItemId: book } : {}) },
+        { onSuccess: (r) => showResult(r, chosen, 'directed'), onError: fail },
+      );
+    } else if (problemId !== null) {
+      specialized.mutate(
+        { studentId: chosen.id, problemId },
+        { onSuccess: (r) => showResult(r, chosen, 'specialized'), onError: fail },
+      );
+    }
+  }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-lg font-semibold">训练</h1>
+    <div data-testid="training-page" className="mx-auto max-w-5xl space-y-4">
+      <PageHeader
+        eyebrow="训练中心"
+        title="训练"
+        description="六维能力靠真比赛与训练一起长：基础打底、定向补短板、专项练真题。每次训练固定消耗 1 点体力与训练费，费用随在营学员数上浮。"
+      />
 
-      <section className="rounded border bg-white p-4">
-        <h2 className="mb-2 text-sm font-semibold text-neutral-500">选择学员</h2>
+      <Panel
+        title="选择学员"
+        eyebrow="训练对象"
+        actions={<span className="text-xs text-fg-dim">在营 {students.length} 名</span>}
+      >
         {students.length === 0 ? (
           <Empty
-            title="还没有学员"
-            action={
-              <Link
-                to="/academy"
-                className="inline-block rounded bg-neutral-900 px-4 py-2 text-sm text-white"
-              >
-                前往高级学院招募
-              </Link>
-            }
+            icon={Dumbbell}
+            title="还没有可以训练的学员"
+            action={<ActionLink to="/academy">前往高级学院招募</ActionLink>}
           >
-            先招募一名学员，再开始针对性训练吧。
+            先去招募一名学员，再回来安排训练计划。
           </Empty>
         ) : (
           <div className="flex flex-wrap gap-2">
             {students.map((s) => (
-              <button
+              <Card
                 key={s.id}
+                as="button"
                 data-testid="train-student"
+                selected={studentId === s.id}
                 onClick={() => setStudentId(s.id)}
-                className={`rounded border px-3 py-1.5 text-sm ${
-                  studentId === s.id
-                    ? 'border-neutral-900 bg-neutral-900 text-white'
-                    : 'hover:bg-neutral-100'
-                }`}
+                className={`min-w-40 flex-1 space-y-2 p-3 text-left ${QUALITY_MATERIAL[s.qualityTier]}`}
               >
-                {s.name}
-                <span className="ml-1 text-xs opacity-70">{QUALITY_LABEL[s.qualityTier]}</span>
-              </button>
+                <span className="flex w-full items-baseline justify-between gap-2">
+                  <span className="truncate text-sm font-semibold">{s.name}</span>
+                  <Numeral value={`V ${s.v}`} className="shrink-0 text-xs text-fg-dim" />
+                </span>
+                <StaminaPips value={s.stamina} />
+                <span className="text-[11px] text-fg-faint">
+                  {QUALITY_LABEL[s.qualityTier]} · 精力 {floor(s.energy)}/{floor(s.energyMax)}
+                </span>
+              </Card>
             ))}
           </div>
         )}
-      </section>
+      </Panel>
 
-      {chosen && (
-        <section className="rounded border bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold">{chosen.name} 训练</h2>
-          <div className="mb-3 flex gap-1 rounded bg-neutral-100 p-1 text-sm">
-            {(['basic', 'directed', 'specialized'] as Tab[]).map((t) => (
-              <button
-                key={t}
-                data-testid={`train-tab-${t}`}
-                onClick={() => setTab(t)}
-                className={`flex-1 rounded px-3 py-1.5 ${tab === t ? 'bg-white shadow' : ''}`}
-              >
-                {tabLabel(t)}
-              </button>
-            ))}
-          </div>
-
-          {tab === 'basic' && (
-            <div className="space-y-3">
-              <p className="text-sm text-neutral-500">
-                基础训练：随机提升一维，消耗 1 体力与训练费。
-              </p>
-              <button
-                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
-                data-testid="train-run"
-                disabled={pending || Math.floor(chosen.stamina) < 1}
-                onClick={runBasic}
-              >
-                开始基础训练（体力 {floor(chosen.stamina)}/5）
-              </button>
-            </div>
-          )}
-
-          {tab === 'directed' && (
-            <div className="space-y-3">
-              <p className="text-sm text-neutral-500">
-                定向训练：自选一维，消耗对应六维书×1 + 1 体力 + 训练费。
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(DIMENSION_LABEL) as DimensionKey[]).map((d) => (
-                  <button
-                    key={d}
-                    data-testid={`train-dim-${d}`}
-                    onClick={() => {
-                      setDim(d);
-                      setBookItemId('');
-                    }}
-                    className={`rounded border px-3 py-1.5 text-sm ${
-                      dim === d
-                        ? 'border-neutral-900 bg-neutral-900 text-white'
-                        : 'hover:bg-neutral-100'
-                    }`}
-                  >
-                    {DIMENSION_LABEL[d]}
-                  </button>
-                ))}
-              </div>
-              <div>
-                <p className="mb-1 text-xs text-neutral-500">选择书籍（默认基础手册 {dim}）</p>
-                <select
-                  data-testid="train-book"
-                  className="rounded border px-3 py-1.5 text-sm"
-                  value={bookItemId}
-                  onChange={(e) => setBookItemId(e.target.value)}
+      {chosen !== null && (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+          <Panel bodyClassName="p-0">
+            <div className="flex flex-wrap gap-1 border-b border-ink-600/70 p-2">
+              {TABS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  data-testid={`train-tab-${t}`}
+                  aria-pressed={tab === t}
+                  onClick={() => setTab(t)}
+                  className={`flex items-center gap-1.5 border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    tab === t
+                      ? 'border-cyber-400/70 bg-cyber-400/15 text-cyber-300'
+                      : 'border-ink-600 text-fg-dim hover:border-ink-500 hover:text-fg'
+                  }`}
                 >
-                  <option value="">默认（{DIMENSION_LABEL[dim]}·基础手册）</option>
-                  {dimBooks.map((b) => (
-                    <option key={b.itemId} value={b.itemId}>
-                      {b.name}（×{b.quantity}）
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
-                data-testid="train-run"
-                disabled={pending || Math.floor(chosen.stamina) < 1}
-                onClick={runDirected}
-              >
-                开始定向训练
-              </button>
+                  <Icon icon={KIND_ICON[t]} className="size-3.5" />
+                  {TRAINING_KIND_LABEL[t]}训练
+                </button>
+              ))}
             </div>
-          )}
 
-          {tab === 'specialized' && (
-            <div className="space-y-3">
-              <p className="text-sm text-neutral-500">
-                专项训练：选题，消耗预制题×1 + 1 体力 + 训练费。
-              </p>
-              {problems.isError ? (
-                <p className="text-sm text-neutral-400">
-                  题库接口暂不可用（后端未提供 GET /api/problems）。
+            <div className="space-y-4 p-4">
+              <div className="flex flex-wrap items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center border border-cyber-500/50 bg-cyber-400/10 text-cyber-300">
+                  <Icon icon={KIND_ICON[tab]} className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">{TRAINING_KIND_LABEL[tab]}训练</p>
+                  <p className="mt-0.5 text-xs text-fg-muted">{MODULE_BLURB[tab]}</p>
+                </div>
+                <Chip className="ml-auto">{MODULE_COST[tab]}</Chip>
+              </div>
+
+              {tab === 'basic' && (
+                <p className="border border-ink-600/70 bg-ink-850/50 px-3 py-2 text-xs text-fg-dim">
+                  随机命中 {chosen.name} 的六维之一，命中维度越低涨得越多；还有小概率额外触达代码 / 思维与稀有成长。
                 </p>
-              ) : problems.isLoading ? (
-                <p className="text-sm text-neutral-400">加载题库…</p>
-              ) : selectableProblems.length === 0 ? (
-                <p className="text-sm text-neutral-400">
-                  暂无可用预制题（需先用出题功能或获取样例题）。
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {selectableProblems.map((p) => (
-                    <ProblemRow
-                      key={p.id}
-                      p={p}
-                      selected={problemId === p.id}
-                      onSelect={() => setProblemId(p.id)}
-                    />
-                  ))}
+              )}
+
+              {tab === 'directed' && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {DIM_ORDER.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        data-testid={`train-dim-${d}`}
+                        aria-pressed={dim === d}
+                        onClick={() => {
+                          setDim(d);
+                          setBookItemId('');
+                        }}
+                        className={`flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors ${
+                          dim === d
+                            ? 'border-cyber-400/70 bg-cyber-400/15 text-cyber-300'
+                            : 'border-ink-600 text-fg-dim hover:border-ink-500 hover:text-fg'
+                        }`}
+                      >
+                        <Icon icon={DIMENSION_ICON[d]} className="size-3.5" />
+                        {DIMENSION_LABEL[d]}
+                        <span className="tnum text-[10px] text-fg-faint">{floor(chosen[DIM_FIELD[d]] as number)}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <label className="block">
+                    <span className="eyebrow mb-1 block">训练用书</span>
+                    <select
+                      data-testid="train-book"
+                      className="w-full max-w-md px-3 py-2 text-sm"
+                      value={bookItemId}
+                      onChange={(e) => setBookItemId(e.target.value)}
+                    >
+                      <option value="">不携带书（基础倍率）</option>
+                      {dimBooks.map((b) => (
+                        <option key={b.itemId} value={b.itemId}>
+                          {b.name}（{rarityLabel(b.rarity)}）×{b.quantity}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="mt-1 block text-[11px] text-fg-dim">
+                      {dimBooks.length === 0
+                        ? `背包里没有${DIMENSION_LABEL[dim]}六维书，本次按基础倍率结算。`
+                        : '六维书只提供本次训练的收益倍率，稀有度越高倍率越大，不占用每周书籍额度。'}
+                    </span>
+                  </label>
                 </div>
               )}
-              <button
-                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
-                data-testid="train-run"
-                disabled={pending || problemId == null || Math.floor(chosen.stamina) < 1}
-                onClick={runSpecialized}
-              >
-                开始专项训练
-              </button>
-            </div>
-          )}
 
-          {msg && (
-            <div
-              data-testid="train-msg"
-              className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-            >
-              {msg}
+              {tab === 'specialized' && (
+                <div className="space-y-2">
+                  {problems.isPending ? (
+                    <InlineLoader>读取题库…</InlineLoader>
+                  ) : selectable.length === 0 ? (
+                    <p className="border border-dashed border-ink-600 px-3 py-4 text-center text-xs text-fg-dim">
+                      暂无可用预制题（先去「出题题库」出一道，或在历练、剧情里收取样例题）。
+                    </p>
+                  ) : (
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      {selectable.map((p) => (
+                        <ProblemOption
+                          key={p.id}
+                          problem={p}
+                          selected={problemId === p.id}
+                          onSelect={() => setProblemId(p.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {msg !== null && (
+                <div data-testid="train-msg">
+                  <ErrorNote>{msg}</ErrorNote>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3 border-t border-ink-600/60 pt-3">
+                <Btn data-testid="train-run" variant="primary" disabled={runDisabled} onClick={run}>
+                  <Icon icon={KIND_ICON[tab]} className="size-3.5" />
+                  {pending ? '训练中…' : `开始${TRAINING_KIND_LABEL[tab]}训练`}
+                </Btn>
+                {noStamina ? (
+                  <span className="text-xs text-warn-400">
+                    {chosen.name} 体力不足（{floor(chosen.stamina)}/5），先休息或使用体力道具。
+                  </span>
+                ) : (
+                  <span className="text-xs text-fg-dim">
+                    {chosen.name} 当前体力 {floor(chosen.stamina)}/5
+                  </span>
+                )}
+              </div>
             </div>
-          )}
-        </section>
+          </Panel>
+
+          <Panel eyebrow="训练对象" title={chosen.name} bodyClassName="space-y-3 p-4">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+              {DIM_ORDER.map((d) => {
+                const v = floor(chosen[DIM_FIELD[d]] as number);
+                return (
+                  <div key={d}>
+                    <div className="flex items-baseline justify-between gap-1 text-[11px]">
+                      <span className="text-fg-dim">{DIMENSION_LABEL[d]}</span>
+                      <span className="tnum text-fg">{v}</span>
+                    </div>
+                    <Meter value={v} max={100} className="bg-cyber-500/70" />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-1.5 border-t border-ink-600/60 pt-3">
+              <KeyVal k="体力">
+                <StaminaPips value={chosen.stamina} />
+              </KeyVal>
+              <KeyVal k="精力">
+                {floor(chosen.energy)}/{floor(chosen.energyMax)}
+              </KeyVal>
+              <KeyVal k="专注上限">{floor(chosen.focusCap)}</KeyVal>
+              <KeyVal k="心态">{round(chosen.mindset)}</KeyVal>
+              <KeyVal k="综合评定 V">{chosen.v}</KeyVal>
+            </div>
+          </Panel>
+        </div>
       )}
 
-      {result && (
+      {result !== null && (
         <section
           data-testid="train-result"
-          className="rounded border border-green-200 bg-green-50 p-4"
+          className="panel panel-corners animate-rise border-good-400/40 bg-good-400/5 p-4"
         >
-          <h3 className="mb-1 font-semibold text-green-800">训练完成</h3>
-          <p className="text-sm text-green-800">
-            {result.studentName}：{DIMENSION_LABEL[result.dim]} +{roundDelta(result.delta)} · 消耗{' '}
-            {result.cost} 金 · 剩余体力 {Math.floor(result.staminaAfter)}/5
-          </p>
-          {result.rareGains.length > 0 && (
-            <ul className="mt-1 space-y-0.5 text-sm text-green-700">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Icon icon={CircleCheck} className="size-4 text-good-400" />
+              <h3 className="text-sm font-semibold text-good-400">训练完成</h3>
+              <Chip>{TRAINING_KIND_LABEL[result.kind]}训练</Chip>
+            </div>
+            <Btn size="sm" variant="subtle" onClick={() => setResult(null)}>
+              收起
+            </Btn>
+          </header>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+            <div>
+              <p className="eyebrow">
+                {result.studentName} · {DIMENSION_LABEL[result.dim]}
+              </p>
+              <Numeral
+                value={`+${trim(result.delta)}`}
+                className="block text-5xl leading-none font-bold text-good-400"
+              />
+            </div>
+            <div className="space-y-2">
               {result.rareGains.map((g) => (
-                <li key={g.stat}>
-                  稀有成长：{GAIN_LABEL[g.stat]} +{roundDelta(g.amount)}
-                </li>
+                <p key={g.stat} className="flex items-center gap-2 text-xs">
+                  <Icon icon={Sparkles} className="size-3.5 text-arc-300" />
+                  <span className="text-fg-muted">稀有成长 · {talentStatLabel(g.stat)}</span>
+                  <Numeral value={`+${trim(g.amount)}`} className="text-arc-300" />
+                </p>
               ))}
-            </ul>
-          )}
-          <button className="mt-2 text-xs text-green-700 underline" onClick={() => setResult(null)}>
-            关闭
-          </button>
+              <KeyVal k="消耗">{result.cost} 金</KeyVal>
+              <KeyVal k="剩余体力">{floor(result.staminaAfter)}/5</KeyVal>
+              <Meter value={result.staminaAfter} max={5} className="bg-good-400" />
+            </div>
+          </div>
         </section>
       )}
 
@@ -322,89 +408,79 @@ export function TrainingPage(): JSX.Element {
   );
 }
 
-function ProblemRow({
-  p,
+/** 专项训练预制题选项（原生 radio；可访问名必须含 `Q N`） */
+function ProblemOption({
+  problem,
   selected,
   onSelect,
 }: {
-  p: ProblemView;
+  problem: ProblemView;
   selected: boolean;
   onSelect: () => void;
 }): JSX.Element {
   return (
     <label
-      className={`flex cursor-pointer items-center gap-2 rounded border p-2 text-sm ${
-        selected ? 'border-neutral-900 bg-neutral-50' : 'hover:bg-neutral-50'
+      className={`flex cursor-pointer items-center gap-2 border px-2 py-1.5 text-xs transition-colors ${
+        selected ? 'border-cyber-400/70 bg-cyber-400/10' : 'border-ink-600 hover:border-ink-500'
       }`}
     >
-      <input
-        type="radio"
-        name="problem"
-        className="accent-neutral-900"
-        checked={selected}
-        onChange={onSelect}
-      />
-      <span className="font-medium">{p.name}</span>
-      <span className={`rounded px-1.5 py-0.5 text-xs ${rarityChip(p.rarity)}`}>
-        {rarityText(p.rarity)}
-      </span>
-      <span className="text-xs text-neutral-500">{DIMENSION_LABEL[p.dominantDim]}</span>
-      <span className="text-xs text-neutral-400">Q {p.quality}</span>
+      <input type="radio" name="train-problem" checked={selected} onChange={onSelect} />
+      <span className="min-w-0 flex-1 truncate text-fg-muted">{problem.name}</span>
+      <span className={`border px-1.5 py-0.5 ${rarityChip(problem.rarity)}`}>{rarityLabel(problem.rarity)}</span>
+      <span className="shrink-0 text-fg-dim">{DIMENSION_LABEL[problem.dominantDim]}</span>
+      <span className="numeral shrink-0 text-fg">Q {problem.quality}</span>
     </label>
   );
 }
 
-function tabLabel(t: Tab): string {
-  switch (t) {
-    case 'basic':
-      return '基础';
-    case 'directed':
-      return '定向';
-    default:
-      return '专项';
-  }
-}
-
-function isSixDimBook(itemId: string): boolean {
-  const m = /^book-(.+)-\w+$/.exec(itemId);
-  return m ? ['ds', 'dp', 'math', 'graph', 'greedy', 'string'].includes(m[1]) : false;
-}
-
-function roundDelta(v: number): number {
-  return round(v * 100) / 100;
-}
-
-function errText(e: unknown): string {
-  return apiErrorMessage(e);
-}
-
-/** 训练记录区：默认只看当前选中学员；类型筛选；游标加载更多 */
-function TrainingLogsSection({ studentId }: { studentId: number | null }): JSX.Element {
-  const [kind, setKind] = useState<'' | TrainingLogView['kind']>('');
+/** 体力 5 格 + 当前格回充进度（分母恒为 5，不除精力上限） */
+function StaminaPips({ value }: { value: number }): JSX.Element {
+  const full = floor(value);
+  const frac = value - full;
   return (
-    <section className="rounded border bg-white p-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-neutral-500">
-          {studentId ? '该学员的训练记录' : '全部训练记录'}
-        </h2>
+    <span className="flex items-center gap-1">
+      <span className="flex gap-0.5">
+        {STAMINA_PIPS.map((i) => (
+          <span key={i} className="relative block h-1.5 w-4 bg-ink-700">
+            <span
+              className="absolute inset-y-0 left-0 bg-good-400"
+              style={{ width: i < full ? '100%' : i === full ? `${Math.round(frac * 100)}%` : '0%' }}
+            />
+          </span>
+        ))}
+      </span>
+      <span className="tnum text-[11px] text-fg-dim">{full}/5</span>
+    </span>
+  );
+}
+
+/** 训练记录：筛选类型 + 游标翻页 */
+function TrainingLogsSection({ studentId }: { studentId: number | null }): JSX.Element {
+  const [kind, setKind] = useState<'' | TrainingKind>('');
+  return (
+    <Panel
+      eyebrow="训练记录"
+      title={studentId === null ? '全部训练记录' : '该学员的训练记录'}
+      actions={
         <select
           data-testid="train-log-kind"
-          className="rounded border px-2 py-1 text-xs"
+          className="px-2 py-1 text-xs"
           value={kind}
-          onChange={(e) => setKind(e.target.value as '' | TrainingLogView['kind'])}
+          onChange={(e) => setKind(e.target.value as '' | TrainingKind)}
         >
           <option value="">全部类型</option>
-          <option value="basic">基础</option>
-          <option value="directed">定向</option>
-          <option value="specialized">专项</option>
+          <option value="basic">{TRAINING_KIND_LABEL.basic}</option>
+          <option value="directed">{TRAINING_KIND_LABEL.directed}</option>
+          <option value="specialized">{TRAINING_KIND_LABEL.specialized}</option>
         </select>
-      </div>
+      }
+    >
       <LogsList
         key={`${studentId ?? 'all'}-${kind}`}
         studentId={studentId}
         kind={kind === '' ? undefined : kind}
       />
-    </section>
+    </Panel>
   );
 }
 
@@ -413,7 +489,7 @@ function LogsList({
   kind,
 }: {
   studentId: number | null;
-  kind: TrainingLogView['kind'] | undefined;
+  kind: TrainingKind | undefined;
 }): JSX.Element {
   const [prev, setPrev] = useState<TrainingLogView[]>([]);
   const [cursor, setCursor] = useState<number | undefined>(undefined);
@@ -430,66 +506,53 @@ function LogsList({
 
   function more(): void {
     const d = q.data;
-    if (!d || !d.nextCursor) return;
+    if (d === undefined || d.nextCursor === null) return;
     setPrev((p) => [...p, ...d.items]);
     setCursor(d.nextCursor);
   }
 
-  if (q.isPending && items.length === 0) {
-    return <p className="text-sm text-neutral-400">加载训练记录…</p>;
-  }
+  if (q.isPending) return <InlineLoader>读取训练记录…</InlineLoader>;
   if (q.isError) {
     return (
-      <div className="space-y-2 text-sm text-red-600">
-        <p>训练记录加载失败：{errText(q.error)}</p>
-        <button className="rounded border px-3 py-1 text-xs" onClick={() => void q.refetch()}>
-          重试
-        </button>
-      </div>
+      <ErrorNote onRetry={() => void q.refetch()}>训练记录读取失败：{apiErrorMessage(q.error)}</ErrorNote>
     );
   }
-  if (items.length === 0) {
-    return <Empty title="暂无训练记录" />;
-  }
+  if (items.length === 0) return <Empty icon={Dumbbell} title="暂无训练记录" />;
+
   return (
     <div>
-      <ul className="divide-y text-sm" data-testid="train-log-list">
+      <ul data-testid="train-log-list" className="divide-y divide-ink-600/60">
         {items.map((t) => (
-          <li key={t.id} className="py-1.5">
-            <p>
-              <span className="font-medium">{t.studentName}</span>
-              <span className="ml-2 text-xs text-neutral-500">
-                {TRAINING_KIND_LABEL[t.kind]} · {DIMENSION_LABEL[t.dim]} +{roundDelta(t.delta)} · 耗{' '}
-                {t.cost} 金 · 体力 {Math.floor(t.staminaAfter)}/5
+          <li key={t.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-xs">
+            <span className="text-sm font-medium text-fg">{t.studentName}</span>
+            <span className="border border-ink-600 bg-ink-800/70 px-1.5 py-0.5 text-fg-muted">
+              {TRAINING_KIND_LABEL[t.kind]}
+            </span>
+            <span className="text-cyber-300">{DIMENSION_LABEL[t.dim]}</span>
+            <span className="numeral text-good-400">+{trim(t.delta)}</span>
+            <span className="text-fg-dim">
+              耗 {t.cost} 金 · 体力 {floor(t.staminaAfter)}/5
+            </span>
+            {t.rareGains.map((g) => (
+              <span key={g.stat} className="text-arc-300">
+                稀有 {talentStatLabel(g.stat)} +{trim(g.amount)}
               </span>
-            </p>
-            <p className="mt-0.5 text-xs text-neutral-400">
-              {new Date(t.createdAt).toLocaleString()}
-              {t.bookItemId ? ` · 用书 ${t.bookItemId}` : ''}
-              {t.problemId ? ` · 选题 #${t.problemId}` : ''}
-              {t.rareGains.length > 0 && (
-                <>
-                  {' '}
-                  · 稀有{' '}
-                  {t.rareGains
-                    .map((g) => `${GAIN_LABEL[g.stat]}+${roundDelta(g.amount)}`)
-                    .join('、')}
-                </>
-              )}
-            </p>
+            ))}
+            <span className="ml-auto text-fg-faint">{new Date(t.createdAt).toLocaleString()}</span>
           </li>
         ))}
       </ul>
-      {q.isFetching && <p className="mt-2 text-xs text-neutral-400">加载中…</p>}
+      {q.isFetching && <p className="mt-2 text-xs text-fg-dim">继续读取…</p>}
       {!q.isFetching && nextCursor !== null && (
-        <button
-          data-testid="train-log-more"
-          className="mt-2 rounded border px-3 py-1 text-xs"
-          onClick={more}
-        >
+        <Btn data-testid="train-log-more" size="sm" className="mt-3" onClick={more}>
           加载更多
-        </button>
+        </Btn>
       )}
     </div>
   );
+}
+
+/** 增益展示：最多两位小数，去掉尾随零 */
+function trim(v: number): number {
+  return round(v * 100) / 100;
 }
