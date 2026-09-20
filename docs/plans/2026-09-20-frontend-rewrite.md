@@ -51,6 +51,8 @@
 | 6 | `/api/talents`、`/api/problems` **实际已注册可用**（`apps/api/src/index.ts:111/113`，commit `aa33436`），前端注释与降级分支是过期的 | `hooks.ts:589/770`、`StudentDetailPage.tsx:167/176`、`TrainingPage.tsx:259` |
 | 7 | 背包前端硬编码白名单漏了 `drumstick-bento` → 鸡腿便当（每关首通产出的 +5 体力稀缺品）显示"暂不可用"，点了没反应 | `InventoryPage.tsx:19-25` vs `items/effects.ts:137-178` |
 
+| 8 | **招募池重掷导致「静默招错人」**：`tempId` 是位置编号会被复用，切标签页触发整池重掷后点「招募 c2」会招到另一个人，扣款与落库全部成功且无提示 | `academy/service.ts:123-127/205-206`、`recruit-gen.ts:372`、`main.tsx:25` |
+
 ### 1.3 目标
 
 - 视觉达到 Awwwards 级：统一 Lucide 图标、无 emoji、实验性但不牺牲可读性的排版、物理感动效。
@@ -123,7 +125,8 @@
   - 题目：主考六维 + 需求 d/m/c + 质量评级 + 特性（严重度 + 中文名 + effect 风味文本）+ 时限
   - 天赋：家族中文名 + 稀有度 + 效果（stat 中文 + mode + 数值）+ 升阶目标 / 净化链位置
   - 天赋的两层信息**不要混**：「是不是独立彩」用配置层 `family === null && rarity === 'colorful'` 判定（全表仅 `turing-colorful` 命中，可给专属光晕）；「这枚天赋怎么来的」用运行时 `acquiredVia`（`RECRUIT`/`EVENT`/`UPGRADE`/`REROLL`/`ADMIN`）—— 后者也是本次要补的中文表之一。
-  - 只有 `memo` 与 `guess` 两条链能冲彩（`upgrade_to` 单链，彩为顶点）；6 条负面家族走灰→黄「净化链」。
+  - 只有 `memo`（记忆化）与 `guess`（猜结论大师）两条链能冲彩；全表彩天赋只有 3 条（`memo-colorful`/`guess-colorful`/`turing-colorful`）。6 条负面家族走灰→黄「净化链」（爆零战神→复盘之神、拖延症→时间管理者、手残→稳如磐石、考场失眠→赛前入定、数组越界→边界检查者、假算法→反证大师），**黄级即终点**，值得单独视觉仪式（"把 debuff 炼成天赋"）。
+  - ⚠️ **进阶石只对"登记了上级形态"的天赋生效**：6 个单点家族（`seg`/`numth`/`dij`/`greed`/`kmp`）+ 14 个无家族天赋 + 所有链顶（含 6 条净化链的黄级）**都不可升阶**。「升阶」入口必须置灰并**给出具体理由**，否则玩家会以为进阶石没生效。
   - 学员：迷你雷达 + 天赋 + 洗练保底计数（`counters.reroll`，≥20 触发保底）
   - 事件：类别 + 稀有度 + 体力档 + 可能结果
 - **战报 = 电竞转播**：AC 是爽点、WA +20min 罚时是痛点、压哨通过是高潮，队伍名次是最终裁决。调试元数据收进「技术详情」折叠区。
@@ -131,7 +134,10 @@
   - 心态双向条要画**三个标记**——`0` 警戒线、个人归位锚点 `B`（`clamp(1+Σmindset flat)`，实测 −1…+5，无天赋时 +1）、`−6` 焦虑反噬阈值（独立告警）。**无上限惩罚**（m∈[+1,+10] 单调增益），不画"过高有害"。
   - 体力 = 5 格 + 当前格回充进度（恢复约 45 分钟/点）。
   - 精力 / 专注：分母取学员当前 `energyMax` / `focusCap`（浮动上限，硬顶 100；新人 55–78 / 45–66），**绝不能除 100**；条上显示 `当前/上限`。**"精力未满"不是参赛门槛**（真正门槛是 `energy ≥ Eneed`，典型约 8 点/题）。
-- **历练 EventCard** 必须显式标注「全队出战」（对决类，3 人各出一题答一题、独立扣精力算心态）/「仅队长」（非对决类，队友只出体力）。
+- **历练 EventCard** 必须显式标注「全队出战」（对决类，3 人各出一题答一题、独立扣精力算心态）/「仅队长」（非对决类，队友只出体力）。另三条实测约束（省掉不必要的工作量）：
+  - **只有 4 条事件有道具门槛**，其余 36 条无 → 只给这 4 条做"持有 X 可解锁"提示：G4 断网事故（`spare-cable`）、G8 摸鱼被抓（`milk-tea`）、R6 天赋异动征兆（`direction-charm`）、L4 OJ 遭黑客攻击（`firewall`）。
+  - **只有 2 条不可重复，必须显式标注**（否则玩家会以为抽不到是 bug）：R7 强者指点（每名队长限一次）、C2 图灵之遗（**全服每周限量 3 次**）。
+  - 其余 38 条的冷却中条目**直接不进池**（玩家不会"看到但抽不到"）→ **UI 不需要为冷却做任何展示**。
 
 ### 2.5 数据层契约适配
 
@@ -160,8 +166,11 @@
   → 内置限额需前端提前 disable/提示：`MILK_TEA_DAILY_LIMIT=2`、`COFFEE_DAILY_LIMIT=2`、`STAMINA_POTION_DAILY_LIMIT=1`、`FOCUS_ENGINE_MAX_USES=1`、`BOOK_WEEK_CAP=10`（**是"单学员 × 单属性每周增益点数 ≤ 10"，不是"每周 10 本书"**）。
   注：`FOCUS_CAP_MAX=100` **不是道具限额**，是 `focus_cap` / `energy_max` / `stamina_regen` 的**属性硬顶**，不要混进道具使用次数。（失败不吞道具：全在同一 `$transaction`，抛错回滚。）
   → ⚠️ **直用书会被周额度截断**：周限 10 点/单学员/单属性，而增益梯度是 灰+2 / 黄+4 / 绿+7 / 蓝+12 / 紫+20 ⇒ **紫书（+20）在任何情况下都吃不满**（额度剩 3 点就只涨 3 点，17 点蒸发）。UI 必须在使用前明确警示「本周剩余 N 点，使用该书将损失 M 点」。**两类书的限额提示必须分开做**：直用书受周限（点数），六维书是定向训练耗材（乘区）不受此限。
-- **Query 策略**：`QueryClient` 加 `defaultOptions` + 分级 `staleTime`（钱包/库存 30s、静态配置 5min、战报 Infinity）。`pvp/*`（detail/bracket/rewards 终态后 `Infinity`）、`/api/overview`、`/api/academy/pool` 设 `refetchOnWindowFocus:false`。
-  理由：后端 `advancePvpTournament` 经源码核对**完全幂等、终态吸收**（不会重复结算/发奖），但每次调用开头 `SELECT ... FOR UPDATE` 加行锁，`PvpPage` 三查询并发会在同一把锁上串行排队，且终态后仍全量跑奖励 upsert —— **是性能与锁竞争问题，不是正确性问题**。
+- **Query 策略**：`QueryClient` 加 `defaultOptions` + 分级 `staleTime`（钱包/库存 30s、静态配置 5min、战报 Infinity），并按下述**两个不同性质**的问题分别处理：
+  - **性能/锁竞争（`pvp/*`）**：后端 `advancePvpTournament` 经源码核对**完全幂等、终态吸收**（不会重复结算/发奖），但每次调用开头 `SELECT ... FOR UPDATE` 加行锁，`PvpPage` 三查询并发会在同一把锁上串行排队，且终态后仍全量跑奖励 upsert。→ detail/bracket/rewards 设 `refetchOnWindowFocus:false`，终态后 `staleTime: Infinity`。
+  - **⚠️ 正确性（`/api/academy/pool` 与 `/api/overview`，用户可见、优先处理）**：`getPool` 一旦跨过 `free_interval_hours` 或日界，**任意一次 GET 就整池重掷**（仅不 stale 且未跨日时是纯读），而 `tempId` 是**位置编号 `c0..c4`**（`recruit-gen.ts:372`），重掷后编号复用；`recruit()` 回查是 `candidates.find(c => c.tempId === tempId)`（`service.ts:205-206`）。叠加 `refetchOnWindowFocus:true` 的后果是：**用户看着 c2（天才）→ 切标签页触发重掷 → 点「招募 c2」→ 命中全新的 c2（可能是普通学员）→ 扣款与落库全部成功、HTTP 200、无任何提示。** 这是静默的资金与预期损失，比 404 严重。
+    → 必须做三件事：① 这两个查询 `refetchOnWindowFocus:false` + 合理 `staleTime`；② 用服务端已给的 `OverviewView.pool.freeRefreshAt`（= `generatedAt + free_interval_hours`）做守卫，**临近该时刻不再 refetch**；③ **refetch 后若 `generatedAt` 变化，立即作废当前选中项并提示「候选池已刷新」**——这条最关键，直接堵住"看着旧卡点新人"。
+    注：`getPool` 全程无 `FOR UPDATE`（不同于 `refreshPool` 有 `lockPoolRow`），并发两个 GET 撞同一过期窗口会各自重掷、last-write-wins，故第 ③ 条不能只靠比较响应体，必须在交互层拦。
 
 ---
 
@@ -233,7 +242,7 @@
 | 0 | `git pull`；新增 `lucide-react`；建本计划文档；跑一次 typecheck 建立基线 | `apps/web/package.json`、`docs/plans/` |
 | 1 | 设计系统地基：Tailwind `@theme`（深色底/主强调青/次强调紫/稀有度六色/严重度六色/难度 8 级/品质材质）、字体 `@font-face`、reset、`focus-visible`、`prefers-reduced-motion` | `apps/web/src/styles/app.css`、`index.html` |
 | 2 | 图标与翻译真源：`components/icons.tsx`、`lib/labels.ts`（26 项）、`lib/rarity.ts`（三套色板 + `colorful↔RAINBOW` 归一）→ **修缺陷 1** | 新建 3 个文件；清理 `BattleReplay.tsx` 重复副本 |
-| 3 | 数据层收敛：修 `normRarity`；消费 `/api/talents`、`/api/problem-library`，**删"接口待后端补充"降级文案** → **修缺陷 6**；`abilities` 适配；删与 shared 重名的 3 个本地 interface；`QueryClient` 分级 `staleTime` + 关 focus refetch；回放改增量 reducer → **修缺陷 5** | `lib/hooks.ts`、`main.tsx`、`BattleReplay.tsx`、`StudentDetailPage.tsx`、`TrainingPage.tsx` |
+| 3 | 数据层收敛：修 `normRarity`；消费 `/api/talents`、`/api/problem-library`，**删"接口待后端补充"降级文案** → **修缺陷 6**；`abilities` 适配；删与 shared 重名的 3 个本地 interface；`QueryClient` 分级 `staleTime` + 关 focus refetch；**招募池 `freeRefreshAt` 守卫 + `generatedAt` 变化即作废选中项 → 修缺陷 8**；回放改增量 reducer → **修缺陷 5** | `lib/hooks.ts`、`main.tsx`、`BattleReplay.tsx`、`StudentDetailPage.tsx`、`TrainingPage.tsx`、`features/academy/AcademyPage.tsx` |
 | 4 | 外壳：新 `Layout`（HUD + 图标导航 + 激活态语义标记）、`RequireAdmin`、登录/注册游戏化启动页（**保留两行硬编码错误文案**） | `app/App.tsx`、`app/guards.tsx`、`main.tsx`、`features/auth/*` |
 | 5 | 总览 `/`：七个区块重排为仪表盘，checklist 做任务轨道，调试元数据不入主视 | `features/overview/OverviewPage.tsx` |
 | 6 | 学员与档案：角色卡（雷达/材质/天赋光效）、心态双向条（0/B/−6 三标记）、体力 5 格、统一品质档材质 → **修缺陷 3、4**；HoverCard | `features/students/*` |
@@ -267,7 +276,9 @@
 - 招募价格快照 bug（已定位到行）：`CandidatePayload.price` 是**建池瞬间**快照（`recruit-gen.ts:362`），而 `recruit()` 在 `service.ts:208-209` 按**当前**在册学员数重算（`recruit_base=300`、`recruit_growth=1.35` ⇒ 每招一人贵 35%：卡显示 300、实际扣 405），且 `:244-247` 只把该候选过滤掉、**不给剩余候选重算 price**。`service.ts:194-196` 注释写明"price 快照仅作展示；招募价以重算为准" ⇒ **重算是设计意图，缺的是写回**。
   → 前端：**禁止跨招募缓存候选价格**，招募成功后必须 invalidate pool；招募按钮悬停提示"费用随在营学员数浮动"。
   → 是否连带修后端（在 `:244-247` 一并写回剩余候选 price）**待定**，见下方待裁决项。
-- **紫书与周额度冲突（需产品裁定，前端先按警示实现）**：直用书增益 灰+2/黄+4/绿+7/蓝+12/**紫+20**，而周限 10 点 ⇒ 蓝书、紫书单本就超限，紫书最多只能吃到 10 点、价值腰斩。文档未说明是 clamp 截断还是硬拒。前端先做「本周剩余 N 点，使用将损失 M 点」的**明确警示**；数值方向（提高周限 / 蓝紫不受限 / 按册数计）留待裁定。
+- **蓝书/紫书超周限（规格疏漏，需产品裁定；前端先按警示实现）**：直用书增益 灰+2/黄+4/绿+7/**蓝+12**/**紫+20**，而周限是 **10 点**（单学员 × 单属性 × 周）⇒ **蓝书与紫书单本就超限**。文档未说明是 clamp 还是硬拒，但**逻辑上只能是 clamp**——硬拒意味着额度上限恒为 10 < 12/20，蓝紫书将永远不可用。故实际后果是"花紫级的钱（2600 金）只能买到 ≤10 点收益"。
+  → 前端先做「本周剩余 N 点，使用将损失 M 点」的**明确警示**（clamp 与硬拒两种裁定下都成立），且提示必须挂在**选中学员 + 选中属性之后**才计算（额度按学员×属性计）。
+  → 数值方向（周限提到 ≥20 / 蓝紫不受限 / 按册数计）待裁定。
 - ⚠️ 不要改 `apps/api/tests/items.test.ts:88`（`expect(calm.rarity).toBe('green')`）—— 该断言**主动锁定了错误的小写值**。本次方案是**只改前端归一、不动后端**，故无需动它；若日后要统一后端大小写，必须 service 与断言**成对改**。另：`items.yaml` 的 `cost_by_target_rarity` 用小写键，那是**配置键空间**，与 API 枚举值无关，不要一起改。
 
 ---
