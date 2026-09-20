@@ -29,7 +29,7 @@ export function LoginPage(): JSX.Element {
       setMe(d.me);
       nav('/');
     } catch (e2) {
-      // ⚠️ 文案与 ERROR_TEXT.INVALID_CREDENTIALS 有意并存：e2e 断言的是这一版页面文案
+      //  文案与 ERROR_TEXT.INVALID_CREDENTIALS 有意并存：e2e 断言的是这一版页面文案
       setErr(
         e2 instanceof ApiCallError && e2.code === 'INVALID_CREDENTIALS'
           ? '用户名或密码错误'

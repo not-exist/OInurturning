@@ -54,7 +54,7 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
   const [msg, setMsg] = useState<string | null>(null);
   const [rotated, setRotated] = useState(false);
 
-  // ⚠️ 重掷守卫：tempId 是位置编号（c0..c4），整池重掷后编号复用 —— 沿用旧响应里的
+  //  重掷守卫：tempId 是位置编号（c0..c4），整池重掷后编号复用 —— 沿用旧响应里的
   // tempId 会静默招到另一个人（扣款、落库、HTTP 200 全都正常）。generatedAt 一变即提示。
   const lastGeneratedAt = useRef(pool.generatedAt);
   useEffect(() => {
