@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useState, type JSX, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
+import { CircleCheck, Gift, Lock, Target, Users } from 'lucide-react';
+import type { StoryStageProgress } from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
 import { BattleReplay, BattleWaiting } from '../records/BattleReplay';
 import {
@@ -8,23 +10,174 @@ import {
   useStudents,
   type StoryEntryResult,
 } from '../../lib/hooks';
-import { Empty } from '../../components/ui';
+import { tierLabel } from '../../lib/labels';
+import { TIER_TEXT, isTier } from '../../lib/rarity';
+import { Icon, NAV_ICON, type LucideIcon } from '../../components/icons';
+import {
+  Btn,
+  Chip,
+  Empty,
+  ErrorNote,
+  HoverCard,
+  InlineLoader,
+  Meter,
+  PageHeader,
+  Panel,
+} from '../../components/ui';
 import { RosterPicker } from '../../components/RosterPicker';
 
 const ROSTER_SIZE = 4;
 
-const CHAPTER_LABEL: Record<string, string> = {
-  cspj: 'CSP-J',
-  csps: 'CSP-S',
-  noip: 'NOIP',
-  province: '省选',
-  noi: 'NOI',
-  ctt: 'CTT',
-  cts: 'CTS',
-  ioi: 'IOI',
-};
+function ngLabel(layer: number): string {
+  return layer === 0 ? '一周目' : `NG+ ${layer}`;
+}
 
-export function StoryPage() {
+/** 悬浮卡内容行（HoverCard 的 tooltip 是 <span>，内容只用 span 保持合法嵌套） */
+function HoverRow({ k, children }: { k: string; children: ReactNode }): JSX.Element {
+  return (
+    <span className="flex items-baseline justify-between gap-3 text-xs">
+      <span className="text-fg-dim">{k}</span>
+      <span className="tnum text-right text-fg">{children}</span>
+    </span>
+  );
+}
+
+/**
+ * 语义色标签：Chip 的默认描边/文字色在同名工具类中排序靠后（ink < cyber/good），
+ * 会盖掉传入的语义色，故状态标签用不含默认色的本组件。
+ */
+function ToneChip({
+  className,
+  icon,
+  children,
+}: {
+  className: string;
+  icon?: LucideIcon;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 border bg-ink-800/40 px-1.5 py-0.5 text-[11px] ${className}`}
+    >
+      {icon !== undefined && <Icon icon={icon} className="size-3" />}
+      {children}
+    </span>
+  );
+}
+
+function StageNode({
+  stage,
+  ordinal,
+  staminaShort,
+  rosterReady,
+  rosterSize,
+  pending,
+  onEnter,
+}: {
+  stage: StoryStageProgress;
+  ordinal: number;
+  staminaShort: boolean;
+  rosterReady: boolean;
+  rosterSize: number;
+  pending: boolean;
+  onEnter: () => void;
+}): JSX.Element {
+  const cost = stage.staminaCost ?? 0;
+  const name = stage.name ?? '未知关卡';
+  const blocked = !stage.unlocked
+    ? '未解锁'
+    : !rosterReady
+      ? `需选满 ${rosterSize} 人`
+      : staminaShort
+        ? '体力不足'
+        : null;
+  const StateIcon = stage.cleared ? CircleCheck : stage.unlocked ? Target : Lock;
+
+  return (
+    <li className="relative flex flex-wrap items-center gap-4 py-3 pl-10">
+      <span aria-hidden className="absolute top-0 bottom-0 left-3 w-px bg-ink-600/70" />
+      <span
+        className={`absolute left-0 flex size-6 items-center justify-center border bg-ink-900 ${
+          stage.cleared
+            ? 'border-good-400/60 text-good-400'
+            : stage.unlocked
+              ? 'border-cyber-400/60 text-cyber-300'
+              : 'border-ink-600 text-fg-faint'
+        }`}
+      >
+        <Icon icon={StateIcon} className="size-3.5" />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[11px] text-fg-faint">
+            {String(ordinal).padStart(2, '0')}
+          </span>
+          <HoverCard
+            width="w-80"
+            content={
+              <span className="block space-y-1.5">
+                <span className="block text-xs font-semibold text-fg">
+                  {name}
+                </span>
+                <HoverRow k="关卡编号">{stage.stageKey}</HoverRow>
+                <HoverRow k="推荐等级">{stage.recommendedLevel ?? '—'}</HoverRow>
+                <HoverRow k="比赛时长">{stage.durationMin ?? '—'} 分钟</HoverRow>
+                <HoverRow k="体力消耗">×{cost}</HoverRow>
+                <HoverRow k="出战人数">{rosterSize} 人</HoverRow>
+                <HoverRow k="首通奖励">{stage.firstClearAt === null ? '待领取' : '已领取'}</HoverRow>
+                <HoverRow k="最佳名次">{stage.bestRank ?? '—'}</HoverRow>
+                <HoverRow k="通关次数">{stage.clearCount}</HoverRow>
+                <span className="block pt-1 text-[11px] text-fg-dim">
+                  {stage.unlocked
+                    ? '通关后在名次达标时解锁下一关。'
+                    : '尚未解锁：先通关上一关。'}
+                </span>
+              </span>
+            }
+          >
+            <span className="cursor-help font-medium text-fg">{name}</span>
+          </HoverCard>
+          {stage.cleared && (
+            <ToneChip className="border-good-400/50 bg-good-400/10 text-good-400">
+              已通关{stage.bestRank === null ? '' : ` · 最佳名次 ${stage.bestRank}`}
+            </ToneChip>
+          )}
+          {!stage.cleared && stage.firstClearAt === null && stage.unlocked && (
+            <ToneChip icon={Gift} className="border-cyber-400/50 bg-cyber-400/10 text-cyber-300">
+              首通奖励待领取
+            </ToneChip>
+          )}
+          {blocked === '未解锁' && <Chip icon={Lock}>未解锁</Chip>}
+        </span>
+        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-dim">
+          <span>推荐等级 {stage.recommendedLevel ?? '—'}</span>
+          <span>{stage.durationMin ?? '—'} 分钟</span>
+          <span>{rosterSize} 人团体赛</span>
+          <span className="text-warn-400">体力 ×{cost}</span>
+          {stage.clearCount > 0 && <span>已通关 {stage.clearCount} 次</span>}
+        </span>
+      </span>
+
+      <span className="flex items-center gap-2">
+        {blocked !== null && blocked !== '未解锁' && (
+          <span className="text-[11px] text-fg-faint">{blocked}</span>
+        )}
+        <Btn
+          variant={stage.unlocked ? 'primary' : 'ghost'}
+          size="sm"
+          data-testid="story-enter"
+          disabled={blocked !== null || pending}
+          onClick={onEnter}
+        >
+          进入
+        </Btn>
+      </span>
+    </li>
+  );
+}
+
+export function StoryPage(): JSX.Element {
   const [ngLevel, setNgLevel] = useState(0);
   const [roster, setRoster] = useState<number[]>([]);
   const overview = useStoryOverview(ngLevel);
@@ -33,30 +186,22 @@ export function StoryPage() {
   const navigate = useNavigate();
   const [battleReplay, setBattleReplay] = useState<StoryEntryResult['replay']>();
 
-  if (overview.isPending || students.isPending)
-    return (
-      <div className="flex items-center gap-2 text-neutral-500">
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" />
-        加载剧情进度…
-      </div>
-    );
+  if (overview.isPending || students.isPending) {
+    return <InlineLoader>正在读取剧情赛程…</InlineLoader>;
+  }
   if (overview.isError || students.isError) {
     return (
-      <div className="space-y-2 text-sm text-red-600">
-        <p>剧情数据加载失败：{apiErrorMessage(overview.error ?? students.error)}</p>
-        <button
-          className="rounded border px-3 py-1 text-xs"
-          onClick={() => {
-            void overview.refetch();
-            void students.refetch();
-          }}
-        >
-          重试
-        </button>
-      </div>
+      <ErrorNote
+        onRetry={() => {
+          void overview.refetch();
+          void students.refetch();
+        }}
+      >
+        剧情进度读取失败：{apiErrorMessage(overview.error ?? students.error)}
+      </ErrorNote>
     );
   }
-  if (overview.data === undefined || students.data === undefined) return null;
+  if (overview.data === undefined || students.data === undefined) return <></>;
 
   if (enter.isPending) {
     return <BattleWaiting label="服务端正在完成比赛模拟并传回回放…" />;
@@ -73,46 +218,67 @@ export function StoryPage() {
   }
 
   const rosterReady = roster.length === ROSTER_SIZE;
-  const enterStage = (stageKey: string) => {
+  const rosterById = new Map(students.data.map((student) => [student.id, student]));
+  const totalStages = overview.data.chapters.reduce(
+    (sum, chapter) => sum + chapter.stages.length,
+    0,
+  );
+  const clearedStages = overview.data.chapters.reduce(
+    (sum, chapter) => sum + chapter.stages.filter((stage) => stage.cleared).length,
+    0,
+  );
+
+  const enterStage = (stageKey: string): void => {
     if (!rosterReady) return;
     enter.mutate(
-      {
-        stageKey,
-        roster,
-        ngLevel,
-        idempotencyKey: crypto.randomUUID(),
-      },
+      { stageKey, roster, ngLevel, idempotencyKey: crypto.randomUUID() },
       { onSuccess: (result) => setBattleReplay(result.replay) },
     );
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-            Contest Circuit
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold">剧情模式</h1>
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-500">挑战层</span>
-          <select
-            data-testid="story-ng"
-            className="rounded border border-neutral-300 bg-white px-3 py-2"
-            value={ngLevel}
-            onChange={(event) => setNgLevel(Number(event.target.value))}
-          >
-            {Array.from({ length: overview.data.maxUnlockedNgLevel + 1 }, (_, layer) => (
-              <option key={layer} value={layer}>
-                {layer === 0 ? '一周目' : `NG+ ${layer}`}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+    <div data-testid="story-page" className="mx-auto max-w-5xl space-y-5">
+      <PageHeader
+        eyebrow="Contest Circuit"
+        title="剧情模式"
+        description="八个赛季阶梯，33 关赛事。每关 4 人团体赛，名次达标即推进。"
+        actions={
+          overview.data.ngPlusUnlocked ? (
+            <div className="flex items-center gap-1.5">
+              <span className="eyebrow">挑战层</span>
+              {Array.from({ length: overview.data.maxUnlockedNgLevel + 1 }, (_, layer) => (
+                <button
+                  key={layer}
+                  type="button"
+                  data-testid={`story-ng-${layer}`}
+                  aria-pressed={ngLevel === layer}
+                  className={`border px-2.5 py-1 text-xs transition-colors ${
+                    ngLevel === layer
+                      ? 'border-cyber-400/70 bg-cyber-400/15 text-cyber-300'
+                      : 'border-ink-600 bg-ink-800/40 text-fg-dim hover:border-ink-500 hover:text-fg'
+                  }`}
+                  onClick={() => setNgLevel(layer)}
+                >
+                  {ngLabel(layer)}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <Chip icon={Lock}>通关八章后解锁 NG+</Chip>
+          )
+        }
+      />
 
-      <div className="border-b pb-4">
+      <Panel
+        eyebrow="Lineup"
+        title="出战阵容"
+        corners
+        actions={
+          <span className="text-xs text-fg-dim">
+            已通关 {clearedStages}/{totalStages} 关
+          </span>
+        }
+      >
         <RosterPicker
           students={students.data}
           selectedIds={roster}
@@ -121,84 +287,93 @@ export function StoryPage() {
           onChange={setRoster}
           dataTestIdPrefix="story-roster"
         />
+        <p className="mt-3 text-[11px] text-fg-dim">
+          4 人团体排名赛：全队每关各消耗固定体力，名次进入前 8 视为通关。
+        </p>
         {enter.isError && (
-          <span data-testid="story-error" className="mt-3 block text-sm text-red-600">
-            进入关卡失败：{apiErrorMessage(enter.error)}（解锁、体力与精力均需满足）
-          </span>
+          <div className="mt-3">
+            <ErrorNote>
+              <span data-testid="story-error">
+                进入关卡失败：{apiErrorMessage(enter.error)}（解锁状态、体力与阵容均需满足）
+              </span>
+            </ErrorNote>
+          </div>
         )}
-      </div>
+      </Panel>
 
       {students.data.length < ROSTER_SIZE && (
         <Empty
-          title="至少需要 4 名学员出战"
+          icon={Users}
+          title={`至少需要 ${ROSTER_SIZE} 名学员出战`}
           action={
-            <Link
-              to="/academy"
-              className="inline-block rounded bg-neutral-900 px-4 py-2 text-sm text-white"
-            >
+            <Btn variant="primary" onClick={() => navigate('/academy')}>
               前往高级学院招募
-            </Link>
+            </Btn>
           }
         >
           剧情关卡为 4 人团体赛，招募满 4 名学员才能踏上 CSP-J 的赛场。
         </Empty>
       )}
 
-      <div className="space-y-8">
-        {overview.data.chapters.map((chapter) => (
-          <section key={chapter.chapter}>
-            <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-lg font-semibold">
-                {CHAPTER_LABEL[chapter.chapter] ?? chapter.chapter}
-              </h2>
-              <span className="text-xs text-neutral-500">
-                {chapter.stages.filter((stage) => stage.cleared).length}/{chapter.stages.length}{' '}
-                已通关
-              </span>
-            </div>
-            <div className="overflow-hidden rounded border border-neutral-200 bg-white">
-              {chapter.stages.map((stage) => (
-                <div
-                  key={stage.stageKey}
-                  className="flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-b-0"
-                >
-                  <div className="min-w-44 flex-1">
-                    <p className="font-medium">{stage.name ?? stage.stageKey}</p>
-                    <p className="text-xs text-neutral-500">
-                      {stage.stageKey} · 推荐 {stage.recommendedLevel ?? '-'} ·{' '}
-                      {stage.durationMin ?? '-'} 分钟 · 体力 {stage.staminaCost ?? '-'}
-                    </p>
-                  </div>
-                  <span
-                    className={
-                      stage.cleared
-                        ? 'text-sm text-green-700'
-                        : stage.unlocked
-                          ? 'text-sm text-blue-700'
-                          : 'text-sm text-neutral-400'
-                    }
-                  >
-                    {stage.cleared
-                      ? `已通关 · 最佳 ${stage.bestRank ?? '-'}`
-                      : stage.unlocked
-                        ? '可挑战'
-                        : '未解锁'}
+      <div className="space-y-5">
+        {overview.data.chapters.map((chapter, chapterIndex) => {
+          const cleared = chapter.stages.filter((stage) => stage.cleared).length;
+          const tier = isTier(chapter.chapter) ? TIER_TEXT[chapter.chapter] : 'text-fg';
+          return (
+            <Panel
+              key={chapter.chapter}
+              bodyClassName="p-2 sm:p-4"
+              className="animate-rise"
+              title={
+                <span className="flex items-center gap-2">
+                  <span className={`font-display text-base ${tier}`}>
+                    {tierLabel(chapter.chapter)}
                   </span>
-                  <button
-                    type="button"
-                    className="rounded bg-neutral-900 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-                    data-testid="story-enter"
-                    disabled={!stage.unlocked || !rosterReady || enter.isPending}
-                    onClick={() => enterStage(stage.stageKey)}
-                  >
-                    {enter.isPending ? '结算中…' : '进入'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
+                  <span className="text-[11px] font-normal text-fg-faint">
+                    第 {chapterIndex + 1} 章
+                  </span>
+                </span>
+              }
+              actions={
+                <span className="flex items-center gap-3">
+                  <span className="tnum text-[11px] text-fg-dim">
+                    {cleared}/{chapter.stages.length}
+                  </span>
+                  <span className="hidden w-24 sm:block">
+                    <Meter
+                      value={cleared}
+                      max={chapter.stages.length}
+                      className={cleared === chapter.stages.length ? 'bg-good-400' : 'bg-cyber-400'}
+                    />
+                  </span>
+                </span>
+              }
+            >
+              <ol className="relative">
+                {chapter.stages.map((stage, stageIndex) => (
+                  <StageNode
+                    key={stage.stageKey}
+                    stage={stage}
+                    ordinal={stageIndex + 1}
+                    rosterSize={ROSTER_SIZE}
+                    rosterReady={rosterReady}
+                    staminaShort={roster.some(
+                      (id) => (rosterById.get(id)?.stamina ?? 0) < (stage.staminaCost ?? 0),
+                    )}
+                    pending={enter.isPending}
+                    onEnter={() => enterStage(stage.stageKey)}
+                  />
+                ))}
+              </ol>
+            </Panel>
+          );
+        })}
       </div>
+
+      <p className="flex items-center gap-1.5 border-t border-ink-600/60 pt-4 text-[11px] text-fg-dim">
+        <Icon icon={NAV_ICON.story} className="size-3.5" />
+        NG+ 各层关卡独立结算：首通奖励按层发放，战报随时可从对应赛事记录回看。
+      </p>
     </div>
   );
 }
