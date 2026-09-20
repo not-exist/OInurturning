@@ -111,7 +111,7 @@ export const simulationProfileSchema = z
     adventures: z
       .object({
         sessions: z.number().nonnegative(),
-        rarity_mix: z.record(z.number().nonnegative()).refine((mix) => Object.values(mix).some((weight) => weight > 0)),
+        rarity_mix: z.record(z.string(), z.number().nonnegative()).refine((mix) => Object.values(mix).some((weight) => weight > 0)),
       })
       .strict(),
     story: z
@@ -170,7 +170,7 @@ export const economyConfigSchema = z
     recruitment: economyRecruitmentSchema,
     // M1 fixtures may carry a partial passthrough lecture block; M3 lecture
     // paths parse the complete shape before using it.
-    lecture: z.union([lectureConfigSchema, z.record(z.unknown())]).optional(),
+    lecture: z.union([lectureConfigSchema, z.record(z.string(), z.unknown())]).optional(),
     simulation: simulationConfigSchema.optional(),
     onboarding: onboardingConfigSchema.optional(),
   })
