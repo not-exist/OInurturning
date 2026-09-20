@@ -64,6 +64,8 @@ export function SettingsPage(): JSX.Element {
       <PageHeader eyebrow="Coach Profile" title="用户设置" />
 
       <section data-testid="settings-me" className="panel panel-corners mb-5 p-4">
+        <p className="eyebrow mb-1">Account</p>
+        <h2 className="mb-4 text-sm font-semibold">账户信息</h2>
         <div className="mb-4 flex items-center gap-3">
           <span className="flex size-9 items-center justify-center border border-cyber-500/60 bg-cyber-400/10 text-cyber-300">
             <Icon icon={UserRound} className="size-4" />
