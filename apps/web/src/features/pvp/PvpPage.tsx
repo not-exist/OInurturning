@@ -122,7 +122,7 @@ export function PvpPage(): JSX.Element {
       </div>
 
       {tournaments.data.length === 0 ? (
-        <Empty icon="🏆" title="暂无开放赛事">
+        <Empty title="暂无开放赛事">
           管理员发布锦标赛后会出现在这里。报名需持有报名券（entry-ticket），可留意公告。
         </Empty>
       ) : (

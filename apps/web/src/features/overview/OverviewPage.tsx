@@ -123,7 +123,7 @@ export function OverviewPage(): JSX.Element {
             </Link>
           </div>
           {ov.students.items.length === 0 ? (
-            <Empty icon="🎓" title="还没有学员">
+            <Empty title="还没有学员">
               去高级学院招募你的第一批学员吧。
             </Empty>
           ) : (

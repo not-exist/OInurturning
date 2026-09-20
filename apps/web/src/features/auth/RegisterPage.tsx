@@ -1,8 +1,12 @@
 import { useState, type FormEvent, type JSX } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { ArrowRight } from 'lucide-react';
 import { apiFetch, setAccessToken, ApiCallError } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth-store';
 import type { MeView } from '@oinur/shared';
+import { Icon } from '../../components/icons';
+import { Btn, InlineLoader } from '../../components/ui';
+import { AuthFrame, Field } from './AuthFrame';
 
 export function RegisterPage(): JSX.Element {
   const nav = useNavigate();
@@ -10,10 +14,12 @@ export function RegisterPage(): JSX.Element {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
     setErr(null);
+    setBusy(true);
     try {
       const d = await apiFetch<{ accessToken: string; me: MeView }>('/api/auth/register', {
         method: 'POST',
@@ -23,48 +29,78 @@ export function RegisterPage(): JSX.Element {
       setMe(d.me);
       nav('/');
     } catch (e2) {
+      // ⚠️ 文案与 ERROR_TEXT 有意并存：e2e 断言的是这一版页面文案
       setErr(
         e2 instanceof ApiCallError && e2.code === 'ALREADY_EXISTS'
           ? '用户名已被占用'
           : '注册失败，请稍后再试',
       );
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
-      <h1 className="text-center text-2xl font-bold">OInurturning</h1>
-      <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-3">
-        <input
-          data-testid="register-username"
-          className="rounded border px-3 py-2"
+    <AuthFrame
+      eyebrow="New Coach"
+      title="开办你的训练营"
+      lead={
+        <>
+          <span>开局 2500 金</span>
+          <span className="text-ink-500">/</span>
+          <span>2 名学员</span>
+          <span className="text-ink-500">/</span>
+          <span>1 本黄级教材 + 2 杯奶茶</span>
+        </>
+      }
+      footer={
+        <>
+          已有账号？
+          <Link className="ml-1 text-cyber-300 underline decoration-cyber-500/50" to="/login">
+            直接登录
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
+        <Field
+          testId="register-username"
+          label="教练代号"
           placeholder="用户名"
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          onChange={setUsername}
+          autoComplete="username"
         />
-        <input
-          data-testid="register-password"
-          className="rounded border px-3 py-2"
+        <Field
+          testId="register-password"
+          label="通行密钥"
           type="password"
           placeholder="密码（至少 8 位）"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={setPassword}
+          autoComplete="new-password"
         />
-        {err && <p data-testid="auth-error" className="text-sm text-red-600">{err}</p>}
-        <button
+        {err && (
+          <p data-testid="auth-error" className="text-sm text-bad-400">
+            {err}
+          </p>
+        )}
+        <Btn
           data-testid="register-submit"
-          className="rounded bg-neutral-900 py-2 font-medium text-white hover:bg-neutral-700"
           type="submit"
+          variant="primary"
+          disabled={busy}
+          className="w-full py-2"
         >
-          注册
-        </button>
-        <p className="text-center text-sm text-neutral-500">
-          已有账号？
-          <Link className="text-blue-600 underline" to="/login">
-            登录
-          </Link>
-        </p>
+          {busy ? (
+            <InlineLoader>创建中…</InlineLoader>
+          ) : (
+            <>
+              开办训练营 <Icon icon={ArrowRight} className="size-4" />
+            </>
+          )}
+        </Btn>
       </form>
-    </div>
+    </AuthFrame>
   );
 }

@@ -60,7 +60,6 @@ export function StudentsPage(): JSX.Element {
       <h1 className="text-lg font-semibold">学员管理</h1>
       {students.length === 0 ? (
         <Empty
-          icon="🎓"
           title="名下还没有学员"
           action={<ActionLink to="/academy">前往高级学院招募</ActionLink>}
         >

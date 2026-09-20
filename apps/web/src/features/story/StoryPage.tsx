@@ -130,7 +130,6 @@ export function StoryPage() {
 
       {students.data.length < ROSTER_SIZE && (
         <Empty
-          icon="🏟️"
           title="至少需要 4 名学员出战"
           action={
             <Link

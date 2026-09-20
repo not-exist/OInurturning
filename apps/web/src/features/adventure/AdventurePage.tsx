@@ -271,7 +271,7 @@ export function AdventurePage(): JSX.Element {
       </section>
 
       {students.data.length < ROSTER_SIZE && (
-        <Empty icon="🧭" title="至少需要 3 名学员出发">
+        <Empty title="至少需要 3 名学员出发">
           历练为 3 人小队，招募满 3 名学员后即可投入体力探索未知事件。
         </Empty>
       )}
