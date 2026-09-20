@@ -44,15 +44,12 @@ export function LoginPage(): JSX.Element {
     <AuthFrame
       eyebrow="Coach Sign-in"
       title="回到指挥中心"
-      lead={
-        <>
-          <Icon icon={Users} className="size-4" /> 招募并培养学员
-          <span className="mx-1.5 text-ink-500">/</span>
-          <Icon icon={Swords} className="size-4" /> 带队打进 IOI
-          <span className="mx-1.5 text-ink-500">/</span>
-          <Icon icon={Compass} className="size-4" /> 挂机也在进步
-        </>
-      }
+      bullets={[
+        { icon: Users, title: '招募与培养', desc: '从气质判断潜力，靠训练与历练把学员送上赛场。' },
+        { icon: Swords, title: '组队参赛', desc: '排名赛并行作战，出题对决 2N 局，胜负由引擎权威结算。' },
+        { icon: Compass, title: '挂机也在进步', desc: '现实时间驱动：体力自动回充，离线也在积累。' },
+      ]}
+      statusLines={['ENGINE READY · 服务端权威结算', 'SEASON: 8 章 / 33 关 / 8 档赛事']}
       footer={
         <>
           没有账号？
