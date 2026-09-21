@@ -76,6 +76,8 @@ export function OverviewPage(): JSX.Element {
 
   const allDone = ov.checklist.doneCount === ov.checklist.total;
   const claimDisabled = claim.isPending || ov.checklist.claimed || !allDone;
+  /** 本页唯一的「当前命令」：开局任务未领完时是任务轨道，否则是剧情下一关 */
+  const checklistLive = !ov.checklist.claimed && !allDone;
   const rep = ov.me.reputation;
   const nextTitle = nextReputationTitle(rep);
   const nextStage = ov.story.nextStage;
@@ -110,35 +112,37 @@ export function OverviewPage(): JSX.Element {
         }
       />
 
-      {/* 资源条：巨型数字 + 称号刻度 */}
-      <section data-testid="overview-wallet" className="panel grid gap-px bg-ink-600/60 sm:grid-cols-2 xl:grid-cols-4">
-        <WalletStat icon={GLYPH.money} tone="text-cyber-300">
+      {/* 资源条：常驻遥测的次级刻度（主命令面留给下方唯一的 live 块） */}
+      <section
+        data-testid="overview-wallet"
+        className="panel flex flex-wrap items-baseline gap-x-6 gap-y-2 px-4 py-2.5"
+      >
+        <WalletTick icon={GLYPH.money} tone="text-cyber-300">
           <span className="eyebrow">金币</span>{' '}
-          <RollingNumber value={ov.me.money} className="numeral text-2xl text-fg" />
-        </WalletStat>
-        <WalletStat icon={GLYPH.reputation} tone="text-arc-300">
+          <RollingNumber value={ov.me.money} className="numeral text-sm text-fg" />
+        </WalletTick>
+        <WalletTick icon={GLYPH.reputation} tone="text-arc-300">
           <span className="eyebrow">声誉</span>{' '}
-          <RollingNumber value={ov.me.reputation} className="numeral text-2xl text-fg" />
-          <span className="mt-1 block text-[11px] text-fg-dim">
+          <RollingNumber value={ov.me.reputation} className="numeral text-sm text-fg" />
+          <span className="text-[11px] text-fg-dim">
             {reputationTitle(rep)}
             {nextTitle !== null ? ` · 距${nextTitle.label} 还差 ${nextTitle.gap}` : ' · 已至顶阶'}
           </span>
-        </WalletStat>
-        <WalletStat icon={GLYPH.student} tone="text-fg-muted">
+        </WalletTick>
+        <WalletTick icon={GLYPH.student} tone="text-fg-muted">
           <span className="eyebrow">在营学员</span>{' '}
-          <span className="numeral text-2xl text-fg">{ov.students.total}</span>
-          <span className="mt-1 block text-[11px] text-fg-dim">
-            剧情已通关 {ov.story.clearedStages}/{ov.story.totalStages} 关
+          <span className="numeral text-sm text-fg">{ov.students.total}</span>
+          <span className="text-[11px] text-fg-dim">
+            · 剧情已通关 {ov.story.clearedStages}/{ov.story.totalStages} 关
           </span>
-        </WalletStat>
-        <WalletStat icon={RefreshCw} tone="text-warn-400">
+        </WalletTick>
+        <WalletTick icon={RefreshCw} tone="text-warn-400">
           <span className="eyebrow">候选池</span>{' '}
-          <span className="numeral text-2xl text-fg">{ov.pool.count}</span>
-          <span className="mt-1 flex items-center gap-1 text-[11px] text-fg-dim">
-            <Icon icon={RefreshCw} className="size-3" />
-            免费刷新 <PoolCountdown targetIso={ov.pool.freeRefreshAt} />
+          <span className="numeral text-sm text-fg">{ov.pool.count}</span>
+          <span className="flex items-center gap-1 text-[11px] text-fg-dim">
+            · 免费刷新 <PoolCountdown targetIso={ov.pool.freeRefreshAt} />
           </span>
-        </WalletStat>
+        </WalletTick>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-12">
@@ -146,7 +150,7 @@ export function OverviewPage(): JSX.Element {
           <Panel
             title="开局任务"
             eyebrow="开局"
-            corners
+            corners={checklistLive}
             actions={
               <span className="flex items-baseline gap-2">
                 <span className="eyebrow">进度</span>
@@ -201,7 +205,13 @@ export function OverviewPage(): JSX.Element {
             actions={<span className="text-[11px] text-fg-faint">训练 · 讲课 · 历练 · 赛事</span>}
           >
             {feed.length === 0 ? (
-              <p className="text-sm text-fg-faint">暂无动态：完成一次训练、讲课、历练或比赛后在此汇总。</p>
+              <Empty
+                icon={Dumbbell}
+                title="还没有训练动态"
+                action={<ActionLink to="/training">去训练中心</ActionLink>}
+              >
+                完成一次训练、讲课、历练或比赛后在此汇总。
+              </Empty>
             ) : (
               <ol>
                 {feed.map((item) => (
@@ -327,7 +337,9 @@ export function OverviewPage(): JSX.Element {
             {nextStage !== null ? (
               <Link
                 to="/story"
-                className="mt-3 flex items-center justify-between gap-3 border border-ink-600 bg-ink-850/50 px-3 py-2.5 transition-colors hover:border-cyber-400/50"
+                className={`relative mt-3 flex items-center justify-between gap-3 border border-ink-600 bg-ink-850/50 px-3 py-2.5 transition-colors hover:border-cyber-400/50 ${
+                  checklistLive ? '' : 'panel-corners'
+                }`}
               >
                 <span className="min-w-0">
                   <span className="eyebrow">下一关</span>
@@ -369,7 +381,8 @@ export function OverviewPage(): JSX.Element {
 // 资源条 / 任务轨道 / 时间线
 // ---------------------------------------------------------------------------
 
-function WalletStat({
+/** 资源刻度：一行小号数字 + eyebrow，不再与 sticky HUD 争主命令面 */
+function WalletTick({
   icon,
   tone,
   children,
@@ -379,10 +392,10 @@ function WalletStat({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <div className="flex items-start gap-3 bg-ink-800/80 px-4 py-3">
-      <Icon icon={icon} className={`mt-0.5 size-4 shrink-0 ${tone}`} />
-      <div className="min-w-0">{children}</div>
-    </div>
+    <span className="inline-flex items-center gap-1.5">
+      <Icon icon={icon} className={`size-3.5 shrink-0 ${tone}`} />
+      {children}
+    </span>
   );
 }
 
