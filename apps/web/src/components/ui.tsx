@@ -318,7 +318,7 @@ export function Empty({
   action?: ReactNode;
 }): JSX.Element {
   return (
-    <div className="empty-briefing">
+    <div className="panel panel-corners empty-briefing">
       <span className="mx-auto mb-3 grid size-12 place-items-center border border-cyber-500/40 bg-cyber-400/10 text-cyber-300/70">
         <Icon icon={icon} className="size-6" />
       </span>
