@@ -16,11 +16,11 @@ import {
 } from '../../lib/labels';
 import {
   QUALITY_MATERIAL,
+  RARITY_BORDER,
   RARITY_GLOW,
+  RARITY_ICON,
   normRarity,
-  rarityChip,
   rarityLabel,
-  rarityText,
 } from '../../lib/rarity';
 import { Chip, Meter } from '../../components/ui';
 import { Icon, talentIcon } from '../../components/icons';
@@ -300,11 +300,13 @@ export function TalentSlot({ def }: { def: TalentDefView }): JSX.Element {
   const rarity = normRarity(def.rarity);
   const purifying = def.family !== null && PURIFY_CHAINS.has(def.family);
   return (
-    <div className={`flex gap-3 border px-3 py-2.5 ${rarityChip(def.rarity)}`}>
+    <div className="flex gap-3 border border-ink-600 bg-ink-850/40 px-3 py-2.5">
       <span
-        className={`grid size-9 shrink-0 place-items-center border border-ink-600 bg-ink-900/70 ${RARITY_GLOW[rarity]}`}
+        className={`grid size-10 shrink-0 place-items-center border bg-ink-900/70 ${RARITY_BORDER[rarity]} ${RARITY_GLOW[rarity]} ${
+          rarity === 'RAINBOW' ? 'animate-rainbow-halo' : ''
+        }`}
       >
-        <Icon icon={talentIcon(def.family, def.kind)} className="size-4" />
+        <Icon icon={talentIcon(def.family, def.kind)} className={`size-4 ${RARITY_ICON[rarity]}`} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -397,7 +399,7 @@ export function StudentHover({
               <li key={id} className="flex items-center gap-1.5 text-[11px]">
                 <Icon
                   icon={talentIcon(def?.family ?? null, def?.kind ?? 'positive')}
-                  className={`size-3.5 ${def ? rarityText(def.rarity) : 'text-fg-dim'}`}
+                  className={`size-3.5 ${def ? RARITY_ICON[def.rarity] : 'text-fg-dim'}`}
                 />
                 <span className={def ? 'text-fg-muted' : 'text-fg-faint'}>{def?.name ?? '未知天赋'}</span>
                 {def !== undefined && (

@@ -83,6 +83,12 @@ export const RARITY_GLOW: Record<Rarity, string> = {
   RAINBOW: 'shadow-[0_0_36px_0_var(--color-rarity-colorful)]',
 };
 
+/**
+ * 图标着色：彩档不能用 rainbow-text（bg-clip-text + text-transparent 会让 SVG 的 stroke 一起透明），
+ * 改用实色 —— 井体与图标是稀有度的两个展示位，语义同 RARITY_TEXT。
+ */
+export const RARITY_ICON: Record<Rarity, string> = { ...RARITY_TEXT, RAINBOW: 'text-rarity-colorful' };
+
 /** 徽章：1px 描边 + 透明底 + 稀有度色文字 */
 export function rarityChip(r: string): string {
   const k = normRarity(r);

@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import type { StudentView } from '@oinur/shared';
 import { useStudents, useTalentDefs, type TalentDefView } from '../../lib/hooks';
 import { SEX_LABEL, floor, round, signed } from '../../lib/labels';
-import { QUALITY_MATERIAL, rarityText } from '../../lib/rarity';
+import { QUALITY_MATERIAL, RARITY_ICON } from '../../lib/rarity';
 import { ActionLink, ErrorNote, Empty, HoverCard, InlineLoader, Meter, Numeral } from '../../components/ui';
 import { Icon, talentIcon } from '../../components/icons';
 import { Users, TriangleAlert } from 'lucide-react';
@@ -103,7 +103,7 @@ function StudentCard({ s, defs }: { s: StudentView; defs: Map<string, TalentDefV
                 <Icon
                   key={id}
                   icon={talentIcon(def?.family ?? null, def?.kind ?? 'positive')}
-                  className={`size-3.5 ${def ? rarityText(def.rarity) : 'text-fg-dim'}`}
+                  className={`size-3.5 ${def ? RARITY_ICON[def.rarity] : 'text-fg-dim'}`}
                 />
               );
             })}

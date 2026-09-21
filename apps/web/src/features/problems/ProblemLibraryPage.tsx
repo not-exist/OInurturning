@@ -10,7 +10,10 @@ import {
   type TraitInfo,
 } from '../../lib/labels';
 import {
+  RARITY_BORDER,
+  RARITY_FILL,
   RARITY_GLOW,
+  RARITY_ICON,
   SEVERITY_CLS,
   SEVERITY_NUMERAL,
   normRarity,
@@ -221,8 +224,12 @@ function ProblemRow({
 
   return (
     <li data-testid="problem-row" className="panel flex flex-wrap items-center gap-3 p-3">
-      <span className={`grid size-10 shrink-0 place-items-center border ${rarityChip(norm)} ${RARITY_GLOW[norm]}`}>
-        <Icon icon={DIMENSION_ICON[problem.dominantDim]} className="size-4" />
+      <span
+        className={`grid size-10 shrink-0 place-items-center border ${RARITY_BORDER[norm]} ${RARITY_FILL[norm]} ${RARITY_GLOW[norm]} ${
+          norm === 'RAINBOW' ? 'animate-rainbow-halo' : ''
+        }`}
+      >
+        <Icon icon={DIMENSION_ICON[problem.dominantDim]} className={`size-4 ${RARITY_ICON[norm]}`} />
       </span>
 
       <div className="min-w-0 flex-1">

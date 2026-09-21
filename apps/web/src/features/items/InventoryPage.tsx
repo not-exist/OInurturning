@@ -15,7 +15,16 @@ import {
   itemCategoryLabel,
   type DirectBookSubject,
 } from '../../lib/labels';
-import { RARITY_GLOW, RARITY_ORDER, normRarity, rarityChip, rarityLabel } from '../../lib/rarity';
+import {
+  RARITY_BORDER,
+  RARITY_FILL,
+  RARITY_GLOW,
+  RARITY_ICON,
+  RARITY_ORDER,
+  normRarity,
+  rarityChip,
+  rarityLabel,
+} from '../../lib/rarity';
 import { Icon, itemIcon } from '../../components/icons';
 import {
   Btn,
@@ -155,8 +164,16 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
   return (
     <li data-testid="inventory-row" data-itemid={item.itemId} className="panel flex items-start gap-3 p-3">
       <HoverCard className="shrink-0" content={<ItemDetail item={item} subject={subject} rule={rule} />}>
-        <span className={`grid size-11 place-items-center border ${rarityChip(norm)} ${RARITY_GLOW[norm]}`}>
-          <Icon icon={itemIcon(item.itemId, item.category)} className="size-5" strokeWidth={1.6} />
+        <span
+          className={`grid size-11 place-items-center border ${RARITY_BORDER[norm]} ${RARITY_FILL[norm]} ${RARITY_GLOW[norm]} ${
+            norm === 'RAINBOW' ? 'animate-rainbow-halo' : ''
+          }`}
+        >
+          <Icon
+            icon={itemIcon(item.itemId, item.category)}
+            className={`size-5 ${RARITY_ICON[norm]}`}
+            strokeWidth={1.6}
+          />
         </span>
       </HoverCard>
 
