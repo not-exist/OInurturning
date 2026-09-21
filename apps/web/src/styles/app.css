@@ -1,31 +1,25 @@
 @import 'tailwindcss';
 
 /* ---------------------------------------------------------------------------
- * 自托管字体（CSP 只允许 'self'，禁止外链；latin 子集合计 38KB）
- * 中文由系统栈接管（Chakra Petch / JetBrains Mono 均无 CJK 字形）。
+ * 自托管字体（CSP 只允许 'self'，禁止外链；latin 子集 Sans 45KB + Mono 15KB）
+ * 字体文件由 @fontsource 包提供（版本锁定在 package.json），但**不引包内 CSS**：
+ * 可变 Sans 的 wght.css 会把西里尔/希腊/越南文一并打进产物（6 子集 ≈162KB），而这些
+ * 字形一个都用不到 —— 故手写 @font-face 直指 latin 单文件。
+ * 中文由系统栈接管：IBM Plex 无 CJK 字形，自托管全套 CJK 的体积不划算；
+ * 且 IBM Plex 属中性黑体，与苹方/雅黑同族骨架，中西混排不断裂。
  * ------------------------------------------------------------------------ */
 @font-face {
-  font-family: 'Chakra Petch';
-  src: url('/fonts/chakra-petch-500.woff2') format('woff2');
-  font-weight: 500;
+  font-family: 'IBM Plex Sans Variable';
+  src: url('@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 700;
   font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'Chakra Petch';
-  src: url('/fonts/chakra-petch-600.woff2') format('woff2');
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Chakra Petch';
-  src: url('/fonts/chakra-petch-700.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/jetbrains-mono-var.woff2') format('woff2');
-  font-weight: 100 800;
+  font-family: 'IBM Plex Mono';
+  src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
   font-display: swap;
 }
 
@@ -34,9 +28,10 @@
  * 近黑冷底 + 单色科技线 + 稀有度作为画面唯一高饱和光源。
  * ------------------------------------------------------------------------ */
 @theme {
-  --font-sans: 'Chakra Petch', system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-display: 'Chakra Petch', system-ui, 'PingFang SC', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  /* 拉丁：IBM Plex 一家承担正文与标题（同骨架，靠字重/字距分层，不再混第二种字形） */
+  --font-sans: 'IBM Plex Sans Variable', system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-display: 'IBM Plex Sans Variable', system-ui, 'PingFang SC', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
   /* 底色分层 */
   --color-ink-950: #05070b;

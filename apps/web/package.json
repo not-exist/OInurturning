@@ -12,6 +12,8 @@
     "test": "echo \"web: no unit tests, typecheck only\" && tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/ibm-plex-sans": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "@oinur/shared": "workspace:*",
     "@tanstack/react-query": "^5.80.0",
     "lucide-react": "^1.47.0",
