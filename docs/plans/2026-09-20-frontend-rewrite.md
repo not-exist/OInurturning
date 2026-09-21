@@ -95,7 +95,7 @@
 - **Art Direction**：「深夜机房 · 算法指挥中心」。深墨底 + 单色科技线 + 稀有度作为画面唯一的高饱和光源。冷峻、精密、有赛事感。
 - **配色**：底色近黑冷调（`#0A0D12` → `#11161F` 分层）；主强调**电光青**、次强调**紫**；面板 1px 半透明描边 + 极轻玻璃感，不要圆角塑料风。**主色不要用红**（红留给错误、负向心态与 severity 刻度）。
 - **排版**：中文系统栈 `system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`；数字/代号/seed 用等宽栈。冲击力放在**巨型数字**（V 值、排名、Q 值、金币）与**超大标题**上，正文层级保持正常可读。
-- **字体**：CSP 禁止外链（见 §3.2）→ 中文系统栈 + **自托管 1 款拉丁 display + 1 款等宽子集**（woff2，合计 ≤100KB，放 `apps/web/public/fonts`）。不愿引入字体文件则退化为纯系统栈，用数字排版补质感。
+- **字体**：CSP 禁止外链（见 §3.2）→ 中文系统栈 + **自托管 1 款拉丁 + 1 款等宽子集**（woff2，合计 ≤100KB）。**2026-09-21 改 `IBM Plex Sans`(可变 latin 45KB) + `IBM Plex Mono`(latin 400 15KB)**，字体文件由 `@fontsource*` 包提供（版本锁在 `apps/web/package.json`），但不引包内 CSS——可变 Sans 的 `wght.css` 会把西里尔/希腊/越南文一并打进产物（6 子集 ≈162KB），故手写 `@font-face` 直指 latin 单文件。选型理由见 §9。
 - **背景**：可加低强度 canvas/程序化纹理（网格、扫描线、缓动粒子），**必须**响应 `prefers-reduced-motion`，不影响首屏。
 - **动效**：spring 缓动、数字滚动、卡片轻微 3D tilt、模态 scale+blur、路由过渡、鼠标跟随光晕。默认 **CSS `@keyframes` + Web Animations API + rAF 手搓**；确需 spring 物理才考虑 `motion`，且必须一次性引入并说明收益（无 `unsafe-eval`）。
 
@@ -357,6 +357,7 @@
 | `e4e63e6` | 总览钱包降为一行刻度；`panel-corners` 只给唯一 live 块；动态空态补 CTA |
 | `a891738` | 剧情章节地图（8 章节点横条 + 只展开当前章轨道，折叠章不卸载 DOM） |
 | `9d66492` | 修生产构建：`.empty-briefing` 误用 `@apply panel` |
+| `ccc0e15` | 拉丁排版换 IBM Plex Sans（可变）+ IBM Plex Mono，删掉 Chakra Petch / JetBrains Mono |
 
 **验收**：`pnpm -r typecheck && pnpm -r lint && pnpm -r build` 全绿；`pnpm e2e` **51 passed**（5.2 min，workers=1）；另用 DOM/computed style 断言复核 23 项视觉验收点全部通过。
 
@@ -373,6 +374,18 @@
 - **不改共享 `HoverCard`**：它已带 `tabIndex=0` + `group-focus-within`，点击即聚焦展开、触屏可用；改它会影响 10 处调用点。
 - **章节地图吸顶只在 `lg` 生效**：窄屏 HUD 会换行变高，`top: var(--hud-h)` 会被压住。
 - 路由级 code-split 仍未做（本轮后包体 551.87 kB / gzip 163.85 kB，另开）。
+
+### 字体选型（`ccc0e15`）
+
+原栈的问题是**把斜切装饰窄体当正文用**：`--font-sans` 与 `--font-display` 同为 `Chakra Petch`，且只自托管 500/600/700、**无 400 字重** → 12–14px 正文被迫 500（小字发糊）、拉丁斜切骨架与中文方正黑体同排断裂、`tabular-nums` 因字形无 tnum 而不生效（数字滚动抖动）、标题没有字重梯度。
+
+换 **IBM Plex Sans（可变 latin，wght 100–700）+ IBM Plex Mono（latin 400）** 的理由：
+- **Sans 与 Mono 同骨架**，等宽与正文混排最协调（这是它相对 "Inter + JetBrains Mono" 的决定性优势）；
+- IBM Plex 属**中性黑体**，与苹方/雅黑同族骨架，中西混排不断裂——这一点对本项目（全中文界面 + 大量拉丁数字）比"科技感"更重要；
+- 实测：tabular 与默认上下文里 `1111`/`8888` 均同宽（数字不再抖）；中文实测 4 字 = 192px（= 4×48px 全角，与强制雅黑一致），**无豆腐块**；
+- 体积 45.7KB + 14.7KB = **60.4KB**，仍在 §2.2 的 ≤100KB 内。
+
+技能库命中的另两条作为反例排除：**Orbitron + JetBrains Mono**（比 Chakra Petch 更窄更游戏化，更不适合正文）、**Russo One + Chakra Petch**（纯电竞路子，与"精密指挥中心"冲突）。
 
 ### 已知遗留（本轮判定为既有问题，未修）
 
