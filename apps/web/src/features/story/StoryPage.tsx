@@ -1,7 +1,7 @@
 import { useState, type JSX, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { CircleCheck, Gift, Lock, Target, Users } from 'lucide-react';
-import type { StoryStageProgress } from '@oinur/shared';
+import type { StoryChapterView, StoryStageProgress } from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
 import { BattleReplay, BattleWaiting } from '../records/BattleReplay';
 import {
@@ -77,6 +77,7 @@ function ToneChip({
 function StageNode({
   stage,
   ordinal,
+  primary,
   staminaShort,
   rosterReady,
   rosterSize,
@@ -85,6 +86,7 @@ function StageNode({
 }: {
   stage: StoryStageProgress;
   ordinal: number;
+  primary: boolean;
   staminaShort: boolean;
   rosterReady: boolean;
   rosterSize: number;
@@ -180,32 +182,24 @@ function StageNode({
               已通关{stage.bestRank === null ? '' : ` · 最佳名次 ${stage.bestRank}`}
             </ToneChip>
           )}
-          {!stage.cleared && stage.firstClearAt === null && stage.unlocked && (
+          {!stage.cleared && blocked === '未解锁' && <Chip icon={Lock}>未解锁</Chip>}
+          {!stage.cleared && blocked !== null && blocked !== '未解锁' && (
+            <span className="text-[11px] text-warn-400">{blocked}</span>
+          )}
+          {!stage.cleared && blocked === null && stage.firstClearAt === null && (
             <ToneChip icon={Gift} className="border-cyber-400/50 bg-cyber-400/10 text-cyber-300">
               首通奖励待领取
             </ToneChip>
           )}
-          {blocked === '未解锁' && <Chip icon={Lock}>未解锁</Chip>}
-        </span>
-        <span
-          className={`mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] ${
-            state === 'open' ? 'text-fg-dim' : 'text-fg-faint'
-          }`}
-        >
-          <span>推荐等级 {stage.recommendedLevel ?? '—'}</span>
-          <span>{stage.durationMin ?? '—'} 分钟</span>
-          <span>{rosterSize} 人团体赛</span>
-          <span className={state === 'locked' ? 'text-fg-faint' : 'text-warn-400'}>体力 ×{cost}</span>
-          {stage.clearCount > 0 && <span>已通关 {stage.clearCount} 次</span>}
         </span>
       </span>
 
       <span className="flex items-center gap-2">
-        {blocked !== null && blocked !== '未解锁' && (
-          <span className="text-[11px] text-fg-faint">{blocked}</span>
-        )}
+        <span className={`tnum text-[11px] ${state === 'locked' ? 'text-fg-faint' : 'text-warn-400'}`}>
+          体力 ×{cost}
+        </span>
         <Btn
-          variant={stage.unlocked ? 'primary' : 'ghost'}
+          variant={primary ? 'primary' : 'ghost'}
           size="sm"
           data-testid="story-enter"
           disabled={blocked !== null || pending}
@@ -218,9 +212,78 @@ function StageNode({
   );
 }
 
+/**
+ * 章节地图：八章节点横条（窄屏换行），只承担导航——点节点切换下方展开的关卡轨道。
+ * 节点色走难度体系的 TIER_TEXT 明度，不借稀有度六色。
+ */
+function ChapterMap({
+  chapters,
+  expandedKey,
+  onToggle,
+}: {
+  chapters: StoryChapterView[];
+  expandedKey: string | null;
+  onToggle: (chapter: string) => void;
+}): JSX.Element {
+  return (
+    <nav
+      aria-label="章节地图"
+      className="panel flex flex-wrap gap-1.5 p-2 lg:sticky lg:z-20"
+      style={{ top: 'var(--hud-h)' }}
+    >
+      {chapters.map((chapter) => {
+        const done = chapter.stages.every((stage) => stage.cleared);
+        const locked = chapter.stages[0]?.unlocked !== true;
+        const expanded = chapter.chapter === expandedKey;
+        const tier = isTier(chapter.chapter) ? TIER_TEXT[chapter.chapter] : 'text-fg';
+        const cls = `relative flex flex-1 basis-24 items-center justify-center gap-1.5 border px-2 py-1.5 transition-colors sm:flex-none ${
+          expanded
+            ? 'panel-corners border-cyber-400/70 bg-cyber-400/15'
+            : locked
+              ? 'border-ink-600 bg-ink-850/40'
+              : 'cursor-pointer border-ink-600 bg-ink-800/40 hover:border-ink-500'
+        }`;
+        const label = (
+          <>
+            {done ? (
+              <Icon icon={CircleCheck} className="size-3.5 shrink-0 text-good-400" />
+            ) : locked ? (
+              <Icon icon={Lock} className="size-3.5 shrink-0 text-fg-faint" />
+            ) : (
+              // 本页唯一 idle 动效：只标当前章
+              <span aria-hidden className="size-1.5 shrink-0 animate-pulse-dot rounded-full bg-cyber-400" />
+            )}
+            <span className={`font-display text-sm ${locked ? 'text-fg-faint' : tier}`}>
+              {tierLabel(chapter.chapter)}
+            </span>
+          </>
+        );
+        // 锁定章不是可操作项：用非控件承载提示（disabled 按钮收不到 title）
+        return locked ? (
+          <span key={chapter.chapter} title="先通关上一章" className={cls}>
+            {label}
+          </span>
+        ) : (
+          <button
+            key={chapter.chapter}
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => onToggle(chapter.chapter)}
+            className={cls}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function StoryPage(): JSX.Element {
   const [ngLevel, setNgLevel] = useState(0);
   const [roster, setRoster] = useState<number[]>([]);
+  /** null = 跟随默认（当前未清完章）；点击章节节点写入具体章，可展开回看已通关章 */
+  const [openChapterKey, setOpenChapterKey] = useState<string | null>(null);
   const overview = useStoryOverview(ngLevel);
   const students = useStudents();
   const enter = useEnterStoryStage();
@@ -260,14 +323,18 @@ export function StoryPage(): JSX.Element {
 
   const rosterReady = roster.length === ROSTER_SIZE;
   const rosterById = new Map(students.data.map((student) => [student.id, student]));
-  const totalStages = overview.data.chapters.reduce(
-    (sum, chapter) => sum + chapter.stages.length,
-    0,
-  );
-  const clearedStages = overview.data.chapters.reduce(
+  const chapters = overview.data.chapters;
+  const totalStages = chapters.reduce((sum, chapter) => sum + chapter.stages.length, 0);
+  const clearedStages = chapters.reduce(
     (sum, chapter) => sum + chapter.stages.filter((stage) => stage.cleared).length,
     0,
   );
+  // 当前章 = 首个「已可达且未清完」的章；八章全清时落在最后一章
+  const found = chapters.findIndex(
+    (chapter) => chapter.stages[0]?.unlocked === true && chapter.stages.some((stage) => !stage.cleared),
+  );
+  const focusIndex = found === -1 ? chapters.length - 1 : found;
+  const expandedKey = openChapterKey ?? chapters[focusIndex]?.chapter ?? null;
 
   const enterStage = (stageKey: string): void => {
     if (!rosterReady) return;
@@ -356,15 +423,24 @@ export function StoryPage(): JSX.Element {
         </Empty>
       )}
 
+      <ChapterMap
+        chapters={chapters}
+        expandedKey={expandedKey}
+        onToggle={(chapter) => setOpenChapterKey(chapter === expandedKey ? null : chapter)}
+      />
+
       <div className="space-y-5">
-        {overview.data.chapters.map((chapter, chapterIndex) => {
+        {chapters.map((chapter, chapterIndex) => {
           const cleared = chapter.stages.filter((stage) => stage.cleared).length;
           const tier = isTier(chapter.chapter) ? TIER_TEXT[chapter.chapter] : 'text-fg';
+          const expanded = chapter.chapter === expandedKey;
+          // 一屏只有一个主命令：本章（即全局）首个可进关用 primary，其余一律 ghost
+          const openIndex = chapter.stages.findIndex((stage) => stage.unlocked && !stage.cleared);
           return (
             <Panel
               key={chapter.chapter}
               bodyClassName="p-2 sm:p-4"
-              className="animate-rise"
+              className={expanded ? '' : 'hidden'}
               title={
                 <span className="flex items-center gap-2">
                   <span className={`font-display text-base ${tier}`}>
@@ -396,6 +472,7 @@ export function StoryPage(): JSX.Element {
                     key={stage.stageKey}
                     stage={stage}
                     ordinal={stageIndex + 1}
+                    primary={stageIndex === openIndex}
                     rosterSize={ROSTER_SIZE}
                     rosterReady={rosterReady}
                     staminaShort={roster.some(
