@@ -117,7 +117,8 @@ test.describe('完整玩家旅程', () => {
     await page.goto('/backpack');
     const potion = page.locator('[data-testid="inventory-row"][data-itemid="stamina-potion"]');
     await potion.getByTestId('item-use').click();
-    await page.getByTestId('item-picker').getByText(best.name).click();
+    // exact：确认按钮文案也含学员名（「给 {名} 使用」），子串匹配会在默认预选该学员时命中两个元素
+    await page.getByTestId('item-picker').getByText(best.name, { exact: true }).click();
     await page.getByTestId('item-use-confirm').click();
     await expect(page.getByTestId('item-picker')).not.toBeVisible();
 
