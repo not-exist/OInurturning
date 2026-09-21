@@ -25,6 +25,10 @@ COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+# Prisma 7 起 datasource.url 不再写在 schema.prisma 里，改由 prisma.config.ts 提供
+# （apps/api/src/lib/prisma.ts 注释同此约定）；缺此文件 entrypoint 的
+# `prisma migrate deploy` 会以 "datasource.url is required" 失败，容器无法启动。
+COPY --from=build /app/apps/api/prisma.config.ts ./apps/api/prisma.config.ts
 COPY --from=build /app/docs/data ./config
 COPY deploy/entrypoint.sh ./entrypoint.sh
 RUN chmod +x entrypoint.sh
