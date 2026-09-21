@@ -340,3 +340,41 @@
 - 计划 §5 三条已知冲突（C1 事件的 `tag-card`、蓝紫书周限数值裁定、招募价写回）均按原口径处理，未改后端。
 - 前端包 548KB / gzip 162KB（lucide 图标 + 页面重写，比改写前 +111KB）。若要压回，做**路由级代码分割**（`React.lazy` + Suspense）或按需 `dynamicIconImports`，评估后可另开提交。
 - `/admin` 审计表保留原始动作码（`TOURNAMENT_CREATE` 等）作为审计追溯字段（e2e 逐字断言依赖它），中文标签并列显示。
+
+---
+
+## 9. 美观度第二轮：指挥台海拔（2026-09-21 完成）
+
+第一轮重写 + `d10a32e` 截图 polish 修完硬伤后，截图仍像**深色 admin**：每块 panel 同等发光、总览钱包与 sticky HUD 重复、剧情是 8 章 × 33 关均质列表、稀有度把整行染色、空态像缺文件。本轮**只抬海拔、不铺新色**：色板、16 条路由、e2e testid 与逐字文案全部锁死。
+
+| 提交 | 内容 |
+|---|---|
+| `fb91259` | 共享基元：HUD 加权（金币主 / 声誉次 / 学员安静 / 体力格 + 缺体点名）、`Empty` 升为无信号简报、可点 `Card` 1px 抬升、`.mat-genius` halo 去彩、`RARITY_GLOW` 加大、训练页改用共享 `StaminaCells` |
+| `c1cd288` | 稀有度收进 40–44px 图标井（行壳回中性）；历练事件整卡呼吸 → 井上专属呼吸 |
+| `8df093b` | 内容页空态 CTA：背包 → 剧情赛程、历练记录 → 出发准备、PVP → 公告 |
+| `4a969d9` | HUD 色值死分支清理 |
+| `b0bfbd2` | `full-journey` 的 `getByText` strict 冲突加 `{ exact: true }` |
+| `e4e63e6` | 总览钱包降为一行刻度；`panel-corners` 只给唯一 live 块；动态空态补 CTA |
+| `a891738` | 剧情章节地图（8 章节点横条 + 只展开当前章轨道，折叠章不卸载 DOM） |
+| `9d66492` | 修生产构建：`.empty-briefing` 误用 `@apply panel` |
+
+**验收**：`pnpm -r typecheck && pnpm -r lint && pnpm -r build` 全绿；`pnpm e2e` **51 passed**（5.2 min，workers=1）；另用 DOM/computed style 断言复核 23 项视觉验收点全部通过。
+
+### 本轮修掉的 3 个真实缺陷（原计划外，已核实成因）
+
+1. **彩档图标整体不可见**：`.rainbow-text` 是 `bg-clip-text text-transparent`，而 Lucide 图标走 `stroke: currentColor` → 凡把 `rarityText()` 或彩档 `rarityChip()` 打在含 SVG 图标的元素上，图标渲染为**透明**。命中 5 处（背包/题库图标井、历练日志、学员卡与悬浮详情的天赋图标）。新增 `RARITY_ICON`（彩档走实色）收敛；`rainbow-text` 仅保留给纯文字（`AuthFrame` 品牌字）。
+2. **生产构建失败**：`.empty-briefing` 用 `@apply panel panel-corners` 组合语义类，而 `panel`/`panel-corners` 是 `@layer components` 的语义类、不是 Tailwind 工具类 → `vite build` 报 `Cannot apply unknown utility class 'panel'` 直接失败。**`vite dev` 不硬失败**，所以 e2e 一直没暴露（dev 下空态只是丢了玻璃底/圆角/四角刻度）。改为在 JSX 里组合类名，CSS 只写差异项。
+3. **`full-journey` 随机失败**：`item-use-confirm` 文案「给 {学员名} 使用」与 spec 的 `getByText(best.name)` 撞车——默认预选 `students[0]` 恰为目标学员时，strict mode 同时命中学员行与按钮。与学员顺序相关，故时好时坏。加 `{ exact: true }` 锁定学员行，产品文案不动。
+
+### 本轮明确不做（含理由）
+
+- **题库空态不加 CTA**：出题工作台就在同页正上方且带主按钮，同义 CTA 属冗余。
+- **不把 `animate-halo` 复用到稀有度彩档井**：该动画已归品质材质 `.mat-genius`（arc 色），复用即跨体系混用；改为独立的 `--animate-rainbow-halo`（只用 `--color-rarity-colorful`）。
+- **不改共享 `HoverCard`**：它已带 `tabIndex=0` + `group-focus-within`，点击即聚焦展开、触屏可用；改它会影响 10 处调用点。
+- **章节地图吸顶只在 `lg` 生效**：窄屏 HUD 会换行变高，`top: var(--hud-h)` 会被压住。
+- 路由级 code-split 仍未做（本轮后包体 551.87 kB / gzip 163.85 kB，另开）。
+
+### 已知遗留（本轮判定为既有问题，未修）
+
+- 窄屏（400px）剧情页 `scrollWidth` 比视口多 **3px**：来源是共享 `HoverCard` 的隐藏 tooltip（`w-80`、`opacity-0`）越出视口。已用 `fb91259` 版本做对照测量，**改动前后同为 403**，非本轮引入；`overflow` 全页一致无真实横向滚动条。
+
