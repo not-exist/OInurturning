@@ -25,10 +25,10 @@ import {
   RARITY_BORDER,
   RARITY_FILL,
   RARITY_GLOW,
+  RARITY_ICON,
   normRarity,
   rarityChip,
   rarityLabel,
-  rarityText,
 } from '../../lib/rarity';
 import { GLYPH, Icon, NAV_ICON, eventCategoryIcon, itemIcon } from '../../components/icons';
 import {
@@ -157,15 +157,14 @@ function EventCard({
   );
 
   return (
-    <section
-      className={`panel animate-rise ${rarity === 'RAINBOW' ? 'animate-halo' : ''}`}
-      aria-labelledby="active-event"
-    >
+    <section className="panel animate-rise" aria-labelledby="active-event">
       <div className="flex flex-wrap items-start gap-4 border-b border-ink-600/70 p-4">
         <span
-          className={`flex size-12 shrink-0 items-center justify-center border ${RARITY_BORDER[rarity]} ${RARITY_FILL[rarity]} ${RARITY_GLOW[rarity]}`}
+          className={`flex size-12 shrink-0 items-center justify-center border ${RARITY_BORDER[rarity]} ${RARITY_FILL[rarity]} ${RARITY_GLOW[rarity]} ${
+            rarity === 'RAINBOW' ? 'animate-rainbow-halo' : ''
+          }`}
         >
-          <Icon icon={eventCategoryIcon(event.category)} className="size-5" />
+          <Icon icon={eventCategoryIcon(event.category)} className={`size-5 ${RARITY_ICON[rarity]}`} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -550,7 +549,7 @@ export function AdventurePage(): JSX.Element {
                 <li key={log.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
                   <Icon
                     icon={eventCategoryIcon(log.event.category)}
-                    className={`size-4 shrink-0 ${pendingLog ? 'text-warn-400' : rarityText(log.event.rarity)}`}
+                    className={`size-4 shrink-0 ${pendingLog ? 'text-warn-400' : RARITY_ICON[normRarity(log.event.rarity)]}`}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-fg">{log.event.name}</span>

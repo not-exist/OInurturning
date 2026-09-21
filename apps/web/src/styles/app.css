@@ -103,6 +103,8 @@
   --hud-h: 3rem;
 
   --animate-halo: halo 3.6s ease-in-out infinite;
+  /* 稀有度彩档专属呼吸（跨体系禁令：不复用品质材质的 halo） */
+  --animate-rainbow-halo: rainbow-halo 3.6s ease-in-out infinite;
   --animate-flow: flow 6s linear infinite;
   --animate-rise: rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
@@ -118,6 +120,19 @@
       box-shadow:
         0 0 0 1px color-mix(in oklab, var(--color-cyber-400) 55%, transparent),
         0 0 34px -4px color-mix(in oklab, var(--color-cyber-400) 60%, transparent);
+    }
+  }
+  @keyframes rainbow-halo {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--color-rarity-colorful) 40%, transparent),
+        0 0 20px -4px color-mix(in oklab, var(--color-rarity-colorful) 50%, transparent);
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--color-rarity-colorful) 70%, transparent),
+        0 0 36px 0 color-mix(in oklab, var(--color-rarity-colorful) 70%, transparent);
     }
   }
   @keyframes flow {
