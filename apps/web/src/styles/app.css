@@ -343,9 +343,9 @@
     @apply border-ink-600/60 border-t;
   }
 
-  /* 空态：无信号简报，不是缺文件虚线框 */
+  /* 空态：无信号简报（组合 panel panel-corners 使用；@apply 不能引用语义类，只写差异项） */
   .empty-briefing {
-    @apply panel panel-corners border-dashed border-cyber-400/25 bg-ink-850/40 px-6 py-10 text-center;
+    @apply border-dashed border-cyber-400/25 bg-ink-850/40 px-6 py-10 text-center;
   }
 }
 
