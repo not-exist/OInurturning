@@ -154,7 +154,7 @@ export function Layout(): JSX.Element {
         >
           <dl className="flex flex-wrap items-center gap-x-6 gap-y-1">
             <HudStat label="金币" hero>
-              <RollingNumber value={overview.data?.me.money ?? me?.money ?? 0} className="text-cyber-300" />
+              <RollingNumber value={overview.data?.me.money ?? me?.money ?? 0} />
             </HudStat>
             <HudStat label="声誉">
               <RollingNumber value={reputation} className="text-arc-300" />
@@ -222,7 +222,7 @@ function HudStat({
 }): JSX.Element {
   return (
     <div className="flex items-baseline gap-2">
-      <dt className={`text-[10px] tracking-[0.14em] ${quiet ? 'text-fg-dim' : 'text-fg-dim'} uppercase`}>
+      <dt className="text-[10px] tracking-[0.14em] text-fg-dim uppercase">
         {label}
       </dt>
       <dd className={`font-display ${hero ? 'text-base text-cyber-300' : quiet ? 'text-sm text-fg-muted' : 'text-sm text-fg'}`}>
