@@ -404,7 +404,7 @@ export function AdventurePage(): JSX.Element {
         actions={<Chip icon={UserRound}>3 人小队 · 队长带队</Chip>}
       />
 
-      <Panel title="出发准备" eyebrow="出发" corners>
+      <Panel id="adventure-depart" className="scroll-mt-20" title="出发准备" eyebrow="出发" corners>
         <RosterPicker
           students={students.data}
           selectedIds={roster}
@@ -536,7 +536,18 @@ export function AdventurePage(): JSX.Element {
       >
         {logs.data.length === 0 ? (
           <div className="p-4">
-            <Empty icon={NAV_ICON.adventure} title="暂无历练记录">
+            <Empty
+              icon={NAV_ICON.adventure}
+              title="暂无历练记录"
+              action={
+                <a
+                  href="#adventure-depart"
+                  className="inline-flex cursor-pointer items-center gap-1.5 border border-ink-600 px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:border-ink-500 hover:text-fg"
+                >
+                  回到出发准备
+                </a>
+              }
+            >
               投入体力抽取事件后，结果会按时间倒序记录在此。
             </Empty>
           </div>

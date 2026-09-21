@@ -27,6 +27,7 @@ import {
 } from '../../lib/rarity';
 import { Icon, itemIcon } from '../../components/icons';
 import {
+  ActionLink,
   Btn,
   Chip,
   Empty,
@@ -120,7 +121,11 @@ export function InventoryPage(): JSX.Element {
       />
 
       {items.length === 0 ? (
-        <Empty icon={Sparkles} title="背包空空如也">
+        <Empty
+          icon={Sparkles}
+          title="背包空空如也"
+          action={<ActionLink to="/story">去剧情赛程获取</ActionLink>}
+        >
           参加剧情比赛、历练或前往高级学院讲课，都会让背包充实起来。
         </Empty>
       ) : (

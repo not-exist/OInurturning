@@ -1,6 +1,6 @@
 import { useState, type JSX } from 'react';
 import { Swords } from 'lucide-react';
-import { Chip, Empty, ErrorNote, InlineLoader, PageHeader } from '../../components/ui';
+import { ActionLink, Chip, Empty, ErrorNote, InlineLoader, PageHeader } from '../../components/ui';
 import { Metric } from '../records/shared/bits';
 import { useItemName } from '../records/shared/rewards';
 import { tournamentStatusLabel } from '../../lib/labels';
@@ -151,7 +151,11 @@ export function PvpPage(): JSX.Element {
       />
 
       {tournaments.data.length === 0 ? (
-        <Empty icon={Swords} title="暂无开放赛事">
+        <Empty
+          icon={Swords}
+          title="暂无开放赛事"
+          action={<ActionLink to="/">查看公告</ActionLink>}
+        >
           管理员发布锦标赛后会出现在这里。报名需持有报名券，可留意公告。
         </Empty>
       ) : (

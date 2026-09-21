@@ -29,6 +29,7 @@ export function Panel({
   className = '',
   bodyClassName = 'p-4',
   corners = false,
+  id,
 }: {
   title?: ReactNode;
   eyebrow?: ReactNode;
@@ -37,9 +38,10 @@ export function Panel({
   className?: string;
   bodyClassName?: string;
   corners?: boolean;
+  id?: string;
 }): JSX.Element {
   return (
-    <section className={`panel ${corners ? 'panel-corners' : ''} ${className}`}>
+    <section id={id} className={`panel ${corners ? 'panel-corners' : ''} ${className}`}>
       {(title !== undefined || actions !== undefined) && (
         <header className="panel-hd">
           <div className="min-w-0">
