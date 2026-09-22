@@ -64,16 +64,6 @@ export function useCompleteTutorial() {
   });
 }
 
-export function useSkipTutorial() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => apiFetch<TutorialStateView>('/api/tutorial/skip', { method: 'POST' }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tutorial'] });
-    },
-  });
-}
-
 export function isRouteUnlocked(unlocked: string[], routeKey: string): boolean {
   if (unlocked.includes('all')) return true;
   return unlocked.includes(routeKey);
