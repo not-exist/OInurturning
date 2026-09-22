@@ -1,5 +1,22 @@
 import { z } from 'zod';
 
+/** 引导 unlock 键的合法词表；后端 ROUTE_MAP 的键必须与它完全一致（有单测断言） */
+export const TUTORIAL_ROUTE_KEYS = [
+  'overview',
+  'students',
+  'training',
+  'academy',
+  'lecture',
+  'adventure',
+  'story',
+  'shop',
+  'backpack',
+  'problem-library',
+  'pvp',
+  'admin',
+] as const;
+export type TutorialRouteKey = (typeof TUTORIAL_ROUTE_KEYS)[number];
+
 export const tutorialStepSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/),
   title: z.string().min(1),

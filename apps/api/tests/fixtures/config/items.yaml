@@ -34,8 +34,9 @@ items:
     effect:
       desc: 将一名学员的一个天赋重新随机。
       kind: talent_reroll
-    price: null
-    sources: [测试发放]
+    # shop.yaml weekly_limits 收录本道具 → 必须可售（price 与 docs/data/items.yaml 一致）
+    price: 1100
+    sources: [商城, 测试发放]
     stack: 99
     description: 测试用洗练券。
   - id: reroll-shard
@@ -189,8 +190,8 @@ items:
       amount: 10
       target: single_student
       usage_timing: 非比赛时段；每名学员限用 1 台
-    price: null
-    sources: [测试发放]
+    price: 4800
+    sources: [商城, 测试发放]
     stack: 10
     description: 测试用心流引擎。
   - id: book-ds-green
@@ -310,3 +311,131 @@ items:
     sources: [商城]
     stack: 99
     description: 测试用出题直用书。
+
+  # --------------------------------------------------------------------
+  # 商城 / 引导配置引用的道具（category/rarity/price/stack 取自 docs/data/items.yaml）
+  # --------------------------------------------------------------------
+  - id: intel-slip
+    name: 情报
+    category: quest
+    rarity: gray
+    effect:
+      desc: 使用后可预览下一次历练的事件与选项，再决定是否投体力出发；每次历练限用一张。
+      kind: info_preview
+      scope: next_adventure
+    price: 30
+    sources: [商城]
+    stack: 99
+    description: 测试用情报。
+  - id: spare-cable
+    name: 备用网线
+    category: functional
+    rarity: gray
+    effect:
+      desc: 持有即生效——历练事件「断网事故(G4)」结算时自动消耗一根，将负面影响完全化解。
+      kind: event_defuse
+      event_ref: G4
+      auto_trigger: true
+    price: 50
+    sources: [商城]
+    stack: 10
+    description: 测试用备用网线。
+  - id: energy-bar
+    name: 能量棒
+    category: functional
+    rarity: green
+    effect:
+      desc: 使用后该学员在下一场比赛中精力上限临时 +20，仅当场有效。
+      kind: contest_buff
+      buff: {energy_cap_temp: 20}
+    price: 220
+    sources: [商城]
+    stack: 99
+    description: 测试用能量棒。
+  - id: double-card
+    name: 双倍训练卡
+    category: functional
+    rarity: green
+    effect:
+      desc: 使用后绑定一名学员，其下一次训练（基础/定向/专项均可）的属性收益翻倍。
+      kind: training_buff
+      multiplier: 2
+      scope: next_training_session
+    price: 450
+    sources: [商城]
+    stack: 99
+    description: 测试用双倍训练卡。
+  - id: protection-card
+    name: 保护卡
+    category: functional
+    rarity: green
+    effect:
+      desc: 历练遇到麻烦类事件的负面结果时，可手动打出此卡将其完全抵消（体力照常消耗）。
+      kind: adventure_insurance
+      scope: trouble_events_only
+    price: 380
+    sources: [商城]
+    stack: 99
+    description: 测试用保护卡。
+  - id: firewall
+    name: 防火墙
+    category: functional
+    rarity: blue
+    effect:
+      desc: 持有即生效——历练事件「OJ 遭黑客攻击(L4)」时自动消耗一面，反击成功并获得稀有材料电路板×2。
+      kind: event_defuse
+      event_ref: L4
+      auto_trigger: true
+    price: 420
+    sources: [商城]
+    stack: 10
+    description: 测试用防火墙。
+  - id: lucky-coin
+    name: 幸运币
+    category: functional
+    rarity: blue
+    effect:
+      desc: 使用后下一次历练的高稀有度事件权重整体上调一档（体力投入档不变），用后自动消耗。
+      kind: adventure_buff
+      buff: {rarity_weight_shift: +1_tier}
+    price: 650
+    sources: [商城]
+    stack: 99
+    description: 测试用幸运币。
+  - id: vitality-core
+    name: 精能核心
+    category: nurture
+    rarity: purple
+    effect:
+      desc: 永久提升一名学员精力上限 +10。
+      kind: energy_cap_add
+      amount: 10
+      target: single_student
+    price: 3200
+    sources: [商城]
+    stack: 10
+    description: 测试用精能核心。
+  - id: entry-ticket
+    name: 报名券
+    category: contest
+    rarity: green
+    effect:
+      desc: 报名一场 PVP 锦标赛的入场凭证，报名时消耗一张。
+      kind: pvp_entry
+      cost_per_registration: 1
+    price: 250
+    sources: [商城]
+    stack: 99
+    description: 测试用报名券。
+  - id: recruit-clue
+    name: 招募线索
+    category: quest
+    rarity: purple
+    effect:
+      desc: 使用后下一次手动刷新招募池时，保底出现至少一名精英品质学员；仅对紧接的一次刷新生效，不可叠加。
+      kind: recruit_guarantee
+      guarantee_quality: elite_min
+    price: 1800
+    sources: [商城]
+    stack: 99
+    description: 测试用招募线索。

@@ -1,6 +1,7 @@
 import {
   CONFIG_RARITIES,
   ECONOMY_QUALITY_TIERS,
+  TUTORIAL_ROUTE_KEYS,
   lectureConfigSchema,
   onboardingConfigSchema,
   tutorialConfigSchema,
@@ -47,12 +48,14 @@ export function runSemanticChecks(input: {
   if (input.problems !== undefined) checkProblems(input.problems, issues);
   if (input.stages !== undefined) checkStages(input.stages, input.problems, input.items, issues);
   if (input.events !== undefined) checkEvents(input.events, input.items, issues);
-  if (input.tutorial !== undefined) checkTutorial(input.tutorial, issues);
+  if (input.tutorial !== undefined) checkTutorial(input.tutorial, input.items, issues);
   if (input.shop !== undefined) checkShop(input.shop, input.items, issues);
   return issues;
 }
 
-function checkTutorial(tutorial: TutorialConfig, issues: SemanticIssue[]): void {
+function checkTutorial(tutorial: TutorialConfig, items: ItemDef[], issues: SemanticIssue[]): void {
+  const itemIds = new Set(items.map((item) => item.id));
+  const routeKeys = new Set<string>(TUTORIAL_ROUTE_KEYS);
   const seen = new Set<string>();
   tutorial.steps.forEach((step, idx) => {
     if (seen.has(step.id)) {
@@ -62,7 +65,15 @@ function checkTutorial(tutorial: TutorialConfig, issues: SemanticIssue[]): void 
     if (step.unlock.length === 0) {
       issues.push({ file: 'tutorial', path: `steps.${idx}.unlock`, message: 'unlock 不能为空' });
     }
+    for (const key of step.unlock) {
+      if (key !== 'all' && !routeKeys.has(key)) {
+        issues.push({ file: 'tutorial', path: `steps.${idx}.unlock`, message: `未知解锁键：${key}` });
+      }
+    }
     if (step.reward?.item) {
+      if (!itemIds.has(step.reward.item)) {
+        issues.push({ file: 'tutorial', path: `steps.${idx}.reward.item`, message: `奖励道具不存在：${step.reward.item}` });
+      }
       if (!step.reward.count || step.reward.count <= 0) {
         issues.push({ file: 'tutorial', path: `steps.${idx}.reward.count`, message: '奖励道具数量必须为正' });
       }
@@ -370,6 +381,7 @@ function checkItems(items: ItemDef[], issues: SemanticIssue[]): void {
       issues.push({ file: 'items', path: `items.${it.id}`, message: `道具 id 重复：${it.id}` });
     }
     seen.add(it.id);
+    // category/rarity/effect.kind 合法性由 zod schema 保证，无需重复检查
   }
 }
 
@@ -401,6 +413,8 @@ function checkEconomy(economy: EconomyConfig, issues: SemanticIssue[]): void {
         issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.threshold`, message: '讲课门槛必须严格递增' });
       }
       previousThreshold = tier.threshold;
+      // 讲课成长（issue #56）：思维要求 R 必须随档位递增，且落在强接窗 [threshold−8, threshold] 内——
+      // 高于门槛会让「达标学员」恒定思维不足，低于窗口会让强接学员永不付出代价。
       const thinkingReq = tier.thinking_req ?? tier.threshold;
       if (thinkingReq <= previousThinkingReq) {
         issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.thinking_req`, message: '讲课思维要求必须严格递增' });
