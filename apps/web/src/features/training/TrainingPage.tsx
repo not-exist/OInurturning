@@ -174,6 +174,7 @@ export function TrainingPage(): JSX.Element {
                 key={s.id}
                 as="button"
                 data-testid="train-student"
+                data-student-id={s.id}
                 selected={studentId === s.id}
                 onClick={() => setStudentId(s.id)}
                 className={`min-w-40 flex-1 space-y-2 p-3 text-left ${QUALITY_MATERIAL[s.qualityTier]}`}
