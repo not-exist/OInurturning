@@ -29,6 +29,9 @@ export function useTutorial() {
     queryKey: ['tutorial'],
     queryFn: () => apiFetch<TutorialStateView>('/api/tutorial'),
     staleTime: 10_000,
+    // 行为步由服务端 autoAdvanceIfNeeded 推进（训练/讲课/历练/剧情/访问学员与候选池、商城…），
+    // 前端拿不到这些写入的完成信号，故未完成时每 2s 轮询一次；完成后停止。
+    refetchInterval: (query) => (query.state.data?.completed === true ? false : 2000),
   });
 }
 
