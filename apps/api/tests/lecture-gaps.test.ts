@@ -39,7 +39,7 @@ async function register(): Promise<{ token: string; userId: number }> {
 async function makeStudent(userId: number, v: number): Promise<{ id: number }> {
   const student = await prisma.student.create({
     data: {
-      userId, name: `讲师 V${v}`, sex: 'MALE', qualityTier: 'COMMON',
+      userId, name: `讲师 V${v}`, qualityTier: 'COMMON',
       ds: v, dp: v, math: v, graph: v, greedy: v, str: v, code: v, thinking: v, setting: v,
       focusCap: 20, energyMax: 50, energy: 50, staminaRegen: 10,
     },

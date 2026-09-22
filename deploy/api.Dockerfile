@@ -11,6 +11,8 @@ COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 COPY docs/data docs/data
+# 构建期：生成 Prisma Client（不连库）。migrate deploy 必须有 MySQL，
+# 由运行镜像 entrypoint 在 compose 起栈、mysql healthy 后自动执行。
 RUN pnpm -C apps/api generate && pnpm -C apps/api build
 
 # ---- stage 2: 运行 ----

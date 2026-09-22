@@ -131,7 +131,7 @@ describe('auth coverage：改密/登出/注销/封禁', () => {
     const { session } = await register();
     const student = await prisma.student.create({
       data: {
-        userId: session.me.id, name: '待删学员', sex: 'MALE', qualityTier: 'COMMON',
+        userId: session.me.id, name: '待删学员', qualityTier: 'COMMON',
         ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10, code: 10, thinking: 10, setting: 10,
         focusCap: 20, energyMax: 50, energy: 50, staminaRegen: 10,
       },

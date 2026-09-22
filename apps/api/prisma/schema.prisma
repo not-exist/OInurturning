@@ -378,11 +378,6 @@ model ConfigImport {
 
 // ───────────────────────── 学员域（M1-R4：字段对齐领域键，student.md 权威） ─────────────────────────
 
-enum Sex {
-  MALE
-  FEMALE
-}
-
 enum QualityTier {
   COMMON
   GOOD
@@ -407,7 +402,6 @@ model Student {
   id          Int           @id @default(autoincrement())
   userId      Int
   name        String        @db.VarChar(24)
-  sex         Sex
   qualityTier QualityTier
   status      StudentStatus @default(ACTIVE)
   // 九维能力（1–100，浮点累积、展示 floor）

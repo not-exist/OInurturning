@@ -2,7 +2,7 @@ import { useMemo, type JSX } from 'react';
 import { Link } from 'react-router';
 import type { StudentView } from '@oinur/shared';
 import { useStudents, useTalentDefs, type TalentDefView } from '../../lib/hooks';
-import { SEX_LABEL, floor, round, signed } from '../../lib/labels';
+import { floor, round, signed } from '../../lib/labels';
 import { QUALITY_MATERIAL, RARITY_ICON } from '../../lib/rarity';
 import { ActionLink, ErrorNote, Empty, HoverCard, InlineLoader, Meter, Numeral } from '../../components/ui';
 import { Icon, talentIcon } from '../../components/icons';
@@ -72,7 +72,6 @@ function StudentCard({ s, defs }: { s: StudentView; defs: Map<string, TalentDefV
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate font-medium text-fg">{s.name}</p>
-          <p className="mt-0.5 text-[11px] text-fg-faint">{SEX_LABEL[s.sex]}</p>
         </div>
         <QualityBadge tier={s.qualityTier} className="shrink-0" />
       </div>

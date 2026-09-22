@@ -4,7 +4,7 @@ import {
   type EconomyRecruitment,
   type TalentDef,
 } from '@oinur/shared';
-import type { QualityTier, Sex } from '@prisma/client';
+import type { QualityTier } from '@prisma/client';
 import { pickName } from './name-pool.js';
 
 /**
@@ -294,7 +294,6 @@ export interface CandidateAttrs {
 export interface CandidatePayload {
   tempId: string;
   name: string;
-  sex: Sex;
   qualityTier: QualityTier;
   hint: string;
   attrs: CandidateAttrs;
@@ -348,13 +347,11 @@ export function generateCandidateWithQuality(
   };
 
   const talentIds = rollTalentIds(rng, quality, ctx.buckets);
-  const sex: Sex = rng() < 0.5 ? 'MALE' : 'FEMALE';
   const name = pickName(rng);
 
   return {
     tempId,
     name,
-    sex,
     qualityTier: QUALITY_TO_TIER[quality],
     hint: QUALITY_HINTS[quality],
     attrs,

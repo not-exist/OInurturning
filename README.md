@@ -82,8 +82,7 @@ OInurturning/
 ```bash
 cp .env.example .env          # 务必修改 JWT_SECRET、数据库口令
 pnpm install
-pnpm db:up                    # docker compose 起 MySQL
-pnpm db:migrate               # prisma migrate deploy
+pnpm db:up                    # docker compose 起 MySQL，就绪后自动 prisma migrate deploy
 pnpm dev                      # 前端 http://localhost:5173，后端 http://localhost:3000
 ```
 
@@ -178,7 +177,7 @@ cp ../.env.example .env   # 补齐 MYSQL_PASSWORD、JWT_SECRET 等生产配置
 docker compose up -d --build
 ```
 
-- API 容器启动时自动执行 `prisma migrate deploy`。
+- 构建 API 镜像时生成 Prisma Client；`docker compose up --build` 在 MySQL 健康后由 entrypoint 自动执行 `prisma migrate deploy`（幂等）。
 - Nginx 负责静态托管前端与 `/api` 反代，安全响应头与 SPA fallback 已配置。
 - 备份脚本：`deploy/backup.sh`（mysqldump + 滚动清理，凭据从容器环境读取）。
 - 完整上线检查、备份恢复、日志与限流配置见 `docs/OPERATIONS.md`。

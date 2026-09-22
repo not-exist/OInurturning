@@ -10,7 +10,7 @@
  * 否则依赖 CONFIG 的路径（招募池生成）会挂。
  */
 import bcrypt from 'bcryptjs';
-import { Prisma, type QualityTier, type Sex } from '@prisma/client';
+import { Prisma, type QualityTier } from '@prisma/client';
 import { getConfig, importConfigs } from '../config/loader.js';
 import { env } from '../config/env.js';
 import { dayKey } from '../lib/clock.js';
@@ -27,7 +27,6 @@ const SEED_RNG = 20_260_830;
 interface StudentTemplate {
   name: string;
   qualityTier: QualityTier;
-  sex: Sex;
   /** 六维各自中值（§3.3 的 E；六维同值） */
   dim: number;
   code: number;
@@ -40,9 +39,9 @@ interface StudentTemplate {
 
 /** common/good/elite 三档的属性中值（student.md §3.3 主表 + 辅助属性表） */
 const STUDENTS: StudentTemplate[] = [
-  { name: '小明', qualityTier: 'COMMON', sex: 'MALE', dim: 8, code: 7, thinking: 8, setting: 3, focusCap: 45, energyMax: 55, staminaRegen: 48 },
-  { name: '阿明', qualityTier: 'GOOD', sex: 'MALE', dim: 14, code: 13, thinking: 15, setting: 6, focusCap: 50, energyMax: 62, staminaRegen: 50 },
-  { name: '千雪', qualityTier: 'ELITE', sex: 'FEMALE', dim: 22, code: 20, thinking: 24, setting: 10, focusCap: 58, energyMax: 70, staminaRegen: 52 },
+  { name: '小明', qualityTier: 'COMMON', dim: 8, code: 7, thinking: 8, setting: 3, focusCap: 45, energyMax: 55, staminaRegen: 48 },
+  { name: '阿明', qualityTier: 'GOOD', dim: 14, code: 13, thinking: 15, setting: 6, focusCap: 50, energyMax: 62, staminaRegen: 50 },
+  { name: '千雪', qualityTier: 'ELITE', dim: 22, code: 20, thinking: 24, setting: 10, focusCap: 58, energyMax: 70, staminaRegen: 52 },
 ];
 
 /** 背包样例道具（itemId, 数量）。六维书取若干科目若干稀有度（定向训练耗材可见） */
@@ -102,7 +101,6 @@ async function main(): Promise<void> {
         data: {
           userId: user.id,
           name: t.name,
-          sex: t.sex,
           qualityTier: t.qualityTier,
           status: 'ACTIVE',
           ds: t.dim, dp: t.dim, math: t.dim, graph: t.dim, greedy: t.dim, str: t.dim,

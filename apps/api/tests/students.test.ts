@@ -35,8 +35,7 @@ async function createStudent(userId: number, overrides: Record<string, unknown> 
     data: {
       userId,
       name: '学员甲',
-      sex: 'MALE',
-      qualityTier: 'COMMON',
+            qualityTier: 'COMMON',
       ds: 10, dp: 12, math: 14, graph: 16, greedy: 18, str: 20,
       code: 22, thinking: 24, setting: 5,
       focusCap: 45, energyMax: 60, energy: 30, staminaRegen: 50,

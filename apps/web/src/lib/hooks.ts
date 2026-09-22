@@ -54,7 +54,6 @@ export interface CandidateAttrs {
 export interface CandidatePayload {
   tempId: string;
   name: string;
-  sex: 'MALE' | 'FEMALE';
   hint: string;
   attrs: CandidateAttrs;
   price: number;
