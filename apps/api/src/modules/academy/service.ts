@@ -15,7 +15,6 @@ import {
   type CandidatePayload,
   type GenerateContext,
 } from './recruit-gen.js';
-import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 /**
  * 招募服务（M1-R1/R2/R3）：
@@ -109,8 +108,11 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
   const cfg = recruitmentCfg();
   const pool = await prisma.recruitPool.findUnique({ where: { userId } });
 
-  let view: PoolView;
+  let view: PoolView | undefined;
   if (!pool) {
+    // 并发首建可能以两种方式失败：P2002（唯一键兜底，他人已建）、
+    // P2034（InnoDB 锁冲突/死锁，CI 上偶发）。先重读胜出方池；若冲突方
+    // 尚未可见（双双回滚），短暂退避后重建，上限 3 次后抛出。
     for (let attempt = 0; ; attempt++) {
       const ctx = await genCtx(prisma, userId);
       const candidates = generatePool(newRng(), ctx, POOL_SIZE);
@@ -153,8 +155,8 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
       view = toPoolView(updated, now);
     }
   }
-  void autoAdvanceIfNeeded(userId, 'visit_academy');
-  return view!;
+  if (!view) throw new Error('[academy] pool view 未构建');
+  return view;
 }
 
 /** POST 手动刷新：价 round(100×1.5^k) 封顶 800；扣钱走条件 UPDATE，不足 → INSUFFICIENT_RESOURCE */
