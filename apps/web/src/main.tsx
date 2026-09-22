@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './styles/app.css';
 import { RequireAdmin, RequireAuth } from './app/guards';
+import { RequireTutorial } from './app/tutorial-guard';
 import { Layout } from './app/App';
 import { OverviewPage } from './features/overview/OverviewPage';
 import { LoginPage } from './features/auth/LoginPage';
@@ -21,6 +22,7 @@ import { AcademyLecturePage } from './features/academy/AcademyLecturePage';
 import { ProblemLibraryPage } from './features/problems/ProblemLibraryPage';
 import { AdminPage } from './features/admin/AdminPage';
 import { PvpPage } from './features/pvp/PvpPage';
+import { ShopPage } from './features/shop/ShopPage';
 
 /**
  * 全局查询策略：
@@ -48,7 +50,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route element={<RequireAuth />}>
-            <Route element={<Layout />}>
+            <Route element={<RequireTutorial />}>
+              <Route element={<Layout />}>
               <Route path="/" element={<OverviewPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/students" element={<StudentsPage />} />
@@ -64,8 +67,10 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/pvp" element={<PvpPage />} />
               <Route path="/story" element={<StoryPage />} />
               <Route path="/adventure" element={<AdventurePage />} />
+              <Route path="/shop" element={<ShopPage />} />
               <Route path="/records/:recordId" element={<RecordReportPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
             </Route>
           </Route>
         </Routes>

@@ -1,0 +1,58 @@
+# 商城配置
+# 权威：docs/plans/2026-09-22-shop-and-onboarding.md
+# price 权威在 items.yaml，商店只决定门槛与限购
+
+reputation_gates:
+  gray: 0
+  yellow: 0
+  green: 30
+  blue: 120
+  purple: 350
+  colorful: 9999
+
+functional_gates:
+  milk-tea: 0
+  spare-cable: 0
+  intel-slip: 0
+  coffee: 0
+  energy-bar: 20
+  double-card: 20
+  protection-card: 20
+  stamina-potion: 30
+  firewall: 50
+  lucky-coin: 50
+  entry-ticket: 10
+  vitality-core: 200
+  focus-engine: 300
+  recruit-clue: 150
+  calm-pill: 0
+  vigor-drink: 0
+  rename-card: 0
+  reroll-ticket: 80
+
+daily_limits:
+  milk-tea: 10
+  coffee: 5
+  stamina-potion: 2
+  energy-bar: 5
+  lucky-coin: 1
+  protection-card: 3
+  intel-slip: 5
+  entry-ticket: 5
+  double-card: 5
+  spare-cable: 10
+  firewall: 3
+
+weekly_limits:
+  book-purple: 2
+  book-blue: 5
+  book-green: 10
+  vitality-core: 2
+  focus-engine: 1
+  recruit-clue: 2
+  reroll-ticket: 3
+  rename-card: 5
+
+refresh:
+  daily_at: "04:00"
+  weekly_at: "Mon 04:00"

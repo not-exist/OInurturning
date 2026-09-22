@@ -33,7 +33,7 @@ export function StudentsPage(): JSX.Element {
   const students = q.data;
 
   return (
-    <div className="space-y-5" data-testid="students-page">
+    <div className="space-y-5" data-testid="students-page" data-tutorial="students-page">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="eyebrow mb-1">在营名册</p>

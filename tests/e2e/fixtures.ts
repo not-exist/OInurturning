@@ -44,6 +44,14 @@ export async function registerUser(
     ok: boolean;
     data: { accessToken: string; me: { id: number; username: string } };
   };
+  // 跳过新手引导，避免旧 e2e 用例被锁定
+  try {
+    await request.post(`${API_URL}/api/tutorial/skip`, {
+      headers: { Authorization: `Bearer ${body.data.accessToken}` },
+    });
+  } catch {
+    // 忽略，引导可能已完成或接口未就绪
+  }
   return {
     username,
     password,

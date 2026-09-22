@@ -22,6 +22,7 @@ export default defineConfig({
       'tests/balance-regression.test.ts',
       'tests/config-m2-schema.test.ts',
       'tests/lecture-growth.test.ts',
+      'tests/tutorial-shop.test.ts',
     ],
     setupFiles: ['tests/setup.ts'],
     env: {

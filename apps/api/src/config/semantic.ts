@@ -3,6 +3,8 @@ import {
   ECONOMY_QUALITY_TIERS,
   lectureConfigSchema,
   onboardingConfigSchema,
+  tutorialConfigSchema,
+  shopConfigSchema,
   type ConfigRarity,
   type EconomyConfig,
   type EventsConfig,
@@ -10,10 +12,12 @@ import {
   type ProblemConfig,
   type StagesConfig,
   type TalentDef,
+  type TutorialConfig,
+  type ShopConfig,
 } from '@oinur/shared';
 
 export interface SemanticIssue {
-  file: 'talents' | 'items' | 'economy' | 'problems' | 'stages' | 'events';
+  file: 'talents' | 'items' | 'economy' | 'problems' | 'stages' | 'events' | 'tutorial' | 'shop';
   path: string;
   message: string;
 }
@@ -31,6 +35,8 @@ export function runSemanticChecks(input: {
   problems?: ProblemConfig;
   stages?: StagesConfig;
   events?: EventsConfig;
+  tutorial?: TutorialConfig;
+  shop?: ShopConfig;
 }): SemanticIssue[] {
   const issues: SemanticIssue[] = [];
   checkTalents(input.talents, issues);
@@ -41,7 +47,83 @@ export function runSemanticChecks(input: {
   if (input.problems !== undefined) checkProblems(input.problems, issues);
   if (input.stages !== undefined) checkStages(input.stages, input.problems, input.items, issues);
   if (input.events !== undefined) checkEvents(input.events, input.items, issues);
+  if (input.tutorial !== undefined) checkTutorial(input.tutorial, issues);
+  if (input.shop !== undefined) checkShop(input.shop, input.items, issues);
   return issues;
+}
+
+function checkTutorial(tutorial: TutorialConfig, issues: SemanticIssue[]): void {
+  const seen = new Set<string>();
+  tutorial.steps.forEach((step, idx) => {
+    if (seen.has(step.id)) {
+      issues.push({ file: 'tutorial', path: `steps.${idx}.id`, message: `引导步骤 id 重复：${step.id}` });
+    }
+    seen.add(step.id);
+    if (step.unlock.length === 0) {
+      issues.push({ file: 'tutorial', path: `steps.${idx}.unlock`, message: 'unlock 不能为空' });
+    }
+    if (step.reward?.item) {
+      if (!step.reward.count || step.reward.count <= 0) {
+        issues.push({ file: 'tutorial', path: `steps.${idx}.reward.count`, message: '奖励道具数量必须为正' });
+      }
+    }
+  });
+  if (tutorial.steps.length < 3) {
+    issues.push({ file: 'tutorial', path: 'steps', message: '引导步骤至少 3 步' });
+  }
+  const last = tutorial.steps[tutorial.steps.length - 1];
+  if (last && !last.unlock.includes('all')) {
+    issues.push({ file: 'tutorial', path: `steps.${tutorial.steps.length - 1}.unlock`, message: '最后一步必须解锁 all' });
+  }
+}
+
+function checkShop(shop: ShopConfig, items: ItemDef[], issues: SemanticIssue[]): void {
+  const itemIds = new Set(items.map((i) => i.id));
+  const itemById = new Map(items.map((i) => [i.id, i]));
+  // daily_limits / weekly_limits 中的 itemId 必须存在且 price != null（可售）
+  const checkLimits = (limits: Record<string, number> | undefined, kind: string) => {
+    if (!limits) return;
+    for (const [itemId, limit] of Object.entries(limits)) {
+      if (itemId.startsWith('book-')) {
+        // 允许按前缀匹配，如 book-purple 代表所有紫书
+        const isPrefix = itemId === 'book-gray' || itemId === 'book-yellow' || itemId === 'book-green' || itemId === 'book-blue' || itemId === 'book-purple';
+        if (!isPrefix && !itemIds.has(itemId)) {
+          issues.push({ file: 'shop', path: `${kind}.${itemId}`, message: `限购道具不存在：${itemId}` });
+        }
+        continue;
+      }
+      if (!itemIds.has(itemId)) {
+        issues.push({ file: 'shop', path: `${kind}.${itemId}`, message: `限购道具不存在：${itemId}` });
+        continue;
+      }
+      const def = itemById.get(itemId);
+      if (def && def.price === null) {
+        issues.push({ file: 'shop', path: `${kind}.${itemId}`, message: `限购道具不可售（price null）：${itemId}` });
+      }
+      if (limit <= 0) {
+        issues.push({ file: 'shop', path: `${kind}.${itemId}`, message: `限购数量必须为正：${itemId}` });
+      }
+    }
+  };
+  checkLimits(shop.daily_limits, 'daily_limits');
+  checkLimits(shop.weekly_limits, 'weekly_limits');
+
+  // functional_gates 中的 itemId 必须存在
+  if (shop.functional_gates) {
+    for (const itemId of Object.keys(shop.functional_gates)) {
+      if (!itemIds.has(itemId)) {
+        issues.push({ file: 'shop', path: `functional_gates.${itemId}`, message: `声誉门槛道具不存在：${itemId}` });
+      }
+    }
+  }
+
+  // reputation_gates 必须包含五档
+  const requiredRarities = ['gray', 'yellow', 'green', 'blue', 'purple'] as const;
+  for (const r of requiredRarities) {
+    if ((shop.reputation_gates as Record<string, unknown>)[r] === undefined) {
+      issues.push({ file: 'shop', path: `reputation_gates.${r}`, message: `声誉门槛缺失：${r}` });
+    }
+  }
 }
 
 function checkEvents(events: EventsConfig, items: ItemDef[], issues: SemanticIssue[]): void {
@@ -288,7 +370,6 @@ function checkItems(items: ItemDef[], issues: SemanticIssue[]): void {
       issues.push({ file: 'items', path: `items.${it.id}`, message: `道具 id 重复：${it.id}` });
     }
     seen.add(it.id);
-    // category/rarity/effect.kind 合法性由 zod schema 保证，无需重复检查
   }
 }
 
@@ -320,8 +401,6 @@ function checkEconomy(economy: EconomyConfig, issues: SemanticIssue[]): void {
         issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.threshold`, message: '讲课门槛必须严格递增' });
       }
       previousThreshold = tier.threshold;
-      // 讲课成长（issue #56）：思维要求 R 必须随档位递增，且落在强接窗 [threshold−8, threshold] 内——
-      // 高于门槛会让「达标学员」恒定思维不足，低于窗口会让强接学员永不付出代价。
       const thinkingReq = tier.thinking_req ?? tier.threshold;
       if (thinkingReq <= previousThinkingReq) {
         issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.thinking_req`, message: '讲课思维要求必须严格递增' });

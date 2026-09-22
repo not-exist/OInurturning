@@ -54,6 +54,8 @@ model User {
   lastLoginAt         DateTime?
   lastSettledAt       DateTime  @default(now())
   adventureIntelReady Boolean   @default(false)
+  tutorialStep        Int       @default(0)
+  tutorialCompleted   Boolean   @default(false)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -72,6 +74,7 @@ model User {
   pvpRegistrations   PvpRegistration[]
   pvpRewardGrants    PvpRewardGrant[]
   trainingLogs       TrainingLog[]
+  shopPurchaseLogs   ShopPurchaseLog[]
 
   @@map("users")
 }
@@ -514,4 +517,21 @@ model ReputationLog {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+model ShopPurchaseLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  itemId    String   @db.VarChar(64)
+  quantity  Int
+  dayKey    String   @db.VarChar(10)
+  weekKey   String   @db.VarChar(10)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dayKey])
+  @@index([userId, weekKey])
+  @@index([userId, itemId, dayKey])
+  @@index([userId, itemId, weekKey])
 }

@@ -11,6 +11,8 @@ import {
   problemConfigSchema,
   stagesConfigSchema,
   talentsFileSchema,
+  tutorialConfigSchema,
+  shopConfigSchema,
   type EconomyConfig,
   type EventConfig,
   type EventsConfig,
@@ -21,6 +23,8 @@ import {
   type StageConfig,
   type StagesConfig,
   type TalentDef,
+  type TutorialConfig,
+  type ShopConfig,
 } from '@oinur/shared';
 import { env } from './env.js';
 import { runSemanticChecks, type SemanticIssue } from './semantic.js';
@@ -29,6 +33,8 @@ import { prisma } from '../lib/prisma.js';
 
 const FILES = ['talents', 'items', 'economy', 'problems', 'stages', 'events'] as const;
 type ConfigFile = (typeof FILES)[number];
+const OPTIONAL_FILES = ['tutorial', 'shop'] as const;
+type OptionalConfigFile = (typeof OPTIONAL_FILES)[number];
 
 export interface ConfigBundle {
   talents: Record<string, TalentDef>;
@@ -42,6 +48,8 @@ export interface ConfigBundle {
   fullClear: StagesConfig['full_clear'];
   ngPlus: StagesConfig['ng_plus'];
   economy: EconomyConfig;
+  tutorial: TutorialConfig;
+  shop: ShopConfig;
   sourceHash: string;
 }
 
@@ -89,6 +97,12 @@ interface RawFile {
   data: unknown;
 }
 
+interface OptionalRaw {
+  file: OptionalConfigFile;
+  text: string;
+  data: unknown;
+}
+
 interface LoadError {
   file: string;
   path: string;
@@ -114,7 +128,37 @@ function readYamlFiles(dir: string): { raws: RawFile[]; errors: LoadError[] } {
         errors.push({
           file,
           path: `${file}.yaml${line ? ` (line ${line})` : ''}`,
-          message: `YAML 语法错误：${e.message.split('\n')[0]}`,
+          message: `YAML 语法错误：${e.message.split('\\n')[0]}`,
+        });
+      }
+      continue;
+    }
+    raws.push({ file, text, data: doc.toJS() });
+  }
+  return { raws, errors };
+}
+
+function readOptionalYamlFiles(dir: string): { raws: OptionalRaw[]; errors: LoadError[] } {
+  const raws: OptionalRaw[] = [];
+  const errors: LoadError[] = [];
+  for (const file of OPTIONAL_FILES) {
+    const full = path.join(dir, `${file}.yaml`);
+    if (!existsSync(full)) continue;
+    let text: string;
+    try {
+      text = readFileSync(full, 'utf8');
+    } catch {
+      errors.push({ file, path: `${file}.yaml`, message: `可选文件不可读：${full}` });
+      continue;
+    }
+    const doc = parseDocument(text);
+    if (doc.errors.length > 0) {
+      for (const e of doc.errors) {
+        const line = e.linePos?.[0]?.line;
+        errors.push({
+          file,
+          path: `${file}.yaml${line ? ` (line ${line})` : ''}`,
+          message: `YAML 语法错误：${e.message.split('\\n')[0]}`,
         });
       }
       continue;
@@ -161,6 +205,7 @@ async function loadBundleFromDb(
   sourceHash: string,
   problemsConfig: ProblemConfig,
   stagesConfig: StagesConfig,
+  extra: { tutorial: TutorialConfig; shop: ShopConfig },
 ): Promise<ConfigBundle> {
   const [talents, items, problems, stages, events, economy] = await Promise.all([
     prisma.configTalent.findMany({ where: { deprecated: false } }),
@@ -184,6 +229,8 @@ async function loadBundleFromDb(
     fullClear: stagesConfig.full_clear,
     ngPlus: stagesConfig.ng_plus,
     economy: economy.payload as unknown as EconomyConfig,
+    tutorial: extra.tutorial,
+    shop: extra.shop,
     sourceHash,
   };
   return deepFreeze(bundle);
@@ -290,6 +337,8 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
 
   // 1. 加载与解析（YAML 语法错误同样汇总进错误表，带行号）
   const { raws, errors } = readYamlFiles(dir);
+  const { raws: optionalRaws, errors: optionalErrors } = readOptionalYamlFiles(dir);
+  errors.push(...optionalErrors);
 
   // 2. 结构校验：收集所有文件的所有错误，一次性报全
   let talents: TalentDef[] = [];
@@ -298,6 +347,9 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
   let problems: ProblemConfig | undefined;
   let stages: StagesConfig | undefined;
   let events: EventsConfig | undefined;
+  let tutorial: TutorialConfig | undefined;
+  let shop: ShopConfig | undefined;
+
   for (const raw of raws) {
     if (raw.file === 'talents') {
       const r = talentsFileSchema.safeParse(raw.data);
@@ -367,6 +419,60 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
         );
     }
   }
+
+  // optional files
+  for (const raw of optionalRaws) {
+    if (raw.file === 'tutorial') {
+      const r = tutorialConfigSchema.safeParse(raw.data);
+      if (r.success) tutorial = r.data;
+      else
+        errors.push(
+          ...r.error.issues.map((i) => ({
+            file: raw.file,
+            path: i.path.join('.'),
+            message: i.message,
+          })),
+        );
+    } else if (raw.file === 'shop') {
+      const r = shopConfigSchema.safeParse(raw.data);
+      if (r.success) shop = r.data;
+      else
+        errors.push(
+          ...r.error.issues.map((i) => ({
+            file: raw.file,
+            path: i.path.join('.'),
+            message: i.message,
+          })),
+        );
+    }
+  }
+
+  // defaults for optional
+  if (!tutorial) {
+    tutorial = {
+      steps: [
+        { id: 'welcome', title: '欢迎来到训练营', desc: '你是新任教练，这里是你的指挥中心。', target: null, unlock: ['overview'], action: 'none' },
+        { id: 'students', title: '查看学员', desc: '这是你的学员，点击查看详情。', target: "[data-tutorial='nav-students']", unlock: ['overview', 'students'], action: 'visit_students' },
+        { id: 'training', title: '第一次训练', desc: '试一次基础训练。', target: "[data-tutorial='training-basic']", unlock: ['overview', 'students', 'training'], action: 'do_training' },
+        { id: 'academy', title: '高级学院', desc: '看看候选池。', target: "[data-tutorial='nav-academy']", unlock: ['overview', 'students', 'training', 'academy'], action: 'visit_academy' },
+        { id: 'lecture', title: '讲课变现', desc: '完成一次讲课。', target: "[data-tutorial='lecture-tier']", unlock: ['overview', 'students', 'training', 'academy', 'lecture'], action: 'do_lecture' },
+        { id: 'adventure', title: '历练', desc: '派出小队历练。', target: "[data-tutorial='nav-adventure']", unlock: ['overview', 'students', 'training', 'academy', 'lecture', 'adventure'], action: 'do_adventure' },
+        { id: 'story', title: '剧情首关', desc: '挑战第一关。', target: "[data-tutorial='nav-story']", unlock: ['overview', 'students', 'training', 'academy', 'lecture', 'adventure', 'story'], action: 'do_story' },
+        { id: 'shop', title: '商城补给', desc: '金币买补给。', target: "[data-tutorial='nav-shop']", unlock: ['overview', 'students', 'training', 'academy', 'lecture', 'adventure', 'story', 'shop', 'backpack'], action: 'visit_shop' },
+        { id: 'complete', title: '引导完成', desc: '全部解锁。', target: null, unlock: ['all'], action: 'none' },
+      ],
+    } as TutorialConfig;
+  }
+  if (!shop) {
+    shop = {
+      reputation_gates: { gray: 0, yellow: 0, green: 30, blue: 120, purple: 350, colorful: 9999 },
+      functional_gates: {},
+      daily_limits: { 'milk-tea': 10, coffee: 5, 'stamina-potion': 2, 'energy-bar': 5, 'lucky-coin': 1, 'protection-card': 3, 'intel-slip': 5, 'entry-ticket': 5 },
+      weekly_limits: { 'book-purple': 2, 'vitality-core': 2, 'focus-engine': 1, 'recruit-clue': 2 },
+      refresh: { daily_at: '04:00', weekly_at: 'Mon 04:00' },
+    } as ShopConfig;
+  }
+
   if (errors.length > 0) failFast(errors);
 
   // 3. 语义交叉校验（引用完整性 / 升阶链合法性 / 经济四档），同样收集全部错误
@@ -377,19 +483,22 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
     problems: problems!,
     stages: stages!,
     events: events!,
+    tutorial,
+    shop,
   });
   if (semanticIssues.length > 0) {
     failFast(semanticIssues.map((i) => ({ file: i.file, path: i.path, message: i.message })));
   }
 
-  // 4. 版本指纹与幂等判断：sha256(六文件原文拼接)
-  const byFile = new Map(raws.map((r) => [r.file, r.text]));
-  const sourceHash = sha256(FILES.map((f) => byFile.get(f) ?? '').join('\n'));
+  // 4. 版本指纹与幂等判断：sha256(六文件原文拼接 + 可选文件)
+  const byFile = new Map<string, string>([
+    ...raws.map((r) => [r.file, r.text] as const),
+    ...optionalRaws.map((r) => [r.file, r.text] as const),
+  ]);
+  const allFilesForHash = [...FILES, ...OPTIONAL_FILES];
+  const sourceHash = sha256(allFilesForHash.map((f) => byFile.get(f) ?? '').join('\n'));
   const done = await prisma.configImport.findFirst({ where: { sourceHash, ok: true } });
   if (done) {
-    // 幂等跳过仍需先调和 DB（F-1/F-2）：回滚到旧 hash 时，被后续批次软弃用的条目复活、
-    // 被改写的 payload 回滚，保证任何进程启动后 CONFIG 必然等于其自身 CONFIG_DIR 的 yaml；
-    // 不新增 configImport 行，保留审计幂等语义。
     await prisma.$transaction(
       (tx) =>
         reconcileTables(tx, {
@@ -403,13 +512,13 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
         }),
       { timeout: 20_000 },
     );
-    CONFIG = await loadBundleFromDb(sourceHash, problems!, stages!);
+    CONFIG = await loadBundleFromDb(sourceHash, problems!, stages!, { tutorial: tutorial!, shop: shop! });
     logger.info({ sourceHash, dir }, '[config] 同 hash 已导入，调和 DB 后幂等跳过');
     return CONFIG;
   }
 
   // 5. 事务性导入：整体要么全量生效、要么保持旧版；本批缺失的历史条目软弃用
-  const manifest = FILES.map((f) => ({
+  const manifest = [...FILES].map((f) => ({
     file: `${f}.yaml`,
     bytes: Buffer.byteLength(byFile.get(f) ?? ''),
     entities:
@@ -423,7 +532,7 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
               ? stages!.stages.length
               : f === 'events'
                 ? events!.events.length
-              : 1,
+                : 1,
   }));
   await prisma.$transaction(
     async (tx) => {
@@ -441,7 +550,7 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
     { timeout: 20_000 },
   );
 
-  CONFIG = await loadBundleFromDb(sourceHash, problems!, stages!);
+  CONFIG = await loadBundleFromDb(sourceHash, problems!, stages!, { tutorial: tutorial!, shop: shop! });
   logger.info(
     {
       sourceHash,

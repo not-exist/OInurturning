@@ -15,6 +15,7 @@ import {
   type CandidatePayload,
   type GenerateContext,
 } from './recruit-gen.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 /**
  * 招募服务（M1-R1/R2/R3）：
@@ -108,10 +109,8 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
   const cfg = recruitmentCfg();
   const pool = await prisma.recruitPool.findUnique({ where: { userId } });
 
+  let view: PoolView;
   if (!pool) {
-    // 并发首建可能以两种方式失败：P2002（唯一键兜底，他人已建）、
-    // P2034（InnoDB 锁冲突/死锁，CI 上偶发）。先重读胜出方池；若冲突方
-    // 尚未可见（双双回滚），短暂退避后重建，上限 3 次后抛出。
     for (let attempt = 0; ; attempt++) {
       const ctx = await genCtx(prisma, userId);
       const candidates = generatePool(newRng(), ctx, POOL_SIZE);
@@ -119,35 +118,43 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
         const created = await prisma.recruitPool.create({
           data: { userId, candidates: candidates as unknown as Prisma.InputJsonValue, generatedAt: now, refreshDayKey: dayKey(now) },
         });
-        return toPoolView(created, now);
+        view = toPoolView(created, now);
+        break;
       } catch (e) {
         const isRace =
           e instanceof Prisma.PrismaClientKnownRequestError && (e.code === 'P2002' || e.code === 'P2034');
         if (isRace) {
           const existing = await prisma.recruitPool.findUnique({ where: { userId } });
-          if (existing) return toPoolView(existing, now);
+          if (existing) {
+            view = toPoolView(existing, now);
+            break;
+          }
           if (attempt < 3) continue;
         }
         throw e;
       }
     }
+  } else {
+    const stale = now.getTime() - pool.generatedAt.getTime() >= cfg.manual_refresh.free_interval_hours * HOUR_MS;
+    const dayChanged = pool.refreshDayKey !== dayKey(now);
+    if (!stale && !dayChanged) {
+      view = toPoolView(pool, now);
+    } else {
+      const candidates = stale ? generatePool(newRng(), await genCtx(prisma, userId), POOL_SIZE) : readCandidates(pool);
+      const updated = await prisma.recruitPool.update({
+        where: { userId },
+        data: {
+          candidates: candidates as unknown as Prisma.InputJsonValue,
+          ...(stale ? { generatedAt: now } : {}),
+          refreshesToday: 0,
+          refreshDayKey: dayKey(now),
+        },
+      });
+      view = toPoolView(updated, now);
+    }
   }
-
-  const stale = now.getTime() - pool.generatedAt.getTime() >= cfg.manual_refresh.free_interval_hours * HOUR_MS;
-  const dayChanged = pool.refreshDayKey !== dayKey(now);
-  if (!stale && !dayChanged) return toPoolView(pool, now);
-
-  const candidates = stale ? generatePool(newRng(), await genCtx(prisma, userId), POOL_SIZE) : readCandidates(pool);
-  const updated = await prisma.recruitPool.update({
-    where: { userId },
-    data: {
-      candidates: candidates as unknown as Prisma.InputJsonValue,
-      ...(stale ? { generatedAt: now } : {}),
-      refreshesToday: 0,
-      refreshDayKey: dayKey(now),
-    },
-  });
-  return toPoolView(updated, now);
+  void autoAdvanceIfNeeded(userId, 'visit_academy');
+  return view!;
 }
 
 /** POST 手动刷新：价 round(100×1.5^k) 封顶 800；扣钱走条件 UPDATE，不足 → INSUFFICIENT_RESOURCE */
