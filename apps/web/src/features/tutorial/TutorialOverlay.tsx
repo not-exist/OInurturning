@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import { ArrowRight, Check, Sparkles } from 'lucide-react';
 import { Btn, Meter, Panel } from '../../components/ui';
 import { Icon } from '../../components/icons';
-import { useAdvanceTutorial, useCompleteTutorial, useTutorial } from '../../lib/tutorial';
+import { useAdvanceTutorial, useCompleteTutorial, useTutorial, useTutorialVisitStepSync } from '../../lib/tutorial';
 
 interface Rect {
   top: number;
@@ -100,6 +100,8 @@ export function TutorialOverlay(): JSX.Element | null {
   const complete = useCompleteTutorial();
   const [rect, setRect] = useState<Rect | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  // 访问步（visit_*）进入时失效目标页的查询，避免命中新鲜缓存而不发请求
+  useTutorialVisitStepSync();
 
   const cur = state?.current;
   const completed = state?.completed;

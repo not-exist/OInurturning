@@ -175,9 +175,11 @@ export function Layout(): JSX.Element {
                   return (
                     <li key={item.to}>
                       {locked ? (
-                        // NavLink 自身 pointer-events-none，悬浮/聚焦提示挂在外层 HoverCard 上
+                        // NavLink 自身 pointer-events-none，悬浮/聚焦提示挂在外层 HoverCard 上；
+                        // 层级抬到 z-55：高于引导遮罩（z-50）与聚光描边（z-51），低于引导卡（z-60）
                         <HoverCard
                           width="w-56"
+                          zClassName="z-[55]"
                           className="w-full"
                           content={<span className="block text-xs text-fg-muted">{lockHint}</span>}
                         >

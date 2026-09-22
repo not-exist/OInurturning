@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './api';
 
@@ -67,6 +68,33 @@ export function useCompleteTutorial() {
 export function isRouteUnlocked(unlocked: string[], routeKey: string): boolean {
   if (unlocked.includes('all')) return true;
   return unlocked.includes(routeKey);
+}
+
+/**
+ * `visit_*` 步对应的前端查询键（键必须与 lib/hooks.ts、lib/shop.ts 里的 queryKey 一致）。
+ *
+ * 这三步靠「用户导航过去时页面自己发的 GET」推进：服务端在该 GET 里调 autoAdvanceIfNeeded。
+ * 但这些 query 有 staleTime（30s，招募池更是永不自动重取），若缓存还新鲜，导航过去只会
+ * mount 命中缓存、不发请求 → 引导永远停在「等待操作完成…」。故进入访问步时主动失效一次：
+ * 已挂载的立刻重取，未挂载的被标记为 stale，下次 mount 必定重取。
+ * do_* 步不在此列（它们由训练/讲课/历练/剧情/招募的 POST 推进，另有 mutation 失效）。
+ */
+const VISIT_STEP_QUERY: Record<string, string[]> = {
+  visit_students: ['students'],
+  visit_academy: ['academy'],
+  visit_shop: ['shop'],
+};
+
+/** 进入访问步时失效对应查询（数组是模块级常量，引用稳定，同一步只触发一次） */
+export function useTutorialVisitStepSync(): void {
+  const qc = useQueryClient();
+  const action = useTutorial().data?.current?.action;
+  const queryKey = action === undefined ? undefined : VISIT_STEP_QUERY[action];
+
+  useEffect(() => {
+    if (queryKey === undefined) return;
+    qc.invalidateQueries({ queryKey });
+  }, [qc, queryKey]);
 }
 
 export const ROUTE_KEY_MAP: Record<string, string> = {
