@@ -18,6 +18,10 @@ export interface TutorialStateView {
   steps: TutorialStepDef[];
   unlocked: string[];
   current: TutorialStepDef | null;
+  /** 招募步（action=do_recruit）：当前在册学员数 */
+  studentsOwned?: number;
+  /** 招募步：达成即自动通过的在册人数要求 */
+  studentsRequired?: number;
 }
 
 export function useTutorial() {
