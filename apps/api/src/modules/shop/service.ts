@@ -99,14 +99,6 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
   const dailyMap = new Map(dailyLogs.map((l) => [l.itemId, l._sum.quantity ?? 0]));
   const weeklyMap = new Map(weeklyLogs.map((l) => [l.itemId, l._sum.quantity ?? 0]));
 
-  // 今日总消费：store 里只存 quantity，故取回今日 logs 逐条乘 price
-  const todayLogs = await prisma.shopPurchaseLog.findMany({ where: { userId, dayKey: dk } });
-  let todaySpent = 0;
-  for (const log of todayLogs) {
-    const def = items[log.itemId];
-    if (def?.price) todaySpent += def.price * log.quantity;
-  }
-
   const views: ShopItemView[] = [];
   for (const [id, def] of Object.entries(items)) {
     if (!isPurchasable(def)) continue;
@@ -213,7 +205,6 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
     items: views,
     money: user.money,
     reputation: user.reputation,
-    todaySpent,
   };
 }
 

@@ -3,12 +3,11 @@ import { z } from 'zod';
 import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as svc from './service.js';
-import { requireTutorialForApi } from '../tutorial/guard.js';
 
 export const shopRouter = Router();
 
+// 教程锁由 app 级 requireTutorialForApi（index.ts）统一覆盖，路由内不再重复挂载
 shopRouter.use(requireAuth);
-shopRouter.use(requireTutorialForApi);
 
 shopRouter.get('/catalog', async (req, res, next) => {
   try {
@@ -35,10 +34,15 @@ shopRouter.post('/buy', async (req, res, next) => {
   }
 });
 
+const LogsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 shopRouter.get('/logs', async (req, res, next) => {
   try {
-    const limit = req.query.limit ? Number(req.query.limit) : 20;
-    const data = await svc.listLogs(req.user!.id, limit);
+    const parsed = LogsQuerySchema.safeParse(req.query);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    const data = await svc.listLogs(req.user!.id, parsed.data.limit);
     res.json({ ok: true, data });
   } catch (e) {
     next(e);

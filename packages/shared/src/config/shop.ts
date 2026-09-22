@@ -50,7 +50,6 @@ export interface ShopCatalogView {
   items: ShopItemView[];
   money: number;
   reputation: number;
-  todaySpent: number;
 }
 
 export interface ShopBuyResult {
