@@ -109,7 +109,7 @@ async function register(): Promise<{ token: string; userId: number }> {
 async function makeStudent(userId: number, stamina = 5): Promise<{ id: number }> {
   const student = await prisma.student.create({
     data: {
-      userId, name: '历练学员', sex: 'MALE', qualityTier: 'COMMON',
+      userId, name: '历练学员', qualityTier: 'COMMON',
       ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10, code: 10, thinking: 10, setting: 10,
       focusCap: 20, energyMax: 60, energy: 30, stamina, staminaRegen: 10,
     },
@@ -283,7 +283,7 @@ describe('adventure gaps：幂等与日志', () => {
     for (let index = 0; index < 3; index += 1) {
       const row = await prisma.student.create({
         data: {
-          userId: direct.id, name: '直调学员', sex: 'MALE', qualityTier: 'COMMON',
+          userId: direct.id, name: '直调学员', qualityTier: 'COMMON',
           ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10, code: 10, thinking: 10, setting: 10,
           focusCap: 20, energyMax: 60, energy: 60, stamina: 5, staminaRegen: 10,
           lastSettledAt: new Date('2026-09-02T11:00:00.000Z'),

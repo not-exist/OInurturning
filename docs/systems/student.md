@@ -31,7 +31,6 @@ V = floor( (code + thinking + floor((ds+dp+math+graph+greedy+string)/6)) / 3 )
 | stamina_regen | 体力恢复效率 | 1–100 | 招募掷点 | 极低概率训练成长 |
 
 - 姓名：招募时由服务端姓名池随机生成（2–4 个汉字，全服可重复），消耗 `rename-card` 可改名。
-- 性别：招募时 50/50 随机，终身不可变。
 
 ---
 

@@ -6,7 +6,6 @@ import {
   DIMENSION_LABEL,
   PURIFY_CHAINS,
   QUALITY_LABEL,
-  SEX_LABEL,
   TALENT_KIND_LABEL,
   floor,
   round,
@@ -355,7 +354,6 @@ export function StudentHover({
         <span className="truncate text-sm font-medium text-fg">{s.name}</span>
         <span className="flex shrink-0 items-center gap-1.5">
           <QualityBadge tier={s.qualityTier} />
-          <span className="text-[11px] text-fg-faint">{SEX_LABEL[s.sex]}</span>
         </span>
       </div>
       <div className="flex gap-3">

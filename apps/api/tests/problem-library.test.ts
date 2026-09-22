@@ -28,8 +28,7 @@ async function createStudent(userId: number, stamina = 5): Promise<number> {
     data: {
       userId,
       name: '出题学员',
-      sex: 'MALE',
-      qualityTier: 'GOOD',
+            qualityTier: 'GOOD',
       ds: 40,
       dp: 40,
       math: 40,

@@ -23,7 +23,32 @@ services:
       start_period: 30s
     logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
 
+  # 一次性迁移：镜像构建完成后、API 启动前，对 healthy 的 MySQL 执行 prisma migrate deploy。
+  # 与 api 共用 oinur-api 镜像（只构建一次）。失败则 api 不会起来。
+  migrate:
+    image: oinur-api
+    build: { context: .., dockerfile: deploy/api.Dockerfile }
+    container_name: oinur-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+    depends_on:
+      mysql: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        cd /app/apps/api
+        if [ -x ./node_modules/.bin/prisma ]; then PRISMA=./node_modules/.bin/prisma
+        elif [ -x /app/node_modules/.bin/prisma ]; then PRISMA=/app/node_modules/.bin/prisma
+        else echo "[migrate] prisma CLI 未找到" >&2; exit 1
+        fi
+        echo "[migrate] prisma migrate deploy"
+        "$$PRISMA" migrate deploy
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
   api:
+    image: oinur-api
     build: { context: .., dockerfile: deploy/api.Dockerfile }
     container_name: oinur-api
     restart: unless-stopped
@@ -42,7 +67,8 @@ services:
       RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-10}
       RATE_LIMIT_AUTH_WINDOW_MS: ${RATE_LIMIT_AUTH_WINDOW_MS:-900000}
     depends_on:
-      mysql: { condition: service_healthy }   # 健康后才启动；启动脚本再跑 migrate deploy
+      mysql: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
     expose: ["3000"]
     logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
 

@@ -11,7 +11,7 @@
 # 1) 准备 .env（生产）
 cd deploy && cp ../.env.example .env
 #    必改：MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD、JWT_SECRET（pnpm secret 生成，勿用占位值）
-# 2) 一键起栈（mysql 健康后 api 自动 migrate deploy，nginx 暴露 :80）
+# 2) 一键起栈（构建镜像含 Prisma Client；mysql 健康后 api entrypoint 自动 migrate deploy，nginx 暴露 :80）
 docker compose up -d --build
 # 3) 探活
 curl -s localhost/api/health

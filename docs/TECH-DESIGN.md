@@ -293,7 +293,6 @@ export interface EconomyConfig {
 export interface StudentView {
   id: number;
   name: string;
-  sex: 'MALE' | 'FEMALE';
   abilities: Record<AbilityKey, number>;   // 六维 + coding/thinking/problemSkill
   mindset: number;
   focusCap: number;
@@ -462,11 +461,6 @@ enum Role {
   ADMIN
 }
 
-enum Sex {
-  MALE
-  FEMALE
-}
-
 enum StudentStatus {
   ACTIVE
   DISMISSED
@@ -570,7 +564,6 @@ model Student {
   id           Int           @id @default(autoincrement())
   userId       Int
   name         String        @db.VarChar(24)
-  sex          Sex
   // —— 能力值（1–100；成长曲线见 systems/progression.md）——
   coding       Int                                         // 代码能力
   thinking     Int                                         // 思维能力
@@ -905,7 +898,7 @@ model AdminAuditLog {
 | Config* 表 | 主键即语义 id | 运行时点查为主；导入走 upsert 主键命中 |
 | ReputationLog / AdminAuditLog | `(userId/adminId,createdAt)` | 审计时间线倒序分页 |
 
-不建索引的原则：JSON 列一律不建索引（无 JSON_CONTAINS 查询需求，快照只在拿到记录 id 后读取）；低基数列（sex、format）单独索引无意义，仅作为复合索引尾列出现。
+不建索引的原则：JSON 列一律不建索引（无 JSON_CONTAINS 查询需求，快照只在拿到记录 id 后读取）；低基数列（format）单独索引无意义，仅作为复合索引尾列出现。
 
 ---
 ## 4. 配置即数据管线

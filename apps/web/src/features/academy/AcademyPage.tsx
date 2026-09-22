@@ -3,7 +3,7 @@ import { RefreshCw, UserSearch } from 'lucide-react';
 import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import { useAcademyPool, useNow, useRecruit, useRefreshPool } from '../../lib/hooks';
 import type { CandidatePayload, PoolView } from '../../lib/hooks';
-import { SEX_LABEL, floor } from '../../lib/labels';
+import { floor } from '../../lib/labels';
 import { QUALITY_HINT } from '../../lib/rarity';
 import { GLYPH, Icon } from '../../components/icons';
 import {
@@ -227,7 +227,7 @@ function CandidateCard({
         <div className="min-w-0">
           <p className="eyebrow">候选档案 {String(index + 1).padStart(2, '0')}</p>
           <h3 className="mt-0.5 truncate font-display text-lg tracking-wide text-fg">{c.name}</h3>
-          <p className="mt-0.5 text-[11px] text-fg-faint">{SEX_LABEL[c.sex]} · 招募前档位未知</p>
+          <p className="mt-0.5 text-[11px] text-fg-faint">招募前档位未知</p>
         </div>
         <HoverCard
           width="w-64"

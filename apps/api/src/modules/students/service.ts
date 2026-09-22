@@ -38,7 +38,6 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
   return {
     id: s.id,
     name: s.name,
-    sex: s.sex,
     qualityTier: s.qualityTier,
     status: s.status,
     ds: s.ds, dp: s.dp, math: s.math, graph: s.graph, greedy: s.greedy, str: s.str,

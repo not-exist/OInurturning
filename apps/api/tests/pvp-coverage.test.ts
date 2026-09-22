@@ -52,7 +52,7 @@ async function makePlayer(): Promise<Player> {
   for (let member = 0; member < 3; member += 1) {
     const student = await prisma.student.create({
       data: {
-        userId, name: `PVP 选手 ${seq}-${member}`, sex: 'MALE', qualityTier: 'ELITE',
+        userId, name: `PVP 选手 ${seq}-${member}`, qualityTier: 'ELITE',
         ds: 60, dp: 60, math: 60, graph: 60, greedy: 60, str: 60, code: 60, thinking: 60, setting: 60,
         focusCap: 40, energyMax: 80, energy: 80, staminaRegen: 50,
       },

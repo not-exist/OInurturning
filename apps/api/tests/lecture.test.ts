@@ -23,8 +23,7 @@ async function createStudent(userId: number, value: number, stamina = 5): Promis
     data: {
       userId,
       name: '讲课学员',
-      sex: 'FEMALE',
-      qualityTier: 'GOOD',
+            qualityTier: 'GOOD',
       ds: value,
       dp: value,
       math: value,

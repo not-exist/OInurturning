@@ -112,7 +112,7 @@
 
 **翻译**：新建 `apps/web/src/lib/labels.ts` 作为**唯一真源**，覆盖 26 项缺失/散落映射：
 `EventCategory`(duel/windfall/trial/chance/trouble/social)、`PvpTournament.status`(REGISTERING/RUNNING/FINISHED/CANCELLED)、`PvpMatch.status`(PENDING/DONE/BYE)、`ContestFormat`(RANKING/DUEL)、`ContestRecordType`(STORY/PVP/ADVENTURE)、`ContestVerdict`(AC/WA/TLE/SKIP/UNFINISHED)、`ContestSide`(**3 个**：HOME/AWAY/**NPC** —— 现有 `BattleReplay.tsx:30-33` 的 `SIDE_LABEL` 只映射了 2 个，**漏 `NPC`**)、`LectureTierId`(beginner/junior/senior/provincial/national)、章节中文名、`PROBLEM_SEVERITIES`、`TalentDef.family`(23 slug)、`TalentEffect.stat`(**33** 键 = 13 属性 + 20 meta，`config/talents.ts:11-49`)、`TalentEffect.mode`(percent/flat)、`TalentDef.kind`(positive/negative)、`ItemEffect.kind`(28 个)、`AdventureStatus`、`AcquiredVia`、`Role`、`StudentStatus`、`ABILITY_KEYS`(CODING/THINKING/PROBLEM)、出题质量 6 档（习作<30 / 合格30 / 良好50 / 优秀70 / 杰作85 / 传世≥95）、声誉 6 档（默默无闻<300 / 小有名气≥300 / 知名教练≥1000 / 名家≥2500 / 大师≥4500 / 传奇≥6500）、problem `requirements` 的 `d`/`m`/`c`（六维需求/思维量/代码量）。
-可直接复用：`QUALITY_LABEL`、`SEX_LABEL`、`CATEGORY_LABEL`、`TRAINING_KIND_LABEL`、`ERROR_TEXT`。
+可直接复用：`QUALITY_LABEL`、`CATEGORY_LABEL`、`TRAINING_KIND_LABEL`、`ERROR_TEXT`。
 **消灭 `BattleReplay.tsx` 内与 `hooks.ts` 完全重复的 `DIMENSION_LABEL` 等副本。**
 
 ### 2.4 交互骨架

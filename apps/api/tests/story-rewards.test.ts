@@ -13,8 +13,7 @@ async function createStudent(userId: number, index = 0): Promise<number> {
     data: {
       userId,
       name: `Reward Student ${index}`,
-      sex: 'FEMALE',
-      qualityTier: 'ELITE',
+            qualityTier: 'ELITE',
       ds: 100,
       dp: 100,
       math: 100,

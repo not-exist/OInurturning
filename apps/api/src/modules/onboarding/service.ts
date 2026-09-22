@@ -79,7 +79,6 @@ export async function grantOnboardingPackage(
       data: {
         userId,
         name: candidate.name,
-        sex: candidate.sex,
         qualityTier: QUALITY_TO_TIER[spec.quality],
         ds: candidate.attrs.ds, dp: candidate.attrs.dp, math: candidate.attrs.math,
         graph: candidate.attrs.graph, greedy: candidate.attrs.greedy, str: candidate.attrs.str,

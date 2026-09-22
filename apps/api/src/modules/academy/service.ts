@@ -81,11 +81,10 @@ export interface PoolView {
 function toPoolView(pool: RecruitPool, now: Date): PoolView {
   const k = pool.refreshDayKey === dayKey(now) ? pool.refreshesToday : 0;
   return {
-    // 只暴露：位置编号 / 姓名 / 性别 / 气质 / 九维 / 价格（价格分级本身就是设计内的推断线索）
-    candidates: readCandidates(pool).map(({ tempId, name, sex, hint, attrs, price }) => ({
+    // 只暴露：位置编号 / 姓名 / 气质 / 九维 / 价格（价格分级本身就是设计内的推断线索）
+    candidates: readCandidates(pool).map(({ tempId, name, hint, attrs, price }) => ({
       tempId,
       name,
-      sex,
       hint,
       attrs,
       price,
@@ -185,7 +184,6 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
   return {
     id: s.id,
     name: s.name,
-    sex: s.sex,
     qualityTier: s.qualityTier,
     status: s.status,
     ds: s.ds, dp: s.dp, math: s.math, graph: s.graph, greedy: s.greedy, str: s.str,
@@ -231,7 +229,6 @@ export async function recruit(userId: number, tempId: string, now: Date = new Da
       data: {
         userId,
         name: candidate.name,
-        sex: candidate.sex,
         qualityTier: candidate.qualityTier,
         ds: candidate.attrs.ds, dp: candidate.attrs.dp, math: candidate.attrs.math,
         graph: candidate.attrs.graph, greedy: candidate.attrs.greedy, str: candidate.attrs.str,

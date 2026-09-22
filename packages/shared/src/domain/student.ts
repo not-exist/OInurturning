@@ -3,9 +3,6 @@
  * 命名对齐 Prisma Student 模型：字符串维列名为 str（STRING 维）。
  */
 
-export const SEXES = ['MALE', 'FEMALE'] as const;
-export type Sex = (typeof SEXES)[number];
-
 export const QUALITY_TIERS = ['COMMON', 'GOOD', 'ELITE', 'GENIUS'] as const;
 export type QualityTier = (typeof QUALITY_TIERS)[number];
 
@@ -59,7 +56,6 @@ export function computeV(s: VStats): number {
 export interface StudentView {
   id: number;
   name: string;
-  sex: Sex;
   qualityTier: QualityTier;
   status: StudentStatus;
   ds: number;

@@ -86,8 +86,7 @@ async function maxedStudent(userId: number, index = 0): Promise<{ id: number }> 
     data: {
       userId,
       name: `满级学员${index}`,
-      sex: 'MALE',
-      qualityTier: 'GENIUS',
+            qualityTier: 'GENIUS',
       ds: 100, dp: 100, math: 100, graph: 100, greedy: 100, str: 100,
       code: 100, thinking: 100, setting: 100,
       mindset: 10,

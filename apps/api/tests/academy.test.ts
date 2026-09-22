@@ -122,7 +122,6 @@ describe('recruit-gen：候选生成（§3.3–3.6）', () => {
     expect(new Set(pool.map((c) => c.tempId)).size).toBe(5);
     for (const c of pool) {
       expect(c.hint).toBe(QUALITY_HINTS[c.qualityTier.toLowerCase() as keyof typeof QUALITY_HINTS]);
-      expect(['MALE', 'FEMALE']).toContain(c.sex);
       expect(NAME_POOL).toContain(c.name);
     }
   });

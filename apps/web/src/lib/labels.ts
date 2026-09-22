@@ -56,8 +56,6 @@ export const ABILITY_LABEL: Record<AbilityKey, string> = {
   PROBLEM: '出题能力',
 };
 
-export const SEX_LABEL: Record<'MALE' | 'FEMALE', string> = { MALE: '男', FEMALE: '女' };
-
 /** 招募品质档（材质层级视觉在 rarity.ts QUALITY_MATERIAL） */
 export const QUALITY_LABEL: Record<QualityTier, string> = {
   COMMON: '普通',

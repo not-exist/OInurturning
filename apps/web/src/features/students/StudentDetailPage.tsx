@@ -16,7 +16,6 @@ import {
   DIMENSION_LABEL,
   QUALITY_LABEL,
   RENAME_CARD_ID,
-  SEX_LABEL,
   STUDENT_STATUS_LABEL,
   floor,
   signed,
@@ -112,7 +111,6 @@ export function StudentDetailPage(): JSX.Element {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold tracking-tight">{s.name}</h1>
               <QualityBadge tier={s.qualityTier} />
-              <Chip>{SEX_LABEL[s.sex]}</Chip>
               <Chip>{STUDENT_STATUS_LABEL[s.status]}</Chip>
             </div>
 

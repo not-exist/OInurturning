@@ -20,7 +20,7 @@ async function entrant(rosterSize = 3): Promise<{ userId: number; studentId: num
   await prisma.user.update({ where: { id: session.me.id }, data: { money: 0, reputation: 0 } }); // 开局包 2500 金/10 誉归零（奖金/声誉绝对断言口径）
   const studentIds: number[] = [];
   for (let member = 0; member < rosterSize; member += 1) {
-    const student = await prisma.student.create({ data: { userId: session.me.id, name: `Entrant ${sequence}-${member}`, sex: 'MALE', qualityTier: 'ELITE', ds: 35, dp: 35, math: 35, graph: 35, greedy: 35, str: 35, code: 35, thinking: 35, setting: 35, mindset: 0, focusCap: 30, energyMax: 80, energy: 80, stamina: 5, staminaRegen: 50, lastSettledAt: PAST } });
+    const student = await prisma.student.create({ data: { userId: session.me.id, name: `Entrant ${sequence}-${member}`, qualityTier: 'ELITE', ds: 35, dp: 35, math: 35, graph: 35, greedy: 35, str: 35, code: 35, thinking: 35, setting: 35, mindset: 0, focusCap: 30, energyMax: 80, energy: 80, stamina: 5, staminaRegen: 50, lastSettledAt: PAST } });
     studentIds.push(student.id);
   }
   await prisma.userItem.create({ data: { userId: session.me.id, itemId: 'entry-ticket', quantity: 1 } });
