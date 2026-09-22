@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as svc from './service.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 export const studentsRouter = Router();
 
@@ -17,7 +18,10 @@ function parseId(raw: string | string[]): number {
 
 studentsRouter.get('/', requireAuth, async (req, res, next) => {
   try {
-    res.json({ ok: true, data: await svc.listStudents(req.user!.id) });
+    const data = await svc.listStudents(req.user!.id);
+    // visit_students 只在本端点推进：overview 内部也调 listStudents()，挂 service 上会被总览页代劳
+    void autoAdvanceIfNeeded(req.user!.id, 'visit_students');
+    res.json({ ok: true, data });
   } catch (e) { next(e); }
 });
 

@@ -4,6 +4,7 @@ import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as svc from './service.js';
 import * as lecture from './lecture.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 export const academyRouter = Router();
 
@@ -18,7 +19,10 @@ const LectureBodySchema = z
 
 academyRouter.get('/pool', requireAuth, async (req, res, next) => {
   try {
-    res.json({ ok: true, data: await svc.getPool(req.user!.id) });
+    const data = await svc.getPool(req.user!.id);
+    // visit_academy 只在本端点推进：overview 内部也调 getPool()，挂 service 上会被总览页代劳
+    void autoAdvanceIfNeeded(req.user!.id, 'visit_academy');
+    res.json({ ok: true, data });
   } catch (e) { next(e); }
 });
 

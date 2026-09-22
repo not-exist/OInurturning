@@ -6,7 +6,6 @@ import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
 import { aggregateMeta } from './meta.js';
 import { settle, settleStudent } from './settle.js';
-import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 /**
  * 学员管理服务（M1 Task 4）：
@@ -77,7 +76,6 @@ export async function listStudents(userId: number, now: Date = new Date()): Prom
     include: { talents: true },
     orderBy: { id: 'asc' },
   });
-  void autoAdvanceIfNeeded(userId, 'visit_students');
   return students.map((s) => project(s, now));
 }
 
