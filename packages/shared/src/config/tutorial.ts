@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-/** 引导 unlock 键的合法词表；后端 ROUTE_MAP 的键必须与它完全一致（有单测断言） */
+/**
+ * 引导 unlock 键的合法词表（含 'all' 之外的取值；yaml unlock 与此不一致时 config 层 failFast）。
+ * 后端 ROUTE_MAP 的键集是它的子集：并非每个键都需要 API 门禁——例如 lecture 的两条前缀完全落在
+ * academy 前缀段内，保留该键只会误导，故 ROUTE_MAP 不登记 lecture，而词表仍需保留它给 yaml 用。
+ */
 export const TUTORIAL_ROUTE_KEYS = [
   'overview',
   'students',
