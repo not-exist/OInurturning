@@ -23,7 +23,8 @@ tutorialRouter.post('/advance', requireAuth, async (req, res, next) => {
   try {
     const parsed = AdvanceSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
-    const state = await svc.advanceTutorial(req.user!.id, parsed.data.step);
+    // 客户端只能手动推进纯展示步；行为步的推进证据由对应功能服务端提供
+    const state = await svc.advanceTutorial(req.user!.id, parsed.data.step, { reason: 'manual' });
     res.json({ ok: true, data: state });
   } catch (e) {
     next(e);

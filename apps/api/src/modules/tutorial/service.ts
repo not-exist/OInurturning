@@ -1,9 +1,10 @@
 import type { Prisma } from '@prisma/client';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
+import { logger } from '../../lib/logger.js';
 import { prisma } from '../../lib/prisma.js';
 import type { TutorialStepDef } from '@oinur/shared';
-import { unlockedForStep } from './routing.js';
+import { resolveProgress, unlockedForStep } from './routing.js';
 
 // 纯逻辑（前缀匹配/解锁计算）在 routing.js，这里 re-export 保持既有 import 路径可用
 export { ROUTE_MAP, isApiAllowed, unlockedForStep } from './routing.js';
@@ -27,22 +28,25 @@ export interface TutorialStateView {
   current: TutorialStepDef | null;
 }
 
+export type AdvanceReason = 'manual' | 'auto';
+
+/** 统一的视图构造：step 一律是归一化后的值（越界钳到配置范围），unlocked 由 routing 计算 */
+function stateView(step: number, completed: boolean, steps: TutorialStepDef[]): TutorialStateView {
+  return {
+    step,
+    completed,
+    total: steps.length,
+    steps,
+    unlocked: unlockedForStep(step, completed, steps),
+    current: completed ? null : (steps[step] ?? null),
+  };
+}
+
 export async function getTutorialState(userId: number): Promise<TutorialStateView> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const steps = getSteps();
-  const total = steps.length;
-  const completed = user.tutorialCompleted;
-  const step = completed ? total : Math.min(user.tutorialStep, total - 1);
-  const unlocked = unlockedForStep(user.tutorialStep, completed, steps);
-  const current = completed ? null : (steps[step] ?? null);
-  return {
-    step: user.tutorialStep,
-    completed,
-    total,
-    steps,
-    unlocked,
-    current,
-  };
+  const progress = resolveProgress(user, steps);
+  return stateView(progress.step, progress.completed, steps);
 }
 
 async function grantReward(tx: Prisma.TransactionClient, userId: number, reward: NonNullable<TutorialStepDef['reward']>) {
@@ -70,77 +74,58 @@ async function grantReward(tx: Prisma.TransactionClient, userId: number, reward:
   }
 }
 
-export async function advanceTutorial(userId: number, targetStep: number): Promise<TutorialStateView> {
+/**
+ * 推进引导步骤（只允许严格 +1，回退与跳步一律 STATE_CONFLICT）。
+ * 奖励在离开当前步时发放一次；同一步重复推进幂等且不发奖（否则可交替刷奖）。
+ * `reason` 是服务端证据：`manual` 只对纯展示步（action=none）开放；
+ * 行为步（visit 系列 / do 系列）只能由对应功能服务端以 `auto` + 匹配的 action 触发。
+ */
+export async function advanceTutorial(
+  userId: number,
+  targetStep: number,
+  opts: { reason: AdvanceReason; action?: TutorialStepDef['action'] },
+): Promise<TutorialStateView> {
   const steps = getSteps();
-  if (targetStep < 0 || targetStep >= steps.length) {
+  if (!Number.isInteger(targetStep) || targetStep < 0 || targetStep >= steps.length) {
     throw new ApiError('VALIDATION_FAILED', { resource: 'tutorial', reason: 'step 越界' });
   }
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
-    if (user.tutorialCompleted) {
-      const unlocked = unlockedForStep(user.tutorialStep, true, steps);
-      return {
-        step: user.tutorialStep,
-        completed: true,
-        total: steps.length,
-        steps,
-        unlocked,
-        current: null,
-      };
+    const progress = resolveProgress(user, steps);
+    // 已完成：幂等返回，不再发任何奖励
+    if (progress.completed) return stateView(progress.step, true, steps);
+    // 重放当前步：幂等返回，必须在发奖之前
+    if (targetStep === progress.step) return stateView(progress.step, false, steps);
+    // 只允许按顺序前进一步：回退（targetStep < 当前）与跳步（> 当前 + 1）都拒绝
+    if (targetStep !== progress.step + 1) {
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'tutorial',
+        reason: `需按顺序完成，当前 ${progress.step}，目标 ${targetStep}`,
+      });
     }
-    if (targetStep !== user.tutorialStep + 1 && targetStep !== user.tutorialStep) {
-      // 允许重放当前步（幂等），但不允许跳步
-      if (targetStep > user.tutorialStep + 1) {
-        throw new ApiError('STATE_CONFLICT', { resource: 'tutorial', reason: `需按顺序完成，当前 ${user.tutorialStep}，目标 ${targetStep}` });
+    const cur = steps[progress.step];
+    if (opts.reason === 'manual') {
+      if (cur?.action !== 'none') {
+        throw new ApiError('STATE_CONFLICT', {
+          resource: 'tutorial',
+          action: cur?.action,
+          reason: '该步需在对应功能中完成',
+        });
       }
+    } else if (cur?.action !== opts.action) {
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'tutorial',
+        action: cur?.action,
+        reason: `自动推进证据不匹配：当前步为 ${cur?.action}`,
+      });
     }
-    if (targetStep === user.tutorialStep) {
-      // 幂等返回
-      const unlocked = unlockedForStep(user.tutorialStep, false, steps);
-      return {
-        step: user.tutorialStep,
-        completed: false,
-        total: steps.length,
-        steps,
-        unlocked,
-        current: steps[user.tutorialStep] ?? null,
-      };
+    if (cur?.reward) {
+      await grantReward(tx, userId, cur.reward);
     }
-    // 发放上一步的奖励？按设计，奖励在进入下一步时发放当前步的奖励，或发放目标步的前一步？
-    // 我们设计：每步完成时发放该步的 reward，advance 到 next 时发放 current 的 reward
-    const currentStepDef = steps[user.tutorialStep];
-    if (currentStepDef?.reward) {
-      await grantReward(tx, userId, currentStepDef.reward);
-    }
-
-    const isLast = targetStep === steps.length - 1;
-    const completed = isLast;
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        tutorialStep: targetStep,
-        tutorialCompleted: completed,
-      },
-    });
-
-    // 最后一步的奖励也在完成时发放
-    if (isLast) {
-      const lastDef = steps[targetStep];
-      if (lastDef?.reward) {
-        await grantReward(tx, userId, lastDef.reward);
-      }
-    }
-
-    const unlocked = unlockedForStep(targetStep, completed, steps);
-    return {
-      step: targetStep,
-      completed,
-      total: steps.length,
-      steps,
-      unlocked,
-      current: completed ? null : (steps[targetStep] ?? null),
-    };
+    // 末步只前进不判完成：完成由 completeTutorial 显式确认（并只在那里发末步奖励）
+    await tx.user.update({ where: { id: userId }, data: { tutorialStep: targetStep } });
+    return stateView(targetStep, false, steps);
   });
 }
 
@@ -155,46 +140,41 @@ export async function autoAdvanceIfNeeded(userId: number, action: TutorialStepDe
     const cur = steps[curIdx];
     if (!cur) return;
     if (cur.action !== action) return;
-    await advanceTutorial(userId, curIdx + 1);
-  } catch {
-    // 自动推进失败不影响主流程
+    await advanceTutorial(userId, curIdx + 1, { reason: 'auto', action });
+  } catch (err) {
+    // 自动推进失败不影响主流程，但必须留痕（空 catch 会让用户永久卡步且无任何日志）
+    logger.warn({ err, userId, action }, '[tutorial] auto advance failed');
   }
 }
 
-export async function completeTutorial(userId: number): Promise<TutorialStateView> {
+/** 完成引导：需先到达末步（skipTutorialForTest 走 force 后门），末步奖励只发一次 */
+export async function completeTutorial(
+  userId: number,
+  opts: { force?: boolean } = {},
+): Promise<TutorialStateView> {
   const steps = getSteps();
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
-    if (user.tutorialCompleted) {
-      return {
-        step: user.tutorialStep,
-        completed: true,
-        total: steps.length,
-        steps,
-        unlocked: ['all'],
-        current: null,
-      };
+    const progress = resolveProgress(user, steps);
+    // 已完成：幂等返回，不重复发末步奖励
+    if (progress.completed) return stateView(progress.step, true, steps);
+    const last = steps.length - 1;
+    if (!opts.force && progress.step !== last) {
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'tutorial',
+        reason: `需先完成引导步骤（当前 ${progress.step}/${last}）`,
+      });
     }
-    // 依次发放所有未发放的奖励
-    for (let i = user.tutorialStep; i < steps.length; i++) {
-      const def = steps[i];
-      if (def?.reward) {
-        await grantReward(tx, userId, def.reward);
-      }
+    const lastDef = steps[last];
+    if (lastDef?.reward) {
+      await grantReward(tx, userId, lastDef.reward);
     }
     await tx.user.update({
       where: { id: userId },
-      data: { tutorialStep: steps.length - 1, tutorialCompleted: true },
+      data: { tutorialStep: last, tutorialCompleted: true },
     });
-    return {
-      step: steps.length - 1,
-      completed: true,
-      total: steps.length,
-      steps,
-      unlocked: ['all'],
-      current: null,
-    };
+    return stateView(last, true, steps);
   });
 }
 
@@ -202,5 +182,5 @@ export async function skipTutorialForTest(userId: number): Promise<TutorialState
   if (process.env.NODE_ENV !== 'test') {
     throw new ApiError('FORBIDDEN', { resource: 'tutorial', reason: '仅测试环境可跳过' });
   }
-  return completeTutorial(userId);
+  return completeTutorial(userId, { force: true });
 }
