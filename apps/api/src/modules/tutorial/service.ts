@@ -1,7 +1,12 @@
+import type { Prisma } from '@prisma/client';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import type { TutorialStepDef } from '@oinur/shared';
+import { unlockedForStep } from './routing.js';
+
+// 纯逻辑（前缀匹配/解锁计算）在 routing.js，这里 re-export 保持既有 import 路径可用
+export { ROUTE_MAP, isApiAllowed, unlockedForStep } from './routing.js';
 
 export function tutorialConfig() {
   const cfg = getConfig();
@@ -22,13 +27,6 @@ export interface TutorialStateView {
   current: TutorialStepDef | null;
 }
 
-export function unlockedForStep(step: number, completed: boolean, steps: TutorialStepDef[]): string[] {
-  if (completed) return ['all'];
-  const idx = Math.min(step, steps.length - 1);
-  const s = steps[idx];
-  return s ? s.unlock : ['overview'];
-}
-
 export async function getTutorialState(userId: number): Promise<TutorialStateView> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const steps = getSteps();
@@ -47,42 +45,7 @@ export async function getTutorialState(userId: number): Promise<TutorialStateVie
   };
 }
 
-/** 路由键到 API 前缀的映射，用于后端守卫 */
-const ROUTE_MAP: Record<string, string[]> = {
-  overview: ['/api/overview', '/api/users/me'],
-  students: ['/api/students'],
-  training: ['/api/training'],
-  academy: ['/api/academy'],
-  lecture: ['/api/academy/lectures', '/api/academy/lecture-tiers'],
-  adventure: ['/api/adventures'],
-  story: ['/api/story', '/api/records'],
-  shop: ['/api/shop'],
-  backpack: ['/api/items', '/api/problem-library', '/api/problems'],
-  'problem-library': ['/api/problem-library', '/api/problems'],
-  pvp: ['/api/pvp'],
-  admin: ['/api/admin'],
-  all: ['all'],
-};
-
-export function isApiAllowed(unlocked: string[], apiPath: string): boolean {
-  if (unlocked.includes('all')) return true;
-  // tutorial 自身总是允许
-  if (apiPath.startsWith('/api/tutorial')) return true;
-  // overview/me 基础允许
-  if (apiPath.startsWith('/api/overview') || apiPath.startsWith('/api/users/me') || apiPath.startsWith('/api/users/') || apiPath.startsWith('/api/auth')) {
-    // /api/users/me 在 overview 阶段也允许
-    return true;
-  }
-  const allowedPrefixes: string[] = [];
-  for (const key of unlocked) {
-    const prefixes = ROUTE_MAP[key];
-    if (prefixes) allowedPrefixes.push(...prefixes);
-  }
-  // 如果 unlocked 包含 all，已在上面返回
-  return allowedPrefixes.some((p) => apiPath.startsWith(p));
-}
-
-async function grantReward(tx: any, userId: number, reward: NonNullable<TutorialStepDef['reward']>) {
+async function grantReward(tx: Prisma.TransactionClient, userId: number, reward: NonNullable<TutorialStepDef['reward']>) {
   if (reward.money && reward.money > 0) {
     await tx.user.update({ where: { id: userId }, data: { money: { increment: reward.money } } });
   }

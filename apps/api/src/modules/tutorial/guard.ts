@@ -1,7 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
-import { getSteps, unlockedForStep, isApiAllowed } from './service.js';
+import { getSteps } from './service.js';
+import { isApiAllowed, unlockedForStep } from './routing.js';
 
 export function requireTutorialForApi(req: Request, _res: Response, next: NextFunction) {
   // 异步检查
