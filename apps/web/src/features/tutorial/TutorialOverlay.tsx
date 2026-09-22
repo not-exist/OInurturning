@@ -65,11 +65,12 @@ function computeHole(rect: Rect | null): Hole | null {
  * 四块遮罩面板：围绕洞口拼出暗场，洞口本身不渲染任何东西 ——
  * 目标元素由此真正可点击（旧实现的单块 `inset-0` 遮罩会把整页点击都吞掉）。
  * 宽或高为 0 的面板不渲染，避免出现零面积的可点击层。
+ * `blocking` 为 false 时面板只做暗场（不参与命中测试），见 TutorialOverlay 内的说明。
  */
-function MaskPanels({ hole }: { hole: Hole }): JSX.Element {
+function MaskPanels({ hole, blocking }: { hole: Hole; blocking: boolean }): JSX.Element {
   const { innerWidth, innerHeight } = window;
   const middle = { top: hole.top, height: hole.bottom - hole.top };
-  const cls = 'fixed z-50 bg-ink-950/70 backdrop-blur-[1px]';
+  const cls = `fixed z-50 bg-ink-950/70 backdrop-blur-[1px]${blocking ? '' : ' pointer-events-none'}`;
   return (
     <>
       {hole.top > 0 && (
@@ -152,6 +153,10 @@ export function TutorialOverlay(): JSX.Element | null {
   const progressPct = Math.round(((stepIdx + 1) / total) * 100);
   const hole = computeHole(rect);
   const actionPending = cur.action !== 'none';
+  // 遮罩是否拦点击：只有「访问即完成」的步骤（visit_*）与纯展示步可以拦。
+  // do_* 步骤要在页内做连续操作（选学员→开始训练、选档位→开始讲课、组队→抽事件、进关…），
+  // 洞口只盖得住目标元素，拦点击会把真正要点的按钮挡在洞外，直接把引导卡死。
+  const blocking = !actionPending || cur.action.startsWith('visit_');
   const actionHint =
     cur.action === 'do_recruit'
       ? recruitHint(state.studentsOwned, state.studentsRequired)
@@ -223,12 +228,14 @@ export function TutorialOverlay(): JSX.Element | null {
     <>
       {/* 遮罩：有洞口时四块面板围出可点击区域；无 target 的步骤整屏遮罩，卡片上的按钮即唯一出口 */}
       {hole !== null ? (
-        <MaskPanels hole={hole} />
+        <MaskPanels hole={hole} blocking={blocking} />
       ) : (
         <div
           aria-hidden
           className={`fixed inset-0 z-50 bg-ink-950/70 backdrop-blur-[1px] ${
-            cur.target === null ? '' : 'pointer-events-none'
+            // 洞口算不出来（目标未挂载 / 已滚出视口）说明用户还得先去别处操作，
+            // 此时只有无 target 的纯展示步可以拦点击
+            cur.target === null && blocking ? '' : 'pointer-events-none'
           }`}
         />
       )}
@@ -257,7 +264,7 @@ export function TutorialOverlay(): JSX.Element | null {
         tabIndex={-1}
         onKeyDown={handleTab}
         style={cardStyle}
-        className="pointer-events-auto animate-rise outline-none"
+        className={`animate-rise outline-none ${actionPending ? 'pointer-events-none' : 'pointer-events-auto'}`}
       >
         <Panel
           title={
