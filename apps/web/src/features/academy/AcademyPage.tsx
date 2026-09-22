@@ -266,6 +266,7 @@ function CandidateCard({
         </div>
         <Btn
           data-testid="recruit-btn"
+          data-tutorial={index === 0 ? 'academy-recruit' : undefined}
           variant="primary"
           className="w-full"
           disabled={recruit.isPending}

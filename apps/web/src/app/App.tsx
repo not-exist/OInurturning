@@ -7,9 +7,9 @@ import { useAuthStore } from '../lib/auth-store';
 import { useOverview } from '../lib/hooks';
 import { nextReputationTitle, reputationTitle } from '../lib/rarity';
 import { Icon, NAV_ICON, type LucideIcon } from '../components/icons';
-import { RollingNumber } from '../components/ui';
+import { RollingNumber, HoverCard } from '../components/ui';
 import { StaminaCells } from '../features/students/StudentVisuals';
-import { useTutorial, ROUTE_KEY_MAP, isRouteUnlocked } from '../lib/tutorial';
+import { useTutorial, isRouteUnlocked } from '../lib/tutorial';
 import { TutorialOverlay, TutorialProgressBar } from '../features/tutorial/TutorialOverlay';
 
 interface NavItem {
@@ -100,8 +100,12 @@ export function Layout(): JSX.Element {
   const staminaMax = roster.length * 5;
   const staminaShort = roster.some((s) => Math.floor(s.stamina) < 1);
 
-  const unlocked = tutorial.data?.unlocked ?? ['all'];
-  const isCompleted = tutorial.data?.completed ?? true;
+  // 引导状态未就绪时视为「未解锁 / 未完成」：宁可能亮不亮的错配，也不要先全亮再收回
+  const unlocked = tutorial.data?.unlocked ?? [];
+  const isCompleted = tutorial.data?.completed ?? false;
+
+  const stepTitle = tutorial.data?.current?.title;
+  const lockHint = stepTitle !== undefined ? `完成「${stepTitle}」后解锁` : '完成新手引导后解锁';
 
   const checkLocked = (routeKey: string): boolean => {
     if (isCompleted) return false;
@@ -132,37 +136,56 @@ export function Layout(): JSX.Element {
               <ul className="flex gap-1 lg:block lg:space-y-0.5">
                 {group.items.map((item) => {
                   const locked = checkLocked(item.tutorialKey);
+                  const link = (
+                    <NavLink
+                      to={item.to}
+                      end={item.end}
+                      data-tutorial={dataTutorialAttr(item.tutorialKey)}
+                      aria-disabled={locked}
+                      className={({ isActive }) =>
+                        `relative flex shrink-0 cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
+                          locked
+                            ? 'pointer-events-none opacity-40'
+                            : isActive
+                              ? 'bg-cyber-400/10 text-cyber-300'
+                              : 'text-fg-dim hover:bg-ink-700/60 hover:text-fg'
+                        }`
+                      }
+                      onClick={(e) => {
+                        if (locked) e.preventDefault();
+                      }}
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <span
+                            aria-hidden
+                            className={`absolute inset-y-0 left-0 w-[2px] ${isActive && !locked ? 'bg-cyber-400' : 'bg-transparent'}`}
+                          />
+                          <Icon icon={item.icon} className="size-4 shrink-0" />
+                          {item.label}
+                          {locked && (
+                            <span title={lockHint} className="ml-auto flex">
+                              <Icon icon={Lock} className="size-3 text-fg-faint" />
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  );
                   return (
                     <li key={item.to}>
-                      <NavLink
-                        to={item.to}
-                        end={item.end}
-                        data-tutorial={dataTutorialAttr(item.tutorialKey)}
-                        className={({ isActive }) =>
-                          `relative flex shrink-0 cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
-                            locked
-                              ? 'pointer-events-none opacity-40'
-                              : isActive
-                                ? 'bg-cyber-400/10 text-cyber-300'
-                                : 'text-fg-dim hover:bg-ink-700/60 hover:text-fg'
-                          }`
-                        }
-                        onClick={(e) => {
-                          if (locked) e.preventDefault();
-                        }}
-                      >
-                        {({ isActive }) => (
-                          <>
-                            <span
-                              aria-hidden
-                              className={`absolute inset-y-0 left-0 w-[2px] ${isActive && !locked ? 'bg-cyber-400' : 'bg-transparent'}`}
-                            />
-                            <Icon icon={item.icon} className="size-4 shrink-0" />
-                            {item.label}
-                            {locked && <Icon icon={Lock} className="ml-auto size-3 text-fg-faint" />}
-                          </>
-                        )}
-                      </NavLink>
+                      {locked ? (
+                        // NavLink 自身 pointer-events-none，悬浮/聚焦提示挂在外层 HoverCard 上
+                        <HoverCard
+                          width="w-56"
+                          className="w-full"
+                          content={<span className="block text-xs text-fg-muted">{lockHint}</span>}
+                        >
+                          {link}
+                        </HoverCard>
+                      ) : (
+                        link
+                      )}
                     </li>
                   );
                 })}

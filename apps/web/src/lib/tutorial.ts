@@ -88,8 +88,9 @@ export const ROUTE_KEY_MAP: Record<string, string> = {
   '/academy/lecture': 'lecture',
   '/adventure': 'adventure',
   '/story': 'story',
+  '/records': 'story',
   '/shop': 'shop',
-  '/problem-library': 'backpack',
+  '/problem-library': 'problem-library',
   '/pvp': 'pvp',
   '/settings': 'overview',
 };
