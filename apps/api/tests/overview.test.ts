@@ -190,45 +190,52 @@ describe('GET /api/overview', () => {
   });
 });
 
+/** 候选池只暴露九维与价格（品质档按 student.md §3.6 隐藏）：用六维和当强度代理。 */
+const STRENGTH_DIMS = ['ds', 'dp', 'math', 'graph', 'greedy', 'str'] as const;
+
+function strengthOf(attrs: Record<string, number>): number {
+  return STRENGTH_DIMS.reduce((sum, dim) => sum + (attrs[dim] ?? 0), 0);
+}
+
 describe('POST /api/overview/checklist/claim', () => {
   beforeEach(resetUsers);
 
-  /** 做完 5 步：GOOD 剧情(≤3 次内必过)+训练+讲课，COMMON 历练结算，再招第 3 人。 */
-  async function completeAll(user: { token: string; userId: number }): Promise<void> {
+  /** 做完 5 步：GOOD 剧情+训练+讲课，COMMON 历练结算，再招第 3 人。返回剧情是否通关。 */
+  async function completeAll(user: { token: string; userId: number }): Promise<boolean> {
     const auth = { Authorization: `Bearer ${user.token}` };
     await fundAdventurer(user.userId);
     const students = await onboardingStudents(user.userId);
     const good = students.find((s) => s.qualityTier === 'GOOD') ?? students[0]!;
     const other = students.find((s) => s.id !== good.id) ?? students[1]!;
 
-    // 剧情/历练都要多人队伍：先补齐队伍人数（在册 2 人 + 招募 2 人）
+    // 剧情/历练都要多人队伍：先补齐队伍人数（在册 2 人 + 招募 2 人），招每池最强的那个
     const recruitedIds: number[] = [];
     for (let index = 0; index < 2; index += 1) {
-      const pool = unwrapOk<{ candidates: { tempId: string }[] }>(
+      const pool = unwrapOk<{ candidates: { tempId: string; attrs: Record<string, number> }[] }>(
         await request(app).get('/api/academy/pool').set(auth),
       );
+      const strongest = [...pool.candidates].sort(
+        (a, b) => strengthOf(b.attrs) - strengthOf(a.attrs),
+      )[0]!;
       const recruited = unwrapOk<{ id: number }>(
         await request(app)
           .post('/api/academy/recruit')
           .set(auth)
-          .send({ tempId: pool.candidates[0]!.tempId }),
+          .send({ tempId: strongest.tempId }),
       );
       recruitedIds.push(recruited.id);
     }
     const roster = [good.id, other.id, ...recruitedIds];
 
-    // 剧情：GOOD（V≈14）打 cspj:1（NPC 均值 8 取前 8，单次≈99%，至多 3 次）
-    let cleared = false;
-    for (let attempt = 0; attempt < 3 && !cleared; attempt += 1) {
-      const entered = await request(app)
-        .post('/api/story/stages/cspj:1/enter')
-        .set(auth)
-        .send({ roster, ngLevel: 0, idempotencyKey: randomUUID() });
-      expect(entered.status).toBe(200);
-      cleared = await stageCleared(user.token, 'cspj:1');
-    }
-    expect(cleared).toBe(true);
-    // 回体（剧情至多耗 3，药水 +3 保证后续训练 1 + 讲课 2 够用）
+    // 剧情：GOOD（V≈14）+ 满状态队伍打 cspj:1（NPC 10 队均值 8、通关线 rank ≤ 8），胜负随机
+    const entered = await request(app)
+      .post('/api/story/stages/cspj:1/enter')
+      .set(auth)
+      .send({ roster, ngLevel: 0, idempotencyKey: randomUUID() });
+    expect(entered.status).toBe(200);
+    // 未通关直接返回：本账号的体力/精力/心态已被这一场消耗，继续用只会更弱
+    if (!(await stageCleared(user.token, 'cspj:1'))) return false;
+    // 回体（药水 +3 保证后续训练 1 + 讲课 2 够用）
     const potion = await request(app)
       .post('/api/items/use')
       .set(auth)
@@ -249,6 +256,19 @@ describe('POST /api/overview/checklist/claim', () => {
     expect(lectured.status).toBe(200);
 
     await resolveAdventure(user.token, [other.id, good.id, recruitedIds[0]!]);
+    return true;
+  }
+
+  /**
+   * 剧情通关是随机事件，输掉一场还会带走体力/精力/心态，原地带伤重试只会越打越弱。
+   * 所以整段换新账号重来：每次都是满状态队伍的一次独立重掷。
+   */
+  async function completeAllFresh(): Promise<{ token: string; userId: number }> {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const user = await register();
+      if (await completeAll(user)) return user;
+    }
+    throw new Error('cspj:1 连 8 次满状态尝试都未通关');
   }
 
   it('未完成领取 → 409 STATE_CONFLICT', async () => {
@@ -261,8 +281,7 @@ describe('POST /api/overview/checklist/claim', () => {
   });
 
   it('5 步全完成 → 领取成功落徽章；重复领取幂等 already', async () => {
-    const user = await register();
-    await completeAll(user);
+    const user = await completeAllFresh();
 
     const before = await fetchOverview(user.token);
     expect(before.checklist.doneCount).toBe(5);
@@ -295,8 +314,7 @@ describe('POST /api/overview/checklist/claim', () => {
   });
 
   it('领奖事务内重算：完成后开除至 2 人 → 409', async () => {
-    const user = await register();
-    await completeAll(user);
+    const user = await completeAllFresh();
     // 开除至只剩 2 人（在册 <3 → recruit3 步骤回退）
     const students = await onboardingStudents(user.userId);
     for (const victim of students.slice(2)) {
