@@ -89,6 +89,100 @@ describe('M3 lecture flow', () => {
     expect(await listLectureLogs(userId)).toHaveLength(1);
   });
 
+  /** 成长增量按属性汇总（未出现的属性记 0），用于逐列核对写回结果 */
+  function gainedOf(
+    gains: { stat: string; amount: number }[],
+    stat: 'setting' | 'thinking',
+  ): number {
+    return gains.filter((gain) => gain.stat === stat).reduce((sum, gain) => sum + gain.amount, 0);
+  }
+
+  it('settles lecture growth into setting/thinking without touching pay (issue #56)', async () => {
+    const userId = await createUser(100);
+    const studentId = await createStudent(userId, 45);
+    const result = await teachLecture(userId, studentId, 'senior', false, NOW);
+
+    expect(result).toMatchObject({ money: 360, reputation: 4, thinkingReq: 45, thinkingDeficit: false });
+    expect(result.gains.length).toBeGreaterThan(0);
+    // 思维=要求 → 匹配系数 1；cur=45 → 主成长 0.75×(1−0.45)^2，附带成长为其 35%
+    const full = 0.75 * (1 - 0.45) ** 2;
+    for (const gain of result.gains) {
+      expect(['setting', 'thinking']).toContain(gain.stat);
+      const known = [full, full * 0.35].some((candidate) => Math.abs(candidate - gain.amount) < 1e-9);
+      expect(known).toBe(true);
+    }
+
+    const student = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
+    expect(student.setting).toBeCloseTo(45 + gainedOf(result.gains, 'setting'), 10);
+    expect(student.thinking).toBeCloseTo(45 + gainedOf(result.gains, 'thinking'), 10);
+
+    const [log] = await listLectureLogs(userId);
+    expect(log?.thinkingReq).toBe(45);
+    expect(log?.thinkingDeficit).toBe(false);
+    expect(log?.gains).toEqual(result.gains);
+  });
+
+  it('gives no growth when thinking far exceeds the tier requirement', async () => {
+    const userId = await createUser();
+    const studentId = await createStudent(userId, 65); // senior 要求思维 45 → 超出 match_span=20
+    const result = await teachLecture(userId, studentId, 'senior', false, NOW);
+
+    expect(result.thinkingDeficit).toBe(false);
+    expect(result.gains).toEqual([]);
+    const student = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
+    expect(student.setting).toBe(65);
+    expect(student.thinking).toBe(65);
+  });
+
+  it('forced lecture with a thinking deficit: discounted growth on success, stat setback on a flop', async () => {
+    const userId = await createUser();
+    const studentId = await createStudent(userId, 37); // V=37 落强接窗 [37,45)；思维 37 < 要求 45
+    const result = await teachLecture(userId, studentId, 'senior', true, NOW);
+
+    expect(result).toMatchObject({ forced: true, thinkingReq: 45, thinkingDeficit: true });
+    const student = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });
+    expect(student.setting).toBeCloseTo(37 + gainedOf(result.gains, 'setting'), 10);
+    expect(student.thinking).toBeCloseTo(37 + gainedOf(result.gains, 'thinking'), 10);
+
+    if (result.success) {
+      expect(result.gains.length).toBeGreaterThan(0);
+      for (const gain of result.gains) expect(gain.amount).toBeGreaterThan(0);
+    } else {
+      // 讲砸且思维不足 → 出题与思维按 forced_deficit_loss 回落（0.5 / 0.8）
+      expect(result.gains).toEqual([
+        { stat: 'thinking', amount: expect.closeTo(-0.8, 10) },
+        { stat: 'setting', amount: expect.closeTo(-0.5, 10) },
+      ]);
+      expect(student.thinking).toBeCloseTo(36.2, 10);
+      expect(student.setting).toBeCloseTo(36.5, 10);
+    }
+  });
+
+  it('never loses stats on a flop when thinking meets the requirement', async () => {
+    const userId = await createUser();
+    // V=40（强接窗）但思维 50 ≥ 要求 45：讲砸只扣声誉与心态，不动属性
+    const student = await prisma.student.create({
+      data: {
+        userId,
+        name: '思维型讲师',
+        qualityTier: 'GOOD',
+        ds: 45, dp: 45, math: 45, graph: 45, greedy: 45, str: 45,
+        code: 25, thinking: 50, setting: 30,
+        mindset: 2, focusCap: 45, energyMax: 60, energy: 30,
+        stamina: 5, staminaRegen: 50, lastSettledAt: NOW,
+      },
+    });
+    const result = await teachLecture(userId, student.id, 'senior', true, NOW);
+
+    expect(result.thinkingDeficit).toBe(false);
+    if (!result.success) {
+      expect(result.gains).toEqual([]);
+      const after = await prisma.student.findUniqueOrThrow({ where: { id: student.id } });
+      expect(after.thinking).toBe(50);
+      expect(after.setting).toBe(30);
+    }
+  });
+
   it('adds the configured overflow multiplier to pay and reputation', async () => {
     const userId = await createUser(100);
     const studentId = await createStudent(userId, 55);

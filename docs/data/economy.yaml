@@ -95,22 +95,27 @@ lecture:
       threshold: 15              # 综合能力门槛 —— 与 systems/gameplay.md 保持一致
       base_money: 60             # 基础金钱报酬
       base_reputation: 1         # 基础声誉报酬
+      thinking_req: 15           # 讲课成长的思维要求（缺省=threshold；与门槛同步调整）
     - id: junior                 # 普及组
       threshold: 30              # —— 与 systems/gameplay.md 保持一致
       base_money: 150
       base_reputation: 2
+      thinking_req: 30
     - id: senior                 # 提高组
       threshold: 45              # —— 与 systems/gameplay.md 保持一致
       base_money: 300
       base_reputation: 4
+      thinking_req: 45
     - id: provincial             # 省选组
       threshold: 62              # —— 与 systems/gameplay.md 保持一致
       base_money: 800
       base_reputation: 8
+      thinking_req: 62
     - id: national               # 国家队集训队
       threshold: 80              # —— 与 systems/gameplay.md 保持一致
       base_money: 2000
       base_reputation: 15
+      thinking_req: 80
   reputation_pay_curve:          # 声誉影响报酬总额的曲线
     formula: "rep_mult = clamp(1 + reputation / rep_divisor, min_mult, max_mult)"
     rep_divisor: 500             # 声誉 200 → ×1.40；500 → ×2.00；≥1000 → 封顶
@@ -122,6 +127,27 @@ lecture:
     overflow_step: 5
     overflow_pct: 0.20
     overflow_cap_pct: 1.00       # 最高 +100%
+  # --------------------------------------------------------------------
+  # 讲课成长（issue #56：讲课能够提升学生水平）
+  # 权威文档 systems/gameplay.md §4.2「讲课成长」；只触及 setting/thinking 两项，
+  # 量级刻意低于训练（student.md §4），且与 V 解耦——匹配判定读思维能力本身。
+  # --------------------------------------------------------------------
+  growth:
+    rule: "主成长落点按 setting_weight 随机二选一；量 = base_gain × 匹配系数 g × 强接折减 × (1 + lecture_growth/100) × (1 − cur/100)^2"
+    match_rule: "d = 学员思维 − 该档 thinking_req；g(d) = d<0 时取 clamp(1 + d/match_span, deficit_floor, 1)，否则取 max(0, 1 − d/match_span)^match_power"
+    base_gain: 0.75              # 单场基准成长（训练 base 为 1.6/2.0/3.2，讲课刻意低一档）
+    setting_weight: 0.55         # 主成长落 setting（出题）的概率，其余落 thinking（思维）
+    secondary_prob: 0.20         # 另一项附带成长的触发概率
+    secondary_share: 0.35        # 附带成长相对 base_gain 的份额
+    forced_success_mult: 0.60    # 强接「勉强过关」的成长折减（与报酬 ×0.6 同源）
+    match_span: 20               # 思维超出要求 20 点 → 成长归零（讲低于自己水平的课学不到东西）
+    match_power: 1.5             # 超出侧衰减指数（>1 → 衰减比线性更快）
+    deficit_floor: 0.35          # 思维不足侧的匹配系数下限（不达标仍能磨到一点）
+    forced_deficit_loss:         # 强接且思维不足时讲砸 → 属性回落（clamp 下限 0）
+      thinking: 0.8
+      setting: 0.5
+    # 手感锚点（无天赋、g=1、达标成功）：cur=20 → ≈0.48/场；cur=50 → ≈0.19/场；cur=80 → ≈0.03/场
+    # 每日上限沿用讲课次数闸（全营 3 场 / 单人 2 场），无需额外成长闸
   forced_taking_penalty_note: 能力不足强行接单扣声誉，具体数值由 systems/gameplay.md 定义
   stamina_assumption: 每次讲课扣 2 点体力 —— 以 systems/gameplay.md 最终定义为准，本文件收支测算按此假设
   frequency_cap_note: 讲课次数限制机制由 systems/gameplay.md 定义（讲课系统规则）

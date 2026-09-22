@@ -7,6 +7,7 @@ import type {
   DimensionKey,
   EventCategory,
   ItemEffectKind,
+  LectureGrowthStat,
   ProblemSeverity,
   ProblemTier,
   QualityTier,
@@ -257,6 +258,7 @@ export const TALENT_STAT_LABEL = {
   duel_posing: '对决出题强度',
   duel_solve: '对决解题',
   lecture_income: '讲课收入',
+  lecture_growth: '讲课成长',
   focus_gain: '专注积累速率',
   energy_cost_reduce: '比赛精力消耗',
   energy_regen: '赛后精力恢复',
@@ -598,6 +600,22 @@ export const LECTURE_TIER_LABEL: Record<LectureTierId, string> = {
 
 export function lectureTierLabel(raw: string): string {
   return (LECTURE_TIER_LABEL as Record<string, string>)[raw] ?? raw;
+}
+
+/** 讲课成长只落两项（issue #56）；紧凑行用短名，与 TALENT_STAT_LABEL 的长名分工 */
+export const LECTURE_GROWTH_STAT_LABEL: Record<LectureGrowthStat, string> = {
+  setting: '出题',
+  thinking: '思维',
+};
+
+export function lectureGrowthStatLabel(stat: string): string {
+  return (LECTURE_GROWTH_STAT_LABEL as Record<string, string>)[stat] ?? stat;
+}
+
+/** 成长增量展示：带符号、最多两位小数（正=成长，负=讲砸回落） */
+export function signedTrim(v: number): string {
+  const n = round(v * 100) / 100;
+  return n > 0 ? `+${n}` : String(n);
 }
 
 // ---------------------------------------------------------------------------

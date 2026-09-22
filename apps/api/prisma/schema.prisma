@@ -41,37 +41,37 @@ enum MatchStatus {
 }
 
 model User {
-  id            Int       @id @default(autoincrement())
-  username      String    @unique @db.VarChar(32)
-  passwordHash  String?
-  role          Role      @default(USER)
-  money         Int       @default(0)
-  reputation    Int       @default(0)
-  badges        Json      @default("[]")
-  tokenVersion  Int       @default(0)
-  bannedAt      DateTime?
-  onboardedAt   DateTime? // 开局包发放标记：注册事务/回填脚本发放后落库，重复发放幂等键
-  lastLoginAt   DateTime?
-  lastSettledAt DateTime  @default(now())
-  adventureIntelReady Boolean @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  Int       @id @default(autoincrement())
+  username            String    @unique @db.VarChar(32)
+  passwordHash        String?
+  role                Role      @default(USER)
+  money               Int       @default(0)
+  reputation          Int       @default(0)
+  badges              Json      @default("[]")
+  tokenVersion        Int       @default(0)
+  bannedAt            DateTime?
+  onboardedAt         DateTime? // 开局包发放标记：注册事务/回填脚本发放后落库，重复发放幂等键
+  lastLoginAt         DateTime?
+  lastSettledAt       DateTime  @default(now())
+  adventureIntelReady Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  students        Student[]
-  items           UserItem[]
-  problemEntries  ProblemLibraryEntry[]
-  reputationLogs  ReputationLog[]
-  recruitPool     RecruitPool?
-  contestRecords ContestRecord[]
-  adventureLogs  AdventureLog[]
-  storyProgress  StoryProgress[]
-  lectureLogs    LectureLog[]
-  createdTournaments PvpTournament[] @relation("TournamentCreator")
-  adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
-  announcements AdminAnnouncement[]
-  pvpRegistrations PvpRegistration[]
-  pvpRewardGrants PvpRewardGrant[]
-  trainingLogs TrainingLog[]
+  students           Student[]
+  items              UserItem[]
+  problemEntries     ProblemLibraryEntry[]
+  reputationLogs     ReputationLog[]
+  recruitPool        RecruitPool?
+  contestRecords     ContestRecord[]
+  adventureLogs      AdventureLog[]
+  storyProgress      StoryProgress[]
+  lectureLogs        LectureLog[]
+  createdTournaments PvpTournament[]       @relation("TournamentCreator")
+  adminAuditLogs     AdminAuditLog[]       @relation("AdminAuditActor")
+  announcements      AdminAnnouncement[]
+  pvpRegistrations   PvpRegistration[]
+  pvpRewardGrants    PvpRewardGrant[]
+  trainingLogs       TrainingLog[]
 
   @@map("users")
 }
@@ -91,9 +91,9 @@ model ContestRecord {
   snapshotHash   String        @db.VarChar(64)
   createdAt      DateTime      @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   adventureLogs AdventureLog[]
-  pvpMatches PvpMatch[]
+  pvpMatches    PvpMatch[]
 
   @@unique([userId, idempotencyKey])
   @@index([userId, type, createdAt])
@@ -120,22 +120,22 @@ model StoryProgress {
 }
 
 model AdventureLog {
-  id         Int             @id @default(autoincrement())
-  userId     Int
-  studentId  Int?
-  studentIds Json            @default("[]")
-  eventId    String          @db.VarChar(64)
-  contestRecordId String?     @db.VarChar(64)
-  tier       Int
-  seed       Int
-  status     AdventureStatus @default(PENDING)
-  choices    Json            @default("[]")
-  results    Json            @default("[]")
-  createdAt  DateTime        @default(now())
-  resolvedAt DateTime?
+  id              Int             @id @default(autoincrement())
+  userId          Int
+  studentId       Int?
+  studentIds      Json            @default("[]")
+  eventId         String          @db.VarChar(64)
+  contestRecordId String?         @db.VarChar(64)
+  tier            Int
+  seed            Int
+  status          AdventureStatus @default(PENDING)
+  choices         Json            @default("[]")
+  results         Json            @default("[]")
+  createdAt       DateTime        @default(now())
+  resolvedAt      DateTime?
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  actorStudent Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actorStudent  Student?       @relation(fields: [studentId], references: [id], onDelete: SetNull)
   contestRecord ContestRecord? @relation(fields: [contestRecordId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
@@ -153,18 +153,25 @@ model AdventureWeeklyUsage {
 }
 
 model LectureLog {
-  id            Int      @id @default(autoincrement())
-  userId        Int
-  studentId     Int
-  tier          String   @db.VarChar(32)
-  teachingValue Int
-  threshold     Int
-  forced        Boolean
-  success       Boolean
-  money         Int
-  reputation    Int
-  staminaCost   Int
-  createdAt     DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  studentId       Int
+  tier            String   @db.VarChar(32)
+  teachingValue   Int
+  threshold       Int
+  // 讲课成长（issue #56）审计三件套：本场比对的思维要求、思维是否不足、逐场成长增量。
+  thinkingReq     Int      @default(0)
+  thinkingDeficit Boolean  @default(false)
+  forced          Boolean
+  success         Boolean
+  money           Int
+  reputation      Int
+  /**
+   * LectureGrowthEntry[]（stat=setting|thinking，amount 为浮点增量；负值=讲砸回落）
+   */
+  gains           Json     @default("[]")
+  staminaCost     Int
+  createdAt       DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -206,18 +213,18 @@ model TrainingLog {
 }
 
 model PvpTournament {
-  id           Int              @id @default(autoincrement())
-  name         String           @db.VarChar(64)
-  status       TournamentStatus @default(REGISTERING)
-  size         Int
+  id             Int              @id @default(autoincrement())
+  name           String           @db.VarChar(64)
+  status         TournamentStatus @default(REGISTERING)
+  size           Int
   registerEndsAt DateTime
-  autoStartAt  DateTime
-  prizes       Json             @default("{}")
-  config       Json             @default("{}")
-  createdBy    Int?
-  createdAt    DateTime         @default(now())
+  autoStartAt    DateTime
+  prizes         Json             @default("{}")
+  config         Json             @default("{}")
+  createdBy      Int?
+  createdAt      DateTime         @default(now())
 
-  creator User? @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  creator       User?             @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   registrations PvpRegistration[]
   matches       PvpMatch[]
   rewardGrants  PvpRewardGrant[]
@@ -226,13 +233,13 @@ model PvpTournament {
 }
 
 model PvpRegistration {
-  id              Int      @id @default(autoincrement())
-  tournamentId    Int
-  userId          Int
-  roster          Json
-  problemEntryIds Json     @default("[]")
-  problemSnapshots Json    @default("[]")
-  createdAt       DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  tournamentId     Int
+  userId           Int
+  roster           Json
+  problemEntryIds  Json     @default("[]")
+  problemSnapshots Json     @default("[]")
+  createdAt        DateTime @default(now())
 
   tournament PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -255,7 +262,7 @@ model PvpMatch {
   contestRecordId String?     @unique @db.VarChar(64)
   playedAt        DateTime?
 
-  tournament    PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament    PvpTournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   contestRecord ContestRecord? @relation(fields: [contestRecordId], references: [id], onDelete: SetNull)
 
   @@unique([tournamentId, round, slot])
@@ -263,13 +270,13 @@ model PvpMatch {
 }
 
 model PvpRewardGrant {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   tournamentId Int
   userId       Int
   rank         Int
-  rewards      Json     @default("[]")
+  rewards      Json      @default("[]")
   claimedAt    DateTime?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   tournament PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -394,40 +401,40 @@ enum AcquiredVia {
   RECRUIT
   EVENT
   UPGRADE // 进阶石升阶
-  REROLL  // 洗练券洗出
+  REROLL // 洗练券洗出
   ADMIN
 }
 
 model Student {
-  id          Int           @id @default(autoincrement())
-  userId      Int
-  name        String        @db.VarChar(24)
-  qualityTier QualityTier
-  status      StudentStatus @default(ACTIVE)
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  name          String        @db.VarChar(24)
+  qualityTier   QualityTier
+  status        StudentStatus @default(ACTIVE)
   // 九维能力（1–100，浮点累积、展示 floor）
-  ds          Float
-  dp          Float
-  math        Float
-  graph       Float
-  greedy      Float
-  str         Float
-  code        Float
-  thinking    Float
-  setting     Float
+  ds            Float
+  dp            Float
+  math          Float
+  graph         Float
+  greedy        Float
+  str           Float
+  code          Float
+  thinking      Float
+  setting       Float
   // 辅助属性与资源
-  mindset     Float         @default(2) // −10…+10
-  focusCap    Int
-  energyMax   Int
-  energy      Float
-  stamina     Float         @default(5) // 上限恒定 5（economy）
-  staminaRegen Int // 1–100 刻度
-  counters    Json          @default("{}") // 稀疏计数器：reroll/vigorUsed/focusEngineUsed/milkTea/bookWeek
-  lastSettledAt DateTime    @default(now())
-  recruitedAt DateTime      @default(now())
-  dismissedAt DateTime?
-  updatedAt   DateTime      @updatedAt
+  mindset       Float         @default(2) // −10…+10
+  focusCap      Int
+  energyMax     Int
+  energy        Float
+  stamina       Float         @default(5) // 上限恒定 5（economy）
+  staminaRegen  Int // 1–100 刻度
+  counters      Json          @default("{}") // 稀疏计数器：reroll/vigorUsed/focusEngineUsed/milkTea/bookWeek
+  lastSettledAt DateTime      @default(now())
+  recruitedAt   DateTime      @default(now())
+  dismissedAt   DateTime?
+  updatedAt     DateTime      @updatedAt
 
-  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   talents          StudentTalent[]
   adventures       AdventureLog[]
   lectureLogs      LectureLog[]
@@ -438,12 +445,12 @@ model Student {
 }
 
 model StudentTalent {
-  id           Int          @id @default(autoincrement())
+  id           Int         @id @default(autoincrement())
   studentId    Int
-  talentId     String       @db.VarChar(64) // → ConfigTalent.id
+  talentId     String      @db.VarChar(64) // → ConfigTalent.id
   acquiredVia  AcquiredVia
-  fromTalentId String?      @db.VarChar(64) // 升阶/洗练前的天赋 id，溯源用
-  createdAt    DateTime     @default(now())
+  fromTalentId String?     @db.VarChar(64) // 升阶/洗练前的天赋 id，溯源用
+  createdAt    DateTime    @default(now())
 
   student Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   talent  ConfigTalent @relation(fields: [talentId], references: [id], onDelete: Restrict)

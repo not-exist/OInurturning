@@ -1094,7 +1094,7 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | 21 | POST /api/academy/pool/refresh | 登录 | — | 扣 poolRefreshCost，重掷学员池 | 手动刷新 |
 | 22 | POST /api/academy/recruits | 登录 | slotId；幂等键 | 按 recruitCostFormula 扣钱；声誉微幅加成属性；生成学员+天赋 | 招募 |
 | 23 | GET /api/academy/lecture-tiers | 登录 | — | 五档受众：门槛/报酬公式说明/解锁状态 | 讲课接单面板 |
-| 24 | POST /api/academy/lectures | 登录 | studentId+tier | 能力达标即时结算钱+声誉（溢出加成；不足强接则扣声誉）；学员进入讲课冷却 | §12 讲课 |
+| 24 | POST /api/academy/lectures | 登录 | studentId+tier | 能力达标即时结算钱+声誉（溢出加成；不足强接则扣声誉）；同事务结算讲课成长（setting/thinking，返回 gains + thinkingReq + thinkingDeficit；强接思维不足讲砸为负增量）；学员进入讲课冷却 | §12 讲课 + gameplay §4.2.1 |
 | 25 | GET /api/academy/lectures | 登录 | 分页 | 讲课历史与收益 | 讲课记录 |
 
 **出题题库**

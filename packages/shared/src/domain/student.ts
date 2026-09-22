@@ -52,6 +52,22 @@ export function computeV(s: VStats): number {
   return Math.floor((s.code + s.thinking + dimAvg) / 3);
 }
 
+/**
+ * 讲课成长可触及的属性（issue #56）：只有「讲得出来」的两项——出题能力与思维能力。
+ * 刻意不含六维/code：讲课是把已有理解讲清楚，不是学新知识（gameplay.md §4.2）。
+ */
+export const LECTURE_GROWTH_STATS = ['setting', 'thinking'] as const;
+export type LectureGrowthStat = (typeof LECTURE_GROWTH_STATS)[number];
+
+/**
+ * 单场讲课的一条成长记录（LectureLog.gains Json 列的元素）。
+ * amount 为浮点增量：正值成长，负值为「思维不足强接讲砸」的属性回落；展示层取两位小数。
+ */
+export interface LectureGrowthEntry {
+  stat: LectureGrowthStat;
+  amount: number;
+}
+
 /** 学员 API 视图：能力值为浮点累积原值（展示层 floor），v 为导出时的计算结果 */
 export interface StudentView {
   id: number;

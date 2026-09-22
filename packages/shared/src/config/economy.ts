@@ -62,9 +62,49 @@ export const lectureTierSchema = z
     threshold: z.number().int().nonnegative(),
     base_money: z.number().int().nonnegative(),
     base_reputation: z.number().int().nonnegative(),
+    /**
+     * 讲课成长的「思维要求」R（issue #56）：可成长性与主讲学员的思维能力比对，
+     * 与 V 门槛解耦（student.md §1 规定奖励结算不得直接引用 V）。
+     * 缺省 = 该档 threshold（均衡学员 thinking≈V，两者同源）。
+     */
+    thinking_req: z.number().int().nonnegative().optional(),
   })
   .strict();
 export type LectureTier = z.infer<typeof lectureTierSchema>;
+
+/**
+ * 讲课成长参数（issue #56：讲课能够提升学生水平）。
+ * 权威文档 docs/systems/gameplay.md §4.2「讲课成长」；数值事实源 docs/data/economy.yaml。
+ * 与训练同构的部分（(1−cur/100)^2 浮点阻尼、cap=100）复用 student.md §4.1 口径，此处不重复声明。
+ */
+export const lectureGrowthSchema = z
+  .object({
+    /** 单场基准成长量（未阻尼、未匹配折减前）；量级刻意小于训练 base（1.6/2.0/3.2） */
+    base_gain: z.number().nonnegative(),
+    /** 主成长落点抽中 setting（出题）的概率；其余落 thinking（思维） */
+    setting_weight: z.number().min(0).max(1),
+    /** 另一项附带成长的触发概率 */
+    secondary_prob: z.number().min(0).max(1),
+    /** 附带成长相对 base_gain 的份额 */
+    secondary_share: z.number().nonnegative(),
+    /** 强接「勉强过关」时的成长折减（与报酬 ×0.6 同源） */
+    forced_success_mult: z.number().min(0).max(1),
+    /** 思维超出要求多少点后成长衰减到 0 */
+    match_span: z.number().positive(),
+    /** 超出侧衰减曲线指数：g(d) = max(0, 1 − d/match_span)^match_power */
+    match_power: z.number().positive(),
+    /** 思维不足侧的匹配系数下限：g(d<0) = clamp(1 + d/match_span, deficit_floor, 1) */
+    deficit_floor: z.number().min(0).max(1),
+    /** 强接且思维不足时讲砸的属性回落量（负向，clamp 下限 0） */
+    forced_deficit_loss: z
+      .object({
+        thinking: z.number().nonnegative(),
+        setting: z.number().nonnegative(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+export type LectureGrowthConfig = z.infer<typeof lectureGrowthSchema>;
 
 export const lectureConfigSchema = z
   .object({
@@ -79,6 +119,8 @@ export const lectureConfigSchema = z
       overflow_pct: z.number().nonnegative(),
       overflow_cap_pct: z.number().nonnegative(),
     }).passthrough(),
+    /** 缺省即「讲课不带来成长」（历史配置/精简 fixture 兼容）；docs/data 必须提供 */
+    growth: lectureGrowthSchema.optional(),
   })
   .passthrough();
 export type LectureConfig = z.infer<typeof lectureConfigSchema>;

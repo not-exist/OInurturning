@@ -310,6 +310,7 @@ function checkEconomy(economy: EconomyConfig, issues: SemanticIssue[]): void {
     const completeLecture = parsed.data;
     const ids = new Set<string>();
     let previousThreshold = -1;
+    let previousThinkingReq = -1;
     completeLecture.audience_tiers.forEach((tier, index) => {
       if (ids.has(tier.id)) {
         issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.id`, message: `讲课档位 id 重复：${tier.id}` });
@@ -319,9 +320,27 @@ function checkEconomy(economy: EconomyConfig, issues: SemanticIssue[]): void {
         issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.threshold`, message: '讲课门槛必须严格递增' });
       }
       previousThreshold = tier.threshold;
+      // 讲课成长（issue #56）：思维要求 R 必须随档位递增，且落在强接窗 [threshold−8, threshold] 内——
+      // 高于门槛会让「达标学员」恒定思维不足，低于窗口会让强接学员永不付出代价。
+      const thinkingReq = tier.thinking_req ?? tier.threshold;
+      if (thinkingReq <= previousThinkingReq) {
+        issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.thinking_req`, message: '讲课思维要求必须严格递增' });
+      }
+      if (thinkingReq > tier.threshold || thinkingReq < tier.threshold - 8) {
+        issues.push({
+          file: 'economy',
+          path: `lecture.audience_tiers.${index}.thinking_req`,
+          message: `讲课思维要求须落在 [门槛−8, 门槛] = [${tier.threshold - 8}, ${tier.threshold}]，实得 ${thinkingReq}`,
+        });
+      }
+      previousThinkingReq = thinkingReq;
     });
     if (completeLecture.reputation_pay_curve.max_mult < completeLecture.reputation_pay_curve.min_mult) {
       issues.push({ file: 'economy', path: 'lecture.reputation_pay_curve', message: '讲课声誉乘区上限不能低于下限' });
+    }
+    const growth = completeLecture.growth;
+    if (growth !== undefined && growth.secondary_share > 1) {
+      issues.push({ file: 'economy', path: 'lecture.growth.secondary_share', message: '讲课附带成长份额不能超过主成长（≤1）' });
     }
   }
 }

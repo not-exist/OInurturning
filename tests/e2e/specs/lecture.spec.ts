@@ -131,6 +131,36 @@ test.describe('讲课', () => {
     await expect(logs).toContainText(/成功|讲砸/);
   });
 
+  test('讲课成长：思维要求随档位联动，成功场在记录上留下成长（issue #56）', async ({ page, request }) => {
+    const account = await registerUser(request, 'lec');
+    await fund(account.username, { money: 50000 });
+    const studentId = await recruitAtLeast(request, account, 15);
+    await loginViaUI(page, account.username, account.password);
+
+    await page.goto('/academy/lecture');
+    await page.getByTestId('lecture-student').selectOption(String(studentId));
+
+    // 思维要求来自档位（economy.yaml lecture.audience_tiers[].thinking_req）：入门组 15 / 国家队 80
+    const match = page.getByTestId('lecture-thinking-match');
+    await expect(match).toContainText('本场要求 15');
+    await page.getByTestId('lecture-tier').selectOption('national');
+    await expect(match).toContainText('本场要求 80');
+    await expect(match).toContainText('思维不足');
+    await page.getByTestId('lecture-tier').selectOption('beginner');
+    await expect(match).toContainText('本场要求 15');
+
+    // 只有在「思维与要求匹配」时成长必然非空；其余两档（远超/不足）走空成长文案
+    const willGrow = (await match.textContent())?.includes('成长最高') ?? false;
+    await page.getByTestId('lecture-teach').click();
+    await expect(page.getByTestId('lecture-gains')).toBeVisible();
+
+    const logs = page.getByTestId('lecture-logs');
+    await expect(logs.getByRole('listitem')).toHaveCount(1);
+    if (willGrow) {
+      await expect(logs.getByTestId('lecture-log-gain').first()).toBeVisible();
+    }
+  });
+
   test('V 低于强接下限时拒单并提示"讲课未能开始"', async ({ page, request }) => {
     const account = await registerUser(request, 'lec');
     await fund(account.username, { money: 50000 });
