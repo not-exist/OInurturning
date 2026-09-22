@@ -10,7 +10,7 @@ import {
 } from '../../lib/hooks';
 import type { StudentView } from '@oinur/shared';
 import type { LectureResultView, LectureTierView } from '../../lib/hooks';
-import { lectureTierLabel, signed, type LectureTierId } from '../../lib/labels';
+import { lectureGrowthStatLabel, lectureTierLabel, signed, signedTrim, type LectureTierId } from '../../lib/labels';
 import { Icon, NAV_ICON } from '../../components/icons';
 import {
   Btn,
@@ -28,6 +28,8 @@ import {
 /** 强接下限 = 门槛 − 8（apps/api/src/modules/academy/lecture.ts:144），窗口 = [门槛−8, 门槛) */
 const FORCE_FLOOR_GAP = 8;
 const STAMINA_COST = 2;
+/** 思维超出要求多少点后成长归零（economy.yaml → lecture.growth.match_span） */
+const THINKING_MATCH_SPAN = 20;
 const DAILY_LIMIT = '每日 3 场 · 同一学员 2 场';
 
 /** 服务端 STATE_CONFLICT 的 reason → 人话（无映射时退回通用文案） */
@@ -84,7 +86,7 @@ export function AcademyLecturePage(): JSX.Element {
       <PageHeader
         eyebrow="讲课"
         title="讲课"
-        description="带学员承接不同层级的训练营课程：达标直讲稳拿全额，未达标可强接，但讲砸不发钱还倒扣声誉。"
+        description="带学员承接不同层级的训练营课程：达标直讲稳拿全额，未达标可强接，但讲砸不发钱还倒扣声誉。讲与学员思维相当的课还能带出成长——出题与思维小幅上涨；讲远低于自己水平的课几乎没有收获。"
         actions={<ActionLinkBack />}
       />
 
@@ -193,6 +195,21 @@ export function AcademyLecturePage(): JSX.Element {
                 <p className="mt-2 text-[11px] text-fg-faint">
                   {standingNote(selectedStudent?.v ?? 0, selectedTier.threshold)}
                 </p>
+                {selectedStudent !== undefined && (
+                  <p
+                    data-testid="lecture-thinking-match"
+                    className={`mt-1.5 text-[11px] ${
+                      selectedStudent.thinking < selectedTier.thinkingReq
+                        ? 'text-warn-400'
+                        : 'text-fg-faint'
+                    }`}
+                  >
+                    思维 <Numeral value={Math.floor(selectedStudent.thinking)} /> / 本场要求{' '}
+                    {selectedTier.thinkingReq}
+                    <span className="mx-1.5 text-ink-500">·</span>
+                    {thinkingNote(selectedStudent.thinking, selectedTier.thinkingReq)}
+                  </p>
+                )}
               </div>
             )}
           </Panel>
@@ -241,6 +258,10 @@ export function AcademyLecturePage(): JSX.Element {
                   强接此档位
                   <span className="ml-2 text-fg-dim">
                     成功按 60% 结算；讲砸不发钱、倒扣声誉，学员心态 −2
+                    {selectedStudent !== undefined &&
+                      selectedTier !== undefined &&
+                      selectedStudent.thinking < selectedTier.thinkingReq &&
+                      '；思维不足，讲砸还会掉出题与思维'}
                   </span>
                 </span>
               </label>
@@ -314,7 +335,7 @@ function TierCard({
       <span className="block text-xs text-fg-muted">{lectureTierLabel(entry.id)}</span>
       <span className="numeral mt-0.5 block text-lg text-fg">V {entry.threshold}</span>
       <span className="mt-0.5 block text-[11px] text-fg-faint">
-        基础金 {entry.baseMoney} · 声誉 {entry.baseReputation}
+        基础金 {entry.baseMoney} · 声誉 {entry.baseReputation} · 思维 {entry.thinkingReq}
       </span>
       <span className={`mt-1 block text-[11px] ${entry.available ? 'text-good-400' : 'text-fg-faint'}`}>
         {entry.available ? '有学员可承接' : '暂无学员够格'}
@@ -341,6 +362,17 @@ function standingNote(v: number, threshold: number): string {
     return `处于强接窗口（V ≥ ${threshold - FORCE_FLOOR_GAP}）：勾选强接后成功按 60% 结算，讲砸不发钱并倒扣声誉。`;
   }
   return `低于强接下限 V ${threshold - FORCE_FLOOR_GAP}，无法承接该档位。`;
+}
+
+/** 讲课成长的匹配提示（issue #56；判定读思维能力本身，与 V 门槛解耦） */
+function thinkingNote(thinking: number, req: number): string {
+  if (thinking >= req + THINKING_MATCH_SPAN) {
+    return '思维远高于要求：这堂课对他几乎没有新东西，成长归零';
+  }
+  if (thinking >= req) {
+    return '思维与要求匹配：本课成长最高（出题或思维小幅上涨）';
+  }
+  return '思维不足：成长打折；若强接讲砸，出题与思维会小幅回落';
 }
 
 function StandingBadge({ student, tier }: { student: StudentView; tier: LectureTierView }): JSX.Element {
@@ -400,8 +432,31 @@ function ResultStrip({
         声誉 {signed(result.reputation)}
       </span>
       {result.staminaAfter !== null && <span className="tnum text-fg-dim">体力 {result.staminaAfter}</span>}
+      <span
+        data-testid="lecture-gains"
+        className="flex w-full flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-ink-600/50 pt-2 text-[11px] text-fg-dim"
+      >
+        <span className="eyebrow">成长</span>
+        {result.gains.length === 0 ? (
+          <span>{growthEmptyText(result)}</span>
+        ) : (
+          result.gains.map((gain) => (
+            <span key={gain.stat} className={`tnum ${gain.amount < 0 ? 'text-bad-400' : 'text-arc-300'}`}>
+              {lectureGrowthStatLabel(gain.stat)} {signedTrim(gain.amount)}
+            </span>
+          ))
+        )}
+      </span>
     </div>
   );
+}
+
+/** 无成长时的解释文案：区分「讲砸」与「思维远超要求」两种原因 */
+function growthEmptyText(result: LectureResultView): string {
+  if (!result.success) {
+    return result.thinkingDeficit ? '讲砸且思维不足：属性回落已在上方计' : '讲砸：本场无成长';
+  }
+  return '思维远超该档要求：这堂课对他没有新东西';
 }
 
 function LectureLogItem({
@@ -439,6 +494,15 @@ function LectureLogItem({
         <span className={`tnum ${entry.reputation < 0 ? 'text-bad-400' : ''}`}>
           声誉 {signed(entry.reputation)}
         </span>
+        {entry.gains.map((gain) => (
+          <span
+            key={gain.stat}
+            data-testid="lecture-log-gain"
+            className={`tnum ${gain.amount < 0 ? 'text-bad-400' : 'text-arc-300'}`}
+          >
+            {lectureGrowthStatLabel(gain.stat)} {signedTrim(gain.amount)}
+          </span>
+        ))}
       </p>
     </li>
   );

@@ -1,5 +1,11 @@
 import { Prisma, type LectureLog } from '@prisma/client';
-import { computeV, lectureConfigSchema, type LectureConfig } from '@oinur/shared';
+import {
+  computeV,
+  lectureConfigSchema,
+  type LectureConfig,
+  type LectureGrowthConfig,
+  type LectureGrowthEntry,
+} from '@oinur/shared';
 import { getConfig } from '../../config/loader.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
@@ -7,12 +13,15 @@ import { prisma } from '../../lib/prisma.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
+import { computeLectureGrowth, thinkingReqOf } from './lecture-growth.js';
 
 export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
 
 export interface LectureTierView {
   id: LectureTierId;
   threshold: number;
+  /** 讲课成长的思维要求 R（issue #56；缺省=门槛） */
+  thinkingReq: number;
   baseMoney: number;
   baseReputation: number;
   available: boolean;
@@ -24,10 +33,16 @@ export interface LectureResultView {
   tier: LectureTierId;
   teachingValue: number;
   threshold: number;
+  /** 本场比对的思维要求 R（成长匹配判定的基准，落库审计） */
+  thinkingReq: number;
+  /** 主讲学员思维是否不足（thinking < R）：讲砸时会付出属性代价 */
+  thinkingDeficit: boolean;
   forced: boolean;
   success: boolean;
   money: number;
   reputation: number;
+  /** 本场成长清单（出题/思维）；amount 为负表示讲砸回落 */
+  gains: LectureGrowthEntry[];
   staminaCost: number;
   staminaAfter: number | null;
   createdAt: string;
@@ -43,6 +58,13 @@ function lectureConfig(): LectureConfig {
   const parsed = lectureConfigSchema.safeParse(config.economy.lecture);
   if (!parsed.success) throw new Error('[academy] economy.lecture 配置不完整');
   return parsed.data;
+}
+
+/** 讲课成长参数（issue #56）：数值事实源 economy.yaml → lecture.growth，缺失即坏配置 */
+function growthConfig(): LectureGrowthConfig {
+  const growth = lectureConfig().growth;
+  if (!growth) throw new Error('[academy] economy.lecture.growth 未加载');
+  return growth;
 }
 
 function tierConfig(tier: string) {
@@ -70,16 +92,20 @@ function clampMindset(value: number): number {
 }
 
 function toLectureView(row: LectureLog, staminaAfter: number | null = null): LectureResultView {
+  const gains = Array.isArray(row.gains) ? (row.gains as unknown as LectureGrowthEntry[]) : [];
   return {
     id: row.id,
     studentId: row.studentId,
     tier: row.tier as LectureTierId,
     teachingValue: row.teachingValue,
     threshold: row.threshold,
+    thinkingReq: row.thinkingReq,
+    thinkingDeficit: row.thinkingDeficit,
     forced: row.forced,
     success: row.success,
     money: row.money,
     reputation: row.reputation,
+    gains,
     staminaCost: row.staminaCost,
     staminaAfter,
     createdAt: row.createdAt.toISOString(),
@@ -105,6 +131,7 @@ export async function getLectureTiers(userId: number): Promise<LectureTierView[]
   return tiers.map((tier) => ({
     id: tier.id as LectureTierId,
     threshold: tier.threshold,
+    thinkingReq: thinkingReqOf(tier),
     baseMoney: tier.base_money,
     baseReputation: tier.base_reputation,
     available: students.some((student) => computeV(student) >= tier.threshold - 8),
@@ -135,7 +162,8 @@ export async function teachLecture(
       throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
     }
     if (current.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
-    const settled = settle(current, aggregateMeta(current.talents.map((talent) => talent.talentId)), now);
+    const meta = aggregateMeta(current.talents.map((talent) => talent.talentId));
+    const settled = settle(current, meta, now);
     if (settled.stamina < LECTURE_STAMINA_COST) {
       throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', need: LECTURE_STAMINA_COST });
     }
@@ -154,7 +182,7 @@ export async function teachLecture(
       !forced || createRandomStream(deriveSeed(userId, studentId, tierId, dayKey(now), logs.length), 'lecture-risk')() >= 0.4;
     const success = forcedSuccess;
     const payMultiplier = repMultiplier(user.reputation) * overflowMultiplier(teachingValue, tierData.threshold);
-    const lectureIncome = aggregateMeta(current.talents.map((talent) => talent.talentId)).lecture_income ?? 0;
+    const lectureIncome = meta.lecture_income ?? 0;
     const incomeMultiplier = 1 + lectureIncome / 100;
     const money =
       !success
@@ -170,9 +198,24 @@ export async function teachLecture(
           ? -ordinal
           : -2 * ordinal;
     const nextMindset = !forced || success ? settled.mindset : clampMindset(settled.mindset - 2);
+    // 讲课成长（issue #56）：与讲砸判定同一 base seed、不同 label 的独立随机流 → 同 seed 必复现。
+    // 成长只写 setting/thinking 两列，与体力/精力/心态同事务落库，任一失败整体回滚。
+    const growth = computeLectureGrowth({
+      growth: growthConfig(),
+      tier: tierData,
+      student: settled,
+      meta,
+      forced,
+      success,
+      rng: createRandomStream(
+        deriveSeed(userId, studentId, tierId, dayKey(now), logs.length),
+        'lecture-growth',
+      ),
+    });
     const updatedStudent = await tx.student.updateMany({
       where: { id: studentId, updatedAt: current.updatedAt },
       data: {
+        ...growth.patch,
         stamina: settled.stamina - LECTURE_STAMINA_COST,
         energy: settled.energy,
         mindset: nextMindset,
@@ -199,10 +242,13 @@ export async function teachLecture(
         tier: tierId,
         teachingValue,
         threshold: tierData.threshold,
+        thinkingReq: growth.thinkingReq,
+        thinkingDeficit: growth.deficit,
         forced,
         success,
         money,
         reputation: reputationDelta,
+        gains: growth.gains as unknown as Prisma.InputJsonValue,
         staminaCost: LECTURE_STAMINA_COST,
         createdAt: now,
       },

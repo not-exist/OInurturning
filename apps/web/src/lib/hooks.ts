@@ -4,6 +4,7 @@ import type {
   BattleReplay,
   ContestRecordView,
   DimensionKey,
+  LectureGrowthEntry,
   MeView,
   Rarity,
   StoryOverview,
@@ -143,6 +144,8 @@ export interface AdventureChoiceResult {
 export interface LectureTierView {
   id: LectureTierId;
   threshold: number;
+  /** 讲课成长的思维要求 R（issue #56；缺省=门槛） */
+  thinkingReq: number;
   baseMoney: number;
   baseReputation: number;
   available: boolean;
@@ -154,10 +157,16 @@ export interface LectureResultView {
   tier: LectureTierId;
   teachingValue: number;
   threshold: number;
+  /** 本场比对的思维要求 R */
+  thinkingReq: number;
+  /** 主讲学员思维是否不足（讲砸时会付出属性代价） */
+  thinkingDeficit: boolean;
   forced: boolean;
   success: boolean;
   money: number;
   reputation: number;
+  /** 本场成长（出题/思维）；amount 为负表示讲砸回落 */
+  gains: LectureGrowthEntry[];
   staminaCost: number;
   staminaAfter: number | null;
   createdAt: string;

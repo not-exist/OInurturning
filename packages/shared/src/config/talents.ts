@@ -39,6 +39,7 @@ export const TALENT_META_STATS = [
   'duel_posing',
   'duel_solve',
   'lecture_income',
+  'lecture_growth',
   'focus_gain',
   'energy_cost_reduce',
   'energy_regen',

@@ -39,6 +39,7 @@
 # - duel_posing:         出题对决中己方学员所出题目的需求参数上调幅度（%，仅对决内生效）。
 # - duel_solve:          出题对决中己方答题三缺口缩小的幅度（%，仅对决内生效）。
 # - lecture_income:      讲课报酬加成（%）。
+# - lecture_growth:      讲课成长（出题/思维）收益加成（%，见 systems/gameplay.md §4.2 讲课成长）。
 # - focus_gain:          比赛中专注积累速率加成（%，与心态系数 g(m) 乘算）。
 # - energy_cost_reduce:  比赛中精力消耗降低（%）。
 # - energy_regen:        赛后精力恢复速率加成（%）。
@@ -350,8 +351,9 @@ talents:
     family: lect
     effects:
       - {stat: lecture_income, mode: percent, value: 10}
+      - {stat: lecture_growth, mode: percent, value: 15}
       - {stat: setting, mode: percent, value: 3}
-    description: "讲课报酬+10%，出题有效值+3%。能把单调栈讲出相声效果的学员，家长抢着报名。"
+    description: "讲课报酬+10%，讲课成长+15%，出题有效值+3%。能把单调栈讲出相声效果的学员，家长抢着报名。"
     upgrade_to: lect-blue
   - id: lect-blue
     name: 讲台之星·金牌讲师
@@ -360,9 +362,10 @@ talents:
     family: lect
     effects:
       - {stat: lecture_income, mode: percent, value: 18}
+      - {stat: lecture_growth, mode: percent, value: 25}
       - {stat: setting, mode: percent, value: 6}
       - {stat: setting_quality, mode: percent, value: 8}
-    description: "讲课报酬+18%，出题有效值+6%，出题质量评分+8%。他的公开课录像在 OI 圈内广为流传。"
+    description: "讲课报酬+18%，讲课成长+25%，出题有效值+6%，出题质量评分+8%。他的公开课录像在 OI 圈内广为流传。"
     upgrade_to: null
 
   # ============ 家族 grind 刷题狂魔 ============
@@ -616,8 +619,9 @@ talents:
     family: null
     effects:
       - {stat: lecture_income, mode: percent, value: 12}
+      - {stat: lecture_growth, mode: percent, value: 30}
       - {stat: setting, mode: percent, value: 3}
-    description: "讲课报酬+12%，出题有效值+3%。给别人讲一遍，自己理解深三层。"
+    description: "讲课报酬+12%，讲课成长+30%，出题有效值+3%。给别人讲一遍，自己理解深三层。"
     upgrade_to: null
   - id: setter-blue
     name: 出题鬼才
