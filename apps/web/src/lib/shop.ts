@@ -5,7 +5,7 @@ import type { ShopCatalogView, ShopBuyResult } from '@oinur/shared';
 export function useShopCatalog() {
   return useQuery({
     queryKey: ['shop'],
-    queryFn: () => apiFetch<ShopCatalogView>('/api/shop'),
+    queryFn: () => apiFetch<ShopCatalogView>('/api/shop/catalog'),
     staleTime: 30_000,
   });
 }
@@ -24,13 +24,5 @@ export function useBuyShopItem() {
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
     },
-  });
-}
-
-export function useShopLogs() {
-  return useQuery({
-    queryKey: ['shop-logs'],
-    queryFn: () => apiFetch<{ itemId: string; quantity: number; dayKey: string; weekKey: string; createdAt: string }[]>('/api/shop/logs'),
-    staleTime: 30_000,
   });
 }
