@@ -128,7 +128,7 @@ export function createApp(opts: AppOptions = {}): express.Express {
           select: { id: true, role: true, tokenVersion: true, bannedAt: true },
         });
         if (!user || user.bannedAt || user.tokenVersion !== claims.tv) return next();
-        (req as any).user = { id: user.id, role: user.role, tokenVersion: user.tokenVersion };
+        req.user = { id: user.id, role: user.role, tokenVersion: user.tokenVersion };
         next();
       } catch {
         next();

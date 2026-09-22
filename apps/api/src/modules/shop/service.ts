@@ -22,12 +22,6 @@ function isPurchasable(item: { price: number | null }): boolean {
   return item.price !== null && item.price > 0;
 }
 
-function rarityOf(itemId: string): string {
-  // 从 itemId 后缀或 payload rarity 获取，这里需要查 def
-  const def = itemDefs()[itemId];
-  return (def?.rarity as string) ?? 'gray';
-}
-
 function reputationRequiredForItem(itemId: string): number {
   const cfg = shopConfig();
   const def = itemDefs()[itemId];
@@ -105,13 +99,7 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
   const dailyMap = new Map(dailyLogs.map((l) => [l.itemId, l._sum.quantity ?? 0]));
   const weeklyMap = new Map(weeklyLogs.map((l) => [l.itemId, l._sum.quantity ?? 0]));
 
-  // 今日总消费
-  const todaySpentAgg = await prisma.shopPurchaseLog.aggregate({
-    where: { userId, dayKey: dk },
-    _sum: { quantity: true },
-  });
-  // 需要算金额，简化：用 log 数量 * price 近似？实际上我们存 quantity，但需要总花费
-  // 为了精确，我们查所有今日 logs 并乘 price
+  // 今日总消费：store 里只存 quantity，故取回今日 logs 逐条乘 price
   const todayLogs = await prisma.shopPurchaseLog.findMany({ where: { userId, dayKey: dk } });
   let todaySpent = 0;
   for (const log of todayLogs) {
@@ -198,7 +186,7 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
       category: def.category as string,
       price,
       description: def.description,
-      effectDesc: (def.effect as any)?.desc ?? null,
+      effectDesc: def.effect?.desc ?? null,
       ownedQuantity: ownedMap.get(id) ?? 0,
       reputationRequired: repReq,
       dailyLimit: dLimit,

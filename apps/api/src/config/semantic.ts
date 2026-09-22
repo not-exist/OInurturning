@@ -4,8 +4,6 @@ import {
   TUTORIAL_ROUTE_KEYS,
   lectureConfigSchema,
   onboardingConfigSchema,
-  tutorialConfigSchema,
-  shopConfigSchema,
   type ConfigRarity,
   type EconomyConfig,
   type EventsConfig,
