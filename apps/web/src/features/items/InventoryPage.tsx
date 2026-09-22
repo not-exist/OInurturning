@@ -323,6 +323,8 @@ function StudentPicker({
             {students.map((s) => (
               <label
                 key={s.id}
+                data-testid="item-picker-student"
+                data-student-id={s.id}
                 className={`flex cursor-pointer items-center gap-2 border px-2 py-1.5 text-sm transition-colors ${
                   selectedId === s.id
                     ? 'border-cyber-400/70 bg-cyber-400/10'

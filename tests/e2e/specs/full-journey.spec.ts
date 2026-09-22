@@ -77,13 +77,14 @@ test.describe('完整玩家旅程', () => {
     await expect(page.getByTestId('student-card')).toHaveCount(4);
 
     const list = await apiCall(request, 'GET', '/api/students', token);
-    const students = unwrap<{ id: number; v: number; name: string }[]>(list.body, '学员列表');
+    const students = unwrap<{ id: number; v: number }[]>(list.body, '学员列表');
     const best = [...students].sort((a, b) => b.v - a.v)[0];
     expect(best).toBeDefined();
 
     // —— 3. 基础训练 ——
+    // 学员姓名允许全服重复（name-pool 不去重），一律按学员 id 定位，避免同名命中多个元素
     await page.goto('/training');
-    await page.getByTestId('train-student').filter({ hasText: best.name }).click();
+    await page.locator(`[data-testid="train-student"][data-student-id="${best.id}"]`).click();
     await page.getByTestId('train-run').click();
     await expect(page.getByTestId('train-result')).toContainText('训练完成');
 
@@ -117,8 +118,9 @@ test.describe('完整玩家旅程', () => {
     await page.goto('/backpack');
     const potion = page.locator('[data-testid="inventory-row"][data-itemid="stamina-potion"]');
     await potion.getByTestId('item-use').click();
-    // exact：确认按钮文案也含学员名（「给 {名} 使用」），子串匹配会在默认预选该学员时命中两个元素
-    await page.getByTestId('item-picker').getByText(best.name, { exact: true }).click();
+    await page
+      .locator(`[data-testid="item-picker-student"][data-student-id="${best.id}"]`)
+      .click();
     await page.getByTestId('item-use-confirm').click();
     await expect(page.getByTestId('item-picker')).not.toBeVisible();
 
