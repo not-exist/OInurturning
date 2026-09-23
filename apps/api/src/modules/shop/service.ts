@@ -4,74 +4,16 @@ import { prisma } from '../../lib/prisma.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
 import type { ShopItemView, ShopCatalogView, ShopBuyResult } from '@oinur/shared';
 import { autoAdvanceIfNeeded } from '../tutorial/service.js';
-
-function shopConfig() {
-  const cfg = getConfig();
-  if (!cfg?.shop) throw new Error('[shop] CONFIG 未加载');
-  return cfg.shop;
-}
-
-function itemDefs() {
-  const cfg = getConfig();
-  if (!cfg?.items) throw new Error('[shop] items CONFIG 未加载');
-  return cfg.items;
-}
+import {
+  bookRaritySuffix,
+  dailyLimitForItem,
+  reputationRequiredForItem,
+  weeklyLimitForItem,
+} from './limits.js';
 
 /** 判断是否可售：price != null */
 function isPurchasable(item: { price: number | null }): boolean {
   return item.price !== null && item.price > 0;
-}
-
-function reputationRequiredForItem(itemId: string): number {
-  const cfg = shopConfig();
-  const def = itemDefs()[itemId];
-  if (!def) return 9999;
-  // 功能门槛优先
-  if (cfg.functional_gates && cfg.functional_gates[itemId] !== undefined) {
-    return cfg.functional_gates[itemId]!;
-  }
-  const rarity = (def.rarity as string).toLowerCase();
-  const gates = cfg.reputation_gates as Record<string, number>;
-  if (gates[rarity] !== undefined) return gates[rarity]!;
-  // 书籍按 rarity 归类
-  if (itemId.startsWith('book-')) {
-    // book-xxx-gray/yellow/... 取后缀
-    const m = /-(gray|yellow|green|blue|purple|colorful)$/.exec(itemId);
-    const r = m?.[1];
-    if (r && gates[r] !== undefined) return gates[r]!;
-  }
-  return 0;
-}
-
-function dailyLimitForItem(itemId: string): number | null {
-  const cfg = shopConfig();
-  if (!cfg.daily_limits) return null;
-  if (cfg.daily_limits[itemId] !== undefined) return cfg.daily_limits[itemId]!;
-  // 前缀匹配 book-*
-  if (itemId.startsWith('book-')) {
-    const m = /-(gray|yellow|green|blue|purple)$/.exec(itemId);
-    const suffix = m?.[1];
-    if (suffix) {
-      const key = `book-${suffix}`;
-      if (cfg.daily_limits[key] !== undefined) return cfg.daily_limits[key]!;
-    }
-  }
-  return null;
-}
-
-function weeklyLimitForItem(itemId: string): number | null {
-  const cfg = shopConfig();
-  if (!cfg.weekly_limits) return null;
-  if (cfg.weekly_limits[itemId] !== undefined) return cfg.weekly_limits[itemId]!;
-  if (itemId.startsWith('book-')) {
-    const m = /-(gray|yellow|green|blue|purple)$/.exec(itemId);
-    const suffix = m?.[1];
-    if (suffix) {
-      const key = `book-${suffix}`;
-      if (cfg.weekly_limits[key] !== undefined) return cfg.weekly_limits[key]!;
-    }
-  }
-  return null;
 }
 
 export async function getCatalog(userId: number, now: Date = new Date()): Promise<ShopCatalogView> {
@@ -103,9 +45,9 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
   for (const [id, def] of Object.entries(items)) {
     if (!isPurchasable(def)) continue;
     const price = def.price!;
-    const repReq = reputationRequiredForItem(id);
-    const dLimit = dailyLimitForItem(id);
-    const wLimit = weeklyLimitForItem(id);
+    const repReq = reputationRequiredForItem(id, cfg.shop, items);
+    const dLimit = dailyLimitForItem(id, cfg.shop);
+    const wLimit = weeklyLimitForItem(id, cfg.shop);
     const dUsed = dailyMap.get(id) ?? 0;
     const wUsed = weeklyMap.get(id) ?? 0;
 
@@ -116,20 +58,15 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
     let reason: string | null = null;
 
     if (dLimit !== null) {
-      // 若是前缀限额，需要统计同类
+      // 若是前缀限额（book-<rarity>），需要统计同稀有度书籍的日购买
       let used = dUsed;
-      if (id.startsWith('book-')) {
-        // 统计同稀有度书籍的日购买
-        const m = /-(gray|yellow|green|blue|purple)$/.exec(id);
-        if (m) {
-          const suffix = m[1];
-          // 聚合所有 book-*-suffix
-          let sum = 0;
-          for (const [logItemId, qty] of dailyMap.entries()) {
-            if (logItemId.endsWith(`-${suffix}`) && logItemId.startsWith('book-')) sum += qty;
-          }
-          used = sum;
+      const suffix = bookRaritySuffix(id);
+      if (suffix) {
+        let sum = 0;
+        for (const [logItemId, qty] of dailyMap.entries()) {
+          if (bookRaritySuffix(logItemId) === suffix) sum += qty;
         }
+        used = sum;
       }
       dRemaining = Math.max(0, dLimit - used);
       if (dRemaining <= 0) {
@@ -140,16 +77,13 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
 
     if (wLimit !== null) {
       let used = wUsed;
-      if (id.startsWith('book-')) {
-        const m = /-(gray|yellow|green|blue|purple)$/.exec(id);
-        if (m) {
-          const suffix = m[1];
-          let sum = 0;
-          for (const [logItemId, qty] of weeklyMap.entries()) {
-            if (logItemId.endsWith(`-${suffix}`) && logItemId.startsWith('book-')) sum += qty;
-          }
-          used = sum;
+      const suffix = bookRaritySuffix(id);
+      if (suffix) {
+        let sum = 0;
+        for (const [logItemId, qty] of weeklyMap.entries()) {
+          if (bookRaritySuffix(logItemId) === suffix) sum += qty;
         }
+        used = sum;
       }
       wRemaining = Math.max(0, wLimit - used);
       if (wRemaining <= 0) {
@@ -219,9 +153,9 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
   if (!def) throw new ApiError('NOT_FOUND', { resource: 'item', itemId });
   if (!isPurchasable(def)) throw new ApiError('VALIDATION_FAILED', { resource: 'item', reason: '该道具不可购买' });
 
-  const repReq = reputationRequiredForItem(itemId);
-  const dLimit = dailyLimitForItem(itemId);
-  const wLimit = weeklyLimitForItem(itemId);
+  const repReq = reputationRequiredForItem(itemId, cfg.shop, cfg.items);
+  const dLimit = dailyLimitForItem(itemId, cfg.shop);
+  const wLimit = weeklyLimitForItem(itemId, cfg.shop);
   const dk = dayKey(now);
   const wk = weekKey(now);
   const totalCost = def.price! * quantity;
@@ -240,17 +174,11 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
     // 限购检查
     if (dLimit !== null) {
       let used = 0;
-      if (itemId.startsWith('book-')) {
-        const m = /-(gray|yellow|green|blue|purple)$/.exec(itemId);
-        if (m) {
-          const suffix = m[1];
-          const logs = await tx.shopPurchaseLog.findMany({ where: { userId, dayKey: dk } });
-          for (const l of logs) {
-            if (l.itemId.endsWith(`-${suffix}`) && l.itemId.startsWith('book-')) used += l.quantity;
-          }
-        } else {
-          const agg = await tx.shopPurchaseLog.aggregate({ where: { userId, itemId, dayKey: dk }, _sum: { quantity: true } });
-          used = agg._sum.quantity ?? 0;
+      const suffix = bookRaritySuffix(itemId);
+      if (suffix) {
+        const logs = await tx.shopPurchaseLog.findMany({ where: { userId, dayKey: dk } });
+        for (const l of logs) {
+          if (bookRaritySuffix(l.itemId) === suffix) used += l.quantity;
         }
       } else {
         const agg = await tx.shopPurchaseLog.aggregate({ where: { userId, itemId, dayKey: dk }, _sum: { quantity: true } });
@@ -263,17 +191,11 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
 
     if (wLimit !== null) {
       let used = 0;
-      if (itemId.startsWith('book-')) {
-        const m = /-(gray|yellow|green|blue|purple)$/.exec(itemId);
-        if (m) {
-          const suffix = m[1];
-          const logs = await tx.shopPurchaseLog.findMany({ where: { userId, weekKey: wk } });
-          for (const l of logs) {
-            if (l.itemId.endsWith(`-${suffix}`) && l.itemId.startsWith('book-')) used += l.quantity;
-          }
-        } else {
-          const agg = await tx.shopPurchaseLog.aggregate({ where: { userId, itemId, weekKey: wk }, _sum: { quantity: true } });
-          used = agg._sum.quantity ?? 0;
+      const suffix = bookRaritySuffix(itemId);
+      if (suffix) {
+        const logs = await tx.shopPurchaseLog.findMany({ where: { userId, weekKey: wk } });
+        for (const l of logs) {
+          if (bookRaritySuffix(l.itemId) === suffix) used += l.quantity;
         }
       } else {
         const agg = await tx.shopPurchaseLog.aggregate({ where: { userId, itemId, weekKey: wk }, _sum: { quantity: true } });

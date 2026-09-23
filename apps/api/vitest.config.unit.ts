@@ -23,6 +23,7 @@ export default defineConfig({
       'tests/config-m2-schema.test.ts',
       'tests/lecture-growth.test.ts',
       'tests/tutorial-shop.test.ts',
+      'tests/shop-limits.test.ts',
     ],
     setupFiles: ['tests/setup.ts'],
     env: {
