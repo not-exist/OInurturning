@@ -68,6 +68,14 @@ function checkTutorial(tutorial: TutorialConfig, items: ItemDef[], issues: Seman
         issues.push({ file: 'tutorial', path: `steps.${idx}.unlock`, message: `未知解锁键：${key}` });
       }
     }
+    // do_recruit 是条件式步：没有门槛就退化成「必须招募一次」，老号会被递增招募价卡死
+    if (step.action === 'do_recruit' && (step.requires_students ?? 0) < 1) {
+      issues.push({
+        file: 'tutorial',
+        path: `steps.${idx}.requires_students`,
+        message: 'do_recruit 步必须声明 requires_students 且 ≥1',
+      });
+    }
     if (step.reward?.item) {
       if (!itemIds.has(step.reward.item)) {
         issues.push({ file: 'tutorial', path: `steps.${idx}.reward.item`, message: `奖励道具不存在：${step.reward.item}` });

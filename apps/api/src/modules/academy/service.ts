@@ -6,6 +6,7 @@ import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 import {
   TIER_TO_QUALITY,
   bucketTalents,
@@ -217,7 +218,7 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
  */
 export async function recruit(userId: number, tempId: string, now: Date = new Date()): Promise<StudentView> {
   const cfg = recruitmentCfg();
-  return prisma.$transaction(async (tx) => {
+  const recruited = await prisma.$transaction(async (tx) => {
     await lockPoolRow(tx, userId);
     const pool = await tx.recruitPool.findUnique({ where: { userId } });
     if (!pool) throw new ApiError('NOT_FOUND', { resource: 'recruitPool' });
@@ -269,4 +270,7 @@ export async function recruit(userId: number, tempId: string, now: Date = new Da
 
     return toStudentView(student, candidate.talents.map((t) => t.talentId));
   });
+  // 招募是引导第 5 步（do_recruit）的唯一证据：事务提交后才推进，避免扣钱失败却算过步
+  void autoAdvanceIfNeeded(userId, 'do_recruit');
+  return recruited;
 }

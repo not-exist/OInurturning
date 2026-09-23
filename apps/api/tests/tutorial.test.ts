@@ -253,6 +253,96 @@ describe('tutorial 服务端锁', () => {
     expect(unwrapErr(res)).toMatchObject({ code: 'FORBIDDEN', details: { resource: 'tutorial' } });
   });
 
+  it('招募步对老号免检：在册 ≥4 人时任意钩子触发即放行（不得要求再招募一次）', async () => {
+    const user = await register();
+    await prisma.student.deleteMany({ where: { userId: user.userId } });
+    await createActiveStudents(user.userId, 4);
+    await setStep(user.userId, stepIndex('recruit'));
+    expect(await activeStudentsOf(user.userId)).toBe(4);
+
+    // 触发动作是 visit_students（非 do_recruit）：条件步只看在册人数，不看谁触发
+    const res = await request(app).get('/api/students').set(auth(user.token));
+    expect(res.status).toBe(200);
+    expect(await waitForStep(user.userId, stepIndex('recruit') + 1)).toBe(stepIndex('recruit') + 1);
+  });
+
+  it('招募步对新号不放行：2 人时停留在招募步，补到 4 人才前进', async () => {
+    const user = await register();
+    await setStep(user.userId, stepIndex('recruit'));
+    expect(await activeStudentsOf(user.userId), '开局只有 2 名学员').toBe(2);
+
+    const before = await request(app).get('/api/students').set(auth(user.token));
+    expect(before.status).toBe(200);
+    await expectStepStays(user.userId, stepIndex('recruit'));
+
+    await createActiveStudents(user.userId, 2);
+    const after = await request(app).get('/api/students').set(auth(user.token));
+    expect(after.status).toBe(200);
+    expect(await waitForStep(user.userId, stepIndex('recruit') + 1)).toBe(stepIndex('recruit') + 1);
+  });
+
+  it('招募步不被无关动作推进：GET /api/training/logs 后仍在招募步', async () => {
+    const user = await register();
+    await setStep(user.userId, stepIndex('recruit'));
+    const res = await request(app).get('/api/training/logs').set(auth(user.token));
+    expect(res.status).toBe(200);
+    await expectStepStays(user.userId, stepIndex('recruit'));
+  });
+
+  it('招募步的 state 下发在册人数与门槛：studentsRequired === 4', async () => {
+    const user = await register();
+    await setStep(user.userId, stepIndex('recruit'));
+    const state = unwrapOk<{ step: number; studentsOwned?: number; studentsRequired?: number }>(
+      await request(app).get('/api/tutorial').set(auth(user.token)),
+    );
+    expect(state.step).toBe(stepIndex('recruit'));
+    expect(state.studentsRequired).toBe(4);
+    expect(state.studentsOwned).toBe(await activeStudentsOf(user.userId));
+  });
+
+  it('端到端推进：welcome → students → training → academy → 招募 2 人 → 离开招募步', async () => {
+    const user = await register();
+    // 给足金币，避免候选池品质随机导致的招募价差异影响用例确定性
+    await prisma.user.update({ where: { id: user.userId }, data: { money: 20_000 } });
+
+    const welcome = await request(app)
+      .post('/api/tutorial/advance')
+      .set(auth(user.token))
+      .send({ step: stepIndex('students') });
+    expect(welcome.status).toBe(200);
+
+    const listed = await request(app).get('/api/students').set(auth(user.token));
+    expect(listed.status).toBe(200);
+    expect(await waitForStep(user.userId, stepIndex('training'))).toBe(stepIndex('training'));
+
+    const students = unwrapOk<{ id: number }[]>(listed);
+    expect(students.length).toBeGreaterThan(0);
+    const trained = await request(app)
+      .post('/api/training/basic')
+      .set(auth(user.token))
+      .send({ studentId: students[0]!.id });
+    expect(trained.status, JSON.stringify(trained.body)).toBe(200);
+    expect(await waitForStep(user.userId, stepIndex('academy'))).toBe(stepIndex('academy'));
+
+    const pool = await request(app).get('/api/academy/pool').set(auth(user.token));
+    expect(pool.status).toBe(200);
+    expect(await waitForStep(user.userId, stepIndex('recruit'))).toBe(stepIndex('recruit'));
+
+    const candidates = unwrapOk<{ candidates: { tempId: string; price: number }[] }>(pool).candidates;
+    const cheapest = [...candidates].sort((a, b) => a.price - b.price).slice(0, 2);
+    expect(cheapest.length, '候选池应有 5 人').toBe(2);
+    for (const c of cheapest) {
+      const recruited = await request(app)
+        .post('/api/academy/recruit')
+        .set(auth(user.token))
+        .send({ tempId: c.tempId });
+      expect(recruited.status, JSON.stringify(recruited.body)).toBe(200);
+    }
+
+    expect(await waitForStep(user.userId, stepIndex('recruit') + 1)).toBe(stepIndex('recruit') + 1);
+    expect(await activeStudentsOf(user.userId), '招募后应达到 4 人在册').toBeGreaterThanOrEqual(4);
+  });
+
   it('完成徽章不再撞名：complete → badges 含 onboarding-done、不含 rookie-done，总览开局任务仍可领', async () => {
     const user = await register();
     await setStep(user.userId, stepIndex('complete'));

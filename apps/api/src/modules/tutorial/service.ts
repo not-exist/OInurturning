@@ -26,12 +26,20 @@ export interface TutorialStateView {
   steps: TutorialStepDef[];
   unlocked: string[];
   current: TutorialStepDef | null;
+  /** 仅 do_recruit 步下发：在册 ACTIVE 学员数与该步门槛，供前端渲染「还需招募 N 人」 */
+  studentsOwned?: number;
+  studentsRequired?: number;
 }
 
 export type AdvanceReason = 'manual' | 'auto';
 
 /** 统一的视图构造：step 一律是归一化后的值（越界钳到配置范围），unlocked 由 routing 计算 */
-function stateView(step: number, completed: boolean, steps: TutorialStepDef[]): TutorialStateView {
+function stateView(
+  step: number,
+  completed: boolean,
+  steps: TutorialStepDef[],
+  roster?: { studentsOwned: number; studentsRequired: number },
+): TutorialStateView {
   return {
     step,
     completed,
@@ -39,6 +47,7 @@ function stateView(step: number, completed: boolean, steps: TutorialStepDef[]): 
     steps,
     unlocked: unlockedForStep(step, completed, steps),
     current: completed ? null : (steps[step] ?? null),
+    ...(roster ?? {}),
   };
 }
 
@@ -46,7 +55,15 @@ export async function getTutorialState(userId: number): Promise<TutorialStateVie
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const steps = getSteps();
   const progress = resolveProgress(user, steps);
-  return stateView(progress.step, progress.completed, steps);
+  const cur = progress.current;
+  // 只有 do_recruit 步才查在册人数：其余步不该为一个永远不渲染的字段付一次 COUNT
+  const roster = cur?.action === 'do_recruit' && (cur.requires_students ?? 0) > 0
+    ? {
+        studentsOwned: await prisma.student.count({ where: { userId, status: 'ACTIVE' } }),
+        studentsRequired: cur.requires_students as number,
+      }
+    : undefined;
+  return stateView(progress.step, progress.completed, steps, roster);
 }
 
 async function grantReward(tx: Prisma.TransactionClient, userId: number, reward: NonNullable<TutorialStepDef['reward']>) {
@@ -136,11 +153,21 @@ export async function autoAdvanceIfNeeded(userId: number, action: TutorialStepDe
     const steps = getSteps();
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.tutorialCompleted) return;
-    const curIdx = user.tutorialStep;
-    const cur = steps[curIdx];
+    const step = resolveProgress(user, steps).step;
+    const cur = steps[step];
     if (!cur) return;
+    // 条件式招募步：不看触发动作，只看在册人数。老号（人数已达标）无需再招募一次即可通过，
+    // 新号必须真的补员到门槛；两者共用同一步，避免「必须招募」把老号卡死在 6000+ 金的招募价上。
+    if (cur.action === 'do_recruit') {
+      const need = cur.requires_students ?? 0;
+      if (need > 0) {
+        const owned = await prisma.student.count({ where: { userId, status: 'ACTIVE' } });
+        if (owned >= need) await advanceTutorial(userId, step + 1, { reason: 'auto', action: 'do_recruit' });
+      }
+      return;
+    }
     if (cur.action !== action) return;
-    await advanceTutorial(userId, curIdx + 1, { reason: 'auto', action });
+    await advanceTutorial(userId, step + 1, { reason: 'auto', action });
   } catch (err) {
     // 自动推进失败不影响主流程，但必须留痕（空 catch 会让用户永久卡步且无任何日志）
     logger.warn({ err, userId, action }, '[tutorial] auto advance failed');

@@ -39,6 +39,15 @@ steps:
     action: visit_academy
     reward: {}
 
+  - id: recruit
+    title: 招募补员
+    desc: 历练需 3 人小队、剧情需 4 人队伍，你现在只有 2 人。去高级学院招募第 3、4 名学员：候选池可花 100 金刷新（100→150→225…），优先招 common/good（第 3 人 547 起、第 4 人 738 起，价格随在册人数递增）。已有 4 名在册学员会自动通过本步。
+    target: "[data-tutorial='academy-recruit']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
+    action: do_recruit
+    requires_students: 4
+    reward: {}
+
   - id: lecture
     title: 讲课变现
     desc: 讲课是主收入来源，能力需达到受众门槛。完成一次讲课，体验报酬与成长机制。

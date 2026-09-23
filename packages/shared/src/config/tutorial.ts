@@ -32,12 +32,18 @@ export const tutorialStepSchema = z.object({
     'visit_students',
     'do_training',
     'visit_academy',
+    'do_recruit',
     'do_lecture',
     'do_adventure',
     'do_story',
     'visit_shop',
     'visit_backpack',
   ]),
+  /**
+   * 条件式完成门槛：仅 action=do_recruit 有意义——在册 ACTIVE 学员数达到该值即自动放行，
+   * 未达到则本步不推进。用于「老号免重做」与「新号必须补足到 N 人」两种情形共存。
+   */
+  requires_students: z.number().int().positive().optional(),
   reward: z
     .object({
       money: z.number().int().nonnegative().optional(),
