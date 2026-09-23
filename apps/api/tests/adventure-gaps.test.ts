@@ -8,7 +8,7 @@ import { importConfigs } from '../src/config/loader.js';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { chooseAdventure, drawAdventure, listAdventureLogs } from '../src/modules/adventure/service.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /**
  * 历练补白（adventure.test.ts 覆盖固定奖励/检定/情报/pending/HTTP 主路径）：
@@ -75,7 +75,7 @@ const ENERGY_CHOICES = `      - text: 耗五十精力
 function writeConfigDir(eventsYaml: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'oinur-advgap-'));
   tempDirs.push(dir);
-  for (const file of ['talents', 'items', 'economy', 'problems', 'stages']) {
+  for (const file of ['talents', 'items', 'economy', 'problems', 'stages', 'tutorial', 'shop']) {
     copyFileSync(path.join(dataDir, `${file}.yaml`), path.join(dir, `${file}.yaml`));
   }
   writeFileSync(path.join(dir, 'events.yaml'), eventsYaml);
@@ -103,6 +103,7 @@ async function register(): Promise<{ token: string; userId: number }> {
     .send({ username: `advgap-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   return { token: session.accessToken, userId: session.me.id };
 }
 

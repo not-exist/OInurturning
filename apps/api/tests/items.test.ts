@@ -4,7 +4,7 @@ import type { Express } from 'express';
 import type { StudentView } from '@oinur/shared';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 import type { ItemView } from '../src/modules/items/service.js';
 
 const app: Express = createApp();
@@ -19,6 +19,7 @@ async function createAuthedUser(money = 0): Promise<{ userId: number; token: str
   const username = `it-${Date.now().toString(36)}-${userSeq}`;
   const res = await request(app).post('/api/auth/register').send({ username, password: 'pw-123456' });
   const { accessToken, me } = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(me.id);
   await prisma.user.update({ where: { id: me.id }, data: { money } });
   return { userId: me.id, token: accessToken };
 }

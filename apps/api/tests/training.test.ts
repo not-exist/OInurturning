@@ -5,7 +5,7 @@ import type { DimensionKey } from '@oinur/shared';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { mulberry32 } from '../src/lib/rng.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 import {
   computeCost,
   computeDelta,
@@ -28,6 +28,7 @@ async function createAuthedUser(money = 0): Promise<{ userId: number; token: str
   const username = `tr-${Date.now().toString(36)}-${userSeq}`;
   const res = await request(app).post('/api/auth/register').send({ username, password: 'pw-123456' });
   const { accessToken, me } = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(me.id);
   await prisma.user.update({ where: { id: me.id }, data: { money } });
   return { userId: me.id, token: accessToken };
 }

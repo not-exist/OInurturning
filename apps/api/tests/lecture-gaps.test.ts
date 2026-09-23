@@ -5,7 +5,7 @@ import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /**
  * 讲课补白（lecture.test.ts 覆盖档位/溢出/强接窗口/次数限制/HTTP）：
@@ -32,6 +32,7 @@ async function register(): Promise<{ token: string; userId: number }> {
     .send({ username: `lecgap-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   return { token: session.accessToken, userId: session.me.id };
 }
 

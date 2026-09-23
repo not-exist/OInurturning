@@ -5,7 +5,7 @@ import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 
 /**
  * 学员补白（students.test.ts 覆盖列表/详情/改名/开除主路径与罚则表）：
@@ -30,6 +30,7 @@ async function register(): Promise<{ token: string; userId: number }> {
     .send({ username: `stugap-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   return { token: session.accessToken, userId: session.me.id };
 }
 

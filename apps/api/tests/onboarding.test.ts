@@ -5,7 +5,7 @@ import type { MeView } from '@oinur/shared';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { grantOnboardingPackage } from '../src/modules/onboarding/service.js';
-import { resetUsers, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 
 /**
  * 开局包（economy.onboarding 口径；docs/data 与 fixtures 同值）：
@@ -22,6 +22,7 @@ async function register(): Promise<{ token: string; userId: number; username: st
     .send({ username, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   return { token: session.accessToken, userId: session.me.id, username };
 }
 

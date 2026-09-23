@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 const app = createApp();
 const REGISTER_END = '2099-01-02T00:00:00.000Z';
@@ -15,6 +15,7 @@ async function createUser(role: 'USER' | 'ADMIN' = 'USER'): Promise<{ id: number
     .post('/api/auth/register')
     .send({ username: `admin-test-${sequence}-${Date.now().toString(36)}`, password: 'pw-123456' });
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(response);
+  await unlockTutorial(session.me.id);
   if (role === 'ADMIN') await prisma.user.update({ where: { id: session.me.id }, data: { role } });
   return { id: session.me.id, token: session.accessToken };
 }

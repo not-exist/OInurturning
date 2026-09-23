@@ -4,7 +4,7 @@ import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { importConfigs } from '../src/config/loader.js';
 import { registerPvp } from '../src/modules/pvp/registration.js';
-import { resetUsers, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 import { buildFirstRound } from '../src/modules/pvp/bracket.js';
 import { advancePvpTournament } from '../src/modules/pvp/scheduler.js';
 
@@ -17,6 +17,7 @@ async function entrant(rosterSize = 3): Promise<{ userId: number; studentId: num
   sequence += 1;
   const auth = await request(app).post('/api/auth/register').send({ username: `sched-${Date.now()}-${sequence}`, password: 'pw-123456' });
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(auth);
+  await unlockTutorial(session.me.id);
   await prisma.user.update({ where: { id: session.me.id }, data: { money: 0, reputation: 0 } }); // 开局包 2500 金/10 誉归零（奖金/声誉绝对断言口径）
   const studentIds: number[] = [];
   for (let member = 0; member < rosterSize; member += 1) {

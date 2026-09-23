@@ -21,7 +21,7 @@ import {
   type TalentBuckets,
 } from '../src/modules/academy/recruit-gen.js';
 import { NAME_POOL } from '../src/modules/academy/name-pool.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 const app: Express = createApp();
 
@@ -183,6 +183,7 @@ async function createAuthedUser(money: number, reputation = 0): Promise<AuthedUs
   const username = `ac-${Date.now().toString(36)}-${userSeq}`;
   const res = await request(app).post('/api/auth/register').send({ username, password: 'pw-123456' });
   const { accessToken, me } = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(me.id);
   await prisma.user.update({ where: { id: me.id }, data: { money, reputation } });
   return { userId: me.id, token: accessToken };
 }

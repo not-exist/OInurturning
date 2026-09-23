@@ -5,7 +5,7 @@ import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { getConfig, importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /**
  * 出题题库补白（problem-library.test.ts 覆盖确定性质量/日限/归属删除/HTTP）：
@@ -28,6 +28,7 @@ async function register(money = 100000): Promise<{ token: string; userId: number
     .send({ username: `probgap-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   await prisma.user.update({ where: { id: session.me.id }, data: { money } }); // 无条件归位：register(0) 穷人口径（开局包 2500 否则误变有钱）
   await prisma.student.deleteMany({ where: { userId: session.me.id } }); // 清开局包 2 学员：费用 N 锚点按自建数精确计数
   return { token: session.accessToken, userId: session.me.id };
