@@ -157,10 +157,12 @@ test.describe('新手引导', () => {
     await expect(page.getByTestId('students-page')).toBeVisible();
     await expectStep(request, token, 'training');
 
-    // 3. training：选一名学员后开始基础训练
+    // 3. training：选一名学员后开始基础训练。
+    //    刻意练最后一名：讲课要 2 点、历练各 1 点，把消耗摊在不同学员身上，
+    //    剧情步（唯一可能需要重打的一步）才有体力余量。
     await navLink(page, 'training').click();
     await expect(page.getByTestId('training-page')).toBeVisible();
-    await page.getByTestId('train-student').first().click();
+    await page.getByTestId('train-student').last().click();
     await page.getByTestId('train-run').click();
     await expect(page.getByTestId('train-result')).toContainText('训练完成');
     await expectStep(request, token, 'academy');
@@ -211,7 +213,14 @@ test.describe('新手引导', () => {
     expect(items.status, '历练页依赖背包接口：adventure 步的 unlock 必须包含 backpack').toBe(200);
     await navLink(page, 'adventure').click();
     await expect(page.getByTestId('adventure-page')).toBeVisible();
-    await pickRoster(page, 'adventure-roster', 3);
+    // 在册 4 人选体力最高的 3 人（历练固定 3 人小队）：留体力给剧情步的重打
+    const before = unwrap<{ id: number; stamina: number }[]>(
+      (await apiCall(request, 'GET', '/api/students', token)).body,
+      '学员列表',
+    );
+    for (const member of [...before].sort((a, b) => b.stamina - a.stamina).slice(0, 3)) {
+      await page.locator(`[data-testid="adventure-roster-checkbox-${member.id}"]`).check();
+    }
     await page.getByTestId('adventure-draw').click();
     await expect(page.locator('[data-testid^="adventure-choice-"]').first()).toBeVisible();
     expect(await resolveAdventureChoice(page), '历练分支应可结算').toBe(true);
