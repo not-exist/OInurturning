@@ -85,6 +85,21 @@ function checkTutorial(tutorial: TutorialConfig, items: ItemDef[], issues: Seman
       }
     }
   });
+  // unlock 必须单调不减：一旦某步"收回"前面已解锁的功能，依赖该端点的页面就会在未完成引导时
+  // 403 打不开（实例：历练页用 GET /api/items 取情报条，adventure 步曾漏掉 backpack → 历练步无法完成）。
+  for (let idx = 1; idx < tutorial.steps.length; idx += 1) {
+    const prev = tutorial.steps[idx - 1]!;
+    const cur = tutorial.steps[idx]!;
+    if (prev.unlock.includes('all') || cur.unlock.includes('all')) continue;
+    const missing = prev.unlock.filter((key) => !cur.unlock.includes(key));
+    if (missing.length > 0) {
+      issues.push({
+        file: 'tutorial',
+        path: `steps.${idx}.unlock`,
+        message: `unlock 必须单调不减：相比上一步缺少 ${missing.join('、')}`,
+      });
+    }
+  }
   if (tutorial.steps.length < 3) {
     issues.push({ file: 'tutorial', path: 'steps', message: '引导步骤至少 3 步' });
   }

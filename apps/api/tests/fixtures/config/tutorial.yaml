@@ -55,7 +55,7 @@ steps:
     title: 讲课变现
     desc: 讲课是主收入来源，能力需达到受众门槛。完成一次讲课，体验报酬与成长机制。若学员能力未达受众门槛，需点「强接」（报酬 ×0.6，失败则无收入）。
     target: "[data-tutorial='lecture-tier']"
-    unlock: [overview, students, training, academy, lecture]
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
     action: do_lecture
     reward:
       reputation: 2
@@ -64,7 +64,7 @@ steps:
     title: 历练探险
     desc: 派出 3 人小队，投入 1-3 体力，抽取不同稀有度事件。对决类会触发出题对决。
     target: "[data-tutorial='nav-adventure']"
-    unlock: [overview, students, training, academy, lecture, adventure]
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
     action: do_adventure
     reward:
       item: intel-slip
@@ -74,7 +74,7 @@ steps:
     title: 剧情首关
     desc: 剧情模式 8 章，从 CSP-J 到 IOI。组建 4 人队伍挑战第一关，体验排名赛回放。
     target: "[data-tutorial='nav-story']"
-    unlock: [overview, students, training, academy, lecture, adventure, story]
+    unlock: [overview, students, training, academy, lecture, adventure, backpack, story]
     action: do_story
     reward: {}
 
