@@ -10,6 +10,7 @@ import {
   recruitStudent,
   apiCall,
   unwrap,
+  finishTutorial,
   backdateTournament,
   adminToken,
   candidateVProxy,
@@ -58,6 +59,10 @@ test.describe('完整玩家旅程', () => {
     await page.getByTestId('register-password').fill(DEFAULT_PASSWORD);
     await page.getByTestId('register-submit').click();
     await page.waitForURL('/');
+    // UI 注册拿到的账号停在引导第 1 步（侧栏被锁 + 遮罩拦点击）：本用例测完整玩家旅程，
+    // 不测引导本身，先完成引导再刷新页面拉取新状态。
+    await finishTutorial(request, username, DEFAULT_PASSWORD);
+    await page.reload();
     await fund(username, { money: 200000, items: STARTER_KIT });
     const token = await loginUser(request, username, DEFAULT_PASSWORD);
     const meRes = await apiCall(request, 'GET', '/api/users/me', token);

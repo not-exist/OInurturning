@@ -54,6 +54,11 @@ function stateView(
 export async function getTutorialState(userId: number): Promise<TutorialStateView> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const steps = getSteps();
+  // ADMIN 豁免引导锁（与 guard.ts 同口径）：状态视图必须一致，否则前端 overlay 仍会罩住
+  // 管理端页面挡住所有点击（e2e admin spec 曾因此 3 分钟超时）。
+  if (user.role === 'ADMIN') {
+    return stateView(Math.max(steps.length - 1, 0), true, steps);
+  }
   const progress = resolveProgress(user, steps);
   const cur = progress.current;
   // 只有 do_recruit 步才查在册人数：其余步不该为一个永远不渲染的字段付一次 COUNT
@@ -177,7 +182,7 @@ export async function autoAdvanceIfNeeded(userId: number, action: TutorialStepDe
 /** 完成引导：需先到达末步（skipTutorialForTest 走 force 后门），末步奖励只发一次 */
 export async function completeTutorial(
   userId: number,
-  opts: { force?: boolean } = {},
+  opts: { force?: boolean; grantReward?: boolean } = {},
 ): Promise<TutorialStateView> {
   const steps = getSteps();
   return prisma.$transaction(async (tx) => {
@@ -194,7 +199,9 @@ export async function completeTutorial(
       });
     }
     const lastDef = steps[last];
-    if (lastDef?.reward) {
+    // grantReward=false 只给测试后门用（skip）：否则每个 e2e/vitest 账号都会被塞进
+    // 末步奖励（+200 金币与徽章），污染"开局包快照"类断言（overview spec 曾因此变红）。
+    if (opts.grantReward !== false && lastDef?.reward) {
       await grantReward(tx, userId, lastDef.reward);
     }
     await tx.user.update({
@@ -209,5 +216,7 @@ export async function skipTutorialForTest(userId: number): Promise<TutorialState
   if (process.env.NODE_ENV !== 'test') {
     throw new ApiError('FORBIDDEN', { resource: 'tutorial', reason: '仅测试环境可跳过' });
   }
-  return completeTutorial(userId, { force: true });
+  // 纯测试便利：只改状态、不发任何奖励（与 tests/helpers.ts 的 unlockTutorial 同口径，
+  // 保证测试账号的货币/背包不被引导奖励扰动）。
+  return completeTutorial(userId, { force: true, grantReward: false });
 }

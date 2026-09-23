@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { uniqueName, DEFAULT_PASSWORD, loginViaUI, registerUser } from '../fixtures';
+import { uniqueName, DEFAULT_PASSWORD, loginViaUI, registerUser, finishTutorial } from '../fixtures';
 
 /** 用户设置：账户信息/改密/注销。 */
 test.describe('用户设置', () => {
@@ -58,13 +58,16 @@ test.describe('用户设置', () => {
     await expect(page.getByTestId('settings-msg')).toHaveText('注销失败：密码确认不符');
   });
 
-  test('注销成功后账号彻底失效，用户名可立即重新注册', async ({ page }) => {
+  test('注销成功后账号彻底失效，用户名可立即重新注册', async ({ page, request }) => {
     const username = uniqueName('set-gone');
     await page.goto('/register');
     await page.getByTestId('register-username').fill(username);
     await page.getByTestId('register-password').fill(DEFAULT_PASSWORD);
     await page.getByTestId('register-submit').click();
     await page.waitForURL('/');
+    // UI 注册的账号停在引导第 1 步：本用例要进设置页点注销，先完成引导再刷新
+    await finishTutorial(request, username, DEFAULT_PASSWORD);
+    await page.reload();
 
     await page.goto('/settings');
     page.on('dialog', (dialog) => void dialog.accept());

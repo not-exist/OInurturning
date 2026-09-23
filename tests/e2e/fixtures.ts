@@ -68,15 +68,28 @@ export async function registerUser(
   password: string = DEFAULT_PASSWORD,
 ): Promise<TestAccount> {
   const account = await registerUserRaw(request, prefix, password);
-  // 跳过新手引导，避免旧 e2e 用例被锁定
-  try {
-    await request.post(`${API_URL}/api/tutorial/skip`, {
-      headers: { Authorization: `Bearer ${account.accessToken}` },
-    });
-  } catch {
-    // 忽略，引导可能已完成或接口未就绪
-  }
+  // 跳过新手引导，避免旧 e2e 用例被锁定。失败必须显式抛错：
+  // 静默吞掉会让账号保持被锁，后续用例以 403/点击被拦的形式红在别处，难以归因。
+  const res = await request.post(`${API_URL}/api/tutorial/skip`, {
+    headers: { Authorization: `Bearer ${account.accessToken}` },
+  });
+  if (!res.ok()) throw new Error(`skip 引导失败：${res.status()} ${await res.text()}`);
   return account;
+}
+
+/**
+ * UI 注册（`/register` 表单）后的账号仍停在引导第 1 步：侧栏被锁、引导遮罩会拦点击。
+ * 不测引导本身的 UI 用例在注册后调用它，再用 `page.reload()` 让 SPA 拉到新状态。
+ * （走 API 登录拿 token，与 global-setup 的 admin 提权同思路。）
+ */
+export async function finishTutorial(
+  request: APIRequestContext,
+  username: string,
+  password: string,
+): Promise<void> {
+  const token = await loginUser(request, username, password);
+  const res = await apiCall(request, 'POST', '/api/tutorial/skip', token);
+  if (res.status !== 200) throw new Error(`skip 引导失败：${res.status} ${JSON.stringify(res.body)}`);
 }
 
 export async function loginUser(

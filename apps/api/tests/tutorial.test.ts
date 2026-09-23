@@ -234,12 +234,23 @@ describe('tutorial 服务端锁', () => {
 
   it('测试环境 skip → 200 全解锁，且跳过后商店可用（不是 403）', async () => {
     const user = await register();
+    // skip 是纯状态捷径：不得发放末步奖励，否则每个测试账号的货币/徽章被扰动
+    const before = await prisma.user.findUniqueOrThrow({
+      where: { id: user.userId },
+      select: { money: true, badges: true },
+    });
     const skipped = await request(app).post('/api/tutorial/skip').set(auth(user.token));
     expect(skipped.status).toBe(200);
     expect(unwrapOk<{ completed: boolean; unlocked: string[] }>(skipped)).toMatchObject({
       completed: true,
       unlocked: ['all'],
     });
+    const after = await prisma.user.findUniqueOrThrow({
+      where: { id: user.userId },
+      select: { money: true, badges: true },
+    });
+    expect(after.money, 'skip 不应发放末步金币奖励').toBe(before.money);
+    expect(after.badges, 'skip 不应发放完成徽章').toEqual(before.badges);
     const catalog = await request(app).get('/api/shop/catalog').set(auth(user.token));
     expect(catalog.status, '跳过引导后商店不应再被锁').not.toBe(403);
     expect(catalog.status).toBe(200);
