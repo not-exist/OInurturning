@@ -29,8 +29,13 @@ export interface TestAccount {
   userId: number;
 }
 
-/** 经 API 注册（快；UI 注册流程由 auth.spec.ts 覆盖）。用户名须 ≥3 字符。 */
-export async function registerUser(
+/**
+ * 经 API 注册，且**不跳过**新手引导（快；UI 注册流程由 auth.spec.ts 覆盖）。用户名须 ≥3 字符。
+ *
+ * 引导自身的用例（tutorial.spec.ts）必须用这个：注册后 completed 恒为 false，
+ * 才能断言「未完成时受限 API 一律 403」与「逐步走完十步」。
+ */
+export async function registerUserRaw(
   request: APIRequestContext,
   prefix = 'e2e',
   password: string = DEFAULT_PASSWORD,
@@ -44,20 +49,34 @@ export async function registerUser(
     ok: boolean;
     data: { accessToken: string; me: { id: number; username: string } };
   };
-  // 跳过新手引导，避免旧 e2e 用例被锁定
-  try {
-    await request.post(`${API_URL}/api/tutorial/skip`, {
-      headers: { Authorization: `Bearer ${body.data.accessToken}` },
-    });
-  } catch {
-    // 忽略，引导可能已完成或接口未就绪
-  }
   return {
     username,
     password,
     accessToken: body.data.accessToken,
     userId: body.data.me.id,
   };
+}
+
+/**
+ * 注册并**跳过**新手引导（registerUserRaw + POST /api/tutorial/skip）。
+ * 非引导用例一律用它：否则账号被引导锁住，受限 API 全数 403。
+ * 引导用例不得用它 —— skip 会把 completed 直接置 true。
+ */
+export async function registerUser(
+  request: APIRequestContext,
+  prefix = 'e2e',
+  password: string = DEFAULT_PASSWORD,
+): Promise<TestAccount> {
+  const account = await registerUserRaw(request, prefix, password);
+  // 跳过新手引导，避免旧 e2e 用例被锁定
+  try {
+    await request.post(`${API_URL}/api/tutorial/skip`, {
+      headers: { Authorization: `Bearer ${account.accessToken}` },
+    });
+  } catch {
+    // 忽略，引导可能已完成或接口未就绪
+  }
+  return account;
 }
 
 export async function loginUser(
