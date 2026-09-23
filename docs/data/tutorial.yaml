@@ -1,6 +1,8 @@
 # 强制新手引导配置
 # 权威：docs/plans/2026-09-22-shop-and-onboarding.md
 # 步骤必须按顺序，unlock 为前端路由白名单键，target 为 CSS 选择器（用于 spotlight），null 表示居中弹窗
+# 完成引导徽章不得与 overview 的 CHECKLIST_REWARD_BADGE（rookie-done）同名：
+# overview 以「徽章是否已在」兼作已领取态与幂等键，同名会让总览开局任务一开局就显示已领取。
 steps:
   - id: welcome
     title: 欢迎来到训练营
@@ -80,5 +82,5 @@ steps:
     unlock: [all]
     action: none
     reward:
-      badge: rookie-done
+      badge: onboarding-done
       money: 200

@@ -63,6 +63,56 @@ async function milkTeaOf(userId: number): Promise<number> {
   return item?.quantity ?? 0;
 }
 
+async function activeStudentsOf(userId: number): Promise<number> {
+  return prisma.student.count({ where: { userId, status: 'ACTIVE' } });
+}
+
+/** 直连 prisma 造在册学员：招募步只认 ACTIVE 人数，不关心钱与池子 */
+async function createActiveStudents(userId: number, count: number): Promise<void> {
+  for (let i = 0; i < count; i += 1) {
+    await prisma.student.create({
+      data: {
+        userId,
+        name: `gen-${i}-${Date.now().toString(36)}`,
+        qualityTier: 'COMMON',
+        status: 'ACTIVE',
+        ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10,
+        code: 10, thinking: 10, setting: 10,
+        focusCap: 100,
+        energyMax: 100,
+        energy: 100,
+        staminaRegen: 10,
+      },
+    });
+  }
+}
+
+async function stepOf(userId: number): Promise<number> {
+  return (await prisma.user.findUniqueOrThrow({ where: { id: userId } })).tutorialStep;
+}
+
+/** 自动推进钩子是 fire-and-forget 独立事务：轮询而不是固定 sleep 断言 */
+async function waitForStep(userId: number, expected: number, timeoutMs = 2000): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  let step = await stepOf(userId);
+  while (step !== expected && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    step = await stepOf(userId);
+  }
+  return step;
+}
+
+/** 负向断言要给在途钩子留出落地时间，否则读到「尚未推进」是假通过 */
+async function expectStepStays(userId: number, expected: number, graceMs = 500): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, graceMs));
+  expect(await stepOf(userId)).toBe(expected);
+}
+
+async function badgesOf(userId: number): Promise<string[]> {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  return Array.isArray(user.badges) ? (user.badges as string[]) : [];
+}
+
 describe('tutorial 服务端锁', () => {
   it('新号业务端点被锁：GET /api/students → 403 tutorial', async () => {
     const user = await register();
@@ -201,5 +251,22 @@ describe('tutorial 服务端锁', () => {
     const res = await request(app).get('/api/shop/catalog').set(auth(user.token));
     expect(res.status).toBe(403);
     expect(unwrapErr(res)).toMatchObject({ code: 'FORBIDDEN', details: { resource: 'tutorial' } });
+  });
+
+  it('完成徽章不再撞名：complete → badges 含 onboarding-done、不含 rookie-done，总览开局任务仍可领', async () => {
+    const user = await register();
+    await setStep(user.userId, stepIndex('complete'));
+    const completed = await request(app).post('/api/tutorial/complete').set(auth(user.token));
+    expect(completed.status).toBe(200);
+
+    const badges = await badgesOf(user.userId);
+    expect(badges).toContain('onboarding-done');
+    expect(badges, '引导徽章不得与 CHECKLIST_REWARD_BADGE 同名').not.toContain('rookie-done');
+
+    const overview = unwrapOk<{ checklist: { claimed: boolean; rewardBadge: string } }>(
+      await request(app).get('/api/overview').set(auth(user.token)),
+    );
+    expect(overview.checklist.rewardBadge).toBe('rookie-done');
+    expect(overview.checklist.claimed, '引导完成不得吞掉总览开局任务的领取态').toBe(false);
   });
 });
