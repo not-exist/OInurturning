@@ -429,7 +429,7 @@ export function StoryPage(): JSX.Element {
         onToggle={(chapter) => setOpenChapterKey(chapter === expandedKey ? null : chapter)}
       />
 
-      <div className="space-y-5" data-tutorial="nav-story">
+      <div className="space-y-5" data-tutorial="story-page-intro">
         {chapters.map((chapter, chapterIndex) => {
           const cleared = chapter.stages.filter((stage) => stage.cleared).length;
           const tier = isTier(chapter.chapter) ? TIER_TEXT[chapter.chapter] : 'text-fg';

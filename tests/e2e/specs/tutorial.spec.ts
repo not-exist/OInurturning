@@ -40,7 +40,7 @@ test.describe('新手引导', () => {
     return unwrap<TutorialStateView>(res.body, '读取引导状态');
   }
 
-  /** 侧栏导航项（限定在 <nav> 内：StoryPage 内另有一个 data-tutorial="nav-story" 会撞名） */
+  /** 侧栏导航项（限定在 <nav> 内：即便页内出现同名 data-tutorial，也只取侧栏那个） */
   function navLink(page: Page, key: string) {
     return page.locator(`nav [data-tutorial="nav-${key}"]`);
   }
