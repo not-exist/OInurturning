@@ -10,7 +10,10 @@ steps:
     target: null
     unlock: [overview]
     action: none
-    reward: {}
+    # 训练步之前没有任何赚钱路径（开除只扣声誉、讲课/历练/背包全锁），
+    # 余额不足的账号会在训练步永久卡死，故离开 welcome 步时先发训练金。
+    reward:
+      money: 200
 
   - id: students
     title: 查看学员档案
@@ -50,7 +53,7 @@ steps:
 
   - id: lecture
     title: 讲课变现
-    desc: 讲课是主收入来源，能力需达到受众门槛。完成一次讲课，体验报酬与成长机制。
+    desc: 讲课是主收入来源，能力需达到受众门槛。完成一次讲课，体验报酬与成长机制。若学员能力未达受众门槛，需点「强接」（报酬 ×0.6，失败则无收入）。
     target: "[data-tutorial='lecture-tier']"
     unlock: [overview, students, training, academy, lecture]
     action: do_lecture

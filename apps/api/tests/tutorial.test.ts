@@ -310,6 +310,8 @@ describe('tutorial 服务端锁', () => {
       .set(auth(user.token))
       .send({ step: stepIndex('students') });
     expect(welcome.status).toBe(200);
+    // welcome 步发训练金：训练步之前没有任何赚钱路径，余额不足的账号会永久卡死
+    expect(await moneyOf(user.userId)).toBe(20_200);
 
     const listed = await request(app).get('/api/students').set(auth(user.token));
     expect(listed.status).toBe(200);
