@@ -189,7 +189,7 @@ export interface ItemDef {
   name: string;
   rarity: Rarity;
   category: ItemCategory;
-  price: number | null;          // 非 null → 商城直售（marketplace 列表即 price!=null 的条目）
+  price: number | null;          // 非 null → 商城直售（商城列表即 price!=null 的条目，端点见 §12「背包与商城」「引导与商店」）
   stackable: boolean;
   usableOn: 'STUDENT' | 'SELF' | 'NONE';
   action: ItemAction;            // 判别联合：使用效果
@@ -985,7 +985,7 @@ async function importConfigs(prisma: PrismaClient): Promise<ConfigBundle> {
 
 - **快速失败**：启动路径上任何校验失败都让 API 容器以非零码退出。compose 中 api 是 mysql 的下游消费者，api 起不来在 `docker compose ps` 一眼可见——坏配置永远不会带病上线。
 - **软弃用而非删除**：历史玩法数据（StudentTalent、UserItem、AdventureLog.eventId）外键指向 Config 表。条目从 yaml 移除时仅标记 `deprecated=true`，保证老记录永远可解释。
-- **运行时只读内存缓存**：游戏逻辑读 `CONFIG.talents['memoize.green']` 纯内存操作，不查库。缓存视为不可变；管理员触发的 `POST /api/admin/config/reload` 会重新执行同一管线并原子替换缓存对象引用。
+- **运行时只读内存缓存**：游戏逻辑读 `CONFIG.talents['memoize.green']` 纯内存操作，不查库。缓存视为不可变；**当前没有热重载端点**（原设计的 `POST /api/admin/config/reload` 未实现），改 yaml 后重启 api 容器，见 `docs/OPERATIONS.md` §8。
 - **canonicalJson**：键排序后的稳定序列化，保证同一份文件在任何机器算出相同 hash。
 
 ---
@@ -1058,7 +1058,7 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | 5 | PUT /api/auth/password | 登录 | oldPassword+newPassword | 成功后 tokenVersion+1，需重新登录 | 设置页改密 |
 | 6 | POST /api/auth/deactivate | 登录 | password 确认 | 物理删除账号 + DB 级联清数据（§9.6），清 Cookie；进行中赛事参赛者 409 STATE_CONFLICT | 设置页注销 |
 | 7 | GET /api/users/me | 登录 | — | MeView（id/注册时间/lastLoginAt/钱/声誉/勋章） | 设置页展示 |
-| 8 | GET /api/meta | 公开 | — | configVersion、serverTime、恢复速率常量 | 前端本地投影 |
+| 8 | GET /api/meta | 公开 | — | configVersion、serverTime、恢复速率常量 | 前端本地投影（**未实现**：源码无此端点；探活走 `GET /api/health`） |
 
 **学员管理**
 
@@ -1066,8 +1066,8 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 |---|---|---|---|---|---|
 | 9 | GET /api/students | 登录 | ?status=&sort= | StudentView[]，含惰性投影后的体力/精力 | 学员列表 |
 | 10 | GET /api/students/:id | 登录 | — | StudentView 详情 + 天赋列表 | 学员详情 |
-| 11 | PATCH /api/students/:id/name | 登录 | newName；自动消耗改名卡×1 | 新名字；无改名卡 409 | 改名卡改名 |
-| 12 | DELETE /api/students/:id | 登录 | — | 扣声誉（economy.dismissRepPenalty）、概率回收改名卡、status→DISMISSED | 开除 |
+| 11 | POST /api/students/:id/rename | 登录 | newName；自动消耗改名卡×1 | 新名字；无改名卡 409 | 改名卡改名 |
+| 12 | POST /api/students/:id/dismiss | 登录 | — | 扣声誉（economy.dismissRepPenalty）、概率回收改名卡、status→DISMISSED | 开除 |
 | 13 | POST /api/students/:id/consumables | 登录 | itemId + params（升阶指明天赋、洗练指定方向锁定等） | 结算结果（升阶成败必成/洗练新天赋/心态增量） | 养成道具 |
 
 **训练**
@@ -1091,8 +1091,8 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
 |---|---|---|---|---|---|
 | 20 | GET /api/academy/pool | 登录 | — | 当前学员池（品质档隐藏，只露可见属性）；过期则懒刷新 | §12 招募池 |
-| 21 | POST /api/academy/pool/refresh | 登录 | — | 扣 poolRefreshCost，重掷学员池 | 手动刷新 |
-| 22 | POST /api/academy/recruits | 登录 | slotId；幂等键 | 按 recruitCostFormula 扣钱；声誉微幅加成属性；生成学员+天赋 | 招募 |
+| 21 | POST /api/academy/refresh | 登录 | — | 扣 poolRefreshCost，重掷学员池 | 手动刷新 |
+| 22 | POST /api/academy/recruit | 登录 | slotId；幂等键 | 按 recruitCostFormula 扣钱；声誉微幅加成属性；生成学员+天赋 | 招募 |
 | 23 | GET /api/academy/lecture-tiers | 登录 | — | 五档受众：门槛/报酬公式说明/解锁状态 | 讲课接单面板 |
 | 24 | POST /api/academy/lectures | 登录 | studentId+tier | 能力达标即时结算钱+声誉（溢出加成；不足强接则扣声誉）；同事务结算讲课成长（setting/thinking，返回 gains + thinkingReq + thinkingDeficit；强接思维不足讲砸为负增量）；学员进入讲课冷却 | §12 讲课 + gameplay §4.2.1 |
 | 25 | GET /api/academy/lectures | 登录 | 分页 | 讲课历史与收益 | 讲课记录 |
@@ -1121,7 +1121,7 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | 33 | GET /api/pvp/tournaments | 登录 | ?status= | 锦标赛列表（状态/截止/奖池概要） | §14 赛事大厅 |
 | 34 | GET /api/pvp/tournaments/:id | 登录 | — | 详情（规则/奖池/我的报名状态）；顺带触发懒推进 | 赛事详情 |
 | 35 | POST /api/pvp/tournaments/:id/registration | 登录 | roster[]+problemEntryIds[]；截止前可提交 | 冻结阵容快照入库；重复报名 409 | 报名锁阵 |
-| 36 | DELETE /api/pvp/tournaments/:id/registration | 登录 | — | 截止前退赛；截止后 409 | 退赛 |
+| 36 | DELETE /api/pvp/tournaments/:id/registration | 登录 | — | 截止前退赛；截止后 409 | 退赛（**未实现**：pvp router 无 DELETE，仅能报名不能退赛） |
 | 37 | GET /api/pvp/tournaments/:id/bracket | 登录 | — | 对阵树（轮次/比分/胜者/战报链接）；顺带触发懒推进 | 对阵树 |
 | 38 | GET /api/pvp/tournaments/:id/rewards | 登录 | — | 奖励公示与领取状态；顺带触发懒推进 | 公示领奖 |
 | 39 | POST /api/pvp/tournaments/:id/rewards/claim | 登录 | — | 本人奖励原子入账；重复请求返回已领取台账 | 领奖 |
@@ -1131,8 +1131,22 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
 |---|---|---|---|---|---|
 | 38 | GET /api/items | 登录 | — | UserItem[] 合并 ConfigItem 元数据（名称/稀有度/分类） | §15 背包 |
-| 39 | GET /api/marketplace | 登录 | — | price!=null 的 ItemDef 列表 | 商城书架 |
-| 40 | POST /api/marketplace/orders | 登录 | itemId+quantity(≤99)；幂等键 | 条件 UPDATE 扣钱入账道具 | 书籍购买 |
+| 39 | GET /api/shop/catalog | 登录 | — | price!=null 的 ItemDef 列表 + 门槛/限购/持有数（原设计写作 `GET /api/marketplace`） | 商城书架 |
+| 40 | POST /api/shop/buy | 登录 | itemId+quantity(1–99)；可选 `Idempotency-Key` 头 | 事务内 `FOR UPDATE` + 条件 UPDATE 扣钱入账道具；超日/周限购或声誉不足即 400/409（原设计写作 `POST /api/marketplace/orders`） | 购买 |
+| 41 | GET /api/shop/logs | 登录 | ?limit=1..100（默认 20） | `ShopPurchaseLog` 分页：itemId/quantity/dayKey/weekKey | 购买审计 |
+
+**引导与商店**（PR #61 引入；`docs/data/tutorial.yaml`、`docs/data/shop.yaml` 为数据源）
+
+| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
+|---|---|---|---|---|---|
+| 42 | GET /api/tutorial | 登录 | — | `{ step, completed, total, steps, unlocked, current }`；ADMIN 一律返回已完成 | 引导状态 |
+| 43 | POST /api/tutorial/advance | 登录 | `{ step }` | 仅允许前进 1 步；`manual` 只允许推进 `action==='none'` 的步，回退/跳步 409 | 手动推进（欢迎步） |
+| 44 | POST /api/tutorial/complete | 登录 | — | 必须已走到末步，否则 409；发末步奖励并置 `tutorialCompleted` | 完成引导 |
+| 45 | POST /api/tutorial/skip | 登录 | 仅 `NODE_ENV=test` | 纯状态捷径：置 `tutorialCompleted`，**不发奖励** | 测试后门 |
+| 46 | （守卫）`requireTutorialForApi` | — | 全局 `app.use`，位于所有 router 之前 | 未完成引导的账号仅放行 `/api/tutorial`、`/api/overview`、`/api/users/me`、`/api/auth`、`/api/talents`，其余一律 403（`details.resource='tutorial'`）；ADMIN 豁免 | 强制引导锁 |
+
+数据：`users.tutorialStep`、`users.tutorialCompleted`；购买流水表 `ShopPurchaseLog(userId, itemId, quantity, dayKey, weekKey)`，日/周限购按其聚合（`dayKey`/`weekKey` 口径见 `apps/api/src/lib/clock.ts`，04:00 为日界）。
+引导步骤由服务端按 `action` 自动推进（训练/讲课/历练/剧情/学员页/学院池/商城），未完成前前端侧栏锁定对应入口并深链重定向到 `/`；上线影响面与运维放行见 `docs/OPERATIONS.md` §11。
 
 **管理端**（requireAdmin，全部写 AdminAuditLog）
 
@@ -1143,8 +1157,8 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | 43 | POST /api/admin/pvp-tournaments/:id/actions/start | 管理 | — | 截止即开：生成首轮对阵（奇数轮空）；提前触发懒推进 | 手动开赛 |
 | 44 | GET /api/admin/users | 管理 | ?q=&page= | 用户列表（钱/声誉/学员数/封禁态） | 用户管理 |
 | 45 | PATCH /api/admin/users/:id | 管理 | role 或 banned 布尔 | 改角色/封禁解封（封禁即 tokenVersion+1 踢下线） | 用户管理 |
-| 46 | GET /api/admin/audit-logs | 管理 | ?action=&page= | AdminAuditLog 分页 | 审计查询 |
-| 47 | POST /api/admin/config/reload | 管理 | — | 重跑 §4 导入管线并热替换内存缓存 | 运维换配置 |
+| 46 | GET /api/admin/audits | 管理 | ?action=&page= | AdminAuditLog 分页 | 审计查询 |
+| 47 | POST /api/admin/config/reload | 管理 | — | 重跑 §4 导入管线并热替换内存缓存 | 运维换配置（**未实现**：源码无此端点，改 yaml 后重启 api 容器，见 `docs/OPERATIONS.md` §8） |
 | 48 | GET /api/health | 公开 | — | { ok, uptime, configVersion }；供容器 healthcheck | 运维探活 |
 
 **总览与训练记录**
@@ -1367,7 +1381,8 @@ API client：薄 fetch 封装（自动带 Bearer、解信封、401 时静默 ref
 | / | AppLayout | RequireAuth | 主布局：顶栏（≥md）/底部标签栏（<md）+ `<Outlet/>` |
 | /students | StudentManagementPage | 登录 | 学员管理列表 |
 | /students/:id | StudentDetailPage | 登录 | 详情（属性/天赋/养成/训练入口/历史） |
-| /backpack | BackpackPage | 登录 | Tab：背包 / 商城（书籍购买） |
+| /backpack | BackpackPage | 登录 | 背包：道具列表、使用与持有数（**无商城 Tab**；商城是独立一级页 `/shop`） |
+| /shop | ShopPage | 登录 | 商城：书籍/道具购买（声誉门槛 + 日/周限购，04:00 刷新） |
 | /academy/recruit | AcademyRecruitPage | 登录 | 招募池 + 刷新 + 招募 |
 | /academy/lecture | AcademyLecturePage | 登录 | 讲课接单 + 记录 |
 | /adventure | AdventurePage | 登录 | 历练：投入档位 → 事件卡 → 选项 → 结果 |

@@ -1,5 +1,5 @@
 # 商城配置
-# 权威：docs/plans/2026-09-22-shop-and-onboarding.md
+# 权威：docs/TECH-DESIGN.md（商城与引导的端点/数据契约）；价格以 docs/data/items.yaml 为准
 # price 权威在 items.yaml，商店只决定门槛与限购
 
 reputation_gates:
