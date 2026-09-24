@@ -216,8 +216,11 @@ export function ShopPage(): JSX.Element {
                 disabled={buy.isPending || blockReason(confirming) !== null}
                 onClick={() => {
                   const item = confirming;
+                  // 幂等键在一次确认内固定：react-query 的重试（QueryClient retry=1）会带同一把 key
+                  // 重发，服务端据此重放而不是再扣一次钱。
+                  const key = crypto.randomUUID();
                   buy.mutate(
-                    { itemId: item.itemId, quantity: qtyOf(item) },
+                    { itemId: item.itemId, quantity: qtyOf(item), idempotencyKey: key },
                     {
                       onSuccess: () => {
                         setQty((prev) => ({ ...prev, [item.itemId]: 1 }));

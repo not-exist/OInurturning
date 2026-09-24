@@ -13,10 +13,20 @@ export function useShopCatalog() {
 export function useBuyShopItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, quantity }: { itemId: string; quantity: number }) =>
+    mutationFn: ({
+      itemId,
+      quantity,
+      idempotencyKey,
+    }: {
+      itemId: string;
+      quantity: number;
+      /** 同一次确认内固定；重试（网络超时后重发）带同一把 key，服务端重放而非重复扣款 */
+      idempotencyKey?: string;
+    }) =>
       apiFetch<ShopBuyResult>('/api/shop/buy', {
         method: 'POST',
         body: JSON.stringify({ itemId, quantity }),
+        ...(idempotencyKey === undefined ? {} : { headers: { 'Idempotency-Key': idempotencyKey } }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['shop'] });

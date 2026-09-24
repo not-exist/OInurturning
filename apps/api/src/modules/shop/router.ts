@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { ApiError } from '../../lib/errors.js';
+import { runIdempotent } from '../../lib/idempotency.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as svc from './service.js';
 
@@ -27,7 +28,18 @@ shopRouter.post('/buy', async (req, res, next) => {
   try {
     const parsed = BuySchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
-    const result = await svc.buyItem(req.user!.id, parsed.data.itemId, parsed.data.quantity);
+    const { itemId, quantity } = parsed.data;
+    // 幂等键可选（TECH-DESIGN §12 T8）：重复下单/超时重试会重复扣钱，故带了 key 就按 key+请求指纹重放。
+    const rawKey = req.header('Idempotency-Key');
+    if (rawKey !== undefined && (rawKey.length < 1 || rawKey.length > 128)) {
+      throw new ApiError('VALIDATION_FAILED', { field: 'Idempotency-Key' });
+    }
+    const idempotencyKey =
+      rawKey === undefined
+        ? undefined
+        : // 指纹必须包含操作参数：同一个 key 换了 itemId/数量应视为另一个操作，不能重放
+          `shop:buy:${req.user!.id}:${rawKey}:${itemId}:${quantity}`;
+    const result = await runIdempotent(idempotencyKey, () => svc.buyItem(req.user!.id, itemId, quantity));
     res.json({ ok: true, data: result });
   } catch (e) {
     next(e);
