@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /** 训练记录：落库快照 + 查询过滤/游标 + 越权隔离。 */
 const app: Express = createApp();
@@ -16,6 +16,7 @@ async function register(money = 100000): Promise<{ token: string; userId: number
     .send({ username: `tlog-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   await prisma.user.update({ where: { id: session.me.id }, data: { money } });
   return { token: session.accessToken, userId: session.me.id };
 }

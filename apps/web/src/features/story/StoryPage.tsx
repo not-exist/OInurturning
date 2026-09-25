@@ -345,7 +345,7 @@ export function StoryPage(): JSX.Element {
   };
 
   return (
-    <div data-testid="story-page" className="mx-auto max-w-5xl space-y-5">
+    <div data-testid="story-page" data-tutorial="story-page" className="mx-auto max-w-5xl space-y-5">
       <PageHeader
         eyebrow="赛程"
         title="剧情模式"
@@ -429,7 +429,7 @@ export function StoryPage(): JSX.Element {
         onToggle={(chapter) => setOpenChapterKey(chapter === expandedKey ? null : chapter)}
       />
 
-      <div className="space-y-5">
+      <div className="space-y-5" data-tutorial="story-page-intro">
         {chapters.map((chapter, chapterIndex) => {
           const cleared = chapter.stages.filter((stage) => stage.cleared).length;
           const tier = isTier(chapter.chapter) ? TIER_TEXT[chapter.chapter] : 'text-fg';

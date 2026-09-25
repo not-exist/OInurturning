@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { uniqueName, DEFAULT_PASSWORD } from '../fixtures';
+import { uniqueName, DEFAULT_PASSWORD, finishTutorial } from '../fixtures';
 
 /** 认证链路：注册/登录/登出/未登录拦截（页面级）。 */
 test.describe('认证', () => {
@@ -29,13 +29,16 @@ test.describe('认证', () => {
     await expect(page.getByTestId('logout-btn')).toBeVisible();
   });
 
-  test('重复注册同一用户名提示"用户名已被占用"', async ({ page }) => {
+  test('重复注册同一用户名提示"用户名已被占用"', async ({ page, request }) => {
     const username = uniqueName('auth-dup');
     await page.goto('/register');
     await page.getByTestId('register-username').fill(username);
     await page.getByTestId('register-password').fill(DEFAULT_PASSWORD);
     await page.getByTestId('register-submit').click();
     await page.waitForURL('/');
+    // UI 注册的账号停在引导第 1 步（遮罩会拦点击）：本用例要点头部登出，先完成引导
+    await finishTutorial(request, username, DEFAULT_PASSWORD);
+    await page.reload();
 
     await page.getByTestId('logout-btn').click();
     await page.waitForURL('/login');
@@ -46,13 +49,16 @@ test.describe('认证', () => {
     await expect(page.getByTestId('auth-error')).toHaveText('用户名已被占用');
   });
 
-  test('错误密码登录提示"用户名或密码错误"', async ({ page }) => {
+  test('错误密码登录提示"用户名或密码错误"', async ({ page, request }) => {
     const username = uniqueName('auth-bad');
     await page.goto('/register');
     await page.getByTestId('register-username').fill(username);
     await page.getByTestId('register-password').fill(DEFAULT_PASSWORD);
     await page.getByTestId('register-submit').click();
     await page.waitForURL('/');
+    // 同上：本用例要登出，先完成引导
+    await finishTutorial(request, username, DEFAULT_PASSWORD);
+    await page.reload();
     await page.getByTestId('logout-btn').click();
     await page.waitForURL('/login');
 
@@ -75,13 +81,16 @@ test.describe('认证', () => {
     await page.waitForURL('/login');
   });
 
-  test('登出后回到登录页且无法再进首页', async ({ page }) => {
+  test('登出后回到登录页且无法再进首页', async ({ page, request }) => {
     const username = uniqueName('auth-out');
     await page.goto('/register');
     await page.getByTestId('register-username').fill(username);
     await page.getByTestId('register-password').fill(DEFAULT_PASSWORD);
     await page.getByTestId('register-submit').click();
     await page.waitForURL('/');
+    // 同上：本用例要登出，先完成引导
+    await finishTutorial(request, username, DEFAULT_PASSWORD);
+    await page.reload();
     await page.getByTestId('logout-btn').click();
     await page.waitForURL('/login');
     await page.goto('/');

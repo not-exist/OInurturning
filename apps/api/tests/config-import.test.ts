@@ -459,8 +459,49 @@ events:
             rewards: {}
 `;
 
+/** tutorial/shop 为必需文件：所有步骤只发货币/徽章，unlock 只用合法路由键，避免引用具体道具 */
+const MINIMAL_TUTORIAL = `steps:
+  - id: welcome
+    title: 欢迎来到训练营
+    desc: 测试用第一步。
+    target: null
+    unlock: [overview]
+    action: none
+    reward: {}
+  - id: shop-tour
+    title: 商城巡览
+    desc: 测试用第二步。
+    target: "[data-tutorial='nav-shop']"
+    unlock: [overview, shop]
+    action: visit_shop
+    reward: {money: 50}
+  - id: complete
+    title: 引导完成
+    desc: 测试用末步。
+    target: null
+    unlock: [all]
+    action: none
+    reward: {}
+`;
+
+/** shop 为必需文件：只写六档声誉门槛，不写限购/门槛道具引用（fixtures 最小自洽） */
+const MINIMAL_SHOP = `reputation_gates:
+  gray: 0
+  yellow: 0
+  green: 30
+  blue: 120
+  purple: 350
+  colorful: 9999
+refresh:
+  daily_at: "04:00"
+  weekly_at: "Mon 04:00"
+`;
+
 const tmpDirs: string[] = [];
-function writeConfigDir(files: { talents: string; items: string; economy: string }): string {
+function writeConfigDir(
+  files: { talents: string; items: string; economy: string },
+  overrides?: { tutorial?: string; shop?: string },
+): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'oinur-config-'));
   tmpDirs.push(dir);
   writeFileSync(path.join(dir, 'talents.yaml'), files.talents);
@@ -470,6 +511,8 @@ function writeConfigDir(files: { talents: string; items: string; economy: string
   const itemId = /^\s*- id: ([a-z0-9-]+)/m.exec(files.items)?.[1] ?? 'rename-card';
   writeFileSync(path.join(dir, 'stages.yaml'), MINIMAL_STAGES.replaceAll('rename-card', itemId));
   writeFileSync(path.join(dir, 'events.yaml'), MINIMAL_EVENTS);
+  writeFileSync(path.join(dir, 'tutorial.yaml'), overrides?.tutorial ?? MINIMAL_TUTORIAL);
+  writeFileSync(path.join(dir, 'shop.yaml'), overrides?.shop ?? MINIMAL_SHOP);
   return dir;
 }
 
@@ -680,6 +723,40 @@ talents:
       economy: BASE_ECONOMY,
     });
     await expect(importConfigs({ configDir: dir })).rejects.toThrow(/line \d+/);
+    spy.mockRestore();
+  });
+
+  it('缺 tutorial.yaml 抛 FatalStartupError（不再静默回退硬编码默认值）', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const dir = writeConfigDir({ talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY });
+    rmSync(path.join(dir, 'tutorial.yaml'), { force: true });
+    await expect(importConfigs({ configDir: dir })).rejects.toThrow(FatalStartupError);
+    await expect(importConfigs({ configDir: dir })).rejects.toThrow(/不可读/);
+    spy.mockRestore();
+  });
+
+  it('tutorial 奖励道具不存在抛 FatalStartupError', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const dir = writeConfigDir(
+      { talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY },
+      {
+        tutorial: MINIMAL_TUTORIAL.replace(
+          'reward: {}',
+          "reward: {item: no-such-item, count: 1}",
+        ),
+      },
+    );
+    await expect(importConfigs({ configDir: dir })).rejects.toThrow(/奖励道具不存在/);
+    spy.mockRestore();
+  });
+
+  it('tutorial unlock 未知键抛 FatalStartupError', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const dir = writeConfigDir(
+      { talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY },
+      { tutorial: MINIMAL_TUTORIAL.replace('unlock: [overview]', 'unlock: [overveiw]') },
+    );
+    await expect(importConfigs({ configDir: dir })).rejects.toThrow(/未知解锁键/);
     spy.mockRestore();
   });
 });

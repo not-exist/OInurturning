@@ -28,6 +28,7 @@ import {
   type AdventureEventDrawContext,
   type AdventureStaminaCost,
 } from './extractor.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -881,7 +882,7 @@ export async function chooseAdventure(
   now: Date = new Date(),
 ): Promise<AdventureChoiceResult> {
   const config = requireConfig();
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     await tx.$queryRaw`SELECT id FROM AdventureLog WHERE id = ${adventureId} FOR UPDATE`;
     const log = await tx.adventureLog.findUnique({ where: { id: adventureId } });
@@ -1071,6 +1072,10 @@ export async function chooseAdventure(
         : { replay: buildBattleReplay(contestRecord.id, duelReport!, event.name) }),
     };
   });
+  if (result.completed) {
+    void autoAdvanceIfNeeded(userId, 'do_adventure');
+  }
+  return result;
 }
 
 export async function listAdventureLogs(userId: number, limit = 20): Promise<AdventureLogView[]> {

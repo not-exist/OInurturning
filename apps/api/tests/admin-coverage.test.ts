@@ -5,7 +5,7 @@ import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /**
  * 管理端覆盖补强（admin.test.ts 仅 4 用例：建赛/公告/尺寸校验/奖池冻结）：
@@ -34,6 +34,7 @@ async function register(username?: string): Promise<{ token: string; userId: num
     .send({ username: username ?? `admcov-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   return { token: session.accessToken, userId: session.me.id };
 }
 

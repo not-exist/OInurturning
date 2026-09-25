@@ -69,6 +69,9 @@ export async function resetUsers(): Promise<void> {
       await tx.reputationLog.deleteMany({});
       await tx.adminAnnouncement.deleteMany({});
       await tx.adminAuditLog.deleteMany({});
+      // ShopPurchaseLog 随 user 级联删除，但本事务关闭了外键检查（见上），
+      // 不显式清理会残留孤儿行，污染后续用例的每日/每周限购统计
+      await tx.shopPurchaseLog.deleteMany({});
       await tx.user.deleteMany({});
     } finally {
       // 同一连接上恢复，杜绝 FOREIGN_KEY_CHECKS=0 泄漏回连接池
@@ -89,8 +92,10 @@ export async function resetUsersFast(): Promise<void> {
 /**
  * 快速创建测试用户（直接写库，避免 HTTP 注册开销）
  * 适用于非 auth 流程的集成测试
+ * `tutorialCompleted` 默认 true：业务用例不关心引导锁，需要测锁定行为时显式传 false
  */
-export async function createTestUserDirect(opts: { username: string; passwordHash?: string; money?: number; reputation?: number; role?: 'USER' | 'ADMIN' } = { username: `test-${Date.now()}` }) {
+export async function createTestUserDirect(opts: { username: string; passwordHash?: string; money?: number; reputation?: number; role?: 'USER' | 'ADMIN'; tutorialCompleted?: boolean } = { username: `test-${Date.now()}` }) {
+  const tutorialCompleted = opts.tutorialCompleted ?? true;
   const user = await prisma.user.create({
     data: {
       username: opts.username,
@@ -99,9 +104,20 @@ export async function createTestUserDirect(opts: { username: string; passwordHas
       reputation: opts.reputation ?? 0,
       role: opts.role ?? 'USER',
       onboardedAt: new Date(),
+      tutorialStep: tutorialCompleted ? 999 : 0,
+      tutorialCompleted,
     },
   });
   return user;
+}
+
+/**
+ * 测试便利：直接把账号标记为已完成引导（业务用例不关心引导锁定时使用）
+ * 服务端守卫 `requireTutorialForApi` 会对未完成引导的账号锁全部业务 API，
+ * 因此 HTTP 注册的测试账号需要显式解锁，而不是放宽服务端守卫。
+ */
+export async function unlockTutorial(userId: number): Promise<void> {
+  await prisma.user.update({ where: { id: userId }, data: { tutorialStep: 999, tutorialCompleted: true } });
 }
 
 /**

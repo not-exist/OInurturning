@@ -41,7 +41,7 @@ events:
 function writeConfigDir(eventsYaml: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'oinur-duel-'));
   tempDirs.push(dir);
-  for (const file of ['talents', 'items', 'economy', 'problems', 'stages']) {
+  for (const file of ['talents', 'items', 'economy', 'problems', 'stages', 'tutorial', 'shop']) {
     copyFileSync(path.join(dataDir, `${file}.yaml`), path.join(dir, `${file}.yaml`));
   }
   writeFileSync(path.join(dir, 'events.yaml'), eventsYaml);

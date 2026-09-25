@@ -4,7 +4,7 @@ import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { importConfigs } from '../src/config/loader.js';
 import { registerPvp } from '../src/modules/pvp/registration.js';
-import { resetUsers, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 import { buildFirstRound } from '../src/modules/pvp/bracket.js';
 import { advancePvpTournament } from '../src/modules/pvp/scheduler.js';
 
@@ -17,6 +17,7 @@ async function entrant(rosterSize = 3): Promise<{ userId: number; studentId: num
   sequence += 1;
   const auth = await request(app).post('/api/auth/register').send({ username: `sched-${Date.now()}-${sequence}`, password: 'pw-123456' });
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(auth);
+  await unlockTutorial(session.me.id);
   await prisma.user.update({ where: { id: session.me.id }, data: { money: 0, reputation: 0 } }); // 开局包 2500 金/10 誉归零（奖金/声誉绝对断言口径）
   const studentIds: number[] = [];
   for (let member = 0; member < rosterSize; member += 1) {
@@ -40,6 +41,10 @@ describe('PVP scheduler', () => {
     expect(buildFirstRound(Array.from({ length: 17 }, (_, userId) => ({ userId: userId + 1 })), 32, 42)).toHaveLength(16);
   });
 
+  // 同属性 ELITE 克隆对打会打出 4-4 平局；此时引擎按设计在常规回合后追加成对骤死回合
+  // （engine/duel.ts:270,290 常规回合恒为 2N；:296-306 平局且 SUDDEN_DEATH 时最多 3 组、每组 +2
+  // → 总回合 10/12/14），且 seed 由全局自增 id 派生、平局与否随套件执行序列翻转。
+  // 故本用例按 decidedBy 分支断言，不要改回写死 [1..8]。
   it('rosterSize=4 的赛事跑完 2N=8 局且客队成员 side 为 AWAY', async () => {
     const tournament = await prisma.pvpTournament.create({ data: { name: 'Four', size: 4, registerEndsAt: OPEN, autoStartAt: PAST, prizes: {}, config: { rosterSize: 4 } } });
     for (let index = 0; index < 4; index += 1) {
@@ -53,8 +58,21 @@ describe('PVP scheduler', () => {
     const report = record.report as {
       rounds: Array<{ roundNo: number; setterSide: string }>;
       inputSnapshot: { home: { members: unknown[] }; away: { members: Array<{ side: string }> } };
+      decidedBy?: 'REGULAR' | 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';
     };
-    expect(report.rounds.map((round) => round.roundNo)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    // 常规回合必须精确为 2N=8
+    expect(report.rounds.slice(0, 8).map((round) => round.roundNo)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    // 全段编号连续（防重复/跳号），且骤死回合成对追加
+    const roundNos = report.rounds.map((round) => round.roundNo);
+    expect(roundNos.length % 2).toBe(0);
+    expect(roundNos.length).toBeGreaterThanOrEqual(8);
+    expect(roundNos.every((roundNo, index) => index === 0 || roundNo === roundNos[index - 1]! + 1)).toBe(true);
+    if (report.decidedBy === 'REGULAR') {
+      expect(roundNos).toHaveLength(8);
+    } else {
+      expect(report.decidedBy).toBe('SUDDEN_DEATH');
+      expect([10, 12, 14]).toContain(roundNos.length);
+    }
     expect(report.inputSnapshot.home.members).toHaveLength(4);
     expect(report.inputSnapshot.away.members).toHaveLength(4);
     expect(report.inputSnapshot.away.members.every((entry) => entry.side === 'AWAY')).toBe(true);

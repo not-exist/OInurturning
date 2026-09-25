@@ -13,7 +13,7 @@ import {
   type AdventureLogView,
 } from '../src/modules/adventure/service.js';
 import { useItem } from '../src/modules/items/service.js';
-import { resetUsers, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 
 const dataDir = path.resolve(import.meta.dirname, '../../../docs/data');
 const tempDirs: string[] = [];
@@ -67,7 +67,7 @@ events:
 function writeConfigDir(eventsYaml = EVENT_YAML): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'oinur-adventure-'));
   tempDirs.push(dir);
-  for (const file of ['talents', 'items', 'economy', 'problems', 'stages']) {
+  for (const file of ['talents', 'items', 'economy', 'problems', 'stages', 'tutorial', 'shop']) {
     copyFileSync(path.join(dataDir, `${file}.yaml`), path.join(dir, `${file}.yaml`));
   }
   writeFileSync(path.join(dir, 'events.yaml'), eventsYaml);
@@ -241,6 +241,7 @@ describe('M3 adventure API service', () => {
       .post('/api/auth/register')
       .send({ username, password: 'pw-123456' });
     const session = unwrapOk<{ accessToken: string; me: { id: number } }>(registration);
+    await unlockTutorial(session.me.id);
     const roster = await createRoster(session.me.id);
     const headers = { Authorization: `Bearer ${session.accessToken}` };
 

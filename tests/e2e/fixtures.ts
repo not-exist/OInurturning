@@ -29,8 +29,13 @@ export interface TestAccount {
   userId: number;
 }
 
-/** 经 API 注册（快；UI 注册流程由 auth.spec.ts 覆盖）。用户名须 ≥3 字符。 */
-export async function registerUser(
+/**
+ * 经 API 注册，且**不跳过**新手引导（快；UI 注册流程由 auth.spec.ts 覆盖）。用户名须 ≥3 字符。
+ *
+ * 引导自身的用例（tutorial.spec.ts）必须用这个：注册后 completed 恒为 false，
+ * 才能断言「未完成时受限 API 一律 403」与「逐步走完十步」。
+ */
+export async function registerUserRaw(
   request: APIRequestContext,
   prefix = 'e2e',
   password: string = DEFAULT_PASSWORD,
@@ -50,6 +55,41 @@ export async function registerUser(
     accessToken: body.data.accessToken,
     userId: body.data.me.id,
   };
+}
+
+/**
+ * 注册并**跳过**新手引导（registerUserRaw + POST /api/tutorial/skip）。
+ * 非引导用例一律用它：否则账号被引导锁住，受限 API 全数 403。
+ * 引导用例不得用它 —— skip 会把 completed 直接置 true。
+ */
+export async function registerUser(
+  request: APIRequestContext,
+  prefix = 'e2e',
+  password: string = DEFAULT_PASSWORD,
+): Promise<TestAccount> {
+  const account = await registerUserRaw(request, prefix, password);
+  // 跳过新手引导，避免旧 e2e 用例被锁定。失败必须显式抛错：
+  // 静默吞掉会让账号保持被锁，后续用例以 403/点击被拦的形式红在别处，难以归因。
+  const res = await request.post(`${API_URL}/api/tutorial/skip`, {
+    headers: { Authorization: `Bearer ${account.accessToken}` },
+  });
+  if (!res.ok()) throw new Error(`skip 引导失败：${res.status()} ${await res.text()}`);
+  return account;
+}
+
+/**
+ * UI 注册（`/register` 表单）后的账号仍停在引导第 1 步：侧栏被锁、引导遮罩会拦点击。
+ * 不测引导本身的 UI 用例在注册后调用它，再用 `page.reload()` 让 SPA 拉到新状态。
+ * （走 API 登录拿 token，与 global-setup 的 admin 提权同思路。）
+ */
+export async function finishTutorial(
+  request: APIRequestContext,
+  username: string,
+  password: string,
+): Promise<void> {
+  const token = await loginUser(request, username, password);
+  const res = await apiCall(request, 'POST', '/api/tutorial/skip', token);
+  if (res.status !== 200) throw new Error(`skip 引导失败：${res.status} ${JSON.stringify(res.body)}`);
 }
 
 export async function loginUser(

@@ -113,7 +113,7 @@ export function InventoryPage(): JSX.Element {
   })).filter((g) => g.items.length > 0);
 
   return (
-    <div data-testid="inventory-page" className="mx-auto max-w-5xl space-y-4">
+    <div data-testid="inventory-page" data-tutorial="backpack-page" className="mx-auto max-w-5xl space-y-4">
       <PageHeader
         eyebrow="补给与道具"
         title="背包"

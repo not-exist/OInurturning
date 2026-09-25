@@ -575,6 +575,7 @@ export function useRecruit() {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['tutorial'] });
     },
   });
 }
@@ -617,6 +618,7 @@ export function useTeachLecture() {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['tutorial'] });
     },
   });
 }
@@ -705,6 +707,7 @@ export function useChooseAdventure() {
       qc.invalidateQueries({ queryKey: ['items'] });
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['tutorial'] });
     },
   });
 }
@@ -768,6 +771,7 @@ export function useBasicTrain() {
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
       qc.invalidateQueries({ queryKey: ['training-logs'] });
+      qc.invalidateQueries({ queryKey: ['tutorial'] });
     },
   });
 }
@@ -786,6 +790,7 @@ export function useDirectedTrain() {
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
       qc.invalidateQueries({ queryKey: ['training-logs'] });
+      qc.invalidateQueries({ queryKey: ['tutorial'] });
     },
   });
 }
@@ -804,6 +809,7 @@ export function useSpecializedTrain() {
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
       qc.invalidateQueries({ queryKey: ['training-logs'] });
+      qc.invalidateQueries({ queryKey: ['tutorial'] });
     },
   });
 }
@@ -1065,6 +1071,7 @@ export function useEnterStoryStage() {
       qc.invalidateQueries({ queryKey: ['items'] });
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['tutorial'] });
       return result;
     },
   });

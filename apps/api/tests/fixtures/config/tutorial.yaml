@@ -1,0 +1,98 @@
+# 强制新手引导配置
+# 权威：docs/TECH-DESIGN.md（引导端点）；步序与门槛以本文件为准
+# 步骤必须按顺序，unlock 为前端路由白名单键，target 为 CSS 选择器（用于 spotlight），null 表示居中弹窗
+# 完成引导徽章不得与 overview 的 CHECKLIST_REWARD_BADGE（rookie-done）同名：
+# overview 以「徽章是否已在」兼作已领取态与幂等键，同名会让总览开局任务一开局就显示已领取。
+steps:
+  - id: welcome
+    title: 欢迎来到训练营
+    desc: 你是新任教练，这里是你的指挥中心。深夜机房的灯还亮着，学员们已经在等你。我们先花 2 分钟熟悉一下。
+    target: null
+    unlock: [overview]
+    action: none
+    # 训练步之前没有任何赚钱路径（开除只扣声誉、讲课/历练/背包全锁），
+    # 余额不足的账号会在训练步永久卡死，故离开 welcome 步时先发训练金。
+    reward:
+      money: 200
+
+  - id: students
+    title: 查看学员档案
+    desc: 这是你开局的两名学员，品质与能力已生成。点击学员卡查看九维能力与天赋。
+    target: "[data-tutorial='nav-students']"
+    unlock: [overview, students]
+    action: visit_students
+    reward:
+      item: milk-tea
+      count: 1
+
+  - id: training
+    title: 第一次训练
+    desc: 体力是行动资源，上限 5 点随时间恢复。训练消耗 1 体力+金币，试一次基础训练。
+    target: "[data-tutorial='training-basic']"
+    unlock: [overview, students, training]
+    action: do_training
+    reward:
+      money: 50
+
+  - id: academy
+    title: 高级学院与招募
+    desc: 声誉影响招募质量与讲课报酬，候选池每 24 小时免费刷新。先看看候选池的气质判读。
+    target: "[data-tutorial='nav-academy']"
+    unlock: [overview, students, training, academy]
+    action: visit_academy
+    reward: {}
+
+  - id: recruit
+    title: 招募补员
+    desc: 历练需 3 人小队、剧情需 4 人队伍，你现在只有 2 人。去高级学院招募第 3、4 名学员：候选池可花 100 金刷新（100→150→225…），优先招 common/good（第 3 人 547 起、第 4 人 738 起，价格随在册人数递增）。已有 4 名在册学员会自动通过本步。
+    target: "[data-tutorial='academy-recruit']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
+    action: do_recruit
+    requires_students: 4
+    reward: {}
+
+  - id: lecture
+    title: 讲课变现
+    desc: 讲课是主收入来源，能力需达到受众门槛。完成一次讲课，体验报酬与成长机制。若学员能力未达受众门槛，需点「强接」（报酬 ×0.6，失败则无收入）。
+    target: "[data-tutorial='lecture-tier']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
+    action: do_lecture
+    reward:
+      reputation: 2
+
+  - id: adventure
+    title: 历练探险
+    desc: 派出 3 人小队，投入 1-3 体力，抽取不同稀有度事件。对决类会触发出题对决。
+    target: "[data-tutorial='nav-adventure']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
+    action: do_adventure
+    reward:
+      item: intel-slip
+      count: 1
+
+  - id: story
+    title: 剧情首关
+    desc: 剧情模式 8 章，从 CSP-J 到 IOI。组建 4 人队伍挑战第一关，体验排名赛回放。
+    target: "[data-tutorial='nav-story']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack, story]
+    action: do_story
+    reward: {}
+
+  - id: shop
+    title: 商城补给站
+    desc: 金币可以在商城购买书籍与道具，紫色以上需要声誉解锁。限购每日 04:00 刷新，书籍受每周 10 点上限约束。
+    target: "[data-tutorial='nav-shop']"
+    unlock: [overview, students, training, academy, lecture, adventure, story, shop, backpack, problem-library]
+    action: visit_shop
+    reward:
+      money: 200
+
+  - id: complete
+    title: 引导完成，指挥中心全面开放
+    desc: 全部功能已解锁。去总览领取开局徽章，或继续培养你的队伍。祝你在 OI 之路上走得更远。
+    target: null
+    unlock: [all]
+    action: none
+    reward:
+      badge: onboarding-done
+      money: 200

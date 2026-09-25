@@ -8,7 +8,7 @@ import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
 import { registerPvp } from '../src/modules/pvp/registration.js';
 import { advancePvpTournament } from '../src/modules/pvp/scheduler.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /**
  * PVP 覆盖补强（registration/scheduler 覆盖 service 层报名/推进/退款/奖池默认桶）：
@@ -43,6 +43,7 @@ async function register(username?: string): Promise<{ token: string; userId: num
     .send({ username: username ?? `pvpcov-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   return { token: session.accessToken, userId: session.me.id };
 }
 

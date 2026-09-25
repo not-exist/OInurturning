@@ -37,6 +37,7 @@ import {
   getContestRecordForUser,
   upsertStoryProgress,
 } from '../contest/repository.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 const FULL_CLEAR_BADGE = 'badge-legend';
 const FULL_CLEAR_TROPHY = 'trophy-gold';
@@ -587,7 +588,10 @@ export async function enterStoryStage(
     throw new ApiError('VALIDATION_FAILED', { field: 'idempotencyKey' });
   }
 
-  return prisma.$transaction(async (tx) => {
+  // 事务内记录本次是否通关（首通与否都要推进引导步）：record.summary 是 ContestSummary |
+  // RankingSummary 联合，出事务后取 .pass 无法通过类型检查，故在事务内就地捕获。
+  let passed = false;
+  const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const replay = await getContestRecordByIdempotency(userId, idempotencyKey, tx);
     if (replay !== null) {
@@ -809,6 +813,7 @@ export async function enterStoryStage(
         tx,
       );
     }
+    passed = report.pass;
     return {
       record,
       replay: buildBattleReplay(record.id, report, stage.name),
@@ -816,4 +821,8 @@ export async function enterStoryStage(
       firstClear: firstClear && report.pass,
     };
   });
+  if (passed) {
+    void autoAdvanceIfNeeded(userId, 'do_story');
+  }
+  return result;
 }

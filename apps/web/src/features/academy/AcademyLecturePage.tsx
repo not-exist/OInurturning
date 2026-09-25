@@ -136,9 +136,10 @@ export function AcademyLecturePage(): JSX.Element {
                 </select>
               </label>
 
-              <label className="block text-sm">
+              <label className="block text-sm" data-tutorial="lecture-tier">
                 <span className="mb-2 block text-fg-dim">受众档位</span>
                 <select
+                  data-tutorial="lecture-tier-select"
                   data-testid="lecture-tier"
                   className="w-full border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-fg outline-none transition-colors focus-visible:border-cyber-400/70 [&>option]:bg-ink-900"
                   value={tier}
@@ -230,6 +231,7 @@ export function AcademyLecturePage(): JSX.Element {
                 )}
               </p>
               <Btn
+                data-tutorial="lecture-teach"
                 data-testid="lecture-teach"
                 variant="primary"
                 disabled={

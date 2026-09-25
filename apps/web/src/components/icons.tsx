@@ -117,6 +117,7 @@ export const NAV_ICON = {
   adventure: Compass,
   story: ScrollText,
   pvp: Swords,
+  shop: Wallet,
   admin: Shield,
   settings: Settings,
 } satisfies Record<string, LucideIcon>;

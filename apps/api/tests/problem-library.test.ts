@@ -9,7 +9,7 @@ import {
   listProblemLibrary,
   type ProblemDimension,
 } from '../src/modules/problems/library.js';
-import { resetUsers, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 
 const app = createApp();
 const NOW = new Date('2026-09-02T12:00:00.000Z');
@@ -105,6 +105,7 @@ describe('M3 problem library', () => {
       .post('/api/auth/register')
       .send({ username: `problem-route-${sequence}-${Date.now().toString(36)}`, password: 'pw-123456' });
     const session = unwrapOk<{ accessToken: string; me: { id: number } }>(registration);
+    await unlockTutorial(session.me.id);
     await prisma.user.update({ where: { id: session.me.id }, data: { money: 100 } });
     const studentId = await createStudent(session.me.id);
     const headers = { Authorization: `Bearer ${session.accessToken}` };

@@ -69,7 +69,7 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
   const cyclePct = Math.min(100, Math.max(0, ((now - generatedAt) / (FREE_REFRESH_HOURS * HOUR_MS)) * 100));
 
   return (
-    <div data-testid="academy-page" className="space-y-5">
+    <div data-testid="academy-page" data-tutorial="academy-page" className="space-y-5">
       <PageHeader
         eyebrow="候选池"
         title="高级学院"
@@ -266,6 +266,7 @@ function CandidateCard({
         </div>
         <Btn
           data-testid="recruit-btn"
+          data-tutorial={index === 0 ? 'academy-recruit' : undefined}
           variant="primary"
           className="w-full"
           disabled={recruit.isPending}

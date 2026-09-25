@@ -6,7 +6,7 @@ import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unwrapErr, unwrapOk, unlockTutorial } from './helpers.js';
 
 /**
  * API 全链路旅程（e2e 类别，跑在 e2e Action；test Action 用 --exclude 跳过本文件）：
@@ -38,6 +38,8 @@ async function register(prefix: string): Promise<{ token: string; userId: number
     .send({ username, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  // 本用例测全链路（不测引导本身）：新号停在引导第 1 步会被守卫 403，先标记完成
+  await unlockTutorial(session.me.id);
   return { token: session.accessToken, userId: session.me.id, username };
 }
 

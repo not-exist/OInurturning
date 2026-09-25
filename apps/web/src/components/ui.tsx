@@ -351,24 +351,28 @@ export function ErrorNote({ children, onRetry }: { children: ReactNode; onRetry?
 /**
  * 悬浮卡：hover 或键盘聚焦即展开，纯 CSS 定位（无 portal、无 JS 状态）。
  * 需要父级不裁剪（避免 overflow-hidden 容器内使用）。
+ * `zClassName` 整体替换气泡层级（默认 z-40 = 顶栏 z-30 之上、模态 z-50 之下）；
+ * 落在新手引导遮罩（z-50）里的调用方需要更高的层级。
  */
 export function HoverCard({
   children,
   content,
   width = 'w-72',
   className = '',
+  zClassName = 'z-40',
 }: {
   children: ReactNode;
   content: ReactNode;
   width?: string;
   className?: string;
+  zClassName?: string;
 }): JSX.Element {
   return (
     <span className={`group/hc relative inline-flex ${className}`} tabIndex={0}>
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none absolute top-full left-0 z-40 mt-2 ${width} origin-top scale-95 border border-ink-500 bg-ink-900/95 p-3 text-left opacity-0 shadow-[0_20px_50px_-20px_#000] backdrop-blur transition-[opacity,transform] duration-150 group-hover/hc:scale-100 group-hover/hc:opacity-100 group-focus-within/hc:scale-100 group-focus-within/hc:opacity-100`}
+        className={`pointer-events-none absolute top-full left-0 ${zClassName} mt-2 ${width} origin-top scale-95 border border-ink-500 bg-ink-900/95 p-3 text-left opacity-0 shadow-[0_20px_50px_-20px_#000] backdrop-blur transition-[opacity,transform] duration-150 group-hover/hc:scale-100 group-hover/hc:opacity-100 group-focus-within/hc:scale-100 group-focus-within/hc:opacity-100`}
       >
         {content}
       </span>

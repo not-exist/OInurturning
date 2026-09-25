@@ -23,6 +23,12 @@ import { adventureRouter } from './modules/adventure/router.js';
 import { adminRouter } from './modules/admin/router.js';
 import { pvpRouter } from './modules/pvp/router.js';
 import { overviewRouter } from './modules/overview/router.js';
+import { tutorialRouter } from './modules/tutorial/router.js';
+import { shopRouter } from './modules/shop/router.js';
+import { requireTutorialForApi } from './modules/tutorial/guard.js';
+import jwt from 'jsonwebtoken';
+import { prisma } from './lib/prisma.js';
+import { verifyAccess } from './lib/jwt.js';
 import type { ApiEnvelope } from '@oinur/shared';
 
 export interface AppOptions {
@@ -103,6 +109,34 @@ export function createApp(opts: AppOptions = {}): express.Express {
   });
 
   app.use(globalLimiter);
+
+  // optionalAuth + tutorial guard：有 token 时解析并执行教程锁，无 token 时放行由下游 requireAuth 处理
+  app.use((req, _res, next) => {
+    void (async () => {
+      try {
+        const h = req.headers.authorization;
+        if (!h?.startsWith('Bearer ')) return next();
+        let claims: ReturnType<typeof verifyAccess>;
+        try {
+          claims = verifyAccess(h.slice(7));
+        } catch (e) {
+          if (e instanceof jwt.TokenExpiredError) return next();
+          return next();
+        }
+        const user = await prisma.user.findUnique({
+          where: { id: claims.uid },
+          select: { id: true, role: true, tokenVersion: true, bannedAt: true },
+        });
+        if (!user || user.bannedAt || user.tokenVersion !== claims.tv) return next();
+        req.user = { id: user.id, role: user.role, tokenVersion: user.tokenVersion };
+        next();
+      } catch {
+        next();
+      }
+    })();
+  });
+  app.use(requireTutorialForApi);
+
   app.use('/api/auth', authLimiter, authRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/academy', academyRouter);
@@ -118,6 +152,8 @@ export function createApp(opts: AppOptions = {}): express.Express {
   app.use('/api/adventures', adventureRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/pvp', pvpRouter);
+  app.use('/api/tutorial', tutorialRouter);
+  app.use('/api/shop', shopRouter);
 
   app.use(errorHandler);
   return app;

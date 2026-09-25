@@ -6,6 +6,7 @@ import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 import {
   TIER_TO_QUALITY,
   bucketTalents,
@@ -108,6 +109,7 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
   const cfg = recruitmentCfg();
   const pool = await prisma.recruitPool.findUnique({ where: { userId } });
 
+  let view: PoolView | undefined;
   if (!pool) {
     // 并发首建可能以两种方式失败：P2002（唯一键兜底，他人已建）、
     // P2034（InnoDB 锁冲突/死锁，CI 上偶发）。先重读胜出方池；若冲突方
@@ -119,35 +121,43 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
         const created = await prisma.recruitPool.create({
           data: { userId, candidates: candidates as unknown as Prisma.InputJsonValue, generatedAt: now, refreshDayKey: dayKey(now) },
         });
-        return toPoolView(created, now);
+        view = toPoolView(created, now);
+        break;
       } catch (e) {
         const isRace =
           e instanceof Prisma.PrismaClientKnownRequestError && (e.code === 'P2002' || e.code === 'P2034');
         if (isRace) {
           const existing = await prisma.recruitPool.findUnique({ where: { userId } });
-          if (existing) return toPoolView(existing, now);
+          if (existing) {
+            view = toPoolView(existing, now);
+            break;
+          }
           if (attempt < 3) continue;
         }
         throw e;
       }
     }
+  } else {
+    const stale = now.getTime() - pool.generatedAt.getTime() >= cfg.manual_refresh.free_interval_hours * HOUR_MS;
+    const dayChanged = pool.refreshDayKey !== dayKey(now);
+    if (!stale && !dayChanged) {
+      view = toPoolView(pool, now);
+    } else {
+      const candidates = stale ? generatePool(newRng(), await genCtx(prisma, userId), POOL_SIZE) : readCandidates(pool);
+      const updated = await prisma.recruitPool.update({
+        where: { userId },
+        data: {
+          candidates: candidates as unknown as Prisma.InputJsonValue,
+          ...(stale ? { generatedAt: now } : {}),
+          refreshesToday: 0,
+          refreshDayKey: dayKey(now),
+        },
+      });
+      view = toPoolView(updated, now);
+    }
   }
-
-  const stale = now.getTime() - pool.generatedAt.getTime() >= cfg.manual_refresh.free_interval_hours * HOUR_MS;
-  const dayChanged = pool.refreshDayKey !== dayKey(now);
-  if (!stale && !dayChanged) return toPoolView(pool, now);
-
-  const candidates = stale ? generatePool(newRng(), await genCtx(prisma, userId), POOL_SIZE) : readCandidates(pool);
-  const updated = await prisma.recruitPool.update({
-    where: { userId },
-    data: {
-      candidates: candidates as unknown as Prisma.InputJsonValue,
-      ...(stale ? { generatedAt: now } : {}),
-      refreshesToday: 0,
-      refreshDayKey: dayKey(now),
-    },
-  });
-  return toPoolView(updated, now);
+  if (!view) throw new Error('[academy] pool view 未构建');
+  return view;
 }
 
 /** POST 手动刷新：价 round(100×1.5^k) 封顶 800；扣钱走条件 UPDATE，不足 → INSUFFICIENT_RESOURCE */
@@ -208,7 +218,7 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
  */
 export async function recruit(userId: number, tempId: string, now: Date = new Date()): Promise<StudentView> {
   const cfg = recruitmentCfg();
-  return prisma.$transaction(async (tx) => {
+  const recruited = await prisma.$transaction(async (tx) => {
     await lockPoolRow(tx, userId);
     const pool = await tx.recruitPool.findUnique({ where: { userId } });
     if (!pool) throw new ApiError('NOT_FOUND', { resource: 'recruitPool' });
@@ -260,4 +270,7 @@ export async function recruit(userId: number, tempId: string, now: Date = new Da
 
     return toStudentView(student, candidate.talents.map((t) => t.talentId));
   });
+  // 招募是引导第 5 步（do_recruit）的唯一证据：事务提交后才推进，避免扣钱失败却算过步
+  void autoAdvanceIfNeeded(userId, 'do_recruit');
+  return recruited;
 }

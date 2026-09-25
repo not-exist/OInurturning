@@ -1,20 +1,23 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { JSX, ReactNode } from 'react';
-import { LogOut, Sparkles, TriangleAlert } from 'lucide-react';
+import { LogOut, Sparkles, TriangleAlert, Lock } from 'lucide-react';
 import { apiFetch, setAccessToken } from '../lib/api';
 import { useAuthStore } from '../lib/auth-store';
 import { useOverview } from '../lib/hooks';
 import { nextReputationTitle, reputationTitle } from '../lib/rarity';
 import { Icon, NAV_ICON, type LucideIcon } from '../components/icons';
-import { RollingNumber } from '../components/ui';
+import { RollingNumber, HoverCard } from '../components/ui';
 import { StaminaCells } from '../features/students/StudentVisuals';
+import { useTutorial, isRouteUnlocked } from '../lib/tutorial';
+import { TutorialOverlay, TutorialProgressBar } from '../features/tutorial/TutorialOverlay';
 
 interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
   end?: boolean;
+  tutorialKey: string; // data-tutorial key and route key
 }
 
 interface NavGroup {
@@ -25,33 +28,41 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     title: '指挥中心',
-    items: [{ to: '/', label: '总览', icon: NAV_ICON.overview, end: true }],
+    items: [{ to: '/', label: '总览', icon: NAV_ICON.overview, end: true, tutorialKey: 'overview' }],
   },
   {
     title: '培养',
     items: [
-      { to: '/students', label: '学员管理', icon: NAV_ICON.students },
-      { to: '/training', label: '训练中心', icon: NAV_ICON.training },
-      { to: '/backpack', label: '背包', icon: NAV_ICON.backpack },
-      { to: '/problem-library', label: '出题题库', icon: NAV_ICON.problems },
+      { to: '/students', label: '学员管理', icon: NAV_ICON.students, tutorialKey: 'students' },
+      { to: '/training', label: '训练中心', icon: NAV_ICON.training, tutorialKey: 'training' },
+      { to: '/backpack', label: '背包', icon: NAV_ICON.backpack, tutorialKey: 'backpack' },
+      { to: '/problem-library', label: '出题题库', icon: NAV_ICON.problems, tutorialKey: 'problem-library' },
     ],
   },
   {
     title: '学院',
     items: [
-      { to: '/academy', label: '高级学院', icon: NAV_ICON.academy, end: true },
-      { to: '/academy/lecture', label: '讲课', icon: NAV_ICON.lecture },
+      { to: '/academy', label: '高级学院', icon: NAV_ICON.academy, end: true, tutorialKey: 'academy' },
+      { to: '/academy/lecture', label: '讲课', icon: NAV_ICON.lecture, tutorialKey: 'lecture' },
     ],
   },
   {
     title: '征程',
     items: [
-      { to: '/adventure', label: '历练', icon: NAV_ICON.adventure },
-      { to: '/story', label: '剧情模式', icon: NAV_ICON.story },
-      { to: '/pvp', label: 'PVP', icon: NAV_ICON.pvp },
+      { to: '/adventure', label: '历练', icon: NAV_ICON.adventure, tutorialKey: 'adventure' },
+      { to: '/story', label: '剧情模式', icon: NAV_ICON.story, tutorialKey: 'story' },
+      { to: '/pvp', label: 'PVP', icon: NAV_ICON.pvp, tutorialKey: 'pvp' },
     ],
   },
+  {
+    title: '商城',
+    items: [{ to: '/shop', label: '商店', icon: NAV_ICON.shop ?? NAV_ICON.backpack, tutorialKey: 'shop' }],
+  },
 ];
+
+function dataTutorialAttr(key: string): string {
+  return `nav-${key}`;
+}
 
 export function Layout(): JSX.Element {
   const { me, setMe } = useAuthStore();
@@ -59,13 +70,14 @@ export function Layout(): JSX.Element {
   const qc = useQueryClient();
   const { pathname } = useLocation();
   const overview = useOverview();
+  const tutorial = useTutorial();
 
   const adminGroup: NavGroup = {
     title: '系统',
     items: [
-      { to: '/settings', label: '用户设置', icon: NAV_ICON.settings },
+      { to: '/settings', label: '用户设置', icon: NAV_ICON.settings, tutorialKey: 'overview' },
       ...(me?.role === 'ADMIN'
-        ? [{ to: '/admin', label: '管理端', icon: NAV_ICON.admin }]
+        ? [{ to: '/admin', label: '管理端', icon: NAV_ICON.admin, tutorialKey: 'admin' }]
         : []),
     ],
   };
@@ -86,8 +98,22 @@ export function Layout(): JSX.Element {
   const roster = overview.data?.students.items ?? [];
   const stamina = roster.reduce((sum, s) => sum + Math.floor(s.stamina), 0);
   const staminaMax = roster.length * 5;
-  // 有人体力低于 1 点：训练 / 剧情 / 历练都会被拦，HUD 直接点名
   const staminaShort = roster.some((s) => Math.floor(s.stamina) < 1);
+
+  // 引导状态未就绪时视为「未解锁 / 未完成」：宁可能亮不亮的错配，也不要先全亮再收回
+  const unlocked = tutorial.data?.unlocked ?? [];
+  const isCompleted = tutorial.data?.completed ?? false;
+
+  const stepTitle = tutorial.data?.current?.title;
+  const lockHint = stepTitle !== undefined ? `完成「${stepTitle}」后解锁` : '完成新手引导后解锁';
+
+  const checkLocked = (routeKey: string): boolean => {
+    if (isCompleted) return false;
+    if (me?.role === 'ADMIN') return false;
+    // overview 总是解锁
+    if (routeKey === 'overview' || routeKey === 'admin') return false;
+    return !isRouteUnlocked(unlocked, routeKey);
+  };
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
@@ -98,12 +124,8 @@ export function Layout(): JSX.Element {
             <Icon icon={Sparkles} className="size-4" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-display text-sm font-bold tracking-[0.12em]">
-              OINURTURNING
-            </span>
-            <span className="block truncate text-[10px] tracking-[0.2em] text-fg-faint">
-              训练营指挥中心
-            </span>
+            <span className="block truncate font-display text-sm font-bold tracking-[0.12em]">OINURTURNING</span>
+            <span className="block truncate text-[10px] tracking-[0.2em] text-fg-faint">训练营指挥中心</span>
           </span>
         </div>
 
@@ -112,34 +134,63 @@ export function Layout(): JSX.Element {
             <div key={group.title} className="shrink-0 lg:shrink">
               <p className="eyebrow hidden px-2 pb-1.5 lg:block">{group.title}</p>
               <ul className="flex gap-1 lg:block lg:space-y-0.5">
-                {group.items.map((item) => (
-                  <li key={item.to}>
+                {group.items.map((item) => {
+                  const locked = checkLocked(item.tutorialKey);
+                  const link = (
                     <NavLink
                       to={item.to}
                       end={item.end}
+                      data-tutorial={dataTutorialAttr(item.tutorialKey)}
+                      aria-disabled={locked}
                       className={({ isActive }) =>
                         `relative flex shrink-0 cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
-                          isActive
-                            ? 'bg-cyber-400/10 text-cyber-300'
-                            : 'text-fg-dim hover:bg-ink-700/60 hover:text-fg'
+                          locked
+                            ? 'pointer-events-none opacity-40'
+                            : isActive
+                              ? 'bg-cyber-400/10 text-cyber-300'
+                              : 'text-fg-dim hover:bg-ink-700/60 hover:text-fg'
                         }`
                       }
+                      onClick={(e) => {
+                        if (locked) e.preventDefault();
+                      }}
                     >
                       {({ isActive }) => (
                         <>
                           <span
                             aria-hidden
-                            className={`absolute inset-y-0 left-0 w-[2px] ${
-                              isActive ? 'bg-cyber-400' : 'bg-transparent'
-                            }`}
+                            className={`absolute inset-y-0 left-0 w-[2px] ${isActive && !locked ? 'bg-cyber-400' : 'bg-transparent'}`}
                           />
                           <Icon icon={item.icon} className="size-4 shrink-0" />
                           {item.label}
+                          {locked && (
+                            <span title={lockHint} className="ml-auto flex">
+                              <Icon icon={Lock} className="size-3 text-fg-faint" />
+                            </span>
+                          )}
                         </>
                       )}
                     </NavLink>
-                  </li>
-                ))}
+                  );
+                  return (
+                    <li key={item.to}>
+                      {locked ? (
+                        // NavLink 自身 pointer-events-none，悬浮/聚焦提示挂在外层 HoverCard 上；
+                        // 层级抬到 z-55：高于引导遮罩（z-50）与聚光描边（z-51），低于引导卡（z-60）
+                        <HoverCard
+                          width="w-56"
+                          zClassName="z-[55]"
+                          className="w-full"
+                          content={<span className="block text-xs text-fg-muted">{lockHint}</span>}
+                        >
+                          {link}
+                        </HoverCard>
+                      ) : (
+                        link
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -147,7 +198,7 @@ export function Layout(): JSX.Element {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* 顶部 HUD：常驻资源条 */}
+        {/* 顶部 HUD */}
         <header
           data-testid="hud"
           className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-ink-600/70 bg-ink-950/80 px-4 py-2 backdrop-blur"
@@ -164,9 +215,7 @@ export function Layout(): JSX.Element {
               </span>
             </HudStat>
             <HudStat label="学员" quiet>
-              <span className="tnum">
-                {overview.data?.students.total ?? '—'}
-              </span>
+              <span className="tnum">{overview.data?.students.total ?? '—'}</span>
             </HudStat>
             <HudStat label="体力">
               <span className="flex items-center gap-2">
@@ -200,10 +249,13 @@ export function Layout(): JSX.Element {
           </div>
         </header>
 
-        {/* 路由内容：以 pathname 为 key 播放一次入场动画 */}
+        <TutorialProgressBar />
+
         <main key={pathname} className="animate-rise min-w-0 flex-1 p-4 sm:p-6">
           <Outlet />
         </main>
+
+        <TutorialOverlay />
       </div>
     </div>
   );
@@ -222,12 +274,8 @@ function HudStat({
 }): JSX.Element {
   return (
     <div className="flex items-baseline gap-2">
-      <dt className="text-[10px] tracking-[0.14em] text-fg-dim uppercase">
-        {label}
-      </dt>
-      <dd className={`font-display ${hero ? 'text-base text-cyber-300' : quiet ? 'text-sm text-fg-muted' : 'text-sm text-fg'}`}>
-        {children}
-      </dd>
+      <dt className="text-[10px] tracking-[0.14em] text-fg-dim uppercase">{label}</dt>
+      <dd className={`font-display ${hero ? 'text-base text-cyber-300' : quiet ? 'text-sm text-fg-muted' : 'text-sm text-fg'}`}>{children}</dd>
     </div>
   );
 }

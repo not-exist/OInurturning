@@ -5,7 +5,7 @@ import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /**
  * 招募补白（academy.test.ts 覆盖生成/权重/懒刷新/招募主路径）：
@@ -30,6 +30,7 @@ async function register(money = 0): Promise<{ token: string; userId: number }> {
     .send({ username: `acadgap-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
+  await unlockTutorial(session.me.id);
   if (money > 0) await prisma.user.update({ where: { id: session.me.id }, data: { money } });
   return { token: session.accessToken, userId: session.me.id };
 }

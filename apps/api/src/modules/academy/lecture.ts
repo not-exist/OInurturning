@@ -14,6 +14,7 @@ import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
 import { computeLectureGrowth, thinkingReqOf } from './lecture-growth.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
 
@@ -146,7 +147,7 @@ export async function teachLecture(
   now: Date = new Date(),
 ): Promise<LectureResultView> {
   const { tierId, tierData, ordinal } = tierConfig(tier);
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const logs = await dailyLogs(tx, userId, now);
     if (logs.length >= DAILY_LECTURE_LIMIT) {
@@ -255,6 +256,8 @@ export async function teachLecture(
     });
     return toLectureView(row, settled.stamina - LECTURE_STAMINA_COST);
   });
+  void autoAdvanceIfNeeded(userId, 'do_lecture');
+  return result;
 }
 
 export async function listLectureLogs(userId: number, limit = 20): Promise<LectureResultView[]> {

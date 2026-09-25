@@ -7,7 +7,7 @@ import { parse as parseYaml } from 'yaml';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /**
  * 剧情模式覆盖补强（story.test.ts 仅 1 用例）：
@@ -74,7 +74,9 @@ async function register(): Promise<Session> {
     .post('/api/auth/register')
     .send({ username: `storycov-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
   expect(res.status).toBe(200);
-  return unwrapOk<Session>(res);
+  const session = unwrapOk<Session>(res);
+  await unlockTutorial(session.me.id);
+  return session;
 }
 
 /** docs/data 的 defaults.roster_size：出战人数必须精确匹配。 */

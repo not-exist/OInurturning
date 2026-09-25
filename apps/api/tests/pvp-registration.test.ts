@@ -5,7 +5,7 @@ import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
 import { getRegistration, registerPvp } from '../src/modules/pvp/registration.js';
-import { resetUsers, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 
 const app = createApp();
 const REGISTER_END = new Date('2099-01-02T00:00:00.000Z');
@@ -155,6 +155,7 @@ describe('M4.2 PVP registration', () => {
       .post('/api/auth/register')
       .send({ username: `pvp-route-${sequence}-${Date.now().toString(36)}`, password: 'pw-123456' });
     const session = unwrapOk<{ accessToken: string; me: { id: number } }>(registration);
+    await unlockTutorial(session.me.id);
     await prisma.user.update({ where: { id: session.me.id }, data: { money: 0 } });
     const routeStudents = await createStudents(session.me.id, 3);
     await prisma.userItem.create({ data: { userId: session.me.id, itemId: 'entry-ticket', quantity: 1 } });

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { getLectureTiers, listLectureLogs, teachLecture } from '../src/modules/academy/lecture.js';
-import { resetUsers, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 import { importConfigs } from '../src/config/loader.js';
 
 const app = createApp();
@@ -230,6 +230,7 @@ describe('M3 lecture flow', () => {
       .post('/api/auth/register')
       .send({ username: `lecture-route-${sequence}-${Date.now().toString(36)}`, password: 'pw-123456' });
     const session = unwrapOk<{ accessToken: string; me: { id: number } }>(registration);
+    await unlockTutorial(session.me.id);
     const studentId = await createStudent(session.me.id, 45);
     const headers = { Authorization: `Bearer ${session.accessToken}` };
 

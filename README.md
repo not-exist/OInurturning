@@ -18,6 +18,8 @@ OInurturning 是一款以信息学竞赛（OI）为题材的网页养成与模�
 - **PVP 锦标赛**：管理员发布赛事，玩家锁定阵容报名，服务端自动推进淘汰赛，奖励包含 PVP 独占的 tag 获取卡与进阶石。
 - **题库与出题**：学员出题生成预制题，可用于专项训练提效、或带入对决替换临场生成题。
 - **道具与天赋**：六档全局稀有度（灰 < 黄 < 绿 < 蓝 < 紫 < 彩），天赋家族树、进阶石升阶、洗练等长期追求。
+- **新手强制引导**：新账号走 10 步聚焦式引导（学员 → 训练 → 学院 → 招募 → 讲课 → 历练 → 剧情 → 商城 → 完成），逐步解锁功能；未完成前对应入口与 API 一律锁定（服务端权威判定，ADMIN 豁免）。影响面与运维放行见 `docs/OPERATIONS.md` §11。
+- **商城**：金币购买书籍与道具，按稀有度设声誉门槛并有日/周限购（门槛与限购在 `docs/data/shop.yaml`，每日 04:00 刷新）；下单支持可选 `Idempotency-Key`，避免重复扣款。
 
 ---
 
@@ -155,17 +157,16 @@ pnpm -C apps/api test:e2e
 
 ### E2E 测试（Playwright）
 
-浏览器级端到端位于 `tests/e2e/`，共用 `oinur_e2e` 库，串行执行。
+浏览器级端到端位于 `tests/e2e/`，共用 `oinur_e2e` 库，串行执行。**日常不必在本地跑全量**（耗时长、需起 API 与浏览器），由 CI 的 `e2e` 作业执行；本地只在需要复现浏览器问题时跑。
+
+最常用两条：
 
 ```bash
-pnpm db:up
-mysql -h 127.0.0.1 -uoinur -poinur -e "CREATE DATABASE IF NOT EXISTS oinur_e2e;"
-DATABASE_URL='mysql://oinur:oinur@127.0.0.1:3306/oinur_e2e' pnpm -C apps/api migrate
 pnpm exec playwright install chromium
-pnpm e2e
+pnpm e2e -g '新手引导'      # 只跑某个 spec 分组
 ```
 
-更多说明见 `tests/e2e/README.md`。
+建库、迁移、端口与输出目录等完整约定见 `tests/e2e/README.md`。
 
 ---
 

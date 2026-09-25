@@ -195,7 +195,7 @@ export function TrainingPage(): JSX.Element {
 
       <div className={chosen !== null ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]' : ''}>
         <Panel bodyClassName="p-0">
-          <div className="flex flex-wrap gap-1 border-b border-ink-600/70 p-2">
+          <div className="flex flex-wrap gap-1 border-b border-ink-600/70 p-2" data-tutorial="training-tabs">
             {TABS.map((t) => (
               <button
                 key={t}
@@ -318,7 +318,7 @@ export function TrainingPage(): JSX.Element {
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-ink-600/60 pt-3">
+            <div className="flex flex-wrap items-center gap-3 border-t border-ink-600/60 pt-3" data-tutorial="training-basic">
               <Btn data-testid="train-run" variant="primary" disabled={runDisabled} onClick={run}>
                 <Icon icon={KIND_ICON[tab]} className="size-3.5" />
                 {pending ? '训练中…' : `开始${TRAINING_KIND_LABEL[tab]}训练`}

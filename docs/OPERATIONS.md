@@ -178,3 +178,47 @@ docker compose exec mysql sh -c \
 - 注销后的用户数据不可恢复（无软删标记、无回收站）；误注销只能从备份库单表捞回，属事故级操作；
 - 玩家侧行为变化：进行中（`REGISTERING`/`RUNNING`）PVP 赛事的参赛者注销会被拒（`409 STATE_CONFLICT`），
   前端提示「等赛事结束后再注销」，赛事 `FINISHED`/`CANCELLED` 后即可注销。
+
+## 11. 强制新手引导的上线与放行
+
+引导（`docs/data/tutorial.yaml`，当前 10 步）在服务端由 `apps/api/src/index.ts` 的全局守卫执行；未完成引导的账号只放行
+`/api/tutorial`、`/api/overview`、`/api/users/me`、`/api/auth`、`/api/talents`，其余端点一律 `403 FORBIDDEN`
+（`details.resource === 'tutorial'`）。前端对应地禁用侧栏未解锁项，并在深链时重定向到 `/`。
+
+**上线前必做：先跑开局包回填**
+
+迁移 `20260923000000_tutorial_shop` 把存量账号一律置为 `tutorialStep=0 / tutorialCompleted=0`
+（产品决策：不回填，升级后所有既有账号需重走一遍引导）。因此**在升级前**必须确认没有"零学员"账号——
+引导第 2 步要求完成一次训练，没有学员的账号会永久卡死。先按 §9 回填：
+
+```bash
+pnpm -C apps/api onboarding:backfill --dry-run   # 看影响面
+pnpm -C apps/api onboarding:backfill             # 正式补发（幂等）
+```
+
+**升级后玩家可见的变化**
+
+| 项 | 说明 |
+|---|---|
+| 老账号 | 被锁在总览/学员/引导自身；完成 10 步后全部解锁（含 PVP、管理端） |
+| 招募步（`recruit`） | 条件式：在册 ACTIVE 学员 **≥4** 即自动通过，不强制发生招募（招募费随在册人数指数增长 `round(300×1.35^n)`，强制招募会让 10 人老号掏 6000+ 金） |
+| 招募步之前的钱不够 | 该步已解锁讲课与历练（挣钱路径），可先赚钱再招人；welcome 步另发 200 训练金 |
+| 管理端 | ADMIN 角色豁免引导锁，不受影响 |
+
+**个别卡死账号的人工放行**（运维通道，产品上不提供用户可见的"跳过引导"）：
+
+```bash
+docker compose exec mysql sh -c \
+  'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
+   -e "UPDATE users SET tutorialStep=999, tutorialCompleted=1 WHERE username='\''<name>'\'';"'
+```
+
+**配置依赖**：`tutorial.yaml` 与 `shop.yaml` 已是**必需**配置文件（缺失即启动失败并打印错误表）。
+`deploy/api.Dockerfile` 整目录复制 `docs/data`，正常部署不受影响；自建 `CONFIG_DIR` 必须包含这两个文件。
+
+**徽章命名**：完成引导发的是 `onboarding-done`，总览开局任务发的是 `rookie-done`（`overview/service.ts`
+的 `CHECKLIST_REWARD_BADGE`，同时被用作"已领取"幂等键）。**两者不得合并**：若引导先发了 `rookie-done`，
+总览开局任务会永久显示"已领取"，其领奖被吞。
+
+**未来改 yaml 步序的注意**：插入/删除中间步会让"未完成引导"账号停留在的 `tutorialStep` 语义发生位移
+（例如在某步之前插入一步后，原索引 4..8 的账号会落到前一个语义步）。改动前先评估在途账号，必要时按上面的 SQL 放行。

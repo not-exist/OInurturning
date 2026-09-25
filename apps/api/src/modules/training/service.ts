@@ -18,6 +18,7 @@ import {
   type RareGain,
   type TrainingKind,
 } from './gains.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 /**
  * 训练服务（M1 Task 6，权威：docs/systems/student.md §4 / docs/data/economy.yaml）：
@@ -165,7 +166,9 @@ export async function basicTrain(
 ): Promise<TrainingResult> {
   await loadOwnedActive(userId, studentId);
   const dim = DIMENSIONS[Math.floor(rng() * DIMENSIONS.length)];
-  return runTraining({ kind: 'basic', userId, studentId, dim }, rng, now);
+  const result = await runTraining({ kind: 'basic', userId, studentId, dim }, rng, now);
+  void autoAdvanceIfNeeded(userId, 'do_training');
+  return result;
 }
 
 /** 定向训练：自选维，base 2.0 × BookMult；耗对应六维书×1 */
@@ -178,7 +181,9 @@ export async function directedTrain(
   now: Date = new Date(),
 ): Promise<TrainingResult> {
   await loadOwnedActive(userId, studentId);
-  return runTraining({ kind: 'directed', userId, studentId, dim, bookItemId }, rng, now);
+  const result = await runTraining({ kind: 'directed', userId, studentId, dim, bookItemId }, rng, now);
+  void autoAdvanceIfNeeded(userId, 'do_training');
+  return result;
 }
 
 /** 专项训练：自选维（=题 dominantDim），base 3.2 × QualityMult；耗预制题×1 */
@@ -190,7 +195,9 @@ export async function specializedTrain(
   now: Date = new Date(),
 ): Promise<TrainingResult> {
   await loadOwnedActive(userId, studentId);
-  return runTraining({ kind: 'specialized', userId, studentId, problemId }, rng, now);
+  const result = await runTraining({ kind: 'specialized', userId, studentId, problemId }, rng, now);
+  void autoAdvanceIfNeeded(userId, 'do_training');
+  return result;
 }
 
 async function resolveProblem(tx: Prisma.TransactionClient, input: TrainingInput): Promise<ProblemLibraryEntry> {

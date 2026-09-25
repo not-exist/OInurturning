@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
-import { resetUsers, unwrapErr, unwrapOk } from './helpers.js';
+import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 const app: Express = createApp();
 let userSeq = 0;
@@ -17,6 +17,7 @@ async function createAuthedUser(): Promise<{ userId: number; token: string }> {
     .post('/api/auth/register')
     .send({ username: `story-${Date.now().toString(36)}-${userSeq}`, password: 'pw-123456' });
   const data = unwrapOk<{ accessToken: string; me: { id: number } }>(response);
+  await unlockTutorial(data.me.id);
   return { userId: data.me.id, token: data.accessToken };
 }
 

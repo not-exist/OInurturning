@@ -65,9 +65,15 @@ export const QUALITY_LABEL: Record<QualityTier, string> = {
   GENIUS: '天才',
 };
 
-/** 开局任务徽章 id 是服务端字面量 `rookie-done`；未领取态用中文，已领取态必须原样输出（e2e 断言 `已领取：rookie-done`） */
+/**
+ * 徽章 id → 中文名（服务端字面量，两个 id 不得合并）：
+ * - `rookie-done`：总览开局任务奖励（`overview/service.ts` 的 CHECKLIST_REWARD_BADGE，
+ *   同时被当作「已领取」幂等键，故已领取态必须原样输出，e2e 断言 `已领取：rookie-done`）；
+ * - `onboarding-done`：走完新手引导的完成徽章（docs/data/tutorial.yaml 末步 reward.badge）。
+ */
 export const CHECKLIST_BADGE_LABEL: Record<string, string> = {
   'rookie-done': '新秀徽章',
+  'onboarding-done': '新手出师',
 };
 
 export const STUDENT_STATUS_LABEL: Record<StudentStatus, string> = {
