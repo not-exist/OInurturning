@@ -6,9 +6,6 @@ import { prisma } from '../../lib/prisma.js';
 import type { TutorialStepDef } from '@oinur/shared';
 import { resolveProgress, unlockedForStep } from './routing.js';
 
-// 纯逻辑（前缀匹配/解锁计算）在 routing.js，这里 re-export 保持既有 import 路径可用
-export { ROUTE_MAP, isApiAllowed, unlockedForStep } from './routing.js';
-
 export function tutorialConfig() {
   const cfg = getConfig();
   if (!cfg?.tutorial) throw new Error('[tutorial] CONFIG 未加载');
