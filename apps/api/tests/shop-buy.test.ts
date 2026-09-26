@@ -84,6 +84,29 @@ describe('shop buy idempotency', () => {
     expect(await moneyOf(userId), '重放不得再次扣钱').toBe(10000 - price);
   });
 
+  it('同一把 key 并发下单：合并为一次执行，恰好扣一次钱', async () => {
+    const { token, userId } = await register();
+    await fund(userId, 10000);
+    const price = getConfig()!.items['milk-tea']!.price!;
+    const key = 'idem-concurrent-1';
+    // 开局包自带 milk-tea×2，以购买前的持有量为基线断言恰好 +1
+    const before = await prisma.userItem.findUnique({
+      where: { userId_itemId: { userId, itemId: 'milk-tea' } },
+    });
+
+    const [a, b] = await Promise.all([
+      request(app).post('/api/shop/buy').set(auth(token)).set('Idempotency-Key', key).send({ itemId: 'milk-tea', quantity: 1 }),
+      request(app).post('/api/shop/buy').set(auth(token)).set('Idempotency-Key', key).send({ itemId: 'milk-tea', quantity: 1 }),
+    ]);
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    const aData = unwrapOk<BuyResult>(a);
+    expect(unwrapOk<BuyResult>(b)).toEqual(aData); // 两个响应同源（共享同一次执行）
+    expect(await moneyOf(userId), '并发不得重复扣钱').toBe(10000 - price);
+    expect(aData.ownedQuantity, '库存只加一次').toBe((before?.quantity ?? 0) + 1);
+    expect(await prisma.shopPurchaseLog.count({ where: { userId } }), '恰好一条购买流水').toBe(1);
+  });
+
   it('同一把 key 但数量不同：指纹不同，应真实下单而非重放', async () => {
     const { token, userId } = await register();
     await fund(userId, 10000);
