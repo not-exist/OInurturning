@@ -56,7 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: '商城',
-    items: [{ to: '/shop', label: '商店', icon: NAV_ICON.shop ?? NAV_ICON.backpack, tutorialKey: 'shop' }],
+    items: [{ to: '/shop', label: '商店', icon: NAV_ICON.shop, tutorialKey: 'shop' }],
   },
 ];
 
@@ -164,7 +164,7 @@ export function Layout(): JSX.Element {
                           <Icon icon={item.icon} className="size-4 shrink-0" />
                           {item.label}
                           {locked && (
-                            <span title={lockHint} className="ml-auto flex">
+                            <span className="ml-auto flex">
                               <Icon icon={Lock} className="size-3 text-fg-faint" />
                             </span>
                           )}

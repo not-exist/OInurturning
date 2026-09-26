@@ -195,7 +195,7 @@ export function TrainingPage(): JSX.Element {
 
       <div className={chosen !== null ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]' : ''}>
         <Panel bodyClassName="p-0">
-          <div className="flex flex-wrap gap-1 border-b border-ink-600/70 p-2" data-tutorial="training-tabs">
+          <div className="flex flex-wrap gap-1 border-b border-ink-600/70 p-2">
             {TABS.map((t) => (
               <button
                 key={t}

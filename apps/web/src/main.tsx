@@ -52,25 +52,25 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<RequireAuth />}>
             <Route element={<RequireTutorial />}>
               <Route element={<Layout />}>
-              <Route path="/" element={<OverviewPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/students" element={<StudentsPage />} />
-              <Route path="/students/:id" element={<StudentDetailPage />} />
-              <Route path="/training" element={<TrainingPage />} />
-              <Route path="/backpack" element={<InventoryPage />} />
-              <Route path="/academy" element={<AcademyPage />} />
-              <Route path="/academy/lecture" element={<AcademyLecturePage />} />
-              <Route path="/problem-library" element={<ProblemLibraryPage />} />
-              <Route element={<RequireAdmin />}>
-                <Route path="/admin" element={<AdminPage />} />
+                <Route path="/" element={<OverviewPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/students" element={<StudentsPage />} />
+                <Route path="/students/:id" element={<StudentDetailPage />} />
+                <Route path="/training" element={<TrainingPage />} />
+                <Route path="/backpack" element={<InventoryPage />} />
+                <Route path="/academy" element={<AcademyPage />} />
+                <Route path="/academy/lecture" element={<AcademyLecturePage />} />
+                <Route path="/problem-library" element={<ProblemLibraryPage />} />
+                <Route element={<RequireAdmin />}>
+                  <Route path="/admin" element={<AdminPage />} />
+                </Route>
+                <Route path="/pvp" element={<PvpPage />} />
+                <Route path="/story" element={<StoryPage />} />
+                <Route path="/adventure" element={<AdventurePage />} />
+                <Route path="/shop" element={<ShopPage />} />
+                <Route path="/records/:recordId" element={<RecordReportPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
-              <Route path="/pvp" element={<PvpPage />} />
-              <Route path="/story" element={<StoryPage />} />
-              <Route path="/adventure" element={<AdventurePage />} />
-              <Route path="/shop" element={<ShopPage />} />
-              <Route path="/records/:recordId" element={<RecordReportPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
             </Route>
           </Route>
         </Routes>
