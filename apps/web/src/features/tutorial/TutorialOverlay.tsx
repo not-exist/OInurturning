@@ -13,8 +13,7 @@ interface Rect {
 
 /** 四周留白：目标元素与洞口之间留 8px，避免洞口贴着目标边缘 */
 const SPOTLIGHT_PAD = 8;
-/** 目标尚未挂载时最多跟随 ~2s（60fps 计）；超时后交由 2s 轮询的新 state 重新触发测量 */
-const MAX_MISS_FRAMES = 120;
+const CARD_H_EST = 200;
 
 /** 行为步的提示文案：禁止把 action 名（英文枚举）直出给用户 */
 const ACTION_HINT: Record<string, string> = {
@@ -27,10 +26,13 @@ const ACTION_HINT: Record<string, string> = {
   visit_shop: '打开商城页面即可',
 };
 
-function getTargetRect(selector: string | null): Rect | null {
+function getTarget(selector: string | null): HTMLElement | null {
   if (!selector) return null;
   const el = document.querySelector(selector);
-  if (!(el instanceof HTMLElement)) return null;
+  return el instanceof HTMLElement ? el : null;
+}
+
+function rectOf(el: HTMLElement): Rect {
   const r = el.getBoundingClientRect();
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
@@ -108,21 +110,24 @@ export function TutorialOverlay(): JSX.Element | null {
   const total = state?.total ?? 0;
   const stepIdx = state?.step ?? 0;
 
-  // 测量目标矩形：rAF 节流 + ResizeObserver（布局变化）+ 滚动/缩放；目标未挂载时跟随若干帧。
+  // 测量目标矩形：rAF 节流 + ResizeObserver（布局变化）+ 滚动/缩放；目标晚挂载由 DOM 变更触发重测。
   useEffect(() => {
     if (!cur || completed) {
       setRect(null);
       return undefined;
     }
     let frame: number | null = null;
-    let misses = 0;
+    // 同一步只抢一次滚动条：之后用户自己滚动不再被打断
+    let scrolled = false;
     const measure = (): void => {
       frame = null;
-      const r = getTargetRect(cur.target);
+      const el = getTarget(cur.target);
+      const r = el === null ? null : rectOf(el);
       setRect((prev) => (sameRect(prev, r) ? prev : r));
-      if (r === null && cur.target !== null && misses < MAX_MISS_FRAMES) {
-        misses += 1;
-        frame = requestAnimationFrame(measure);
+      if (el !== null && !scrolled && (r!.top < 0 || r!.top + r!.height > window.innerHeight)) {
+        scrolled = true;
+        // 瞬时滚动：平滑动画会让 rect 持续变化，也会让 e2e 点击判定不稳
+        el.scrollIntoView({ block: 'center' });
       }
     };
     const schedule = (): void => {
@@ -131,13 +136,18 @@ export function TutorialOverlay(): JSX.Element | null {
     measure();
     window.addEventListener('scroll', schedule, true);
     window.addEventListener('resize', schedule);
-    const observer = new ResizeObserver(schedule);
-    observer.observe(document.body);
+    const ro = new ResizeObserver(schedule);
+    ro.observe(document.body);
+    // 目标晚挂载（页面还在 loading）时靠 DOM 变更重测：轮询带回的 state 引用不变
+    // （react-query structuralSharing），effect 不会重跑，帧跟随一旦放弃就永远测不回来。
+    const mo = new MutationObserver(schedule);
+    mo.observe(document.body, { childList: true, subtree: true });
     return () => {
       if (frame !== null) cancelAnimationFrame(frame);
       window.removeEventListener('scroll', schedule, true);
       window.removeEventListener('resize', schedule);
-      observer.disconnect();
+      ro.disconnect();
+      mo.disconnect();
     };
   }, [cur, completed]);
 
@@ -209,10 +219,10 @@ export function TutorialOverlay(): JSX.Element | null {
     }
     if (left < 16) left = 16;
     // 若下方空间不足，放到上方
-    if (top + 200 > window.innerHeight - 16) {
-      top = rect.top - 200 - margin;
-      if (top < 16) top = 16;
+    if (top + CARD_H_EST > window.innerHeight - 16) {
+      top = rect.top - CARD_H_EST - margin;
     }
+    top = Math.min(Math.max(top, 16), Math.max(16, window.innerHeight - CARD_H_EST - 16));
     cardStyle = { position: 'fixed', top, left, width: cardWidth, zIndex: 60 };
   } else {
     // 居中模态
@@ -245,6 +255,7 @@ export function TutorialOverlay(): JSX.Element | null {
       {/* 聚光切口：只做描边，不参与命中测试 */}
       {hole !== null && (
         <div
+          data-testid="tutorial-spotlight"
           aria-hidden
           className="pointer-events-none fixed z-[51] border-2 border-cyber-400/80 shadow-[0_0_24px_-4px_var(--color-cyber-400)]"
           style={{
@@ -259,6 +270,7 @@ export function TutorialOverlay(): JSX.Element | null {
 
       {/* 引导卡 */}
       <div
+        data-testid="tutorial-card"
         ref={cardRef}
         role="dialog"
         aria-modal="true"

@@ -46,7 +46,7 @@ export function ShopPage(): JSX.Element {
   };
 
   return (
-    <div className="space-y-5" data-tutorial="shop-page">
+    <div className="space-y-5">
       <PageHeader
         title="商城"
         eyebrow="补给站"
@@ -67,7 +67,7 @@ export function ShopPage(): JSX.Element {
             {c}
           </Btn>
         ))}
-        {['gray', 'yellow', 'green', 'blue', 'purple'].map((r) => (
+        {['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'].map((r) => (
           <Btn key={r} variant={filter === r ? 'primary' : 'ghost'} size="sm" onClick={() => setFilter(r)} className={rarityText(r)}>
             {r}
           </Btn>
@@ -79,7 +79,6 @@ export function ShopPage(): JSX.Element {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
-            const isFirst = item.itemId === filtered[0]?.itemId;
             const norm = normRarity(item.rarity);
             const blocked = blockReason(item);
             const q = qtyOf(item);
@@ -89,7 +88,6 @@ export function ShopPage(): JSX.Element {
                 data-testid="shop-card"
                 data-itemid={item.itemId}
                 className={`p-3 ${RARITY_BORDER[norm]} ${blocked !== null ? 'opacity-75' : ''}`}
-                data-tutorial={isFirst ? 'shop-first-item' : undefined}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -162,7 +160,6 @@ export function ShopPage(): JSX.Element {
                     disabled={blocked !== null || buy.isPending}
                     onClick={() => setConfirming(item)}
                     data-testid="shop-buy"
-                    data-tutorial={isFirst ? 'shop-buy' : undefined}
                   >
                     <Icon icon={blocked !== null ? Lock : ShoppingBag} className="size-3.5" />
                     {blocked ?? `购买 ${totalOf(item)}`}

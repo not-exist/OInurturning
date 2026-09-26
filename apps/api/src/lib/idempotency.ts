@@ -8,11 +8,10 @@
  * 设计要点：
  * - **失败不入缓存**：只有成功结果才记录，否则一次 409/400 会把后续合法重试也变成重放。
  * - **键必须带请求指纹**：同样的 key 搭配不同的请求体应视为不同操作（见下方 scope 说明）。
- * - 淘汰策略：过期即删 + 超过容量删最旧（近似 LRU，够用且不引入依赖）。
+ * - 淘汰策略：过期即删 + 超过容量删最久未用（LRU：命中即刷新 recency）。
  *
- * 局限：本机制覆盖的是"客户端重放/重试"（前后脚的第二次请求）。**同一个 key 的并发请求
- * 可能都穿透到 fn** —— 需要严格"恰好一次"语义时，应在业务侧改用 DB 唯一键（如剧情的
- * `ContestRecord.idempotencyKey` 那样）。
+ * 并发合并：**同一个 key 的并发请求共享同一次执行**（in-flight 去重），副作用恰好一次；
+ * 多实例部署时需在业务侧用 DB 唯一键兜底（如剧情的 `ContestRecord.idempotencyKey` 那样）。
  */
 
 const TTL_MS = 10 * 60 * 1000;
@@ -24,6 +23,8 @@ interface Entry {
 }
 
 const store = new Map<string, Entry>();
+/** 在途执行表：同 key 的并发请求合并到同一次 fn 执行上 */
+const inFlight = new Map<string, Promise<unknown>>();
 
 function evict(now: number): void {
   for (const [key, entry] of store) {
@@ -50,15 +51,30 @@ export async function runIdempotent<T>(key: string | undefined, fn: () => Promis
   const now = Date.now();
   const hit = store.get(key);
   if (hit !== undefined && hit.expiresAt > now) {
+    // delete+set 刷新 recency：Map 按插入序迭代，命中即把该键移到最新，淘汰才是真 LRU
+    store.delete(key);
+    store.set(key, hit);
     return hit.value as T;
   }
-  const value = await fn();
-  store.set(key, { expiresAt: Date.now() + TTL_MS, value });
-  evict(now);
-  return value;
+  // 已有同 key 的执行在途：共享它，不重复执行（如重复扣款）
+  const pending = inFlight.get(key);
+  if (pending) return pending as Promise<T>;
+  const exec: Promise<T> = fn()
+    .then((value) => {
+      // 成功才入缓存；失败不入缓存，各并发调用方收到同一 rejection
+      store.set(key, { expiresAt: Date.now() + TTL_MS, value });
+      evict(now);
+      return value;
+    })
+    .finally(() => {
+      inFlight.delete(key);
+    });
+  inFlight.set(key, exec);
+  return exec;
 }
 
-/** 仅供测试使用：清空缓存（避免用例之间互相命中）。 */
+/** 仅供测试使用：清空缓存与在途合并表（避免用例之间互相命中）。 */
 export function resetIdempotencyStore(): void {
   store.clear();
+  inFlight.clear();
 }

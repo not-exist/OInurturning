@@ -8,8 +8,10 @@ import {
   itemsFileSchema,
   stagesConfigSchema,
   talentsFileSchema,
+  tutorialStepSchema,
   type ItemDef,
   type TalentDef,
+  type TutorialConfig,
 } from '@oinur/shared';
 import { runSemanticChecks } from '../src/config/semantic.js';
 import { FatalStartupError, getConfig, importConfigs } from '../src/config/loader.js';
@@ -283,6 +285,24 @@ describe('runSemanticChecks', () => {
           e.path === 'defaults.first_clear_fixed_items.0.item' && e.message.includes('ghost-food'),
       ),
     ).toBe(true);
+  });
+
+  it('unlock 单调性：上一步 all 回退为具体键报错，升到 all 不报', () => {
+    const step = (id: string, unlock: string[]) =>
+      tutorialStepSchema.parse({ id, title: id, desc: id, target: null, unlock, action: 'none' });
+    const run = (steps: TutorialConfig['steps']) =>
+      runSemanticChecks({
+        talents: [makeTalent({})],
+        items: parsedItem,
+        economy: parsedEconomy,
+        tutorial: { steps },
+      });
+    const retracted = run([step('s1', ['all']), step('s2', ['overview'])]);
+    expect(retracted.some((e) => e.path === 'steps.1.unlock' && e.message.includes('单调不减'))).toBe(
+      true,
+    );
+    const grown = run([step('s1', ['overview']), step('s2', ['all'])]);
+    expect(grown.some((e) => e.path === 'steps.1.unlock')).toBe(false);
   });
 });
 

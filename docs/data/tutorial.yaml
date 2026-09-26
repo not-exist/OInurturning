@@ -80,7 +80,7 @@ steps:
 
   - id: shop
     title: 商城补给站
-    desc: 金币可以在商城购买书籍与道具，紫色以上需要声誉解锁。限购每日 04:00 刷新，书籍受每周 10 点上限约束。
+    desc: 金币可以在商城购买书籍与道具，紫色以上需要声誉解锁。限购分每日与每周：消耗品每日限购 04:00 刷新，书籍按稀有度受每周上限约束（绿 10 / 蓝 5 / 紫 2），每周一 04:00 刷新。
     target: "[data-tutorial='nav-shop']"
     unlock: [overview, students, training, academy, lecture, adventure, story, shop, backpack, problem-library]
     action: visit_shop

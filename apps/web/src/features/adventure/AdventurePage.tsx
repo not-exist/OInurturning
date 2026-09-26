@@ -396,7 +396,7 @@ export function AdventurePage(): JSX.Element {
   };
 
   return (
-    <div data-testid="adventure-page" data-tutorial="adventure-page" className="mx-auto max-w-5xl space-y-5">
+    <div data-testid="adventure-page" className="mx-auto max-w-5xl space-y-5">
       <PageHeader
         eyebrow="历练"
         title="历练"

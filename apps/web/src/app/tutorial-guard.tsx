@@ -2,8 +2,8 @@ import { Navigate, Outlet, useLocation } from 'react-router';
 import type { JSX } from 'react';
 import { useTutorial, ROUTE_KEY_MAP, isRouteUnlocked } from '../lib/tutorial';
 import { useAuthStore } from '../lib/auth-store';
-import { ErrorNote, InlineLoader } from '../components/ui';
-import { apiErrorMessage } from '../lib/api';
+import { ActionLink, ErrorNote, InlineLoader } from '../components/ui';
+import { ApiCallError, apiErrorMessage } from '../lib/api';
 
 /** 最长前缀匹配：'/academy/lecture' 优先于 '/academy'；未登记路径返回 null */
 function routeKeyFor(path: string): string | null {
@@ -29,11 +29,20 @@ export function RequireTutorial(): JSX.Element {
 
   // fail-closed：进度取不到就不放行 —— 放行等于引导期整站（含 pvp/管理端）越权可见
   if (tutorial.isError || !tutorial.data) {
+    // 登录态失效重试无意义，补一个重新登录入口；5xx/网络错误维持仅重试
+    const authError =
+      tutorial.error instanceof ApiCallError &&
+      (tutorial.error.code === 'UNAUTHENTICATED' || tutorial.error.code === 'TOKEN_EXPIRED');
     return (
       <div className="p-8">
         <ErrorNote onRetry={() => void tutorial.refetch()}>
           引导进度读取失败：{apiErrorMessage(tutorial.error)}
         </ErrorNote>
+        {authError && (
+          <div className="mt-3">
+            <ActionLink to="/login">重新登录</ActionLink>
+          </div>
+        )}
       </div>
     );
   }

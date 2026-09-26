@@ -41,6 +41,18 @@ describe('tutorial config（docs/data/tutorial.yaml 真身）', () => {
       }
     }
   });
+
+  it('docs/data/tutorial.yaml 与测试 fixture 逐字节一致（防漂移）', () => {
+    const doc = fs.readFileSync(
+      path.resolve(import.meta.dirname, '../../..', 'docs/data/tutorial.yaml'),
+      'utf8',
+    );
+    const fixture = fs.readFileSync(
+      path.resolve(import.meta.dirname, 'fixtures/config/tutorial.yaml'),
+      'utf8',
+    );
+    expect(fixture).toBe(doc);
+  });
 });
 
 describe('shop config（docs/data/shop.yaml 真身）', () => {

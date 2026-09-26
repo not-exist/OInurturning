@@ -268,4 +268,37 @@ test.describe('新手引导', () => {
     const badges = unwrap<{ badges: string[] }>(me.body, '读取用户信息').badges;
     expect(badges).toContain('onboarding-done');
   });
+
+  /**
+   * 遮罩/聚光圈回归：十步走查只断言步骤推进，不关心「用户看得到指示」。
+   * 深页锚点（training / recruit / lecture）在矮视口下目标首屏不可见，
+   * 历史实现会把洞口 clamp 到视口后判空 → 只剩整屏暗场、零指示（真 bug）。
+   * viewport 必须在 describe 级用 test.use 固定：滚动是步骤激活时的一次性动作，
+   * 页面加载完再 resize 不会重放。
+   */
+  test.describe('引导高亮', () => {
+    test.use({ viewport: { width: 1280, height: 600 } });
+
+    test('深页步骤把目标滚进视口并画出聚光圈', async ({ page, request }) => {
+      const account = await registerUserRaw(request, 'tutspot');
+      const token = account.accessToken;
+      await loginViaUI(page, account.username, DEFAULT_PASSWORD);
+
+      await expectStep(request, token, 'welcome');
+      await page.locator('[data-tutorial="next-btn"]').click();
+      await expectStep(request, token, 'students');
+      await navLink(page, 'students').click();
+      await expectStep(request, token, 'training');
+      await navLink(page, 'training').click();
+      await expect(page.getByTestId('training-page')).toBeVisible();
+
+      await expect(page.getByTestId('tutorial-spotlight'), '训练步应高亮「开始基础训练」').toBeVisible();
+      const box = await page.locator("[data-tutorial='training-basic']").boundingBox();
+      expect(box, '目标应已挂载').not.toBeNull();
+      expect(box!.y, '目标应被滚进视口').toBeGreaterThanOrEqual(0);
+      expect(box!.y + box!.height, '目标应完整落在视口内').toBeLessThanOrEqual(600);
+      const card = await page.getByTestId('tutorial-card').boundingBox();
+      expect(card!.y + card!.height, '引导卡应留在视口内').toBeLessThanOrEqual(600);
+    });
+  });
 });
