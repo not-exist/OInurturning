@@ -1,5 +1,6 @@
 #!/bin/sh
 # API 容器入口：先对 MySQL 执行 prisma migrate deploy（幂等），再启动进程。
+# MIGRATE_ONLY=1 时迁移完成后直接退出，供 compose 一次性 migrate 服务复用同一迁移实现。
 # compose 保证本脚本只在 mysql healthy 之后运行。
 set -e
 
@@ -21,6 +22,13 @@ fi
 
 echo "[entrypoint] prisma migrate deploy"
 "$PRISMA" migrate deploy
+
+# 只跑迁移不启动服务（compose migrate 服务置 MIGRATE_ONLY=1）
+if [ "${MIGRATE_ONLY:-0}" = "1" ]; then
+  echo "[entrypoint] 迁移完成，MIGRATE_ONLY=1 退出"
+  exit 0
+fi
+
 echo "[entrypoint] migrate 完成，启动 API"
 
 exec node dist/index.js
