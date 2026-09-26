@@ -3,7 +3,6 @@ import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
 import type { ShopItemView, ShopCatalogView, ShopBuyResult } from '@oinur/shared';
-import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 import {
   bookRaritySuffix,
   dailyLimitForItem,
@@ -133,8 +132,6 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
     return a.price - b.price;
   });
 
-  void autoAdvanceIfNeeded(userId, 'visit_shop');
-
   return {
     items: views,
     money: user.money,
@@ -215,8 +212,8 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
       throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: totalCost });
     }
 
-    // 加道具
-    await tx.userItem.upsert({
+    // 加道具（upsert 返回自增后的持有行，响应直接取用，省两次回读）
+    const holding = await tx.userItem.upsert({
       where: { userId_itemId: { userId, itemId } },
       create: { userId, itemId, quantity },
       update: { quantity: { increment: quantity } },
@@ -227,14 +224,12 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
       data: { userId, itemId, quantity, dayKey: dk, weekKey: wk },
     });
 
-    const freshUser = await tx.user.findUniqueOrThrow({ where: { id: userId } });
-    const holding = await tx.userItem.findUniqueOrThrow({ where: { userId_itemId: { userId, itemId } } });
-
+    // user 行已 FOR UPDATE 锁定、本事务刚完成扣减，余额可直接推得，无需回读
     return {
       itemId,
       quantity,
       totalCost,
-      moneyAfter: freshUser.money,
+      moneyAfter: user.money - totalCost,
       ownedQuantity: holding.quantity,
     };
   });

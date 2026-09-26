@@ -4,6 +4,7 @@ import { ApiError } from '../../lib/errors.js';
 import { runIdempotent } from '../../lib/idempotency.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as svc from './service.js';
+import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 export const shopRouter = Router();
 
@@ -12,6 +13,9 @@ shopRouter.use(requireAuth);
 
 shopRouter.get('/catalog', async (req, res, next) => {
   try {
+    // visit_shop 只在本端点推进（getCatalog 无其他调用方）；先推进再读目录，
+    // 离开步骤的奖励入账后，目录内的金币/声誉快照才是最新的
+    void autoAdvanceIfNeeded(req.user!.id, 'visit_shop');
     const data = await svc.getCatalog(req.user!.id);
     res.json({ ok: true, data });
   } catch (e) {
@@ -21,7 +25,7 @@ shopRouter.get('/catalog', async (req, res, next) => {
 
 const BuySchema = z.object({
   itemId: z.string().min(1),
-  quantity: z.number().int().min(1).max(99).optional().default(1),
+  quantity: z.number().int().min(1).max(99).default(1),
 });
 
 shopRouter.post('/buy', async (req, res, next) => {
