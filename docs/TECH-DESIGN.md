@@ -1152,22 +1152,22 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 
 | # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
 |---|---|---|---|---|---|
-| 41 | POST /api/admin/pvp-tournaments | 管理 | name/registerEndsAt/autoStartAt/config | 创建 REGISTERING 锦标赛并全服公告位可见 | §14 发布通告 |
-| 42 | PATCH /api/admin/pvp-tournaments/:id | 管理 | prizes 等（REGISTERING 期可改） | 更新奖池 | 配置奖池 |
-| 43 | POST /api/admin/pvp-tournaments/:id/actions/start | 管理 | — | 截止即开：生成首轮对阵（奇数轮空）；提前触发懒推进 | 手动开赛 |
-| 44 | GET /api/admin/users | 管理 | ?q=&page= | 用户列表（钱/声誉/学员数/封禁态） | 用户管理 |
-| 45 | PATCH /api/admin/users/:id | 管理 | role 或 banned 布尔 | 改角色/封禁解封（封禁即 tokenVersion+1 踢下线） | 用户管理 |
-| 46 | GET /api/admin/audits | 管理 | ?action=&page= | AdminAuditLog 分页 | 审计查询 |
-| 47 | POST /api/admin/config/reload | 管理 | — | 重跑 §4 导入管线并热替换内存缓存 | 运维换配置（**未实现**：源码无此端点，改 yaml 后重启 api 容器，见 `docs/OPERATIONS.md` §8） |
-| 48 | GET /api/health | 公开 | — | { ok, uptime, configVersion }；供容器 healthcheck | 运维探活 |
+| 47 | POST /api/admin/pvp-tournaments | 管理 | name/registerEndsAt/autoStartAt/config | 创建 REGISTERING 锦标赛并全服公告位可见 | §14 发布通告 |
+| 48 | PATCH /api/admin/pvp-tournaments/:id | 管理 | prizes 等（REGISTERING 期可改） | 更新奖池 | 配置奖池 |
+| 49 | POST /api/admin/pvp-tournaments/:id/actions/start | 管理 | — | 截止即开：生成首轮对阵（奇数轮空）；提前触发懒推进 | 手动开赛 |
+| 50 | GET /api/admin/users | 管理 | ?q=&page= | 用户列表（钱/声誉/学员数/封禁态） | 用户管理 |
+| 51 | PATCH /api/admin/users/:id | 管理 | role 或 banned 布尔 | 改角色/封禁解封（封禁即 tokenVersion+1 踢下线） | 用户管理 |
+| 52 | GET /api/admin/audits | 管理 | ?action=&page= | AdminAuditLog 分页 | 审计查询 |
+| 53 | POST /api/admin/config/reload | 管理 | — | 重跑 §4 导入管线并热替换内存缓存 | 运维换配置（**未实现**：源码无此端点，改 yaml 后重启 api 容器，见 `docs/OPERATIONS.md` §8） |
+| 54 | GET /api/health | 公开 | — | { ok, uptime, configVersion }；供容器 healthcheck | 运维探活 |
 
 **总览与训练记录**
 
 | # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
 |---|---|---|---|---|---|
-| 49 | GET /api/overview | 登录 | — | 钱包/学员 TOP5/剧情进度/招募池/最近动态/公告/checklist 聚合 | 总览页 |
-| 50 | POST /api/overview/checklist/claim | 登录 | — | 5 步全完成颁发 rookie-done 徽章；事务内重算，重复领取幂等 200（already） | 开局任务领奖 |
-| 51 | GET /api/training/logs | 登录 | ?studentId=&kind=&limit=&cursor=（id 倒序游标） | TrainingLog 分页（含学员名快照/用书/选题） | 训练记录 |
+| 55 | GET /api/overview | 登录 | — | 钱包/学员 TOP5/剧情进度/招募池/最近动态/公告/checklist 聚合 | 总览页 |
+| 56 | POST /api/overview/checklist/claim | 登录 | — | 5 步全完成颁发 rookie-done 徽章；事务内重算，重复领取幂等 200（already） | 开局任务领奖 |
+| 57 | GET /api/training/logs | 登录 | ?studentId=&kind=&limit=&cursor=（id 倒序游标） | TrainingLog 分页（含学员名快照/用书/选题） | 训练记录 |
 
 ---
 ## 6. 行动时钟与懒结算
