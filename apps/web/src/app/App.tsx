@@ -18,6 +18,8 @@ interface NavItem {
   icon: LucideIcon;
   end?: boolean;
   tutorialKey: string; // data-tutorial key and route key
+  /** true = 只用 tutorialKey 做解锁口径，不渲染 data-tutorial 锚点（避免与规范路由的锚点重名） */
+  noAnchor?: boolean;
 }
 
 interface NavGroup {
@@ -75,7 +77,7 @@ export function Layout(): JSX.Element {
   const adminGroup: NavGroup = {
     title: '系统',
     items: [
-      { to: '/settings', label: '用户设置', icon: NAV_ICON.settings, tutorialKey: 'overview' },
+      { to: '/settings', label: '用户设置', icon: NAV_ICON.settings, tutorialKey: 'overview', noAnchor: true },
       ...(me?.role === 'ADMIN'
         ? [{ to: '/admin', label: '管理端', icon: NAV_ICON.admin, tutorialKey: 'admin' }]
         : []),
@@ -140,7 +142,7 @@ export function Layout(): JSX.Element {
                     <NavLink
                       to={item.to}
                       end={item.end}
-                      data-tutorial={dataTutorialAttr(item.tutorialKey)}
+                      data-tutorial={item.noAnchor ? undefined : dataTutorialAttr(item.tutorialKey)}
                       aria-disabled={locked}
                       className={({ isActive }) =>
                         `relative flex shrink-0 cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${

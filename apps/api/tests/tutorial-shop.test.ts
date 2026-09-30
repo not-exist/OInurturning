@@ -91,8 +91,8 @@ describe('tutorial routing：段边界与前缀匹配', () => {
     expect(isApiAllowed(['shop'], '/api/shopxxx')).toBe(false);
     expect(isApiAllowed(['training'], '/api/problem-library')).toBe(true);
     expect(isApiAllowed(['training'], '/api/problem-library/entry/1')).toBe(true);
-    expect(isApiAllowed(['problem-library'], '/api/problems')).toBe(true);
-    expect(isApiAllowed(['problem-library'], '/api/problems-archive')).toBe(false);
+    expect(isApiAllowed(['training'], '/api/problems')).toBe(true);
+    expect(isApiAllowed(['training'], '/api/problems-archive')).toBe(false);
   });
 
   it('全解锁 → 任意路径放行', () => {

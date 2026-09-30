@@ -15,7 +15,6 @@ export const TUTORIAL_ROUTE_KEYS = [
   'story',
   'shop',
   'backpack',
-  'problem-library',
   'pvp',
   'admin',
 ] as const;

@@ -13,7 +13,10 @@ interface Rect {
 
 /** 四周留白：目标元素与洞口之间留 8px，避免洞口贴着目标边缘 */
 const SPOTLIGHT_PAD = 8;
-const CARD_H_EST = 200;
+// 卡片真实高度的上界（eyebrow+标题+进度条+最长文案+奖励徽章+按钮行+内边距 ≈ 300）。
+// 目标下方放不下时卡片改放上方：top = 目标顶 - EST - margin，只有 EST ≥ 真实高度，
+// 卡片底边才保证不越过目标顶 —— 低估会让卡片压住聚光目标本身（如 lecture-force 的复选框被盖住点不了）。
+const CARD_H_EST = 320;
 
 /** 行为步的提示文案：禁止把 action 名（英文枚举）直出给用户 */
 const ACTION_HINT: Record<string, string> = {

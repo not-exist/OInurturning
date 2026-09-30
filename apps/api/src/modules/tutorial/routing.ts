@@ -9,7 +9,8 @@ type RouteKey = (typeof TUTORIAL_ROUTE_KEYS)[number];
 /**
  * 路由键 → 后端 API 前缀。
  * - 键集是 TUTORIAL_ROUTE_KEYS 的子集（编译期由 `satisfies` 约束）。
- * - 不保留 lecture 键：其两条前缀都被 academy 前缀段边界覆盖，是死配置，留着只会误导。
+ * - 不保留 lecture / problem-library 键：lecture 的两条前缀都被 academy 前缀段边界覆盖，
+ *   problem-library 的两条前缀都被 training 覆盖，且 yaml 无人 unlock 它们——是死配置，留着只会误导。
  */
 export const ROUTE_MAP = {
   overview: ['/api/overview'],
@@ -20,7 +21,6 @@ export const ROUTE_MAP = {
   story: ['/api/story', '/api/records'],
   shop: ['/api/shop'],
   backpack: ['/api/items'],
-  'problem-library': ['/api/problem-library', '/api/problems'],
   pvp: ['/api/pvp'],
   admin: ['/api/admin'],
 } as const satisfies Partial<Record<RouteKey, readonly string[]>>;
