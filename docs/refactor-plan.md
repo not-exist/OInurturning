@@ -13,6 +13,7 @@
 | 0.3 | 每阶段一个 commit，产物完整可编译，可独立回滚；**不 push**，全部完成后统一 push | 便于 reviewer 分阶段审查 |
 | 0.4 | 不碰：`apps/api/src/modules/contest/engine/{duel,solve,ranking}.ts` 的算法、`docs/data/*.yaml` 的任何数值、已应用的 20 个迁移 | 有 `report-determinism` / `m2-golden` / `contest-rng-replay` 三层 golden 快照与 `bal:regress` 数值门保护 |
 | 0.5 | 删除要删干净，不留兼容分支 | 项目既有规则 |
+| 0.6 | 提交信息遵循 §5：**原子化、全英文、`type(scope): subject`** | 孤儿化后 history 是仓库的新门面，而旧的"为什么"记录已不可恢复（§1.4 R2） |
 
 ## 1. 仓库变动方式：Orphan Branch 全量重构
 
@@ -206,6 +207,7 @@ main
 | R4 | 同上 + `clampInt` 单测 |
 | R5 | 同上 + "改 shared 字段 → API 侧 `tsc` 报错"的实测记录 |
 | R6 | 新规则先 `warn` 跑一轮清零，再改 `error` |
+| 每个提交 | 提交信息匹配 §5 的 `type(scope): subject`（校验命令见 §5.4，应为空输出） |
 | 全程 | `pnpm bal:regress` 与 `pnpm sim:economy` 必须始终 PASS |
 
 **KPI 写法**：每阶段给出"**净删除行数 + 一个可测指标**"。不要用"总行数 −10%"——仓库全部跟踪文本实测 **57,895 行**，草案表格各行为 50,414 行（口径不一：web/e2e 只数 `.ts`，api/tests 连 fixture yaml 一起数），而它自己各阶段净删除相加仅约 4,300 行，推不出 −5,661 行。
@@ -218,6 +220,63 @@ main
 - 不引入新框架（Express 5 + Prisma 7 + zod 4 是当前正确选择；问题是没用它们的新范式）。
 - 不重复 PR #63 已做的（幂等键、auth 单查询、deploy 去重）。注意 `index.ts:113-150` 的"整个请求只做一次 user-PK 查询"是**有意设计**，不是冗余。
 - 不在 `/admin` 下为假想用户加辅助功能。
+
+## 5. Commit 规范
+
+### 5.1 规则
+
+1. **原子化**：一次提交只做一件事；每个提交必须能独立编译、并通过该模块的测试（§2 阶段计划里的每一步 = 一个提交）。不把"顺手清理"混进功能改动。
+2. **全英文**：type / scope / subject 与正文一律英文。
+   > 现状说明：最近 200 条非合并提交中有 **76 条含中文**，因此本规范是**孤儿化之后生效的新约定**，不是对现状的记录。
+3. **标题简洁**：形式为 `type(scope): subject`；subject ≤ **72 字符**（历史最长 100，其中两条正好 100）、祈使句、首字母小写、结尾不加句号。
+4. **正文写"为什么"**：非显然的改动必须写正文。孤儿化会丢弃旧历史，**新提交的正文是唯一的"为什么"记录**（§1.4 R2）；破坏性改动加 `BREAKING CHANGE:` 脚注。
+5. **保持线性历史**：PR 用 squash 合并，不使用 merge commit（旧历史里有 19 个 `Merge pull request` 噪音，§1.3 的最终形态是一条直线）。
+
+### 5.2 允许的 type 与 scope
+
+- **type**：`feat` / `fix` / `refactor` / `perf` / `test` / `docs` / `build` / `chore` / `revert`
+- **scope** 用模块名，取仓库实测的高频值：`web` `api` `shared` `contest` `tutorial` `pvp` `story` `adventure` `items` `shop` `config` `balance` `e2e` `ci` `deploy` `deps`
+- **不要用里程碑代号做 scope**（历史里出现过 `m5`；测试文件名里的 `m2` 同理，见 §2 R6）
+- **dependabot 的提交不受本规范约束**（`build(deps): bump …` 原样保留）
+
+### 5.3 示例
+
+反面 → 正面（前三条改自真实历史）：
+
+| 现状 | 改为 |
+|---|---|
+| `fix(api): 幂等跳过路径调和 DB 回滚不一致 + CONFIG 深冻结（M1 Task 1 审查 F-1/F-2/F-3）` | `fix(config): reconcile config tables on the idempotent import path`，F-1/F-2 的来由放正文 |
+| `feat: 讲课附带出题/思维成长（issue #56）` | `feat(academy): grant problem-setting and thinking growth on lecture`，issue 号放正文 |
+| `docs: 重写 README 为项目介绍，补全 AGPL-3.0 完整协议文本，优化测试脚本` | 拆成多条：`docs: rewrite README as a project introduction` + `chore: add the full AGPL-3.0 license text` |
+| `refactor(items): 取消鸡腿便当「每名学员每日限用 1 份」限额` | `refactor(items): drop the daily use limit on drumstick-bento` |
+
+§2 阶段计划对应的提交序列：
+
+```
+chore: import legacy codebase as baseline
+docs: fix README and CI drift found in the plan audit
+fix(ci): upload test logs before cleanup and drop locate-* scaffolding
+perf(api): batch the config reconcile upserts
+perf(contest): drop the recursive JSON-safety walker from report schemas
+build(api): migrate to the prisma-client generator
+refactor(shared): migrate the 96 deprecated zod call sites
+refactor(api): extract lock/clamp/weightedPick helpers
+refactor(shared): move response view types out of the web hooks
+chore: remove legacy files
+```
+
+### 5.4 校验
+
+```bash
+# 单条
+git log --pretty=%s -1 | grep -qE '^(feat|fix|refactor|perf|test|docs|build|chore|revert)(\([a-z0-9./-]+\))?!?: .{1,72}$'
+
+# 整条分支（期望：空输出）
+git log --no-merges --pretty=%s origin/main..HEAD \
+  | grep -vE '^(feat|fix|refactor|perf|test|docs|build|chore|revert)(\([a-z0-9./-]+\))?!?: '
+```
+
+当前仓库**没有** commitlint / husky / `.githooks`（实测均不存在），因此上面两条先作为 §3 门禁的一部分手跑；是否上工具化另议。
 
 ## 附A：草案被证伪的结论（保留备查）
 
