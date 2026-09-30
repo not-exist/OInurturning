@@ -90,18 +90,18 @@ describe('tutorial-hooks', () => {
   });
 
   it('visit_academy 只由 GET /api/academy/pool 推进，GET /api/overview 不得代为推进', async () => {
-    expect(actionOfStep(3)).toBe('visit_academy');
+    expect(actionOfStep(5)).toBe('visit_academy');
     const user = await register();
-    await setStep(user.userId, 3);
+    await setStep(user.userId, 5);
     const auth = { Authorization: `Bearer ${user.token}` };
 
     const overview = await request(app).get('/api/overview').set(auth);
     expect(overview.status).toBe(200);
-    // overview 内部调用了 getPool()：钩子若挂在 service 上，这里会被推进到 4
-    await expectStepStays(user.userId, 3);
+    // overview 内部调用了 getPool()：钩子若挂在 service 上，这里会被推进到 6
+    await expectStepStays(user.userId, 5);
 
     const pool = await request(app).get('/api/academy/pool').set(auth);
     expect(pool.status).toBe(200);
-    expect(await waitForStep(user.userId, 4)).toBe(4);
+    expect(await waitForStep(user.userId, 6)).toBe(6);
   });
 });

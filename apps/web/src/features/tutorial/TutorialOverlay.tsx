@@ -13,8 +13,10 @@ interface Rect {
 
 /** 四周留白：目标元素与洞口之间留 8px，避免洞口贴着目标边缘 */
 const SPOTLIGHT_PAD = 8;
-/** 目标尚未挂载时最多跟随 ~2s（60fps 计）；超时后交由 2s 轮询的新 state 重新触发测量 */
-const MAX_MISS_FRAMES = 120;
+// 卡片真实高度的上界（eyebrow+标题+进度条+最长文案+奖励徽章+按钮行+内边距 ≈ 300）。
+// 目标下方放不下时卡片改放上方：top = 目标顶 - EST - margin，只有 EST ≥ 真实高度，
+// 卡片底边才保证不越过目标顶 —— 低估会让卡片压住聚光目标本身（如 lecture-force 的复选框被盖住点不了）。
+const CARD_H_EST = 320;
 
 /** 行为步的提示文案：禁止把 action 名（英文枚举）直出给用户 */
 const ACTION_HINT: Record<string, string> = {
@@ -22,15 +24,16 @@ const ACTION_HINT: Record<string, string> = {
   do_training: '完成一次训练即可',
   visit_academy: '打开高级学院的候选池即可',
   do_lecture: '完成一次讲课即可',
-  do_adventure: '完成一次历练即可',
-  do_story: '通关一关剧情即可',
-  visit_shop: '打开商城页面即可',
+  do_story: '进入第一关战斗即可',
 };
 
-function getTargetRect(selector: string | null): Rect | null {
+function getTarget(selector: string | null): HTMLElement | null {
   if (!selector) return null;
   const el = document.querySelector(selector);
-  if (!(el instanceof HTMLElement)) return null;
+  return el instanceof HTMLElement ? el : null;
+}
+
+function rectOf(el: HTMLElement): Rect {
   const r = el.getBoundingClientRect();
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
@@ -65,7 +68,8 @@ function computeHole(rect: Rect | null): Hole | null {
  * 四块遮罩面板：围绕洞口拼出暗场，洞口本身不渲染任何东西 ——
  * 目标元素由此真正可点击（旧实现的单块 `inset-0` 遮罩会把整页点击都吞掉）。
  * 宽或高为 0 的面板不渲染，避免出现零面积的可点击层。
- * `blocking` 为 false 时面板只做暗场（不参与命中测试），见 TutorialOverlay 内的说明。
+ * `blocking` 为 false 时面板只做暗场（不参与命中测试）：该步配置了
+ * block_outside_click: false，洞外点击放行（如 recruit 步要先离页赚钱）。
  */
 function MaskPanels({ hole, blocking }: { hole: Hole; blocking: boolean }): JSX.Element {
   const { innerWidth, innerHeight } = window;
@@ -108,21 +112,24 @@ export function TutorialOverlay(): JSX.Element | null {
   const total = state?.total ?? 0;
   const stepIdx = state?.step ?? 0;
 
-  // 测量目标矩形：rAF 节流 + ResizeObserver（布局变化）+ 滚动/缩放；目标未挂载时跟随若干帧。
+  // 测量目标矩形：rAF 节流 + ResizeObserver（布局变化）+ 滚动/缩放；目标晚挂载由 DOM 变更触发重测。
   useEffect(() => {
     if (!cur || completed) {
       setRect(null);
       return undefined;
     }
     let frame: number | null = null;
-    let misses = 0;
+    // 同一步只抢一次滚动条：之后用户自己滚动不再被打断
+    let scrolled = false;
     const measure = (): void => {
       frame = null;
-      const r = getTargetRect(cur.target);
+      const el = getTarget(cur.target);
+      const r = el === null ? null : rectOf(el);
       setRect((prev) => (sameRect(prev, r) ? prev : r));
-      if (r === null && cur.target !== null && misses < MAX_MISS_FRAMES) {
-        misses += 1;
-        frame = requestAnimationFrame(measure);
+      if (el !== null && !scrolled && (r!.top < 0 || r!.top + r!.height > window.innerHeight)) {
+        scrolled = true;
+        // 瞬时滚动：平滑动画会让 rect 持续变化，也会让 e2e 点击判定不稳
+        el.scrollIntoView({ block: 'center' });
       }
     };
     const schedule = (): void => {
@@ -131,13 +138,18 @@ export function TutorialOverlay(): JSX.Element | null {
     measure();
     window.addEventListener('scroll', schedule, true);
     window.addEventListener('resize', schedule);
-    const observer = new ResizeObserver(schedule);
-    observer.observe(document.body);
+    const ro = new ResizeObserver(schedule);
+    ro.observe(document.body);
+    // 目标晚挂载（页面还在 loading）时靠 DOM 变更重测：轮询带回的 state 引用不变
+    // （react-query structuralSharing），effect 不会重跑，帧跟随一旦放弃就永远测不回来。
+    const mo = new MutationObserver(schedule);
+    mo.observe(document.body, { childList: true, subtree: true });
     return () => {
       if (frame !== null) cancelAnimationFrame(frame);
       window.removeEventListener('scroll', schedule, true);
       window.removeEventListener('resize', schedule);
-      observer.disconnect();
+      ro.disconnect();
+      mo.disconnect();
     };
   }, [cur, completed]);
 
@@ -149,16 +161,40 @@ export function TutorialOverlay(): JSX.Element | null {
     cardRef.current?.focus();
   }, [visible, stepIdx]);
 
+  /**
+   * 纯展示步（action=none）且带高亮目标：点目标本身即推进（`advance_on_target_click !== false`）。
+   * 例：「选一名学员」步——选中学员是纯前端状态，服务端无从感知，只能由点击驱动；
+   * 服务端也只给 action=none 的步开放 manual 推进（service.ts 的 advanceTutorial）。
+   * 引导卡上的「下一步」保留作兜底：锚点缺失（如学员已清空）时那是唯一出口。
+   */
+  useEffect(() => {
+    if (!visible || cur === undefined || cur === null || cur.action !== 'none') return undefined;
+    if (cur.advance_on_target_click === false) return undefined;
+    const selector = cur.target;
+    if (selector === null) return undefined;
+    const onClick = (event: MouseEvent): void => {
+      const el = getTarget(selector);
+      const node = event.target instanceof Node ? event.target : null;
+      if (el === null || node === null || !el.contains(node)) return;
+      void advance.mutateAsync(stepIdx + 1);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [visible, cur, stepIdx, advance.mutateAsync]);
+
   if (!state || completed || !cur) return null;
 
   const isLast = stepIdx === total - 1;
   const progressPct = Math.round(((stepIdx + 1) / total) * 100);
   const hole = computeHole(rect);
   const actionPending = cur.action !== 'none';
-  // 遮罩是否拦点击：只有「访问即完成」的步骤（visit_*）与纯展示步可以拦。
-  // do_* 步骤要在页内做连续操作（选学员→开始训练、选档位→开始讲课、组队→抽事件、进关…），
-  // 洞口只盖得住目标元素，拦点击会把真正要点的按钮挡在洞外，直接把引导卡死。
-  const blocking = !actionPending || cur.action.startsWith('visit_');
+  // 遮罩是否拦点击：
+  // - 有洞口（高亮可见）→ 默认拦：聚光即焦点，点其他 UI 无效。例外由配置声明
+  //   （block_outside_click: false，目前仅 recruit：招募金不足时要先离页赚钱，拦死即软锁）。
+  // - 无洞口：只有无 target 的纯展示步（welcome）整屏拦；有 target 但锚点缺失/未滚入时不拦，
+  //   玩家还能自己走到目标所在页（如 lecture-force 未渲染时页面仍可操作）。
+  const blockOutside = cur.block_outside_click !== false;
+  const modalBlock = !actionPending || cur.action.startsWith('visit_');
   const actionHint =
     cur.action === 'do_recruit'
       ? recruitHint(state.studentsOwned, state.studentsRequired)
@@ -209,10 +245,10 @@ export function TutorialOverlay(): JSX.Element | null {
     }
     if (left < 16) left = 16;
     // 若下方空间不足，放到上方
-    if (top + 200 > window.innerHeight - 16) {
-      top = rect.top - 200 - margin;
-      if (top < 16) top = 16;
+    if (top + CARD_H_EST > window.innerHeight - 16) {
+      top = rect.top - CARD_H_EST - margin;
     }
+    top = Math.min(Math.max(top, 16), Math.max(16, window.innerHeight - CARD_H_EST - 16));
     cardStyle = { position: 'fixed', top, left, width: cardWidth, zIndex: 60 };
   } else {
     // 居中模态
@@ -230,14 +266,14 @@ export function TutorialOverlay(): JSX.Element | null {
     <>
       {/* 遮罩：有洞口时四块面板围出可点击区域；无 target 的步骤整屏遮罩，卡片上的按钮即唯一出口 */}
       {hole !== null ? (
-        <MaskPanels hole={hole} blocking={blocking} />
+        <MaskPanels hole={hole} blocking={blockOutside} />
       ) : (
         <div
           aria-hidden
           className={`fixed inset-0 z-50 bg-ink-950/70 backdrop-blur-[1px] ${
             // 洞口算不出来（目标未挂载 / 已滚出视口）说明用户还得先去别处操作，
             // 此时只有无 target 的纯展示步可以拦点击
-            cur.target === null && blocking ? '' : 'pointer-events-none'
+            cur.target === null && modalBlock ? '' : 'pointer-events-none'
           }`}
         />
       )}
@@ -245,6 +281,7 @@ export function TutorialOverlay(): JSX.Element | null {
       {/* 聚光切口：只做描边，不参与命中测试 */}
       {hole !== null && (
         <div
+          data-testid="tutorial-spotlight"
           aria-hidden
           className="pointer-events-none fixed z-[51] border-2 border-cyber-400/80 shadow-[0_0_24px_-4px_var(--color-cyber-400)]"
           style={{
@@ -259,6 +296,7 @@ export function TutorialOverlay(): JSX.Element | null {
 
       {/* 引导卡 */}
       <div
+        data-testid="tutorial-card"
         ref={cardRef}
         role="dialog"
         aria-modal="true"

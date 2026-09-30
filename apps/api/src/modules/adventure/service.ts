@@ -28,7 +28,6 @@ import {
   type AdventureEventDrawContext,
   type AdventureStaminaCost,
 } from './extractor.js';
-import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -1072,9 +1071,6 @@ export async function chooseAdventure(
         : { replay: buildBattleReplay(contestRecord.id, duelReport!, event.name) }),
     };
   });
-  if (result.completed) {
-    void autoAdvanceIfNeeded(userId, 'do_adventure');
-  }
   return result;
 }
 

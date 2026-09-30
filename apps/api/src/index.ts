@@ -26,7 +26,6 @@ import { overviewRouter } from './modules/overview/router.js';
 import { tutorialRouter } from './modules/tutorial/router.js';
 import { shopRouter } from './modules/shop/router.js';
 import { requireTutorialForApi } from './modules/tutorial/guard.js';
-import jwt from 'jsonwebtoken';
 import { prisma } from './lib/prisma.js';
 import { verifyAccess } from './lib/jwt.js';
 import type { ApiEnvelope } from '@oinur/shared';
@@ -119,16 +118,30 @@ export function createApp(opts: AppOptions = {}): express.Express {
         let claims: ReturnType<typeof verifyAccess>;
         try {
           claims = verifyAccess(h.slice(7));
-        } catch (e) {
-          if (e instanceof jwt.TokenExpiredError) return next();
+        } catch {
+          // 解析失败（含过期）一律按未认证放行，交由下游 requireAuth 给出精确错误
           return next();
         }
+        // 一次查询带齐 requireAuth / tutorial guard 所需字段：整个请求只做这一次 user-PK 查询
         const user = await prisma.user.findUnique({
           where: { id: claims.uid },
-          select: { id: true, role: true, tokenVersion: true, bannedAt: true },
+          select: {
+            id: true,
+            role: true,
+            tokenVersion: true,
+            bannedAt: true,
+            tutorialStep: true,
+            tutorialCompleted: true,
+          },
         });
         if (!user || user.bannedAt || user.tokenVersion !== claims.tv) return next();
-        req.user = { id: user.id, role: user.role, tokenVersion: user.tokenVersion };
+        req.user = {
+          id: user.id,
+          role: user.role,
+          tokenVersion: user.tokenVersion,
+          tutorialStep: user.tutorialStep,
+          tutorialCompleted: user.tutorialCompleted,
+        };
         next();
       } catch {
         next();

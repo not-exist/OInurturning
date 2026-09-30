@@ -6,9 +6,6 @@ import { prisma } from '../../lib/prisma.js';
 import type { TutorialStepDef } from '@oinur/shared';
 import { resolveProgress, unlockedForStep } from './routing.js';
 
-// 纯逻辑（前缀匹配/解锁计算）在 routing.js，这里 re-export 保持既有 import 路径可用
-export { ROUTE_MAP, isApiAllowed, unlockedForStep } from './routing.js';
-
 export function tutorialConfig() {
   const cfg = getConfig();
   if (!cfg?.tutorial) throw new Error('[tutorial] CONFIG 未加载');
@@ -172,6 +169,12 @@ export async function autoAdvanceIfNeeded(userId: number, action: TutorialStepDe
       return;
     }
     if (cur.action !== action) return;
+    // 末步没有下一步可前进：它的行为动作就是收尾信号，直接判完成（含末步奖励）。
+    // 例：剧情末步「点第一关进入」——开打即结束引导，不再挂一张"完成引导"的卡片让人再点一次。
+    if (step === steps.length - 1) {
+      await completeTutorial(userId);
+      return;
+    }
     await advanceTutorial(userId, step + 1, { reason: 'auto', action });
   } catch (err) {
     // 自动推进失败不影响主流程，但必须留痕（空 catch 会让用户永久卡步且无任何日志）

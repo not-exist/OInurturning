@@ -181,7 +181,7 @@ docker compose exec mysql sh -c \
 
 ## 11. 强制新手引导的上线与放行
 
-引导（`docs/data/tutorial.yaml`，当前 10 步）在服务端由 `apps/api/src/index.ts` 的全局守卫执行；未完成引导的账号只放行
+引导（`docs/data/tutorial.yaml`，当前 14 步）在服务端由 `apps/api/src/index.ts` 的全局守卫执行；未完成引导的账号只放行
 `/api/tutorial`、`/api/overview`、`/api/users/me`、`/api/auth`、`/api/talents`，其余端点一律 `403 FORBIDDEN`
 （`details.resource === 'tutorial'`）。前端对应地禁用侧栏未解锁项，并在深链时重定向到 `/`。
 
@@ -189,7 +189,7 @@ docker compose exec mysql sh -c \
 
 迁移 `20260923000000_tutorial_shop` 把存量账号一律置为 `tutorialStep=0 / tutorialCompleted=0`
 （产品决策：不回填，升级后所有既有账号需重走一遍引导）。因此**在升级前**必须确认没有"零学员"账号——
-引导第 2 步要求完成一次训练，没有学员的账号会永久卡死。先按 §9 回填：
+引导的训练步要求完成一次训练（`training-pick` 要高亮并选中一张学员卡），没有学员的账号会永久卡死。先按 §9 回填：
 
 ```bash
 pnpm -C apps/api onboarding:backfill --dry-run   # 看影响面
@@ -200,7 +200,7 @@ pnpm -C apps/api onboarding:backfill             # 正式补发（幂等）
 
 | 项 | 说明 |
 |---|---|
-| 老账号 | 被锁在总览/学员/引导自身；完成 10 步后全部解锁（含 PVP、管理端） |
+| 老账号 | 被锁在总览/学员/引导自身；打完第一关（末步进关即判完成）后全部解锁（含 PVP、管理端） |
 | 招募步（`recruit`） | 条件式：在册 ACTIVE 学员 **≥4** 即自动通过，不强制发生招募（招募费随在册人数指数增长 `round(300×1.35^n)`，强制招募会让 10 人老号掏 6000+ 金） |
 | 招募步之前的钱不够 | 该步已解锁讲课与历练（挣钱路径），可先赚钱再招人；welcome 步另发 200 训练金 |
 | 管理端 | ADMIN 角色豁免引导锁，不受影响 |

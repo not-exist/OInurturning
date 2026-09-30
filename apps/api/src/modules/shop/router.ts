@@ -12,6 +12,7 @@ shopRouter.use(requireAuth);
 
 shopRouter.get('/catalog', async (req, res, next) => {
   try {
+    // 教程锁由 app 级 requireTutorialForApi（index.ts）统一覆盖，路由内不再重复挂载
     const data = await svc.getCatalog(req.user!.id);
     res.json({ ok: true, data });
   } catch (e) {
@@ -21,7 +22,7 @@ shopRouter.get('/catalog', async (req, res, next) => {
 
 const BuySchema = z.object({
   itemId: z.string().min(1),
-  quantity: z.number().int().min(1).max(99).optional().default(1),
+  quantity: z.number().int().min(1).max(99).default(1),
 });
 
 shopRouter.post('/buy', async (req, res, next) => {

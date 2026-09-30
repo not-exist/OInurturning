@@ -169,12 +169,15 @@ export function TrainingPage(): JSX.Element {
           </Empty>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {students.map((s) => (
+            {students.map((s, index) => (
               <Card
                 key={s.id}
                 as="button"
                 data-testid="train-student"
                 data-student-id={s.id}
+                // 引导「选一名学员」步的锚点只挂第一张卡：学员数随在营人数变化，
+                // 挂容器会让洞口大到盖住整块面板，挂单卡才是指向明确的高亮。
+                data-tutorial={index === 0 ? 'training-student' : undefined}
                 selected={studentId === s.id}
                 onClick={() => setStudentId(s.id)}
                 className={`min-w-40 flex-1 space-y-2 p-3 text-left ${QUALITY_MATERIAL[s.qualityTier]}`}
@@ -195,7 +198,7 @@ export function TrainingPage(): JSX.Element {
 
       <div className={chosen !== null ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]' : ''}>
         <Panel bodyClassName="p-0">
-          <div className="flex flex-wrap gap-1 border-b border-ink-600/70 p-2" data-tutorial="training-tabs">
+          <div className="flex flex-wrap gap-1 border-b border-ink-600/70 p-2">
             {TABS.map((t) => (
               <button
                 key={t}

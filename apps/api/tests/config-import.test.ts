@@ -8,8 +8,10 @@ import {
   itemsFileSchema,
   stagesConfigSchema,
   talentsFileSchema,
+  tutorialStepSchema,
   type ItemDef,
   type TalentDef,
+  type TutorialConfig,
 } from '@oinur/shared';
 import { runSemanticChecks } from '../src/config/semantic.js';
 import { FatalStartupError, getConfig, importConfigs } from '../src/config/loader.js';
@@ -284,6 +286,24 @@ describe('runSemanticChecks', () => {
       ),
     ).toBe(true);
   });
+
+  it('unlock 单调性：上一步 all 回退为具体键报错，升到 all 不报', () => {
+    const step = (id: string, unlock: string[]) =>
+      tutorialStepSchema.parse({ id, title: id, desc: id, target: null, unlock, action: 'none' });
+    const run = (steps: TutorialConfig['steps']) =>
+      runSemanticChecks({
+        talents: [makeTalent({})],
+        items: parsedItem,
+        economy: parsedEconomy,
+        tutorial: { steps },
+      });
+    const retracted = run([step('s1', ['all']), step('s2', ['overview'])]);
+    expect(retracted.some((e) => e.path === 'steps.1.unlock' && e.message.includes('单调不减'))).toBe(
+      true,
+    );
+    const grown = run([step('s1', ['overview']), step('s2', ['all'])]);
+    expect(grown.some((e) => e.path === 'steps.1.unlock')).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -468,12 +488,12 @@ const MINIMAL_TUTORIAL = `steps:
     unlock: [overview]
     action: none
     reward: {}
-  - id: shop-tour
-    title: 商城巡览
+  - id: story-tour
+    title: 剧情首关
     desc: 测试用第二步。
-    target: "[data-tutorial='nav-shop']"
+    target: "[data-tutorial='nav-story']"
     unlock: [overview, shop]
-    action: visit_shop
+    action: do_story
     reward: {money: 50}
   - id: complete
     title: 引导完成

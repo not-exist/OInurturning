@@ -25,6 +25,22 @@ steps:
       item: milk-tea
       count: 1
 
+  - id: training-enter
+    title: 前往训练中心
+    desc: 训练在「训练中心」进行：消耗 1 点体力与训练费，把学员练强。点侧栏的「训练中心」进去。
+    target: "[data-tutorial='nav-training']"
+    unlock: [overview, students, training]
+    action: none
+    reward: {}
+
+  - id: training-pick
+    title: 选一名学员
+    desc: 训练要落在具体学员身上：消耗 TA 的 1 点体力与训练费。先点一名学员，再去点「开始基础训练」。
+    target: "[data-tutorial='training-student']"
+    unlock: [overview, students, training]
+    action: none
+    reward: {}
+
   - id: training
     title: 第一次训练
     desc: 体力是行动资源，上限 5 点随时间恢复。训练消耗 1 体力+金币，试一次基础训练。
@@ -49,50 +65,75 @@ steps:
     unlock: [overview, students, training, academy, lecture, adventure, backpack]
     action: do_recruit
     requires_students: 4
+    # 全站唯一例外：进本步时只有 ~250 金，连最便宜的 common（547）都买不起，
+    # 玩家必须能离开学院页去讲课/历练赚钱再回来——洞外拦死即软锁。
+    block_outside_click: false
+    reward: {}
+
+  - id: lecture-enter
+    title: 前往讲课台
+    desc: 招募完成。讲课在学院分组下的「讲课」页，不在当前这个候选池里。点侧栏的「讲课」进入讲课台。
+    target: "[data-tutorial='nav-lecture']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
+    action: none
+    reward: {}
+
+  - id: lecture-pick
+    title: 先看受众档位
+    desc: 档位决定门槛与报酬：门槛越高，报酬越厚。主讲学员与受众档位都已默认选好，确认后点「下一步」。
+    target: "[data-tutorial='lecture-tier']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
+    action: none
+    # 只让人看：点档位不推进，出口是引导卡上的「下一步」。
+    # 否则玩家改一下档位就被推进到讲课步，还没弄清门槛就站上讲台。
+    advance_on_target_click: false
+    reward: {}
+
+  - id: lecture-force
+    title: 强接此档位
+    desc: 该学员能力未达本档门槛，不勾「强接」会被直接拒单。勾上再讲：成功按 60% 结算，讲砸不发钱、倒扣声誉。
+    target: "[data-tutorial='lecture-force']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack]
+    action: none
+    # 勾上即推进，与「选一名学员」步同口径；能力达标时本行不渲染（未出现说明无需强接），
+    # 锚点缺失 → 退化成整屏暗场，出口是引导卡上的「下一步」。
     reward: {}
 
   - id: lecture
     title: 讲课变现
-    desc: 讲课是主收入来源，能力需达到受众门槛。完成一次讲课，体验报酬与成长机制。若学员能力未达受众门槛，需点「强接」（报酬 ×0.6，失败则无收入）。
-    target: "[data-tutorial='lecture-tier']"
+    desc: 主讲学员、受众档位与强接都已就绪，点「开始讲课」站上讲台。报酬与门槛挂钩，讲砸也有成长记录。
+    target: "[data-tutorial='lecture-teach']"
     unlock: [overview, students, training, academy, lecture, adventure, backpack]
     action: do_lecture
     reward:
       reputation: 2
 
-  - id: adventure
-    title: 历练探险
-    desc: 派出 3 人小队，投入 1-3 体力，抽取不同稀有度事件。对决类会触发出题对决。
-    target: "[data-tutorial='nav-adventure']"
-    unlock: [overview, students, training, academy, lecture, adventure, backpack]
-    action: do_adventure
-    reward:
-      item: intel-slip
-      count: 1
-
-  - id: story
-    title: 剧情首关
-    desc: 剧情模式 8 章，从 CSP-J 到 IOI。组建 4 人队伍挑战第一关，体验排名赛回放。
+  - id: story-enter
+    title: 前往剧情模式
+    desc: 最后一站是剧情模式：8 章关卡，从 CSP-J 一路打到 IOI。点侧栏的「剧情模式」进去。
     target: "[data-tutorial='nav-story']"
     unlock: [overview, students, training, academy, lecture, adventure, backpack, story]
-    action: do_story
+    action: none
     reward: {}
 
-  - id: shop
-    title: 商城补给站
-    desc: 金币可以在商城购买书籍与道具，紫色以上需要声誉解锁。限购每日 04:00 刷新，书籍受每周 10 点上限约束。
-    target: "[data-tutorial='nav-shop']"
-    unlock: [overview, students, training, academy, lecture, adventure, story, shop, backpack, problem-library]
-    action: visit_shop
-    reward:
-      money: 200
-
-  - id: complete
-    title: 引导完成，指挥中心全面开放
-    desc: 全部功能已解锁。去总览领取开局徽章，或继续培养你的队伍。祝你在 OI 之路上走得更远。
-    target: null
-    unlock: [all]
+  - id: story-pick
+    title: 组建出战阵容
+    desc: 剧情是 4 人团体排名赛。勾满 4 名学员，然后点「下一步」。
+    target: "[data-tutorial='story-roster']"
+    unlock: [overview, students, training, academy, lecture, adventure, backpack, story]
     action: none
+    # 勾满 4 人要连点四次，点一下就推进会让人莫名其妙：这一步只认引导卡上的「下一步」。
+    advance_on_target_click: false
+    reward: {}
+
+  # 末步：进第一关就收尾（服务端对末步的行为动作直接判 complete，没有下一步可前进）。
+  # unlock 必须是 [all]——unlockedForStep(末步, false) 的口径要求，也是"打完这关就全放开"的本意。
+  - id: story
+    title: 打第一关
+    desc: 点第一关的「进入」开打：名次进前 8 算通关，没过可以重打。开打即完成引导，剩下的交给你。
+    target: "[data-tutorial='story-enter']"
+    unlock: [all]
+    action: do_story
     reward:
       badge: onboarding-done
       money: 200

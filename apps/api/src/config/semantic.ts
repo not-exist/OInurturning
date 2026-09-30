@@ -90,7 +90,15 @@ function checkTutorial(tutorial: TutorialConfig, items: ItemDef[], issues: Seman
   for (let idx = 1; idx < tutorial.steps.length; idx += 1) {
     const prev = tutorial.steps[idx - 1]!;
     const cur = tutorial.steps[idx]!;
-    if (prev.unlock.includes('all') || cur.unlock.includes('all')) continue;
+    if (cur.unlock.includes('all')) continue;
+    if (prev.unlock.includes('all')) {
+      issues.push({
+        file: 'tutorial',
+        path: `steps.${idx}.unlock`,
+        message: `unlock 必须单调不减：上一步已解锁 all，本步却回退为 ${cur.unlock.join('、')}`,
+      });
+      continue;
+    }
     const missing = prev.unlock.filter((key) => !cur.unlock.includes(key));
     if (missing.length > 0) {
       issues.push({
