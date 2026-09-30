@@ -1146,7 +1146,7 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 | 46 | （守卫）`requireTutorialForApi` | — | 全局 `app.use`，位于所有 router 之前 | 未完成引导的账号仅放行 `/api/tutorial`、`/api/overview`、`/api/users/me`、`/api/auth`、`/api/talents`，其余一律 403（`details.resource='tutorial'`）；ADMIN 豁免 | 强制引导锁 |
 
 数据：`users.tutorialStep`、`users.tutorialCompleted`；购买流水表 `ShopPurchaseLog(userId, itemId, quantity, dayKey, weekKey)`，日/周限购按其聚合（`dayKey`/`weekKey` 口径见 `apps/api/src/lib/clock.ts`，04:00 为日界）。
-引导步骤由服务端按 `action` 自动推进（训练/讲课/历练/剧情/学员页/学院池/商城），未完成前前端侧栏锁定对应入口并深链重定向到 `/`；上线影响面与运维放行见 `docs/OPERATIONS.md` §11。
+引导步骤由服务端按 `action` 自动推进（训练/讲课/剧情/学员页/学院池/商城；历练不设引导步，入口随招募步的 unlock 一并放行），未完成前前端侧栏锁定对应入口并深链重定向到 `/`；上线影响面与运维放行见 `docs/OPERATIONS.md` §11。
 
 **管理端**（requireAdmin，全部写 AdminAuditLog）
 

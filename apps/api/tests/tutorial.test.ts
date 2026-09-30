@@ -217,7 +217,7 @@ describe('tutorial 服务端锁', () => {
 
   it('到达末步后 complete → 200 且末步奖励只发一次', async () => {
     const user = await register();
-    await setStep(user.userId, stepIndex('complete'));
+    await setStep(user.userId, stepIndex('story'));
     const moneyBefore = await moneyOf(user.userId);
     const first = await request(app).post('/api/tutorial/complete').set(auth(user.token));
     expect(first.status).toBe(200);
@@ -326,7 +326,17 @@ describe('tutorial 服务端锁', () => {
 
     const listed = await request(app).get('/api/students').set(auth(user.token));
     expect(listed.status).toBe(200);
-    expect(await waitForStep(user.userId, stepIndex('training'))).toBe(stepIndex('training'));
+    expect(await waitForStep(user.userId, stepIndex('training-enter'))).toBe(stepIndex('training-enter'));
+
+    // none 步（training-enter / training-pick）服务端无法自动推进：前端点锚点手动 advance，这里同口径补上
+    for (const id of ['training-enter', 'training-pick', 'training']) {
+      const manual = await request(app)
+        .post('/api/tutorial/advance')
+        .set(auth(user.token))
+        .send({ step: stepIndex(id) });
+      expect(manual.status).toBe(200);
+    }
+    expect(await stepOf(user.userId)).toBe(stepIndex('training'));
 
     const students = unwrapOk<{ id: number }[]>(listed);
     expect(students.length).toBeGreaterThan(0);
@@ -356,9 +366,9 @@ describe('tutorial 服务端锁', () => {
     expect(await activeStudentsOf(user.userId), '招募后应达到 4 人在册').toBeGreaterThanOrEqual(4);
   });
 
-  it('完成徽章不再撞名：complete → badges 含 onboarding-done、不含 rookie-done，总览开局任务仍可领', async () => {
+  it('完成徽章不再撞名：末步 complete → badges 含 onboarding-done、不含 rookie-done，总览开局任务仍可领', async () => {
     const user = await register();
-    await setStep(user.userId, stepIndex('complete'));
+    await setStep(user.userId, stepIndex('story'));
     const completed = await request(app).post('/api/tutorial/complete').set(auth(user.token));
     expect(completed.status).toBe(200);
 

@@ -488,12 +488,12 @@ const MINIMAL_TUTORIAL = `steps:
     unlock: [overview]
     action: none
     reward: {}
-  - id: shop-tour
-    title: 商城巡览
+  - id: story-tour
+    title: 剧情首关
     desc: 测试用第二步。
-    target: "[data-tutorial='nav-shop']"
+    target: "[data-tutorial='nav-story']"
     unlock: [overview, shop]
-    action: visit_shop
+    action: do_story
     reward: {money: 50}
   - id: complete
     title: 引导完成

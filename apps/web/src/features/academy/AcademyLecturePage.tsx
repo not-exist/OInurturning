@@ -231,6 +231,7 @@ export function AcademyLecturePage(): JSX.Element {
               </p>
               <Btn
                 data-testid="lecture-teach"
+                data-tutorial="lecture-teach"
                 variant="primary"
                 disabled={
                   selectedStudentId === undefined || selectedTier === undefined || teach.isPending
@@ -246,7 +247,7 @@ export function AcademyLecturePage(): JSX.Element {
             </div>
 
             {canForce && (
-              <label className="mt-4 flex items-start gap-2 border-t border-ink-600/60 pt-3 text-sm text-warn-400">
+              <label className="mt-4 flex items-start gap-2 border-t border-ink-600/60 pt-3 text-sm text-warn-400" data-tutorial="lecture-force">
                 <input
                   data-testid="lecture-force"
                   type="checkbox"

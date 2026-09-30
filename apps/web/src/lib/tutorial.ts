@@ -9,6 +9,8 @@ export interface TutorialStepDef {
   target: string | null;
   unlock: string[];
   action: string;
+  /** false 表示该展示步只认引导卡上的「下一步」，点被聚光的元素不推进 */
+  advance_on_target_click?: boolean;
   reward?: { money?: number; reputation?: number; item?: string; count?: number; badge?: string };
 }
 
@@ -82,7 +84,6 @@ export function isRouteUnlocked(unlocked: string[], routeKey: string): boolean {
 const VISIT_STEP_QUERY: Record<string, string[]> = {
   visit_students: ['students'],
   visit_academy: ['academy'],
-  visit_shop: ['shop'],
 };
 
 /** 进入访问步时失效对应查询（数组是模块级常量，引用稳定，同一步只触发一次） */

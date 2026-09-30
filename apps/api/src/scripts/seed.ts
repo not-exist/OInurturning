@@ -90,7 +90,7 @@ async function main(): Promise<void> {
         role: 'USER',
         money: DEMO_MONEY,
         reputation: DEMO_REPUTATION,
-        // 引导已解锁（对齐 OPERATIONS.md §11 运维放行口径），否则 demo 环境被 10 步引导锁死
+        // 引导已解锁（对齐 OPERATIONS.md §11 运维放行口径），否则 demo 环境被 13 步引导锁死
         tutorialStep: 999,
         tutorialCompleted: true,
         badges: [],

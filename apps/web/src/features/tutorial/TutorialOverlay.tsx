@@ -21,9 +21,7 @@ const ACTION_HINT: Record<string, string> = {
   do_training: '完成一次训练即可',
   visit_academy: '打开高级学院的候选池即可',
   do_lecture: '完成一次讲课即可',
-  do_adventure: '完成一次历练即可',
-  do_story: '通关一关剧情即可',
-  visit_shop: '打开商城页面即可',
+  do_story: '进入第一关战斗即可',
 };
 
 function getTarget(selector: string | null): HTMLElement | null {
@@ -67,7 +65,8 @@ function computeHole(rect: Rect | null): Hole | null {
  * 四块遮罩面板：围绕洞口拼出暗场，洞口本身不渲染任何东西 ——
  * 目标元素由此真正可点击（旧实现的单块 `inset-0` 遮罩会把整页点击都吞掉）。
  * 宽或高为 0 的面板不渲染，避免出现零面积的可点击层。
- * `blocking` 为 false 时面板只做暗场（不参与命中测试），见 TutorialOverlay 内的说明。
+ * `blocking` 为 false 时面板只做暗场（不参与命中测试）：该步配置了
+ * block_outside_click: false，洞外点击放行（如 recruit 步要先离页赚钱）。
  */
 function MaskPanels({ hole, blocking }: { hole: Hole; blocking: boolean }): JSX.Element {
   const { innerWidth, innerHeight } = window;
@@ -159,16 +158,40 @@ export function TutorialOverlay(): JSX.Element | null {
     cardRef.current?.focus();
   }, [visible, stepIdx]);
 
+  /**
+   * 纯展示步（action=none）且带高亮目标：点目标本身即推进（`advance_on_target_click !== false`）。
+   * 例：「选一名学员」步——选中学员是纯前端状态，服务端无从感知，只能由点击驱动；
+   * 服务端也只给 action=none 的步开放 manual 推进（service.ts 的 advanceTutorial）。
+   * 引导卡上的「下一步」保留作兜底：锚点缺失（如学员已清空）时那是唯一出口。
+   */
+  useEffect(() => {
+    if (!visible || cur === undefined || cur === null || cur.action !== 'none') return undefined;
+    if (cur.advance_on_target_click === false) return undefined;
+    const selector = cur.target;
+    if (selector === null) return undefined;
+    const onClick = (event: MouseEvent): void => {
+      const el = getTarget(selector);
+      const node = event.target instanceof Node ? event.target : null;
+      if (el === null || node === null || !el.contains(node)) return;
+      void advance.mutateAsync(stepIdx + 1);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [visible, cur, stepIdx, advance.mutateAsync]);
+
   if (!state || completed || !cur) return null;
 
   const isLast = stepIdx === total - 1;
   const progressPct = Math.round(((stepIdx + 1) / total) * 100);
   const hole = computeHole(rect);
   const actionPending = cur.action !== 'none';
-  // 遮罩是否拦点击：只有「访问即完成」的步骤（visit_*）与纯展示步可以拦。
-  // do_* 步骤要在页内做连续操作（选学员→开始训练、选档位→开始讲课、组队→抽事件、进关…），
-  // 洞口只盖得住目标元素，拦点击会把真正要点的按钮挡在洞外，直接把引导卡死。
-  const blocking = !actionPending || cur.action.startsWith('visit_');
+  // 遮罩是否拦点击：
+  // - 有洞口（高亮可见）→ 默认拦：聚光即焦点，点其他 UI 无效。例外由配置声明
+  //   （block_outside_click: false，目前仅 recruit：招募金不足时要先离页赚钱，拦死即软锁）。
+  // - 无洞口：只有无 target 的纯展示步（welcome）整屏拦；有 target 但锚点缺失/未滚入时不拦，
+  //   玩家还能自己走到目标所在页（如 lecture-force 未渲染时页面仍可操作）。
+  const blockOutside = cur.block_outside_click !== false;
+  const modalBlock = !actionPending || cur.action.startsWith('visit_');
   const actionHint =
     cur.action === 'do_recruit'
       ? recruitHint(state.studentsOwned, state.studentsRequired)
@@ -240,14 +263,14 @@ export function TutorialOverlay(): JSX.Element | null {
     <>
       {/* 遮罩：有洞口时四块面板围出可点击区域；无 target 的步骤整屏遮罩，卡片上的按钮即唯一出口 */}
       {hole !== null ? (
-        <MaskPanels hole={hole} blocking={blocking} />
+        <MaskPanels hole={hole} blocking={blockOutside} />
       ) : (
         <div
           aria-hidden
           className={`fixed inset-0 z-50 bg-ink-950/70 backdrop-blur-[1px] ${
             // 洞口算不出来（目标未挂载 / 已滚出视口）说明用户还得先去别处操作，
             // 此时只有无 target 的纯展示步可以拦点击
-            cur.target === null && blocking ? '' : 'pointer-events-none'
+            cur.target === null && modalBlock ? '' : 'pointer-events-none'
           }`}
         />
       )}

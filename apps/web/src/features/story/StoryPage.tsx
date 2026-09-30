@@ -202,6 +202,7 @@ function StageNode({
           variant={primary ? 'primary' : 'ghost'}
           size="sm"
           data-testid="story-enter"
+          data-tutorial={primary ? 'story-enter' : undefined}
           disabled={blocked !== null || pending}
           onClick={onEnter}
         >
@@ -387,14 +388,16 @@ export function StoryPage(): JSX.Element {
           </span>
         }
       >
-        <RosterPicker
-          students={students.data}
-          selectedIds={roster}
-          min={ROSTER_SIZE}
-          max={ROSTER_SIZE}
-          onChange={setRoster}
-          dataTestIdPrefix="story-roster"
-        />
+        <div data-tutorial="story-roster">
+          <RosterPicker
+            students={students.data}
+            selectedIds={roster}
+            min={ROSTER_SIZE}
+            max={ROSTER_SIZE}
+            onChange={setRoster}
+            dataTestIdPrefix="story-roster"
+          />
+        </div>
         <p className="mt-3 text-[11px] text-fg-dim">
           4 人团体排名赛：全队每关各消耗固定体力，名次进入前 8 视为通关。
         </p>

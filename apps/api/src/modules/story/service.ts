@@ -588,9 +588,6 @@ export async function enterStoryStage(
     throw new ApiError('VALIDATION_FAILED', { field: 'idempotencyKey' });
   }
 
-  // 事务内记录本次是否通关（首通与否都要推进引导步）：record.summary 是 ContestSummary |
-  // RankingSummary 联合，出事务后取 .pass 无法通过类型检查，故在事务内就地捕获。
-  let passed = false;
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const replay = await getContestRecordByIdempotency(userId, idempotencyKey, tx);
@@ -813,7 +810,6 @@ export async function enterStoryStage(
         tx,
       );
     }
-    passed = report.pass;
     return {
       record,
       replay: buildBattleReplay(record.id, report, stage.name),
@@ -821,8 +817,7 @@ export async function enterStoryStage(
       firstClear: firstClear && report.pass,
     };
   });
-  if (passed) {
-    void autoAdvanceIfNeeded(userId, 'do_story');
-  }
+  // 进关即推进：引导只负责把人送上赛场，通关与否不该卡住后续步骤（重打时当前步已不是本步，幂等）。
+  void autoAdvanceIfNeeded(userId, 'do_story');
   return result;
 }

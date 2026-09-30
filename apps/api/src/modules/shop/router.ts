@@ -4,7 +4,6 @@ import { ApiError } from '../../lib/errors.js';
 import { runIdempotent } from '../../lib/idempotency.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as svc from './service.js';
-import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 export const shopRouter = Router();
 
@@ -13,9 +12,7 @@ shopRouter.use(requireAuth);
 
 shopRouter.get('/catalog', async (req, res, next) => {
   try {
-    // visit_shop 只在本端点推进（getCatalog 无其他调用方）；先推进再读目录，
-    // 离开步骤的奖励入账后，目录内的金币/声誉快照才是最新的
-    void autoAdvanceIfNeeded(req.user!.id, 'visit_shop');
+    // 教程锁由 app 级 requireTutorialForApi（index.ts）统一覆盖，路由内不再重复挂载
     const data = await svc.getCatalog(req.user!.id);
     res.json({ ok: true, data });
   } catch (e) {
