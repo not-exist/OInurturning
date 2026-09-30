@@ -11,18 +11,20 @@ import {
 } from '../fixtures';
 
 /**
- * 强制新手引导（13 步，真源 docs/data/tutorial.yaml）：
- * welcome → students → training-pick（选学员，点卡片即推进）→ training → academy → recruit（在册 ≥4 即通过）
- * → lecture-enter（点侧栏「讲课」即推进）→ lecture-pick（看档位，点「下一步」推进）
- * → lecture-force（勾「强接」即推进，未渲染则点「下一步」）→ lecture（点「开始讲课」）
- * → story-enter（点侧栏「剧情模式」即推进）→ story-pick（勾 4 人，点「下一步」推进）
+ * 强制新手引导（14 步，真源 docs/data/tutorial.yaml）：
+ * welcome → students（visit，点侧栏「学员管理」）→ training-enter（点侧栏「训练中心」即推进）
+ * → training-pick（点第一张学员卡即推进）→ training（开始基础训练）→ academy（visit，点侧栏「高级学院」）
+ * → recruit（在册 ≥4 即通过；唯一 block_outside_click: false 的步）→ lecture-enter（点侧栏「讲课」即推进）
+ * → lecture-pick（看档位，点「下一步」推进）→ lecture-force（勾「强接」即推进，未渲染则点「下一步」）
+ * → lecture（点「开始讲课」）→ story-enter（点侧栏「剧情模式」即推进）→ story-pick（勾 4 人，点「下一步」推进）
  * → story（末步：点第一关「进入」开打，进关即判引导完成）。
- * （历练不设引导：入口随 recruit 步的 unlock 一并放行，但不强制走一遍；末步 unlock 为 all，
- *   故打完第一关前商城/PVP 等已全部放开。）
+ *
+ * 遮罩口径：有高亮（洞口可见）即拦洞外点击（block_outside_click 缺省 true），
+ * 仅 recruit 步显式放行——进该步时买不起任何候选，玩家必须能离页赚钱再回来。
  *
  * 用例一律用 registerUserRaw 注册（registerUser 内部会 skip，直接把 completed 置 true）。
  * 锁定探针只打**真实存在的**端点（/api/shop/catalog、/api/training/logs、/api/pvp/tournaments）：
- * 打不存在的 /api/shop 会拿到 404 而不是 403，历史上正是它把「路由缺失」伪装成「引导锁」。
+ * 打不存在的端点会拿到 404 而不是 403，历史上正是它把「路由缺失」伪装成「引导锁」。
  */
 test.describe('新手引导', () => {
   interface TutorialStepView {
@@ -79,6 +81,13 @@ test.describe('新手引导', () => {
     expect(state.current?.id ?? 'completed', `引导应推进到「${id}」（实际 ${JSON.stringify(state)}）`).toBe(id);
   }
 
+  /** 负向断言：留出在途请求的落地时间后，引导必须仍停在该步 */
+  async function expectStepStays(request: APIRequestContext, token: string, id: string): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const state = await tutorialState(request, token);
+    expect(state.current?.id ?? 'completed', `洞外点击不应推进引导（应停在「${id}」）`).toBe(id);
+  }
+
   /** 锁定探针：引导未完成时受限端点一律 403 且 details.resource === 'tutorial' */
   async function expectLocked(request: APIRequestContext, token: string, path: string): Promise<void> {
     const res = await apiCall(request, 'GET', path, token);
@@ -96,7 +105,7 @@ test.describe('新手引导', () => {
     const state = await tutorialState(request, token);
     expect(state.completed).toBe(false);
     expect(state.step).toBe(0);
-    expect(state.total).toBe(13);
+    expect(state.total).toBe(14);
     expect(state.current?.id).toBe('welcome');
     // welcome 步只解锁总览：其余功能全锁
     expect(state.unlocked).toEqual(['overview']);
@@ -139,12 +148,12 @@ test.describe('新手引导', () => {
     await expect(page).toHaveURL('/');
   });
 
-  test('真实走完十步引导：逐步操作推进，全程不刷新页面', async ({ page, request }) => {
+  test('真实走完十四步引导：逐步操作推进，全程不刷新页面', async ({ page, request }) => {
     test.setTimeout(180_000);
     const account = await registerUserRaw(request, 'tutwalk');
     const token = account.accessToken;
-    // 招募价随在册人数递增（第 3 人 547 起、第 4 人 738 起，品质系数最高 ×5），
-    // 历练分支亦有高额花费：一次注足，避免中途因金币不足卡步。
+    // 一次注足：招募价随在册人数递增（第 3 人 547 起，品质系数最高 ×5），
+    // 避免中途因金币不足卡步。
     await fund(account.username, { money: 200_000, items: ADVENTURE_KEYCHAIN });
     await loginViaUI(page, account.username, DEFAULT_PASSWORD);
 
@@ -159,28 +168,30 @@ test.describe('新手引导', () => {
     // 2. students：访问步遮罩只留侧栏学员入口这一个洞
     await navLink(page, 'students').click();
     await expect(page.getByTestId('students-page')).toBeVisible();
-    await expectStep(request, token, 'training-pick');
+    await expectStep(request, token, 'training-enter');
 
-    // 3. training-pick：先高亮第一张学员卡，点它即推进（「下一步」是锚点缺失时的兜底）
+    // 3. training-enter：点侧栏「训练中心」即推进（点目标 = 手动 advance + 导航）
     await navLink(page, 'training').click();
     await expect(page.getByTestId('training-page')).toBeVisible();
+    await expectStep(request, token, 'training-pick');
+
+    // 4. training-pick：拦截下唯一可点的学员卡是聚光的第 1 张，点它即推进
     await page.getByTestId('train-student').first().click();
     await expectStep(request, token, 'training');
 
-    // 4. training：选一名学员后开始基础训练。
-    //    刻意练最后一名：讲课要 2 点、历练各 1 点，把消耗摊在不同学员身上，
-    //    剧情步（唯一可能需要重打的一步）才有体力余量。
-    await page.getByTestId('train-student').last().click();
+    // 5. training：洞口就是「开始基础训练」（选人已在上一完成），点它完成训练
     await page.getByTestId('train-run').click();
     await expect(page.getByTestId('train-result')).toContainText('训练完成');
     await expectStep(request, token, 'academy');
 
-    // 5. academy：打开候选池即通过（visit_academy 只认 GET /api/academy/pool）
+    // 6. academy：打开候选池即通过（visit_academy 只认 GET /api/academy/pool）
     await navLink(page, 'academy').click();
     await expect(page.getByTestId('academy-page')).toBeVisible();
     await expectStep(request, token, 'recruit');
 
-    // 6. recruit：在册 ACTIVE ≥ 4 才通过 —— 从候选池里挑最便宜的两名各招募一次
+    // 7. recruit：唯一放行洞外点击的步（block_outside_click: false）——
+    //    点非聚光位的候选卡也必须能点中，正是这一例外的不变量（若被误拦，这里的
+    //    hit-target 检查会一直失败直到超时）。挑最便宜的两名各招募一次，避开品质随机价差。
     const poolRes = await apiCall(request, 'GET', '/api/academy/pool', token);
     const pool = unwrap<{ candidates: { tempId: string; price: number }[] }>(poolRes.body, '取候选池');
     const cheapest = [...pool.candidates]
@@ -198,50 +209,48 @@ test.describe('新手引导', () => {
     expect(unwrap<{ id: number }[]>(roster.body, '学员列表')).toHaveLength(4);
     await expectStep(request, token, 'lecture-enter');
 
-    // 7. lecture-enter：招募结束玩家还停在学院页，而讲课档位锚点在 /academy/lecture ——
+    // 8. lecture-enter：招募结束玩家还停在学院页，而讲课档位锚点在 /academy/lecture ——
     //    没有这一步引导时目标不在 DOM，聚光圈直接消失、只剩整屏暗场（真 bug）。
     await navLink(page, 'lecture').click();
     await expectStep(request, token, 'lecture-pick');
 
-    // 8. lecture-pick：档位步只让人看 —— 点档位不推进（advance_on_target_click: false），
+    // 9. lecture-pick：档位步只让人看 —— 点档位不推进（advance_on_target_click: false），
     //    出口是引导卡上的「下一步」，点完才进讲课步高亮「开始讲课」。
     await expect(page.getByTestId('lecture-page')).toBeVisible();
-    await page.locator("[data-tutorial='next-btn']").click();
+    await nextBtn.click();
     await expectStep(request, token, 'lecture-force');
 
-    // 9. lecture-force：入门组门槛 V15、强接窗口 [7,15) —— 开局 GOOD 学员（V≈14）多半要勾「强接」。
-    //    不勾会被服务端拒单（lecture.ts:176）而拒单不推进本步。该行未渲染说明默认学员已达标，
-    //    此时锚点缺失、退化为整屏暗场，出口是引导卡上的「下一步」。
+    // 10. lecture-force：默认主讲是开局 GOOD 学员（V≈14），beginner 门槛 V15，多半要勾「强接」。
+    //     不勾会被服务端拒单（拒单不推进本步）。该行未渲染说明默认学员已达标，
+    //     此时锚点缺失、退化为整屏暗场，出口是引导卡上的「下一步」。
     const force = page.getByTestId('lecture-force');
     if (await force.isVisible()) {
       await force.check();
     } else {
-      await page.locator("[data-tutorial='next-btn']").click();
+      await nextBtn.click();
     }
     await expectStep(request, token, 'lecture');
 
-    // 10. lecture：高亮「开始讲课」。do_* 步遮罩不拦点击，故此刻还能改选 V 最高的学员提高成功率
-    const students = unwrap<{ id: number; v: number }[]>(roster.body, '学员列表');
-    const speaker = [...students].sort((a, b) => b.v - a.v)[0]!;
-    await page.getByTestId('lecture-student').selectOption(String(speaker.id));
+    // 11. lecture：洞口就是「开始讲课」。拦截下无法换主讲（select 会被遮罩吃掉），
+    //     主讲即页面默认选中的第一名学员——与 lecture-force 步判定强接的是同一人。
     await page.getByTestId('lecture-teach').click();
     // 讲砸也推进（服务端 do_lecture 在写日志后无条件 autoAdvance），但拒单不会：据此断言未拒单
     await expect(page.getByTestId('lecture-logs').or(page.getByTestId('lecture-error'))).toBeVisible();
     await expect(page.getByTestId('lecture-error'), '讲课被拒单会导致本步无法推进').toHaveCount(0);
     await expect(page.getByTestId('lecture-logs').getByRole('listitem')).toHaveCount(1);
-    await expectStep(request, token, 'story');
+    await expectStep(request, token, 'story-enter');
 
-    // 11. story-enter：点侧栏「剧情模式」即推进
+    // 12. story-enter：点侧栏「剧情模式」即推进
     await navLink(page, 'story').click();
     await expect(page.getByTestId('story-page')).toBeVisible();
     await expectStep(request, token, 'story-pick');
 
-    // 12. story-pick：勾满 4 人。勾选不推进（advance_on_target_click: false），出口是「下一步」
+    // 13. story-pick：勾满 4 人（勾选在 story-roster 洞口内）。勾选不推进，出口是「下一步」
     await pickRoster(page, 'story-roster', 4);
-    await page.locator("[data-tutorial='next-btn']").click();
+    await nextBtn.click();
     await expectStep(request, token, 'story');
 
-    // 13. story（末步）：点第一关「进入」开打 —— 进关即判完成：不再等通关，也不再有后续卡片
+    // 14. story（末步）：点第一关「进入」开打 —— 进关即判完成：不再等通关，也不再有后续卡片
     const enter = page.getByTestId('story-enter').first();
     await expect(enter).toBeEnabled();
     await enter.click();
@@ -261,40 +270,59 @@ test.describe('新手引导', () => {
   });
 
   /**
-   * 遮罩/聚光圈回归：十步走查只断言步骤推进，不关心「用户看得到指示」。
-   * 深页锚点（training-student / training-basic / recruit / lecture）在矮视口下目标首屏不可见，
-   * 历史实现会把洞口 clamp 到视口后判空 → 只剩整屏暗场、零指示（真 bug）。
+   * 遮罩/聚光圈回归：走查只断言步骤推进，不关心「用户看得到指示」与「洞外是否真的点不动」。
+   * 本组断言三件事：
+   * 1. 深页锚点（training-student / training-basic）在矮视口下必须被滚进视口并聚光
+   *    （历史实现会把洞口 clamp 到视口后判空 → 只剩整屏暗场、零指示，真 bug）；
+   * 2. 有高亮即拦洞外点击：点洞外 UI（force）不导航、不推进；
+   * 3. 洞内目标可点：点聚光元素照常完成操作并推进。
    * viewport 必须在 describe 级用 test.use 固定：滚动是步骤激活时的一次性动作，
    * 页面加载完再 resize 不会重放。
    */
-  test.describe('引导高亮', () => {
+  test.describe('引导高亮与拦截', () => {
     test.use({ viewport: { width: 1280, height: 600 } });
 
-    test('训练两段引导：先聚光学员卡，点掉后聚光训练按钮', async ({ page, request }) => {
+    test('训练三段引导：逐步聚光，洞外点击无效，洞内目标可点', async ({ page, request }) => {
       const account = await registerUserRaw(request, 'tutspot');
       const token = account.accessToken;
       await loginViaUI(page, account.username, DEFAULT_PASSWORD);
 
+      const nextBtn = page.locator('[data-tutorial="next-btn"]');
+
       await expectStep(request, token, 'welcome');
-      await page.locator('[data-tutorial="next-btn"]').click();
+      await nextBtn.click();
       await expectStep(request, token, 'students');
+
+      // students：聚光侧栏「学员管理」
+      await expect(page.getByTestId('tutorial-spotlight'), '学员步应聚光侧栏入口').toBeVisible();
       await navLink(page, 'students').click();
-      await expectStep(request, token, 'training-pick');
+      await expect(page.getByTestId('students-page')).toBeVisible();
+      await expectStep(request, token, 'training-enter');
+
+      // training-enter：聚光侧栏「训练中心」；洞外的「总览」点了不动（不导航、不推进）
+      await expect(page.getByTestId('tutorial-spotlight'), '应高亮「训练中心」入口').toBeVisible();
+      await navLink(page, 'overview').click({ force: true });
+      await expect(page, '洞外点击不得导航').toHaveURL('/students');
+      await expectStepStays(request, token, 'training-enter');
       await navLink(page, 'training').click();
       await expect(page.getByTestId('training-page')).toBeVisible();
+      await expectStep(request, token, 'training-pick');
 
-      // 第一段：学员卡必须被滚进视口并聚光
+      // training-pick：第一张学员卡必须被滚进视口并聚光；洞外点击无效
       await expect(page.getByTestId('tutorial-spotlight'), '选学员步应高亮第一张学员卡').toBeVisible();
       const student = await page.locator("[data-tutorial='training-student']").boundingBox();
       expect(student, '学员卡锚点应已挂载').not.toBeNull();
       expect(student!.y, '学员卡应被滚进视口').toBeGreaterThanOrEqual(0);
       expect(student!.y + student!.height, '学员卡应完整落在视口内').toBeLessThanOrEqual(600);
+      await navLink(page, 'overview').click({ force: true });
+      await expect(page, '洞外点击不得导航').toHaveURL('/training');
+      await expectStepStays(request, token, 'training-pick');
 
-      // 点学员卡即推进到训练步（纯前端状态，服务端感知不到，只能由点击驱动）
+      // 点学员卡（洞内）即推进（纯前端状态，服务端感知不到，只能由点击驱动）
       await page.locator("[data-tutorial='training-student']").click();
       await expectStep(request, token, 'training');
 
-      // 第二段：聚光切到「开始基础训练」，引导卡仍留在视口内
+      // training：聚光切到「开始基础训练」，引导卡仍留在视口内；洞外点击无效，洞内可点并完成训练
       await expect(page.getByTestId('tutorial-spotlight'), '训练步应高亮「开始基础训练」').toBeVisible();
       const run = await page.locator("[data-tutorial='training-basic']").boundingBox();
       expect(run, '训练按钮锚点应已挂载').not.toBeNull();
@@ -302,6 +330,12 @@ test.describe('新手引导', () => {
       expect(run!.y + run!.height, '训练按钮应完整落在视口内').toBeLessThanOrEqual(600);
       const card = await page.getByTestId('tutorial-card').boundingBox();
       expect(card!.y + card!.height, '引导卡应留在视口内').toBeLessThanOrEqual(600);
+      await navLink(page, 'overview').click({ force: true });
+      await expect(page, '洞外点击不得导航').toHaveURL('/training');
+      await expectStepStays(request, token, 'training');
+      await page.getByTestId('train-run').click();
+      await expect(page.getByTestId('train-result')).toContainText('训练完成');
+      await expectStep(request, token, 'academy');
     });
   });
 });
