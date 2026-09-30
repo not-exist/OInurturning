@@ -1,7 +1,7 @@
 /**
  * M1 种子脚本（T1.7，一键演示环境）：pnpm -C apps/api seed
  *
- * 内容：演示账号 coach/demo1234（钱 5000、声誉 100）；3 名样例学员（common/good/elite 各一，
+ * 内容：演示账号 coach/demo1234（钱 5000、声誉 100，引导已解锁）；3 名样例学员（common/good/elite 各一，
  * 属性取 student.md §3.3 中值 E，不做随机掷点——声誉加成在 rep=100 时 E'≈E，静态化避免漂移）；
  * 背包样例道具（改名卡/定心丸/体力药水/浓咖啡/奶茶/精力药剂/若干六维书）；2 道样例预制题
  * （专项训练可用，作者绑定样例学员）；并触发一次免费招募池生成（固定 seed rng，可复现）。
@@ -90,6 +90,9 @@ async function main(): Promise<void> {
         role: 'USER',
         money: DEMO_MONEY,
         reputation: DEMO_REPUTATION,
+        // 引导已解锁（对齐 OPERATIONS.md §11 运维放行口径），否则 demo 环境被 10 步引导锁死
+        tutorialStep: 999,
+        tutorialCompleted: true,
         badges: [],
         lastSettledAt: now,
       },

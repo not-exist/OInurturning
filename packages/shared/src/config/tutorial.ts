@@ -37,7 +37,6 @@ export const tutorialStepSchema = z.object({
     'do_adventure',
     'do_story',
     'visit_shop',
-    'visit_backpack',
   ]),
   /**
    * 条件式完成门槛：仅 action=do_recruit 有意义——在册 ACTIVE 学员数达到该值即自动放行，
