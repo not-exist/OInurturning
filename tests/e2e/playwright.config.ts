@@ -20,7 +20,8 @@ export default defineConfig({
   testDir: './specs',
   fullyParallel: false,
   workers: 1,
-  retries: 0,
+  // CI 下抖动时重试一次，避免整条 e2e 流程因单次抖动转红（§R0）
+  retries: process.env.CI ? 1 : 0,
   timeout: 180_000,
   expect: { timeout: 15_000 },
   reporter: process.env.CI
