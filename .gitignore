@@ -9,3 +9,6 @@ test-results/
 playwright-report/
 playwright/.cache/
 tests/e2e/.auth/
+
+# SDD scratch (per-session, ephemeral)
+.superpowers/
