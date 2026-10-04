@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import path from 'node:path';
 import { getProblemTemplate, getStageConfig, importConfigs } from '../src/config/loader.js';
+
+const DOCS = path.resolve(import.meta.dirname, '../../../docs/data');
 
 describe('M2 configuration import', () => {
   it('loads all problem templates and story stages into the frozen bundle', async () => {
-    const bundle = await importConfigs();
+    const bundle = await importConfigs({ configDir: DOCS });
 
     expect(Object.keys(bundle.problems)).toHaveLength(34);
     expect(Object.keys(bundle.stages)).toHaveLength(33);
@@ -18,8 +21,8 @@ describe('M2 configuration import', () => {
   });
 
   it('keeps the five-file source hash idempotent while restoring active rows', async () => {
-    const first = await importConfigs();
-    const second = await importConfigs();
+    const first = await importConfigs({ configDir: DOCS });
+    const second = await importConfigs({ configDir: DOCS });
 
     expect(second.sourceHash).toBe(first.sourceHash);
   });

@@ -1,7 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import path from 'node:path';
 import type { TalentDef } from '@oinur/shared';
 import { importConfigs } from '../src/config/loader.js';
 import { aggregateFromTalents, aggregateMeta } from '../src/modules/students/meta.js';
+
+const DOCS = path.resolve(import.meta.dirname, '../../../docs/data');
 
 // ---------------------------------------------------------------------------
 // aggregateFromTalents：纯函数（fabricated defs 精确断言）
@@ -66,7 +69,7 @@ describe('aggregateFromTalents', () => {
 
 describe('aggregateMeta（CONFIG 集成）', () => {
   beforeAll(async () => {
-    await importConfigs();
+    await importConfigs({ configDir: DOCS });
   });
 
   it('空列表 → 空聚合', () => {

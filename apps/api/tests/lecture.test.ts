@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import path from 'node:path';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { getLectureTiers, listLectureLogs, teachLecture } from '../src/modules/academy/lecture.js';
 import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 import { importConfigs } from '../src/config/loader.js';
 
+const DOCS = path.resolve(import.meta.dirname, '../../../docs/data');
 const app = createApp();
 const NOW = new Date('2026-09-02T12:00:00.000Z');
 let sequence = 0;
@@ -48,7 +50,7 @@ async function createStudent(userId: number, value: number, stamina = 5): Promis
 describe('M3 lecture flow', () => {
   beforeEach(async () => {
     await resetUsers();
-    await importConfigs();
+    await importConfigs({ configDir: DOCS });
   });
 
   it('returns five configured audience tiers with per-user availability', async () => {

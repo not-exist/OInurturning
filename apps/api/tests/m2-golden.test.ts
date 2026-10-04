@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import path from 'node:path';
 import type {
   AbilityKey,
   DuelInput,
@@ -13,6 +14,8 @@ import { simulateRanking } from '../src/modules/contest/engine/ranking.js';
 import { stableHash, stableSerialize } from '../src/modules/contest/engine/report.js';
 import { getStoryOverview } from '../src/modules/story/service.js';
 import { resetUsers } from './helpers.js';
+
+const DOCS = path.resolve(import.meta.dirname, '../../../docs/data');
 
 const abilityKeys: readonly AbilityKey[] = [
   'DS',
@@ -74,7 +77,7 @@ const finalStageKeys = [
 
 describe('M2 consolidated golden', () => {
   beforeAll(async () => {
-    await importConfigs();
+    await importConfigs({ configDir: DOCS });
   });
   beforeEach(resetUsers);
 
@@ -106,7 +109,7 @@ describe('M2 consolidated golden', () => {
   });
 
   it('loads the full M2 problem and stage catalog', async () => {
-    const config = await importConfigs();
+    const config = await importConfigs({ configDir: DOCS });
     expect(Object.keys(config.problems)).toHaveLength(34);
     expect(Object.keys(config.stages)).toHaveLength(33);
   });

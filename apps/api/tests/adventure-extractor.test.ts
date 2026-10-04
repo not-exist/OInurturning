@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import path from 'node:path';
 import { eventConfigSchema, type EventConfig } from '@oinur/shared';
 import { getEventConfig, importConfigs } from '../src/config/loader.js';
 import {
@@ -6,6 +7,8 @@ import {
   listEligibleAdventureEvents,
   type AdventureEventDrawContext,
 } from '../src/modules/adventure/extractor.js';
+
+const DOCS = path.resolve(import.meta.dirname, '../../../docs/data');
 
 const baseEvent: EventConfig = {
   id: 'evt-test-gray',
@@ -40,7 +43,7 @@ function context(overrides: Partial<AdventureEventDrawContext> = {}): AdventureE
 
 describe('M3 event configuration', () => {
   it('imports all 40 events into the frozen config bundle', async () => {
-    const bundle = await importConfigs();
+    const bundle = await importConfigs({ configDir: DOCS });
 
     expect(Object.keys(bundle.events)).toHaveLength(40);
     expect(getEventConfig('evt-g1-signin-warmup')).toMatchObject({
