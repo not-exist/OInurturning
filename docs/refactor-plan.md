@@ -197,7 +197,7 @@ main
 ### R0.5 / R7（本次新增）
 
 - **R0.5 统一测试配置源**（优先级高于任何行长优化）。`apps/api/src/index.ts:181-185` 把 `apps/api/tests/fixtures/config`（**790 行**）设为整个测试套件的默认 `CONFIG_DIR`，而 `docs/data` 是 **4,852 行**：fixtures 里 talents 3 条（真 61）、items 34（真 81）、problems 2 个模板（真 34）、events 1 条（真 40）。同时有 **14 处无参 `importConfigs()`** 会退回 `env.CONFIG_DIR`（默认 `docs/data`），使同一文件内 `CONFIG` 在两个数据源间翻转。→ 大部分配置驱动行为其实只验证了缩水副本；应先明确每个测试用哪一份并消除翻转。
-- **R7 疑似产品漏项（独立提交，不与重构混）**：`packages/shared/src/domain/contest.ts:416-427` 的 `growthDeltaShape.attr` 白名单只到 10 键，**缺 `setting`**，而同文件的 `ABILITY_KEYS` 含 `PROBLEM`、Prisma `Student` 有 `setting` 列 → 若为漏项则"出题能力"永远无法通过成长增量落地。需作者/策划确认。
+- **R7 疑似产品漏项：已开 issue 跟进，不在本重构 PR 里改。** 核查见下：[#65](https://github.com/not-exist/OInurturning/issues/65) —— `growthDeltaShape.attr` 白名单只到 10 键、缺 `setting`，而 `ABILITY_KEYS` 含 `PROBLEM`、Prisma `Student` 有 `setting` 列；若为漏项则"出题能力"无法通过成长增量落地。是否修复由该 issue 决定，避免与重构混在一个 PR。
 
 ## 3. 门禁与 KPI
 
