@@ -41,15 +41,7 @@ jobs:
       E2E_DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_e2e
       E2E_JWT_SECRET: ci-e2e-jwt-secret-0123456789abcdef-only
     steps:
-      - uses: actions/checkout@v7
-      # 不传 version：由根 package.json 的 packageManager 决定，避免两处真源漂移
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm -C apps/api generate
+      - uses: ./.github/actions/ci-setup
       - name: Grant test user and create e2e database
         run: |
           mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
