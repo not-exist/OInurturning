@@ -225,73 +225,75 @@ async function reconcileTables(
   },
 ): Promise<void> {
   const { talents, items, problems, stages, events, economy, sourceHash } = batch;
+  const ops: Prisma.PrismaPromise<unknown>[] = [];
   for (const t of talents) {
-    await tx.configTalent.upsert({
+    ops.push(tx.configTalent.upsert({
       where: { id: t.id },
       create: { id: t.id, sourceHash, payload: toJsonPayload(t) },
       update: { sourceHash, payload: toJsonPayload(t), deprecated: false },
-    });
+    }));
   }
   for (const it of items) {
-    await tx.configItem.upsert({
+    ops.push(tx.configItem.upsert({
       where: { id: it.id },
       create: { id: it.id, sourceHash, payload: toJsonPayload(it) },
       update: { sourceHash, payload: toJsonPayload(it), deprecated: false },
-    });
+    }));
   }
   for (const problem of problems.templates) {
-    await tx.configProblem.upsert({
+    ops.push(tx.configProblem.upsert({
       where: { id: problem.id },
       create: { id: problem.id, sourceHash, payload: toJsonPayload(problem) },
       update: { sourceHash, payload: toJsonPayload(problem), deprecated: false },
-    });
+    }));
   }
   for (const stage of stages.stages) {
     const id = `${stage.chapter}:${stage.stage_index}`;
-    await tx.configStage.upsert({
+    ops.push(tx.configStage.upsert({
       where: { id },
       create: { id, sourceHash, payload: toJsonPayload(stage) },
       update: { sourceHash, payload: toJsonPayload(stage), deprecated: false },
-    });
+    }));
   }
   for (const event of events.events) {
-    await tx.configEvent.upsert({
+    ops.push(tx.configEvent.upsert({
       where: { id: event.id },
       create: { id: event.id, sourceHash, payload: toJsonPayload(event) },
       update: { sourceHash, payload: toJsonPayload(event), deprecated: false },
-    });
+    }));
   }
-  await tx.configEconomy.upsert({
+  ops.push(tx.configEconomy.upsert({
     where: { id: 'active' },
     create: { id: 'active', sourceHash, payload: toJsonPayload(economy) },
     update: { sourceHash, payload: toJsonPayload(economy), deprecated: false },
-  });
-  await tx.configTalent.updateMany({
+  }));
+  ops.push(tx.configTalent.updateMany({
     where: { deprecated: false, id: { notIn: talents.map((t) => t.id) } },
     data: { deprecated: true, sourceHash },
-  });
-  await tx.configItem.updateMany({
+  }));
+  ops.push(tx.configItem.updateMany({
     where: { deprecated: false, id: { notIn: items.map((i) => i.id) } },
     data: { deprecated: true, sourceHash },
-  });
-  await tx.configProblem.updateMany({
+  }));
+  ops.push(tx.configProblem.updateMany({
     where: { deprecated: false, id: { notIn: problems.templates.map((problem) => problem.id) } },
     data: { deprecated: true, sourceHash },
-  });
-  await tx.configStage.updateMany({
+  }));
+  ops.push(tx.configStage.updateMany({
     where: {
       deprecated: false,
       id: { notIn: stages.stages.map((stage) => `${stage.chapter}:${stage.stage_index}`) },
     },
     data: { deprecated: true, sourceHash },
-  });
-  await tx.configEvent.updateMany({
+  }));
+  ops.push(tx.configEvent.updateMany({
     where: {
       deprecated: false,
       id: { notIn: events.events.map((event) => event.id) },
     },
     data: { deprecated: true, sourceHash },
-  });
+  }));
+  await tx.$transaction(ops);
 }
 
 export interface ImportConfigsOptions {
