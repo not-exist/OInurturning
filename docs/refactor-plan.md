@@ -31,9 +31,10 @@ git checkout --orphan refactor/v2
 git add -A && git commit -m "chore: import legacy codebase as baseline"
 
 # 3. 原子化重构，逐个提交
-git commit -m "refactor(xxx): ..."
-git commit -m "refactor(yyy): ..."
-git commit -m "test: ..."
+#    提交信息遵循 §5：type(scope): subject（全英文、≤72 字符、正文写为什么）
+git commit -m "refactor(api): ..."
+git commit -m "refactor(shared): ..."
+git commit -m "test(api): ..."
 git commit -m "chore: remove legacy files"
 
 # 4. 推送开 PR
@@ -41,20 +42,22 @@ git push origin refactor/v2
 
 # 5. 重命名：让 refactor/v2 变成 main
 git branch -m refactor/v2 main        # 本地重命名（旧 main 需先改名或删除）
-git push origin main --force          # 覆盖远程 main
+git push origin main --force-with-lease    # 覆盖远程 main（用 lease 而非裸 --force，见 R5）
 git push origin --delete refactor/v2  # 删除远程旧分支名
 ```
 
-> 若本地已有 main，先 `git branch -m main old-main`，再 `git branch -m refactor/v2 main`。
+> 若本地已有 main，先 `git branch -m main old-main`，再 `git branch -m refactor/v2 main`。每条提交的 message 生成规范见 §5，可执行的格式校验命令见 §5.4。
 
 ### 1.3 最终形态
+
+每条提交的 message 遵循 §5（此处 xxx 是占位）：
 
 ```
 main
  ├── chore: import legacy codebase as baseline
- ├── refactor(xxx): ...
- ├── refactor(yyy): ...
- ├── test: ...
+ ├── refactor(api): ...
+ ├── refactor(shared): ...
+ ├── test(api): ...
  └── chore: remove legacy files
 ```
 
