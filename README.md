@@ -47,14 +47,17 @@ OInurturning/
 │   │   │   ├── config/     # env 与配置导入管线
 │   │   │   ├── lib/        # prisma、logger、jwt、rng 等
 │   │   │   ├── middlewares/
-│   │   │   └── modules/    # 按领域划分：auth、students、academy、contest、pvp 等
+│   │   │   ├── modules/    # 按领域划分：auth、students、academy、contest、pvp 等
+│   │   │   └── scripts/    # seed、admin、经济模拟、平衡回归等
 │   │   └── tests/          # Vitest 单测/集成测试
 │   └── web/                # 前端 SPA：Vite + React
 │       └── src/
 │           ├── app/        # 路由与布局
 │           ├── features/   # 领域页面
 │           ├── components/ # 通用 UI
-│           └── lib/        # api client、query hooks、store
+│           ├── lib/        # api client、query hooks、store
+│           └── styles/     # 全局样式
+└── .github/                # workflows 与 dependabot 配置
 ├── packages/
 │   └── shared/             # 共享类型与 Zod schema
 ├── docs/
@@ -75,9 +78,9 @@ OInurturning/
 
 ### 环境要求
 
-- Node.js >= 22
+- Node.js 26（CI 与镜像同为 node 26）
 - pnpm >= 10
-- Docker（用于 MySQL）或本地 MySQL 8.4 / MariaDB
+- Docker（用于 MySQL）或本地 MySQL 8.4 / MariaDB（compose 使用 `mysql:26.7`，见 §"配置即数据"）
 
 ### 本地开发（常规网络）
 
@@ -189,9 +192,9 @@ docker compose up -d --build
 
 `docs/data/*.yaml` 同时是策划文档与运行时数据源：
 
-- `talents.yaml` / `items.yaml` / `problems.yaml` / `events.yaml` / `stages.yaml` / `economy.yaml`
+- `talents.yaml` / `items.yaml` / `economy.yaml` / `problems.yaml` / `stages.yaml` / `events.yaml` / `tutorial.yaml` / `shop.yaml`
 - API 启动时经 Zod 严格校验并导入 MySQL 配置表，内存缓存为只读。
-- 改数值 = 改 yaml + 重启，无需发版。管理员可通过 `POST /api/admin/config/reload` 热重载。
+- 改数值 = 改 yaml + 重启容器，无需发版。暂无热重载端点（改 yaml 后需重启 api）。
 
 ---
 
