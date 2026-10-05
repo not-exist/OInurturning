@@ -10,6 +10,7 @@ import type {
 } from '@oinur/shared';
 import type { ContestRecordView } from '@oinur/shared';
 import { prisma } from '../../lib/prisma.js';
+import { stableSerialize } from './engine/report.js';
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 type ContestRecordRow = NonNullable<Awaited<ReturnType<typeof prisma.contestRecord.findFirst>>>;
@@ -44,6 +45,9 @@ export interface UpsertStoryProgressInput {
 }
 
 function jsonPayload(value: unknown): Prisma.InputJsonValue {
+  // Throws unless the value survives JSON storage unchanged (no undefined members,
+  // non-finite numbers, cycles, accessors, sparse arrays, or non-plain objects).
+  stableSerialize(value);
   return value as Prisma.InputJsonValue;
 }
 

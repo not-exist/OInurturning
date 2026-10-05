@@ -105,10 +105,6 @@ export function validateRankingReport(report: RankingReport): RankingReport {
   return rankingReportSchema.parse(report);
 }
 
-export function serializeRankingReport(report: RankingReport): string {
-  return stableSerialize(validateRankingReport(report));
-}
-
 export function isPassingRank(rank: number): boolean {
   return Number.isInteger(rank) && rank >= 1 && rank <= PASS_RANK_MAX;
 }

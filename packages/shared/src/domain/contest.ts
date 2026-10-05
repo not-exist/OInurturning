@@ -11,151 +11,22 @@ export type TiebreakMode = 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';
 const finiteNumber = z.number().finite();
 const nonnegativeFinite = finiteNumber.nonnegative();
 
-function rejectJsonSafetyIssue(
-  context: z.RefinementCtx,
-  path: (string | number)[],
-  message: string,
-): void {
-  context.addIssue({ code: z.ZodIssueCode.custom, path, message });
-}
-
-function rejectNonJsonSafeValues(
-  value: unknown,
-  context: z.RefinementCtx,
-  path: (string | number)[] = [],
-  active = new WeakSet<object>(),
-): void {
-  if (value === null) return;
-
-  switch (typeof value) {
-    case 'undefined':
-      rejectJsonSafetyIssue(context, path, 'Explicit undefined values are not JSON-safe');
-      return;
-    case 'number':
-      if (!Number.isFinite(value))
-        rejectJsonSafetyIssue(context, path, 'Non-finite numbers are not JSON-safe');
-      return;
-    case 'string':
-    case 'boolean':
-      return;
-    case 'bigint':
-    case 'function':
-    case 'symbol':
-      rejectJsonSafetyIssue(context, path, `${typeof value} values are not JSON-safe`);
-      return;
-    case 'object':
-      break;
-  }
-
-  const object = value as object;
-  if (active.has(object)) {
-    rejectJsonSafetyIssue(context, path, 'Cyclic values are not JSON-safe');
-    return;
-  }
-  active.add(object);
-
-  if (!Array.isArray(value)) {
-    const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) {
-      rejectJsonSafetyIssue(context, path, 'Non-plain objects are not JSON-safe');
-      active.delete(object);
-      return;
-    }
-
-    for (const key of Reflect.ownKeys(value)) {
-      if (typeof key === 'symbol') {
-        rejectJsonSafetyIssue(
-          context,
-          [...path, String(key)],
-          'Symbol-keyed properties are not JSON-safe',
-        );
-        continue;
-      }
-
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (descriptor?.enumerable !== true) {
-        rejectJsonSafetyIssue(
-          context,
-          [...path, key],
-          'Non-enumerable properties are not JSON-safe',
-        );
-      }
-      if (descriptor?.get !== undefined || descriptor?.set !== undefined) {
-        rejectJsonSafetyIssue(context, [...path, key], 'Accessor properties are not JSON-safe');
-        continue;
-      }
-
-      const entry = descriptor?.value;
-      rejectNonJsonSafeValues(entry, context, [...path, key], active);
-    }
-    active.delete(object);
-    return;
-  }
-
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key === 'symbol') {
-      rejectJsonSafetyIssue(
-        context,
-        [...path, String(key)],
-        'Symbol-keyed array properties are not JSON-safe',
-      );
-      continue;
-    }
-    if (key === 'length') continue;
-
-    const index = Number(key);
-    if (!Number.isInteger(index) || index < 0 || index >= value.length || String(index) !== key) {
-      rejectJsonSafetyIssue(
-        context,
-        [...path, key],
-        'Arrays may only contain dense numeric own properties',
-      );
-      continue;
-    }
-
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (descriptor?.get !== undefined || descriptor?.set !== undefined) {
-      rejectJsonSafetyIssue(context, [...path, key], 'Accessor properties are not JSON-safe');
-    }
-  }
-
-  for (let index = 0; index < value.length; index += 1) {
-    if (!Object.prototype.hasOwnProperty.call(value, index)) {
-      rejectJsonSafetyIssue(context, [...path, index], 'Sparse arrays are not JSON-safe');
-      continue;
-    }
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-    if (descriptor?.get !== undefined || descriptor?.set !== undefined) continue;
-    rejectNonJsonSafeValues(descriptor?.value, context, [...path, index], active);
-  }
-
-  active.delete(object);
-}
-
-function withJsonSafety<T extends z.ZodTypeAny>(schema: T) {
-  return z.preprocess((value, context) => {
-    rejectNonJsonSafeValues(value, context);
-    return value;
-  }, schema);
-}
-
 export const rankingSeedSchema = z.number().int().min(0).max(0xffffffff);
 
-const contestStageRefShape = z
+export const contestStageRefSchema = z
   .object({
     chapter: z.string().min(1),
     stageIndex: z.number().int().nonnegative(),
     ngPlusLayer: z.number().int().nonnegative(),
   })
   .strict();
-export const contestStageRefSchema = withJsonSafety(contestStageRefShape);
 export type ContestStageRef = z.infer<typeof contestStageRefSchema>;
 
 export const hookConditionSchema = z.enum(['first_problem', 'anti_ak']);
 export const partialOverrideSchema = z.enum(['none', 'trap', 'keep']);
 
 /** Frozen snake-case hook payload consumed directly by the solving kernel. */
-const frozenSolveHooksShape = z
+export const frozenSolveHooksSchema = z
   .object({
     condition: hookConditionSchema.optional(),
     time_k_mul: finiteNumber.optional(),
@@ -173,21 +44,19 @@ const frozenSolveHooksShape = z
     prob_amplify: finiteNumber.optional(),
   })
   .strict();
-export const frozenSolveHooksSchema = withJsonSafety(frozenSolveHooksShape);
 export type FrozenSolveHooks = z.infer<typeof frozenSolveHooksSchema>;
 
-const questionTraitSnapshotShape = z
+export const questionTraitSnapshotSchema = z
   .object({
     traitId: z.string().min(1),
     severity: z.enum(PROBLEM_SEVERITIES),
     hooks: z.array(frozenSolveHooksSchema),
   })
   .strict();
-export const questionTraitSnapshotSchema = withJsonSafety(questionTraitSnapshotShape);
 export type QuestionTraitSnapshot = z.infer<typeof questionTraitSnapshotSchema>;
 
 /** Immutable question values and resolved trait hooks used by simulation and replay. */
-const questionSnapshotShape = z
+export const questionSnapshotSchema = z
   .object({
     instanceId: z.string().min(1),
     index: z.number().int().nonnegative(),
@@ -206,7 +75,6 @@ const questionSnapshotShape = z
     premadeEntryId: z.number().int().positive().optional(),
   })
   .strict();
-export const questionSnapshotSchema = withJsonSafety(questionSnapshotShape);
 export type QuestionSnapshot = z.infer<typeof questionSnapshotSchema>;
 
 const abilityNumber = finiteNumber.min(1).max(100);
@@ -215,11 +83,10 @@ const abilityValues = Object.fromEntries(ABILITY_KEYS.map((key) => [key, ability
 };
 
 /** Immutable participant values captured at contest entry. Talents remain archival and inactive. */
-const participantTraitSnapshotShape = z.object({ traitId: z.string().min(1) }).strict();
-export const participantTraitSnapshotSchema = withJsonSafety(participantTraitSnapshotShape);
+export const participantTraitSnapshotSchema = z.object({ traitId: z.string().min(1) }).strict();
 export type ParticipantTraitSnapshot = z.infer<typeof participantTraitSnapshotSchema>;
 
-const participantSnapshotShape = z
+export const participantSnapshotSchema = z
   .object({
     side: z.enum(['HOME', 'AWAY', 'NPC']),
     userId: z.number().int().positive().nullable(),
@@ -233,22 +100,20 @@ const participantSnapshotShape = z
     energyMax: nonnegativeFinite,
   })
   .strict();
-export const participantSnapshotSchema = withJsonSafety(participantSnapshotShape);
 export type ParticipantSnapshot = z.infer<typeof participantSnapshotSchema>;
 
 /** 一支队伍的出战人数区间；同一场比赛内所有队伍必须取相同人数。 */
 export const TEAM_SIZE_MIN = 3 as const;
 export const TEAM_SIZE_MAX = 4 as const;
 
-const teamMembersShape = z
+export const teamMembersSchema = z
   .array(participantSnapshotSchema)
   .min(TEAM_SIZE_MIN)
   .max(TEAM_SIZE_MAX);
-export const teamMembersSchema = withJsonSafety(teamMembersShape);
 export type TeamMembers = z.infer<typeof teamMembersSchema>;
 
 /** 一场比赛的参赛队伍：HOME 为玩家队（恒 index 0），其余为 NPC 队。 */
-const contestTeamShape = z
+export const contestTeamSchema = z
   .object({
     teamId: z.string().min(1),
     side: z.enum(['HOME', 'NPC']),
@@ -256,15 +121,13 @@ const contestTeamShape = z
     members: teamMembersSchema,
   })
   .strict();
-export const contestTeamSchema = withJsonSafety(contestTeamShape);
 export type ContestTeam = z.infer<typeof contestTeamSchema>;
 
 /** 出题对决的某一侧队伍：只允许携带成员表，出场人数与对侧必须一致。 */
-const duelSideInputShape = z.object({ members: teamMembersSchema }).strict();
-export const duelSideInputSchema = withJsonSafety(duelSideInputShape);
+export const duelSideInputSchema = z.object({ members: teamMembersSchema }).strict();
 export type DuelSideInput = z.infer<typeof duelSideInputSchema>;
 
-const attemptResolutionShape = z
+export const attemptResolutionSchema = z
   .object({
     attemptNumber: z.number().int().positive(),
     verdict: z.enum(['AC', 'WA', 'TLE', 'UNFINISHED']),
@@ -276,10 +139,9 @@ const attemptResolutionShape = z
     clockExhausted: z.boolean(),
   })
   .strict();
-export const attemptResolutionSchema = withJsonSafety(attemptResolutionShape);
 export type AttemptResolutionSnapshot = z.infer<typeof attemptResolutionSchema>;
 
-const questionAttemptShape = z
+export const questionAttemptSchema = z
   .object({
     problemInstanceId: z.string().min(1),
     questionIndex: z.number().int().nonnegative(),
@@ -302,10 +164,9 @@ const questionAttemptShape = z
     notes: z.array(z.string()),
   })
   .strict();
-export const questionAttemptSchema = withJsonSafety(questionAttemptShape);
 export type QuestionAttemptSnapshot = z.infer<typeof questionAttemptSchema>;
 
-const participantAttemptShape = z
+export const participantAttemptSchema = z
   .object({
     problemInstanceId: z.string().min(1),
     questionIndex: z.number().int().nonnegative(),
@@ -340,10 +201,9 @@ const participantAttemptShape = z
       }
     }
   });
-export const participantAttemptSchema = withJsonSafety(participantAttemptShape);
 export type ParticipantAttempt = z.infer<typeof participantAttemptSchema>;
 
-const participantTimelineShape = z
+export const participantTimelineSchema = z
   .object({
     participant: participantSnapshotSchema,
     attempts: z.array(participantAttemptSchema),
@@ -371,20 +231,18 @@ const participantTimelineShape = z
       });
     }
   });
-export const participantTimelineSchema = withJsonSafety(participantTimelineShape);
 export type ParticipantTimeline = z.infer<typeof participantTimelineSchema>;
 
-const rankingStandingShape = z
+export const rankingStandingSchema = z
   .object({
     teamIndex: z.number().int().nonnegative(),
     totalScore: nonnegativeFinite,
     rank: z.number().int().positive(),
   })
   .strict();
-export const rankingStandingSchema = withJsonSafety(rankingStandingShape);
 export type RankingStanding = z.infer<typeof rankingStandingSchema>;
 
-const rewardLineShape = z.discriminatedUnion('type', [
+export const rewardLineSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('first_clear_money'), amount: nonnegativeFinite }).strict(),
   z
     .object({
@@ -408,10 +266,9 @@ const rewardLineShape = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
-export const rewardLineSchema = withJsonSafety(rewardLineShape);
 export type RewardLine = z.infer<typeof rewardLineSchema>;
 
-const growthDeltaShape = z
+export const growthDeltaSchema = z
   .object({
     attr: z.enum([
       'ds',
@@ -429,19 +286,17 @@ const growthDeltaShape = z
     sourceProblem: z.string().min(1).optional(),
   })
   .strict();
-export const growthDeltaSchema = withJsonSafety(growthDeltaShape);
 export type GrowthDelta = z.infer<typeof growthDeltaSchema>;
 
-const npcPoolParamShape = z
+const npcPoolParamSchema = z
   .object({
     size: z.number().int().nonnegative(),
     meanLevel: finiteNumber,
     spread: nonnegativeFinite,
   })
   .strict();
-const npcPoolParamSchema = withJsonSafety(npcPoolParamShape);
 
-const rankingInputShape = z
+export const rankingInputSchema = z
   .object({
     kind: z.enum(['story', 'custom']).optional(),
     stageRef: contestStageRefSchema.optional(),
@@ -516,10 +371,9 @@ const rankingInputShape = z
       teamIds.add(team.teamId);
     });
   });
-export const rankingInputSchema = withJsonSafety(rankingInputShape);
 export type RankingInput = z.infer<typeof rankingInputSchema>;
 
-const reportHeaderShape = z
+export const reportHeaderSchema = z
   .object({
     reportVersion: z.literal(1),
     engineVersion: z.string().min(1),
@@ -532,7 +386,6 @@ const reportHeaderShape = z
     growth: z.array(growthDeltaSchema),
   })
   .strict();
-export const reportHeaderSchema = withJsonSafety(reportHeaderShape);
 export type ReportHeader = z.infer<typeof reportHeaderSchema>;
 
 /** 队员身份摘要，用于核对 participants 与 teams.flatMap(members) 的顺序一致性。 */
@@ -616,17 +469,17 @@ function aggregateTeam(timelines: readonly ParticipantTimeline[]): TeamAggregate
   return { totalScore, rankingPenaltyMin };
 }
 
-const rankingReportShape = reportHeaderShape.extend({
-  format: z.literal('RANKING'),
-  inputSnapshot: rankingInputSchema,
-  questions: z.array(questionSnapshotSchema).min(1),
-  teams: z.array(contestTeamSchema).min(2),
-  participants: z.array(participantTimelineSchema).min(1),
-  standings: z.array(rankingStandingSchema).min(1),
-  pass: z.boolean(),
-});
-
-const rankingReportWithChecks = rankingReportShape.superRefine((report, context) => {
+export const rankingReportSchema = reportHeaderSchema
+  .extend({
+    format: z.literal('RANKING'),
+    inputSnapshot: rankingInputSchema,
+    questions: z.array(questionSnapshotSchema).min(1),
+    teams: z.array(contestTeamSchema).min(2),
+    participants: z.array(participantTimelineSchema).min(1),
+    standings: z.array(rankingStandingSchema).min(1),
+    pass: z.boolean(),
+  })
+  .superRefine((report, context) => {
   const instanceIds = new Set(report.questions.map((question) => question.instanceId));
   if (instanceIds.size !== report.questions.length) {
     context.addIssue({
@@ -751,7 +604,6 @@ const rankingReportWithChecks = rankingReportShape.superRefine((report, context)
     });
   }
 });
-export const rankingReportSchema = withJsonSafety(rankingReportWithChecks);
 export type RankingReport = z.infer<typeof rankingReportSchema>;
 
 export interface DuelRoundReport {
@@ -825,7 +677,7 @@ export interface DuelTiebreakInput {
   seed: number;
 }
 
-const duelTiebreakInputShape = z
+export const duelTiebreakInputSchema = z
   .object({
     mode: z.enum(['SUDDEN_DEATH', 'ENERGY', 'QUALITY', 'FRIENDLY']),
     homeEnergy: nonnegativeFinite,
@@ -837,11 +689,10 @@ const duelTiebreakInputShape = z
     seed: rankingSeedSchema,
   })
   .strict();
-export const duelTiebreakInputSchema = withJsonSafety(duelTiebreakInputShape);
 
 const duelMemberIndex = z.number().int().nonnegative();
 
-const duelInputShape = z
+export const duelInputSchema = z
   .object({
     home: duelSideInputSchema,
     away: duelSideInputSchema,
@@ -903,10 +754,9 @@ const duelInputShape = z
       }
     });
   });
-export const duelInputSchema = withJsonSafety(duelInputShape);
 export type DuelInput = z.infer<typeof duelInputSchema>;
 
-const duelRoundReportShape = z
+export const duelRoundReportSchema = z
   .object({
     roundNo: z.number().int().positive(),
     setterSide: z.enum(['HOME', 'AWAY']),
@@ -952,9 +802,8 @@ const duelRoundReportShape = z
       });
     }
   });
-export const duelRoundReportSchema = withJsonSafety(duelRoundReportShape);
 
-const duelReportShape = reportHeaderShape
+export const duelReportSchema = reportHeaderSchema
   .extend({
     format: z.literal('DUEL'),
     inputSnapshot: duelInputSchema,
@@ -1110,7 +959,6 @@ const duelReportShape = reportHeaderShape
       }
     }
   });
-export const duelReportSchema = withJsonSafety(duelReportShape);
 
 export type ContestReportView = ContestReport;
 

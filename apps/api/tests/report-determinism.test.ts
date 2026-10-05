@@ -15,7 +15,6 @@ import { simulateRanking } from '../src/modules/contest/engine/ranking.js';
 import {
   ENGINE_VERSION,
   buildContestSummary,
-  serializeRankingReport,
   stableHash,
   stableSerialize,
 } from '../src/modules/contest/engine/report.js';
@@ -120,42 +119,6 @@ describe('shared ranking contracts', () => {
     expect(attemptResolutionSchema.parse(firstSubmission)).toEqual(firstSubmission);
   });
 
-  it('rejects explicit undefined own properties at nested input and report boundaries', () => {
-    const malformedInput = input();
-    malformedInput.problems[0]!.traits = [
-      {
-        traitId: 'undefined-hook',
-        severity: 'red',
-        hooks: [{ condition: undefined } as unknown as Record<string, never>],
-      },
-    ];
-    const malformedReport = structuredClone(simulateRanking(input(), 45));
-    malformedReport.growth.push({
-      attr: 'ds',
-      delta: 1,
-      sourceProblem: undefined,
-    } as unknown as (typeof malformedReport.growth)[number]);
-
-    expect(rankingInputSchema.safeParse(malformedInput).success).toBe(false);
-    expect(rankingReportSchema.safeParse(malformedReport).success).toBe(false);
-  });
-
-  it('rejects unsafe raw members before Zod can strip them', () => {
-    const namedProblems = [replayQuestion()] as QuestionSnapshot[] & { extra?: unknown };
-    Object.defineProperty(namedProblems, 'extra', { value: undefined });
-    const namedInput = { ...input(), problems: namedProblems };
-
-    const cyclicInput = input() as RankingInput & { cycle?: unknown };
-    cyclicInput.cycle = cyclicInput;
-
-    const symbolInput = input() as RankingInput & { [key: symbol]: unknown };
-    symbolInput[Symbol('unsupported')] = 1;
-
-    expect(rankingInputSchema.safeParse(namedInput).success).toBe(false);
-    expect(rankingInputSchema.safeParse(cyclicInput).success).toBe(false);
-    expect(rankingInputSchema.safeParse(symbolInput).success).toBe(false);
-  });
-
   it('rejects inconsistent indexes, ranks, totals, energy, final mindset, and pass state', () => {
     const report = simulateRanking(input(), 45);
     const duplicateIndex = structuredClone(report);
@@ -214,11 +177,10 @@ describe('ranking report determinism', () => {
     const contestInput = input();
     const first = simulateRanking(contestInput, 0x1234abcd);
     const second = simulateRanking(contestInput, 0x1234abcd);
-    const firstBytes = serializeRankingReport(first);
-    const secondBytes = serializeRankingReport(second);
+    const firstBytes = stableSerialize(first);
+    const secondBytes = stableSerialize(second);
 
     expect(firstBytes).toBe(secondBytes);
-    expect(firstBytes).toBe(stableSerialize(first));
     expect(stableHash(first)).toBe(stableHash(second));
   });
 
@@ -289,7 +251,6 @@ describe('ranking report determinism', () => {
       durationMin: 100,
     };
     const report = simulateRanking(goldenInput, 123);
-    const serialized = serializeRankingReport(report);
 
     expect(
       report.participants[0]?.attempts[0]?.resolution.submissions.some(
@@ -297,8 +258,7 @@ describe('ranking report determinism', () => {
       ),
     ).toBe(true);
     expect(report.participants[0]?.attempts[0]?.resolution.penaltyMin).toBeGreaterThan(0);
-    expect(stableHash(report)).toBe('c5ce89e2');
-    expect(serialized).toBe(stableSerialize(report)); /*
+    expect(stableHash(report)).toBe('c5ce89e2'); /*
       '{"createdAt":"1970-01-01T00:00:00.123Z","engineVersion":"ranking-v1","format":"RANKING","growth":[],"inputSnapshot":{"durationMin":100,"kind":"custom","participants":[],"problems":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"student":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"traits":[],"userId":11}},"participants":[{"attempts":[{"energyCost":14,"focusGain":6,"mindsetDelta":-12,"minutesUsed":100,"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"resolution":{"energyAfter":76,"energyCost":14,"energyRequired":2,"estimatedTimeMin":19.55192508628933,"focusAfter":6,"focusBefore":0,"mindsetAfter":-10,"mindsetDelta":-12,"notes":["WA","WA","WA"],"penaltyMin":55.31720358486209,"problemInstanceId":"golden#0","questionIndex":0,"scoreAwarded":30,"submissionCount":3,"submissions":[{"attemptNumber":1,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":18.006145652292588,"timeSpentMin":43.00614565229259,"verdict":"WA"},{"attemptNumber":2,"clockExhausted":false,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":25,"submissionTimeMin":11.843373965624004,"timeSpentMin":36.843373965624004,"verdict":"WA"},{"attemptNumber":3,"clockExhausted":true,"extraEnergyCost":4,"mindsetDelta":-4,"penaltyMin":5.317203584862094,"submissionTimeMin":14.833276797221307,"timeSpentMin":20.1504803820834,"verdict":"WA"}],"timeSpentMin":100,"tleJudgeCount":0,"verdict":"UNFINISHED","waCount":3},"verdict":"UNFINISHED"}],"finalMindset":-10,"participant":{"abilities":{"CODING":70,"DP":70,"DS":70,"GRAPH":70,"GREEDY":70,"MATH":70,"PROBLEM":70,"STRING":70,"THINKING":70},"displayName":"Replay Player","energyMax":90,"focusCap":35,"mindset":2,"side":"HOME","studentId":22,"traits":[],"userId":11},"totalEnergySpent":14}],"pass":true,"questions":[{"codeVolume":50,"demand":70,"dimension":"GREEDY","index":0,"instanceId":"golden#0","partialScores":true,"score":100,"source":"GENERATED","thought":70,"timeLimitMin":30,"traits":[{"hooks":[{"ac_prob_add":-1,"wa_penalty_add":5}],"severity":"black","traitId":"golden-failure"}]}],"reportVersion":1,"rewards":[],"rngVersion":"mulberry32-v1","seed":123,"snapshotHash":"c7007ad4","standings":[{"participantIndex":0,"rank":1,"totalScore":30}]}',
     */
   });
