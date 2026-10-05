@@ -21,7 +21,7 @@ importers:
         specifier: ^3.9.9
         version: 3.9.9
       typescript:
-        specifier: ^6.0.3
+        specifier: ~6.0.3
         version: 6.0.3
       typescript-eslint:
         specifier: ^8.71.0
@@ -41,9 +41,6 @@ importers:
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.3
-      dotenv:
-        specifier: ^18.0.5
-        version: 18.0.5
       express:
         specifier: ^5.1.0
         version: 5.2.1
@@ -103,7 +100,7 @@ importers:
         specifier: ^4.23.15
         version: 4.23.15
       typescript:
-        specifier: ^6.0.3
+        specifier: ~6.0.3
         version: 6.0.3
       vitest:
         specifier: ^5.0.3
@@ -155,7 +152,7 @@ importers:
         specifier: ^4.1.0
         version: 4.3.3
       typescript:
-        specifier: ^6.0.3
+        specifier: ~6.0.3
         version: 6.0.3
       vite:
         specifier: ^8.3.2
@@ -168,7 +165,7 @@ importers:
         version: 4.6.5
     devDependencies:
       typescript:
-        specifier: ^6.0.3
+        specifier: ~6.0.3
         version: 6.0.3
 
 packages:
@@ -1616,11 +1613,6 @@ packages:
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
-
-  dotenv@18.0.5:
-    resolution: {integrity: sha512-aBrGvt6KhjxbEnatqMWOMidftwsrCiCvqh1yNIGB9QyF0J+VcWkKDMsvYOEm7ZS82oiV+BT1sTOtIlAmUlTpwQ==}
-    engines: {node: '>=12'}
-    hasBin: true
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -4153,8 +4145,6 @@ snapshots:
       wrappy: 1.0.2
 
   dotenv@17.4.2: {}
-
-  dotenv@18.0.5: {}
 
   dunder-proto@1.0.1:
     dependencies:

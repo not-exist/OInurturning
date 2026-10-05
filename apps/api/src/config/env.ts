@@ -1,5 +1,11 @@
-import 'dotenv/config';
+import { existsSync } from 'node:fs';
 import { z } from 'zod';
+
+// dotenv was dropped in favor of the Node built-in; semantics are identical:
+// load ./.env relative to the current working directory, silently skip when
+// the file does not exist, and never override variables already exported by
+// the calling shell or process manager.
+if (existsSync('.env')) process.loadEnvFile();
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
