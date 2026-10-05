@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { Student } from '@prisma/client';
+import type { Student } from '../src/generated/prisma/client.js';
 import {
   SERVER_DAY_OFFSET_HOUR,
   crossedDayBoundaries,

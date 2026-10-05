@@ -15,7 +15,7 @@
  * - 依赖 DATABASE_URL（-env-file 注入）；运行前已应用的迁移须包含 User/AdminAuditLog。
  */
 import bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client.js';
 import { env } from '../config/env.js';
 import { prisma } from '../lib/prisma.js';
 

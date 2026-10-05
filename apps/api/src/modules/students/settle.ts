@@ -1,4 +1,4 @@
-import type { Student } from '@prisma/client';
+import type { Student } from '../../generated/prisma/client.js';
 import { crossedDayBoundaries } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';

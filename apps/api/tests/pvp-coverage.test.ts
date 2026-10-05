@@ -2,7 +2,7 @@ import path from 'node:path';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../src/generated/prisma/client.js';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';

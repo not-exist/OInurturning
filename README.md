@@ -93,17 +93,17 @@ pnpm dev                      # 前端 http://localhost:5173，后端 http://loc
 
 可选：`pnpm -C apps/api seed` 灌入演示数据。
 
-### 受限网络 / 无 Docker 环境
+### 无 Docker 环境
 
-当无法访问 `binaries.prisma.sh` 且没有 Docker 时，仓库提供离线自举脚本：
+没有 Docker 时，仓库提供本地 MySQL 自举脚本：
 
 ```bash
 pnpm install
-node scripts/dev-bootstrap.mjs   # 自动：占位引擎 + queryCompiler 模式 + 本地 MySQL 二进制 + 建库
+node scripts/dev-bootstrap.mjs   # 自动：本地 MySQL 二进制 + 建库 + 生成 .env
 pnpm test
 ```
 
-原理：Prisma 7 起客户端默认即 Rust-free（queryCompiler/WASM），运行时统一走 `@prisma/adapter-mariadb` driver adapter，不再需要 query engine 二进制；`prisma generate` 若因 CDN 不可达失败，bootstrap 会布置占位引擎绕过。数据库侧从 npm 拉取 MySQL 5.7 社区二进制在本地启动。生产与常规开发仍使用 compose 的 MySQL 8.4，迁移 SQL 兼容。
+原理：Prisma 7 起客户端走 Rust-free 的 `prisma-client` generator（queryCompiler/WASM），运行时统一走 `@prisma/adapter-mariadb` driver adapter，`generate` 与运行时均不需要任何引擎二进制，受限网络也不影响。数据库侧从 npm 拉取 MySQL 5.7 社区二进制在本地启动。生产与常规开发仍使用 compose 的 MySQL 26.7，迁移 SQL 兼容。
 
 > Prisma 7 说明：数据库连接串不再写在 `apps/api/prisma/schema.prisma` 的 `datasource` 块里，而由 `apps/api/prisma.config.ts` 提供（CLI 侧），运行时则由 `PrismaClient({ adapter })` 直接持有。
 

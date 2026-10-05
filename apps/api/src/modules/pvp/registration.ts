@@ -1,4 +1,4 @@
-import { Prisma, type PvpRegistration, type PvpTournament, type Student } from '@prisma/client';
+import { Prisma, type PvpRegistration, type PvpTournament, type Student } from '../../generated/prisma/client.js';
 import { TEAM_SIZE_MAX, TEAM_SIZE_MIN, type ParticipantSnapshot } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';

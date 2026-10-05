@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
 import type { QualityTier, StudentView } from '@oinur/shared';
-import type { Student } from '@prisma/client';
+import type { Student } from '../src/generated/prisma/client.js';
 import { createApp } from '../src/index.js';
 import { mulberry32 } from '../src/lib/rng.js';
 import { prisma } from '../src/lib/prisma.js';

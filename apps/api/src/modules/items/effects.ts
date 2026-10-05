@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ITEM_USE_LIMITS, USABLE_ITEM_ID_SET } from '@oinur/shared';
-import type { Student } from '@prisma/client';
+import type { Student } from '../../generated/prisma/client.js';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
 import { dayKey, weekKey } from '../../lib/clock.js';

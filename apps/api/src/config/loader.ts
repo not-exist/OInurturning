@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from 'yaml';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../generated/prisma/client.js';
 import {
   economyConfigSchema,
   eventsConfigSchema,

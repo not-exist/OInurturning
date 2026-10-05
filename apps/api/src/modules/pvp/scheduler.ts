@@ -1,4 +1,4 @@
-import { Prisma, type PvpMatch, type PvpRegistration, type PvpTournament } from '@prisma/client';
+import { Prisma, type PvpMatch, type PvpRegistration, type PvpTournament } from '../../generated/prisma/client.js';
 import {
   frozenSolveHooksSchema,
   type DuelInput,

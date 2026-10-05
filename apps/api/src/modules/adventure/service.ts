@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { Prisma, type AdventureLog, type Student } from '@prisma/client';
+import { Prisma, type AdventureLog, type Student } from '../../generated/prisma/client.js';
 import {
   type BattleReplay,
   type ConfigRarity,

@@ -1,4 +1,4 @@
-import { Prisma, type ProblemLibraryEntry } from '@prisma/client';
+import { Prisma, type ProblemLibraryEntry } from '../../generated/prisma/client.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';

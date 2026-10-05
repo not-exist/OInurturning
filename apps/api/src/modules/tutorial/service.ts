@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';

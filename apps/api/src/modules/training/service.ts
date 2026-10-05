@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { Prisma, type ProblemLibraryEntry, type Student } from '@prisma/client';
+import { Prisma, type ProblemLibraryEntry, type Student } from '../../generated/prisma/client.js';
 import { DIMENSIONS, type DimensionKey } from '@oinur/shared';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';

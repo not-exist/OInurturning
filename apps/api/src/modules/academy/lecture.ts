@@ -1,4 +1,4 @@
-import { Prisma, type LectureLog } from '@prisma/client';
+import { Prisma, type LectureLog } from '../../generated/prisma/client.js';
 import {
   computeV,
   lectureConfigSchema,

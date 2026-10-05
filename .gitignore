@@ -12,3 +12,6 @@ tests/e2e/.auth/
 
 # SDD scratch (per-session, ephemeral)
 .superpowers/
+
+# Prisma prisma-client generator output (regenerated via `pnpm -C apps/api generate`)
+apps/api/src/generated/

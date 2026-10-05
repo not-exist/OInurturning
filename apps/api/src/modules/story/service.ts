@@ -1,4 +1,4 @@
-import { Prisma, type Student, type StoryProgress as StoryProgressRow } from '@prisma/client';
+import { Prisma, type Student, type StoryProgress as StoryProgressRow } from '../../generated/prisma/client.js';
 import {
   CONFIG_RARITIES,
   frozenSolveHooksSchema,

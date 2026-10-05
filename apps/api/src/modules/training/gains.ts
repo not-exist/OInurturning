@@ -1,4 +1,4 @@
-import type { Student } from '@prisma/client';
+import type { Student } from '../../generated/prisma/client.js';
 import type { DimensionKey } from '@oinur/shared';
 import type { MetaAggregate } from '../students/meta.js';
 

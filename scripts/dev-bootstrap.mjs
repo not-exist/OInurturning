@@ -2,17 +2,16 @@
 /**
  * 受限网络环境（离线/沙箱）开发引导脚本。
  *
- * 目标：在 `binaries.prisma.sh` 等二进制 CDN 不可达、且无 docker 的环境里，
- * 仍能完成 `pnpm test` / `pnpm dev` 所需的全部准备：
+ * 目标：在无 docker 的环境里，仍能完成 `pnpm test` / `pnpm dev` 所需的数据库准备：
  *
- *   1. Prisma 引擎：下载被墙时，本仓库改走 Rust-free 路线——
- *      queryCompiler(WASM) + @prisma/adapter-mariadb driver adapter，
- *      只需在 generate 时放置占位引擎文件绕过下载（占位文件不会被执行）。
- *   2. MySQL 服务器：无 docker 时，从 npm 拉取 MySQL 5.7 社区二进制 + 源码编译
- *      libaio，初始化本地 datadir 并启动（见 docs/, compose 生产仍为 mysql:8.4）。
- *   3. 初始化 oinur/oinur 账号并按 prisma/migrations 建好开发库。
+ *   1. MySQL 服务器：从 npm 拉取 MySQL 5.7 社区二进制 + 源码编译 libaio，
+ *      初始化本地 datadir 并启动（见 docs/，compose 生产为 mysql:26.7）。
+ *   2. 初始化 oinur/oinur 账号并按 prisma/migrations 建好开发库，
+ *      并在缺失时生成本地 .env（gitignored）。
  *
- * 正常网络环境下各步骤自动跳过（no-op）。用法：`node scripts/dev-bootstrap.mjs`
+ * Prisma 侧已迁移到 Rust-free 的 `prisma-client` generator（queryCompiler WASM +
+ * driver adapter），generate 与运行时都不再下载引擎二进制，无需任何占位处理。
+ * 数据库已就绪时各步骤自动跳过（no-op）。用法：`node scripts/dev-bootstrap.mjs`
  */
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -47,76 +46,8 @@ function tcpOpen(port, host = '127.0.0.1', timeout = 800) {
   });
 }
 
-function httpsReachable(url, timeout = 5000) {
-  return new Promise((resolve) => {
-    try {
-      const u = new URL(url);
-      const mod = u.protocol === 'http:' ? await_import('node:http') : await_import('node:https');
-      mod.then(({ request }) => {
-        const req = request({ hostname: u.hostname, method: 'HEAD', timeout });
-        const done = (ok) => (req.destroy(), resolve(ok));
-        req.setTimeout(timeout, () => done(false));
-        req.once('response', () => done(true));
-        req.once('error', () => done(false));
-        req.end();
-      });
-    } catch {
-      resolve(false);
-    }
-  });
-}
-const await_import = (m) => import(m);
-
-/** 1) Prisma：二进制 CDN 可达则按常规流程；不可达则布置占位文件并走 queryCompiler。 */
-async function bootstrapPrisma() {
-  const reach = await httpsReachable('https://binaries.prisma.sh/');
-  if (reach) {
-    log('binaries.prisma.sh 可达，使用常规 Prisma 流程（Rust library engine）');
-    return false;
-  }
-  log('binaries.prisma.sh 不可达，切换 Rust-free queryCompiler + driver adapter 模式');
-  // @prisma/engines 的缓存目录：放置空占位二进制后，fetch-engine 检测到 envVarPath 存在即跳过下载
-  const requireFromPrisma = createRequire(requireFromApi.resolve('prisma/package.json'));
-  let enginesDir;
-  try {
-    enginesDir = path.dirname(requireFromPrisma.resolve('@prisma/engines/package.json'));
-  } catch {
-    const globDir = path.join(ROOT, 'node_modules/.pnpm');
-    const hit = fs
-      .readdirSync(globDir)
-      .find((d) => d.startsWith('@prisma+engines@'));
-    if (!hit) throw new Error('未找到 @prisma/engines，请先 `pnpm install`');
-    enginesDir = path.join(globDir, hit, 'node_modules/@prisma/engines');
-  }
-  const gpMod = await await_import(requireFromPrisma.resolve('@prisma/get-platform'));
-  const gp = gpMod.default ?? gpMod;
-  const target = await gp.getBinaryTargetForCurrentPlatform();
-  const schemaEngine = path.join(enginesDir, `schema-engine-${target}`);
-  const queryEngine = path.join(enginesDir, `libquery_engine-${target}.so.node`);
-  for (const f of [schemaEngine, queryEngine]) {
-    if (!fs.existsSync(f)) {
-      fs.writeFileSync(f, '#!/bin/sh\necho prisma-engine-placeholder (never executed)\n');
-      fs.chmodSync(f, 0o755);
-      log('已布置占位引擎:', path.basename(f));
-    }
-  }
-  const gen = spawnSync('pnpm', ['exec', 'prisma', 'generate'], {
-    cwd: API,
-    shell: true,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      PRISMA_CLIENT_ENGINE_TYPE: 'client',
-      PRISMA_SCHEMA_ENGINE_BINARY: schemaEngine,
-      PRISMA_QUERY_ENGINE_LIBRARY: queryEngine,
-    },
-  });
-  if (gen.status !== 0) throw new Error('prisma generate 失败');
-  return true; // 需要 PRISMA_CLIENT_ENGINE_TYPE=client 运行时
-}
-
-/** 2) MySQL：有 docker 走 compose（略，见 pnpm db:up）；否则用 npm 上的社区二进制。 */
-async function bootstrapMysql(rustFree) {
+/** 1) MySQL：有 docker 走 compose（略，见 pnpm db:up）；否则用 npm 上的社区二进制。 */
+async function bootstrapMysql() {
   if (await tcpOpen(MYSQL_PORT)) {
     log(`MySQL 已在 127.0.0.1:${MYSQL_PORT} 运行`);
   } else {
@@ -228,9 +159,8 @@ async function applyMigrations(mariadb, database) {
   await admin.end();
 }
 
-/** 3) 本地 .env（gitignored）：受限网络下固定 client 引擎模式。 */
-function ensureEnv(rustFree) {
-  if (!rustFree) return;
+/** 2) 本地 .env（gitignored）：本地开发的最小环境配置。 */
+function ensureEnv() {
   for (const p of [path.join(ROOT, '.env'), path.join(API, '.env')]) {
     if (fs.existsSync(p)) continue;
     const secret = 'bootstrap-local-dev-secret-0123456789abcdef';
@@ -248,7 +178,6 @@ function ensureEnv(rustFree) {
         'PORT=3000',
         'NODE_ENV=development',
         'LOG_LEVEL=info',
-        'PRISMA_CLIENT_ENGINE_TYPE=client',
         '',
       ].join('\n'),
     );
@@ -256,7 +185,6 @@ function ensureEnv(rustFree) {
   }
 }
 
-const rustFree = await bootstrapPrisma();
-await bootstrapMysql(rustFree);
-await ensureEnv(rustFree);
+await bootstrapMysql();
+await ensureEnv();
 log(`完成 ✅  （node ${process.version}, ${os.platform()} ${os.arch()}）`);

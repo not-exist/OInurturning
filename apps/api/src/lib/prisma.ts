@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma } from '../generated/prisma/client.js';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { env } from '../config/env.js';
 

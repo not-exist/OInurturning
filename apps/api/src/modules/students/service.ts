@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import type { Student } from '@prisma/client';
+import type { Student } from '../../generated/prisma/client.js';
 import { computeV, type QualityTier, type StudentView } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';

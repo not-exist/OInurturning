@@ -29,7 +29,6 @@ export default defineConfig({
     env: {
       DATABASE_URL: 'mysql://oinur:oinur@127.0.0.1:3306/oinur_test',
       JWT_SECRET: 'test-secret-test-secret-test-secret-32',
-      PRISMA_CLIENT_ENGINE_TYPE: 'client',
     },
     // 无需 globalSetup，不碰数据库
     fileParallelism: true,

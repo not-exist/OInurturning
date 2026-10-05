@@ -10,7 +10,7 @@
  * 否则依赖 CONFIG 的路径（招募池生成）会挂。
  */
 import bcrypt from 'bcryptjs';
-import { Prisma, type QualityTier } from '@prisma/client';
+import { Prisma, type QualityTier } from '../generated/prisma/client.js';
 import { getConfig, importConfigs } from '../config/loader.js';
 import { env } from '../config/env.js';
 import { dayKey } from '../lib/clock.js';

@@ -4,7 +4,7 @@ import {
   type EconomyRecruitment,
   type TalentDef,
 } from '@oinur/shared';
-import type { QualityTier } from '@prisma/client';
+import type { QualityTier } from '../../generated/prisma/client.js';
 import { pickName } from './name-pool.js';
 
 /**

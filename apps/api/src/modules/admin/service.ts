@@ -1,4 +1,4 @@
-import { Prisma, type AdminAnnouncement, type AdminAuditLog, type PvpTournament } from '@prisma/client';
+import { Prisma, type AdminAnnouncement, type AdminAuditLog, type PvpTournament } from '../../generated/prisma/client.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { validatePvpPrizes } from '../pvp/rewards.js';

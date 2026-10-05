@@ -1,4 +1,4 @@
-import { Prisma, type PvpMatch, type PvpRewardGrant, type PvpTournament } from '@prisma/client';
+import { Prisma, type PvpMatch, type PvpRewardGrant, type PvpTournament } from '../../generated/prisma/client.js';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';

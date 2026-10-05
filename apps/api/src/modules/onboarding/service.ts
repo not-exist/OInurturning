@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { Prisma, type QualityTier } from '@prisma/client';
+import { Prisma, type QualityTier } from '../../generated/prisma/client.js';
 import { onboardingConfigSchema, type OnboardingConfig } from '@oinur/shared';
 import { getConfig } from '../../config/loader.js';
 import { dayKey } from '../../lib/clock.js';

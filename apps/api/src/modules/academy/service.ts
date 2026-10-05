@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { Prisma, type RecruitPool, type Student } from '@prisma/client';
+import { Prisma, type RecruitPool, type Student } from '../../generated/prisma/client.js';
 import { computeV, type StudentView } from '@oinur/shared';
 import { getConfig } from '../../config/loader.js';
 import { dayKey } from '../../lib/clock.js';

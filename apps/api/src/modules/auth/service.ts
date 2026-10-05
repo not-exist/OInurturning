@@ -1,11 +1,11 @@
 import bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { signAccess, signRefresh, type AccessClaims } from '../../lib/jwt.js';
 import type { MeView } from '@oinur/shared';
-import type { User } from '@prisma/client';
+import type { User } from '../../generated/prisma/client.js';
 
 const REFRESH_COOKIE = 'oinur_rt';
 
