@@ -82,7 +82,7 @@ export const problemConfigSchema = z
       template.trait_pool.forEach((entry, entryIndex) => {
         if (!traitIds.has(entry.trait)) {
           context.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: `Unknown problem trait: ${entry.trait}`,
             path: ['templates', templateIndex, 'trait_pool', entryIndex, 'trait'],
           });

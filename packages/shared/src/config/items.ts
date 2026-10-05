@@ -50,7 +50,7 @@ export const itemEffectSchema = z
     desc: z.string(),
     kind: z.enum(ITEM_EFFECT_KINDS),
   })
-  .passthrough();
+  .loose();
 export type ItemEffect = z.infer<typeof itemEffectSchema>;
 
 export const itemDefSchema = z

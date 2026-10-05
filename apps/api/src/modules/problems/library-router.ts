@@ -22,7 +22,7 @@ export const problemLibraryRouter = Router();
 problemLibraryRouter.post('/', requireAuth, async (req, res, next) => {
   try {
     const parsed = createSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await service.createProblem(req.user!.id, parsed.data.studentId, parsed.data.dimension) });
   } catch (error) {
     next(error);

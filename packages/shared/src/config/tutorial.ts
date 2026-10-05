@@ -60,7 +60,7 @@ export const tutorialStepSchema = z.object({
       count: z.number().int().positive().optional(),
       badge: z.string().optional(),
     })
-    .passthrough()
+    .loose()
     .optional(),
 });
 

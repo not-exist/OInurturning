@@ -20,7 +20,7 @@ storyRouter.get('/overview', requireAuth, async (req, res, next) => {
   try {
     const parsed = ngLevelSchema.safeParse(req.query.ngLevel ?? 0);
     if (!parsed.success)
-      throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await service.getStoryOverview(req.user!.id, parsed.data) });
   } catch (error) {
     next(error);
@@ -35,7 +35,7 @@ storyRouter.get('/progress', requireAuth, async (req, res, next) => {
         ? { success: true as const, data: undefined }
         : ngLevelSchema.safeParse(raw);
     if (!parsed.success)
-      throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await service.getProgress(req.user!.id, parsed.data) });
   } catch (error) {
     next(error);
@@ -46,7 +46,7 @@ storyRouter.post('/stages/:stageKey/enter', requireAuth, async (req, res, next) 
   try {
     const parsed = enterSchema.safeParse(req.body);
     if (!parsed.success)
-      throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     const idempotencyKey = req.header('Idempotency-Key') ?? parsed.data.idempotencyKey;
     if (idempotencyKey === undefined)
       throw new ApiError('VALIDATION_FAILED', { field: 'idempotencyKey' });

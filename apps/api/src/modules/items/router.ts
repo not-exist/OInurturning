@@ -21,7 +21,7 @@ itemsRouter.get('/', requireAuth, async (req, res, next) => {
 itemsRouter.post('/use', requireAuth, async (req, res, next) => {
   try {
     const parsed = UseBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await svc.useItem(req.user!.id, parsed.data) });
   } catch (e) { next(e); }
 });

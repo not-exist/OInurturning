@@ -34,7 +34,7 @@ studentsRouter.get('/:id', requireAuth, async (req, res, next) => {
 studentsRouter.post('/:id/rename', requireAuth, async (req, res, next) => {
   try {
     const parsed = RenameBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await svc.renameStudent(req.user!.id, parseId(req.params.id!), parsed.data.name) });
   } catch (e) { next(e); }
 });

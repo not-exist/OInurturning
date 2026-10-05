@@ -11,9 +11,9 @@ import { verifyRefresh } from '../../lib/jwt.js';
 
 export const authRouter = Router();
 
-function parse<T extends z.ZodTypeAny>(schema: T, body: unknown): z.infer<T> {
+function parse<T extends z.ZodType>(schema: T, body: unknown): z.infer<T> {
   const r = schema.safeParse(body);
-  if (!r.success) throw new ApiError('VALIDATION_FAILED', r.error.flatten().fieldErrors);
+  if (!r.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(r.error).fieldErrors);
   return r.data;
 }
 

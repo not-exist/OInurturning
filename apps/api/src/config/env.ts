@@ -12,7 +12,7 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   /** 可信反向代理层数；用于恢复原始协议并生成正确的 Secure Cookie。 */
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: z.url(),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET 至少 32 字节随机'),
   BCRYPT_COST: z.coerce.number().int().min(10).max(14).default(12),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug']).default('info'),
@@ -31,7 +31,7 @@ const EnvSchema = z.object({
 
 const parsed = EnvSchema.safeParse(process.env);
 if (!parsed.success) {
-  console.error('[env] 环境变量校验失败：\n', parsed.error.flatten().fieldErrors);
+  console.error('[env] 环境变量校验失败：\n', z.flattenError(parsed.error).fieldErrors);
   process.exit(1);
 }
 

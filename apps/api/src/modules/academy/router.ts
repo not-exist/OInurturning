@@ -35,7 +35,7 @@ academyRouter.post('/refresh', requireAuth, async (req, res, next) => {
 academyRouter.post('/recruit', requireAuth, async (req, res, next) => {
   try {
     const parsed = RecruitBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await svc.recruit(req.user!.id, parsed.data.tempId) });
   } catch (e) { next(e); }
 });
@@ -49,7 +49,7 @@ academyRouter.get('/lecture-tiers', requireAuth, async (req, res, next) => {
 academyRouter.post('/lectures', requireAuth, async (req, res, next) => {
   try {
     const parsed = LectureBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({
       ok: true,
       data: await lecture.teachLecture(

@@ -37,7 +37,7 @@ adminRouter.use(requireAdmin);
 adminRouter.post('/tournaments', async (req, res, next) => {
   try {
     const parsed = tournamentSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     if (parsed.data.registerEndsAt <= new Date() || parsed.data.autoStartAt < parsed.data.registerEndsAt) {
       throw new ApiError('VALIDATION_FAILED', { field: 'autoStartAt', reason: 'invalid tournament window' });
     }
@@ -60,7 +60,7 @@ adminRouter.patch('/pvp-tournaments/:id', async (req, res, next) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
     const parsed = z.object({ prizes: z.record(z.string(), z.unknown()) }).strict().safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await service.updateTournamentPrizes(req.user!.id, id, parsed.data.prizes) });
   } catch (error) {
     next(error);
@@ -70,7 +70,7 @@ adminRouter.patch('/pvp-tournaments/:id', async (req, res, next) => {
 adminRouter.post('/announcements', async (req, res, next) => {
   try {
     const parsed = announcementSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await service.createAnnouncement(req.user!.id, parsed.data.title, parsed.data.body) });
   } catch (error) {
     next(error);

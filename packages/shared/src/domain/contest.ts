@@ -194,7 +194,7 @@ export const participantAttemptSchema = z
     for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
       if (attempt[key] !== expected[key]) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: [key],
           message: `Must match resolution.${key}`,
         });
@@ -215,7 +215,7 @@ export const participantTimelineSchema = z
     const energySpent = timeline.attempts.reduce((total, attempt) => total + attempt.energyCost, 0);
     if (timeline.totalEnergySpent !== energySpent) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['totalEnergySpent'],
         message: 'Must equal summed attempt energy',
       });
@@ -225,7 +225,7 @@ export const participantTimelineSchema = z
       timeline.attempts.at(-1)?.resolution.mindsetAfter ?? timeline.participant.mindset;
     if (timeline.finalMindset !== expectedMindset) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['finalMindset'],
         message: 'Must equal the final replay mindset',
       });
@@ -311,7 +311,7 @@ export const rankingInputSchema = z
     const instanceIds = new Set(input.problems.map((problem) => problem.instanceId));
     if (instanceIds.size !== input.problems.length) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['problems'],
         message: 'instanceId values must be unique',
       });
@@ -323,7 +323,7 @@ export const rankingInputSchema = z
       const expectedSide = teamIndex === 0 ? 'HOME' : 'NPC';
       if (team.side !== expectedSide) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['teams', teamIndex, 'side'],
           message: `Team ${teamIndex} must use side ${expectedSide}`,
         });
@@ -331,7 +331,7 @@ export const rankingInputSchema = z
       const expectedUserId = teamIndex === 0 ? team.userId : null;
       if (team.userId !== expectedUserId) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['teams', teamIndex, 'userId'],
           message: teamIndex === 0 ? 'Player team must have a userId' : 'NPC teams must not have a userId',
         });
@@ -340,14 +340,14 @@ export const rankingInputSchema = z
       team.members.forEach((member, memberIndex) => {
         if (member.side !== expectedSide) {
           context.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['teams', teamIndex, 'members', memberIndex, 'side'],
             message: `Team members must use side ${expectedSide}`,
           });
         }
         if (member.studentId !== null && memberStudentIds.has(member.studentId)) {
           context.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['teams', teamIndex, 'members', memberIndex, 'studentId'],
             message: 'Student IDs must be unique within a team',
           });
@@ -356,14 +356,14 @@ export const rankingInputSchema = z
       });
       if (team.members.length !== rosterSize) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['teams', teamIndex, 'members'],
           message: 'Every team must field the same number of members',
         });
       }
       if (teamIds.has(team.teamId)) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['teams', teamIndex, 'teamId'],
           message: 'teamId values must be unique',
         });
@@ -380,7 +380,7 @@ export const reportHeaderSchema = z
     rngVersion: z.string().min(1),
     seed: rankingSeedSchema,
     snapshotHash: z.string().regex(/^[0-9a-f]{8}$/),
-    createdAt: z.string().datetime(),
+    createdAt: z.iso.datetime(),
     stageRef: contestStageRefSchema.optional(),
     rewards: z.array(rewardLineSchema),
     growth: z.array(growthDeltaSchema),
@@ -483,7 +483,7 @@ export const rankingReportSchema = reportHeaderSchema
   const instanceIds = new Set(report.questions.map((question) => question.instanceId));
   if (instanceIds.size !== report.questions.length) {
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['questions'],
       message: 'instanceId values must be unique',
     });
@@ -491,7 +491,7 @@ export const rankingReportSchema = reportHeaderSchema
 
   if (report.standings.length !== report.teams.length) {
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['standings'],
       message: 'Must contain exactly one standing per team',
     });
@@ -504,7 +504,7 @@ export const rankingReportSchema = reportHeaderSchema
     )
   ) {
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['teams'],
       message: 'Teams must match inputSnapshot.teams exactly',
     });
@@ -513,7 +513,7 @@ export const rankingReportSchema = reportHeaderSchema
   const flatMembers = report.teams.flatMap((team) => team.members);
   if (flatMembers.length !== report.participants.length) {
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['participants'],
       message: 'Must contain one timeline per team member',
     });
@@ -521,7 +521,7 @@ export const rankingReportSchema = reportHeaderSchema
     report.participants.forEach((timeline, index) => {
       if (memberIdentityKey(timeline.participant) !== memberIdentityKey(flatMembers[index]!)) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['participants', index, 'participant'],
           message: 'Order must follow teams.flatMap(members)',
         });
@@ -548,21 +548,21 @@ export const rankingReportSchema = reportHeaderSchema
     const expected = expectedTeamOrder[standingPosition];
     if (standing.teamIndex !== expected?.teamIndex) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['standings', standingPosition, 'teamIndex'],
         message: 'Must match score, accepted-time, and stable-index ordering',
       });
     }
     if (standing.rank !== standingPosition + 1) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['standings', standingPosition, 'rank'],
         message: 'Ranks must be contiguous and match standings order',
       });
     }
     if (standing.teamIndex >= report.teams.length || seenTeams.has(standing.teamIndex)) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['standings', standingPosition, 'teamIndex'],
         message: 'Team indexes must be unique and in range',
       });
@@ -571,7 +571,7 @@ export const rankingReportSchema = reportHeaderSchema
 
     if (standing.totalScore !== expected?.totalScore) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['standings', standingPosition, 'totalScore'],
         message: 'Must equal the aggregated team score',
       });
@@ -586,7 +586,7 @@ export const rankingReportSchema = reportHeaderSchema
         seenProblems.has(attempt.problemInstanceId)
       ) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['participants', participantIndex, 'attempts', attemptPosition, 'problemInstanceId'],
           message: 'Attempt problem instance IDs must be known and unique per participant',
         });
@@ -598,7 +598,7 @@ export const rankingReportSchema = reportHeaderSchema
   const playerStanding = report.standings.find((standing) => standing.teamIndex === 0);
   if (playerStanding === undefined || report.pass !== playerStanding.rank <= 8) {
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['pass'],
       message: 'Must match the player team rank pass line',
     });
@@ -705,14 +705,14 @@ export const duelInputSchema = z
     const instanceIds = new Set(input.questions.map((question) => question.instanceId));
     if (instanceIds.size !== input.questions.length) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['questions'],
         message: 'instanceId values must be unique',
       });
     }
     if (input.home.members.length !== input.away.members.length) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['away', 'members'],
         message: 'Both sides must field the same number of members',
       });
@@ -720,7 +720,7 @@ export const duelInputSchema = z
     input.home.members.forEach((member, memberIndexValue) => {
       if (member.side !== 'HOME') {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['home', 'members', memberIndexValue, 'side'],
           message: 'Home members must use side HOME',
         });
@@ -729,7 +729,7 @@ export const duelInputSchema = z
     input.away.members.forEach((member, memberIndexValue) => {
       if (member.side !== 'AWAY') {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['away', 'members', memberIndexValue, 'side'],
           message: 'Away members must use side AWAY',
         });
@@ -739,7 +739,7 @@ export const duelInputSchema = z
     const roundCount = input.home.members.length * 2;
     if (input.questions.length < roundCount) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['questions'],
         message: `Must supply at least ${roundCount} questions for ${input.home.members.length} members per side`,
       });
@@ -747,7 +747,7 @@ export const duelInputSchema = z
     input.questions.slice(roundCount).forEach((question, offset) => {
       if (question.source === 'PREMADE') {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['questions', offset + roundCount, 'source'],
           message: 'Sudden-death questions must be generated',
         });
@@ -782,21 +782,21 @@ export const duelRoundReportSchema = z
   .superRefine((round, context) => {
     if (round.setterSide === round.answererSide || round.answerer.side !== round.answererSide) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['answererSide'],
         message: 'Setter and answerer sides must differ',
       });
     }
     if (round.problemSource !== round.question.source) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['problemSource'],
         message: 'Must match question source',
       });
     }
     if (round.solved !== (round.reason === 'AC')) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['solved'],
         message: 'Must match the round reason',
       });
@@ -827,7 +827,7 @@ export const duelReportSchema = reportHeaderSchema
   .superRefine((report, context) => {
     if (report.scoreAfterEachRound.length !== report.rounds.length) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['scoreAfterEachRound'],
         message: 'Must contain one score per round',
       });
@@ -837,7 +837,7 @@ export const duelReportSchema = reportHeaderSchema
     report.rounds.forEach((round, index) => {
       if (round.roundNo !== index + 1) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['rounds', index, 'roundNo'],
           message: 'Round numbers must be contiguous',
         });
@@ -847,7 +847,7 @@ export const duelReportSchema = reportHeaderSchema
       const score = report.scoreAfterEachRound[index];
       if (score?.home !== home || score?.away !== away) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['scoreAfterEachRound', index],
           message: 'Must match cumulative round scores',
         });
@@ -855,7 +855,7 @@ export const duelReportSchema = reportHeaderSchema
     });
     if (report.scores.home !== home || report.scores.away !== away) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['scores'],
         message: 'Must match final cumulative score',
       });
@@ -867,7 +867,7 @@ export const duelReportSchema = reportHeaderSchema
     const roundCount = memberCount * 2;
     if (report.rounds.length < roundCount) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['rounds'],
         message: `Must contain at least ${roundCount} rounds for ${memberCount} members per side`,
       });
@@ -885,35 +885,35 @@ export const duelReportSchema = reportHeaderSchema
 
       if (round.setterSide !== expectedSetterSide) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['rounds', index, 'setterSide'],
           message: 'Odd rounds must be set by HOME and even rounds by AWAY',
         });
       }
       if (round.answererSide !== expectedAnswererSide) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['rounds', index, 'answererSide'],
           message: 'Answerer side must be opposite the setter side',
         });
       }
       if (round.setterMemberIndex !== expectedSetterMember) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['rounds', index, 'setterMemberIndex'],
           message: 'Setter member must follow the 2N rotation',
         });
       }
       if (round.answererMemberIndex !== expectedAnswererMember) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['rounds', index, 'answererMemberIndex'],
           message: 'Answerer member must follow the 2N rotation',
         });
       }
       if (expectedAnswerer === undefined || memberIdentityKey(round.answerer) !== memberIdentityKey(expectedAnswerer)) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['rounds', index, 'answerer'],
           message: 'Answerer must match the input snapshot member',
         });
@@ -926,14 +926,14 @@ export const duelReportSchema = reportHeaderSchema
           round.question.source !== expectedQuestion.source
         ) {
           context.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['rounds', index, 'question'],
             message: 'Regular round question must match inputSnapshot.questions',
           });
         }
       } else if (round.question.source !== 'GENERATED') {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['rounds', index, 'question', 'source'],
           message: 'Sudden-death questions must be generated',
         });
@@ -949,7 +949,7 @@ export const duelReportSchema = reportHeaderSchema
           for (const duty of ['setter', 'answerer'] as const) {
             if (!duties.has(`${duty}:${side}:${member}`)) {
               context.addIssue({
-                code: z.ZodIssueCode.custom,
+                code: 'custom',
                 path: ['rounds'],
                 message: `Every ${side} member must ${duty === 'setter' ? 'set' : 'answer'} exactly once`,
               });

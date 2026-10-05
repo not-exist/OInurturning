@@ -14,19 +14,19 @@ export const economyTrainingSchema = z
     student_coeff: z.number(),
     basic: z
       .object({ money_base: money, stamina_cost: z.number().int().positive() })
-      .passthrough(),
+      .loose(),
     directed: z
       .object({ money_base: money, stamina_cost: z.number().int().positive(), book_consumed: z.number().int().positive() })
-      .passthrough(),
+      .loose(),
     specialized: z
       .object({
         money_base: money,
         stamina_cost: z.number().int().positive(),
         premade_problem_consumed: z.number().int().positive(),
       })
-      .passthrough(),
+      .loose(),
   })
-  .passthrough();
+  .loose();
 export type EconomyTraining = z.infer<typeof economyTrainingSchema>;
 
 export const ECONOMY_QUALITY_TIERS = ['common', 'good', 'elite', 'genius'] as const;
@@ -51,9 +51,9 @@ export const economyRecruitmentSchema = z
         daily_price_cap: money,
         free_interval_hours: z.number(),
       })
-      .passthrough(),
+      .loose(),
   })
-  .passthrough();
+  .loose();
 export type EconomyRecruitment = z.infer<typeof economyRecruitmentSchema>;
 
 export const lectureTierSchema = z
@@ -101,9 +101,9 @@ export const lectureGrowthSchema = z
         thinking: z.number().nonnegative(),
         setting: z.number().nonnegative(),
       })
-      .passthrough(),
+      .loose(),
   })
-  .passthrough();
+  .loose();
 export type LectureGrowthConfig = z.infer<typeof lectureGrowthSchema>;
 
 export const lectureConfigSchema = z
@@ -113,16 +113,16 @@ export const lectureConfigSchema = z
       rep_divisor: z.number().positive(),
       min_mult: z.number().nonnegative(),
       max_mult: z.number().nonnegative(),
-    }).passthrough(),
+    }).loose(),
     overflow_bonus: z.object({
       overflow_step: z.number().positive(),
       overflow_pct: z.number().nonnegative(),
       overflow_cap_pct: z.number().nonnegative(),
-    }).passthrough(),
+    }).loose(),
     /** 缺省即「讲课不带来成长」（历史配置/精简 fixture 兼容）；docs/data 必须提供 */
     growth: lectureGrowthSchema.optional(),
   })
-  .passthrough();
+  .loose();
 export type LectureConfig = z.infer<typeof lectureConfigSchema>;
 
 const simulationProfileIdSchema = z.enum(['beginner', 'mid', 'late']);
@@ -216,5 +216,5 @@ export const economyConfigSchema = z
     simulation: simulationConfigSchema.optional(),
     onboarding: onboardingConfigSchema.optional(),
   })
-  .passthrough();
+  .loose();
 export type EconomyConfig = z.infer<typeof economyConfigSchema>;

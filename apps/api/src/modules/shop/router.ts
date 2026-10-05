@@ -28,7 +28,7 @@ const BuySchema = z.object({
 shopRouter.post('/buy', async (req, res, next) => {
   try {
     const parsed = BuySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     const { itemId, quantity } = parsed.data;
     // 幂等键可选（TECH-DESIGN §12 T8）：重复下单/超时重试会重复扣钱，故带了 key 就按 key+请求指纹重放。
     const rawKey = req.header('Idempotency-Key');
@@ -54,7 +54,7 @@ const LogsQuerySchema = z.object({
 shopRouter.get('/logs', async (req, res, next) => {
   try {
     const parsed = LogsQuerySchema.safeParse(req.query);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     const data = await svc.listLogs(req.user!.id, parsed.data.limit);
     res.json({ ok: true, data });
   } catch (e) {

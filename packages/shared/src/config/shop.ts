@@ -11,7 +11,7 @@ export const shopConfigSchema = z
         purple: z.number().int().nonnegative(),
         colorful: z.number().int().nonnegative(),
       })
-      .passthrough(),
+      .loose(),
     functional_gates: z.record(z.string(), z.number().int().nonnegative()).optional(),
     daily_limits: z.record(z.string(), z.number().int().positive()).optional(),
     weekly_limits: z.record(z.string(), z.number().int().positive()).optional(),
@@ -20,10 +20,10 @@ export const shopConfigSchema = z
         daily_at: z.string(),
         weekly_at: z.string(),
       })
-      .passthrough()
+      .loose()
       .optional(),
   })
-  .passthrough();
+  .loose();
 
 export type ShopConfig = z.infer<typeof shopConfigSchema>;
 

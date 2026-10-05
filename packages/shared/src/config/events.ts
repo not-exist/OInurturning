@@ -21,10 +21,10 @@ const eventRequirementsSchema = z
       .object({
         six_max: z.number().finite().nonnegative().optional(),
       })
-      .passthrough()
+      .loose()
       .optional(),
   })
-  .passthrough();
+  .loose();
 export type EventRequirements = z.infer<typeof eventRequirementsSchema>;
 
 /** 历练出题对决参数：局数由 party_size 推导（2N 局，每人出一题、答一题） */
@@ -35,7 +35,7 @@ export const eventDuelSchema = z
     quality_rule: z.boolean(),
     tiebreak: z.string().min(1),
   })
-  .passthrough();
+  .loose();
 export type EventDuel = z.infer<typeof eventDuelSchema>;
 
 const eventOutcomeSchema = z
@@ -44,7 +44,7 @@ const eventOutcomeSchema = z
     type: z.enum(EVENT_OUTCOME_TYPES),
     duel: eventDuelSchema.optional(),
   })
-  .passthrough();
+  .loose();
 export type EventOutcome = z.infer<typeof eventOutcomeSchema>;
 
 const eventConsumeSchema = z
@@ -62,7 +62,7 @@ const eventChoiceSchema = z
     cost_money: z.number().int().nonnegative().optional(),
     outcomes: z.array(eventOutcomeSchema).min(1),
   })
-  .passthrough();
+  .loose();
 export type EventChoice = z.infer<typeof eventChoiceSchema>;
 
 export const eventConfigSchema = z

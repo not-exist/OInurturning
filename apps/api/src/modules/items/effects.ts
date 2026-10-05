@@ -29,7 +29,7 @@ const amountField = z.object({ amount: z.number().finite() });
 /** 咖啡类：amount 有限数值 + mentality_change 必须为有限数值（心态副作用）；其余子键 passthrough 放行（F-4） */
 const staminaMindsetField = z
   .object({ amount: z.number().finite(), mentality_change: z.number().finite() })
-  .passthrough();
+  .loose();
 /** 直用书：attribute 必须为合法科目键、amount 为有限数值 */
 const bookField = z.object({ attribute: z.string().min(1), amount: z.number().finite() });
 

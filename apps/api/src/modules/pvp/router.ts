@@ -80,7 +80,7 @@ pvpRouter.post('/tournaments/:id/rewards/claim', async (req, res, next) => {
 pvpRouter.post('/tournaments/:id/register', async (req, res, next) => {
   try {
     const parsed = registrationSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({
       ok: true,
       data: await service.registerPvp(
@@ -99,7 +99,7 @@ pvpRouter.post('/tournaments/:id/register', async (req, res, next) => {
 pvpRouter.post('/tournaments/:id/registration', async (req, res, next) => {
   try {
     const parsed = registrationSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', parsed.error.flatten().fieldErrors);
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await service.registerPvp(req.user!.id, parseId(req.params.id), parsed.data.studentIds, parsed.data.problemEntryIds) });
   } catch (error) {
     next(error);
