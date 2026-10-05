@@ -48,6 +48,14 @@ updates:
         update-types:
           - 'minor'
           - 'patch'
+    ignore:
+      # typescript-eslint 8.x declares a peer range of >=4.8.4 <6.1.0; a
+      # typescript 6.1+ bump would resolve the range but fail lint, so hold
+      # typescript at ~6.0.3 until typescript-eslint widens the range.
+      - dependency-name: 'typescript'
+        update-types:
+          - 'version-update:semver-minor'
+          - 'version-update:semver-major'
 
   # Base images in deploy/api.Dockerfile and deploy/web.Dockerfile. Dependabot
   # matches any filename containing "dockerfile" (case-insensitive), so the
