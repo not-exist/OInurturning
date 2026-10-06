@@ -16,6 +16,7 @@ import { requireConfig } from '../../config/require-config.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { weightedPick } from '../../lib/weighted-pick.js';
 import { createRandomStream } from '../contest/engine/rng.js';
 import { deriveStreamSeed } from '../contest/engine/rng.js';
 import { simulateDuel } from '../contest/engine/duel.js';
@@ -129,17 +130,6 @@ function numberValue(value: unknown, random: () => number, field: string): numbe
     return range.min + Math.floor(random() * (range.max - range.min + 1));
   }
   throw new ApiError('STATE_CONFLICT', { resource: 'adventure', field, reason: 'invalid reward value' });
-}
-
-function weightedPick<T>(entries: readonly { value: T; weight: number }[], random: () => number): T {
-  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
-  if (total <= 0) throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'empty outcome pool' });
-  let roll = random() * total;
-  for (const entry of entries) {
-    roll -= entry.weight;
-    if (roll < 0) return entry.value;
-  }
-  return entries[entries.length - 1]!.value;
 }
 
 function outcomeSupported(outcome: EventOutcome): boolean {

@@ -25,6 +25,7 @@ export default defineConfig({
       'tests/tutorial-shop.test.ts',
       'tests/shop-limits.test.ts',
       'tests/shared-clamp.test.ts',
+      'tests/weighted-pick.test.ts',
       'tests/config-read-yaml.test.ts',
     ],
     setupFiles: ['tests/setup.ts'],

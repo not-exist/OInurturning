@@ -6,6 +6,7 @@ import {
   type TalentDef,
 } from '@oinur/shared';
 import type { QualityTier } from '../../generated/prisma/client.js';
+import { weightedPick } from '../../lib/weighted-pick.js';
 import { pickName } from './name-pool.js';
 
 /**
@@ -129,15 +130,12 @@ function randint(rng: () => number, lo: number, hi: number): number {
   return lo + Math.floor(rng() * (hi - lo + 1));
 }
 
-/** 按权重表抽下标；weights 无需归一化 */
+/** 按权重表抽下标；weights 无需归一化。各行权重非负且 Σ>0（qualityWeights 归一为 1，TALENT_COUNT_WEIGHTS 行含 0，drawTalent 侧已过滤 w>0），零权重项被安全跳过，空池守卫不可达。 */
 function weightedIndex(rng: () => number, weights: readonly number[]): number {
-  const total = weights.reduce((a, b) => a + b, 0);
-  let roll = rng() * total;
-  for (let i = 0; i < weights.length; i++) {
-    roll -= weights[i]!;
-    if (roll < 0) return i;
-  }
-  return weights.length - 1;
+  return weightedPick(
+    weights.map((weight, value) => ({ value, weight })),
+    rng,
+  );
 }
 
 // ── §3.2 品质档 ──

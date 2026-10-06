@@ -1,5 +1,6 @@
 import type { ConfigRarity, EventConfig } from '@oinur/shared';
 import type { RandomSource } from '../contest/engine/models.js';
+import { weightedPick } from '../../lib/weighted-pick.js';
 
 export type AdventureStaminaCost = 1 | 2 | 3;
 export type EventTimestamp = Date | string;
@@ -27,18 +28,6 @@ export interface AdventureEventDrawContext {
 
 function timestamp(value: EventTimestamp): number {
   return typeof value === 'string' ? new Date(value).getTime() : value.getTime();
-}
-
-function weightedPick<T>(entries: readonly { value: T; weight: number }[], rng: RandomSource): T {
-  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
-  if (total <= 0) throw new Error('[adventure] weighted pool is empty');
-
-  let roll = rng() * total;
-  for (const entry of entries) {
-    roll -= entry.weight;
-    if (roll < 0) return entry.value;
-  }
-  return entries[entries.length - 1]!.value;
 }
 
 function meetsRequirements(event: EventConfig, context: AdventureEventDrawContext): boolean {

@@ -3,6 +3,7 @@ import { clamp } from '@oinur/shared';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { weightedPick } from '../../lib/weighted-pick.js';
 import { requireConfig } from '../../config/require-config.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { aggregateMeta } from '../students/meta.js';
@@ -59,15 +60,9 @@ function drawTrait(setting: number, random: () => number): string | null {
   if (random() >= probability || traits.length === 0) return null;
   const weighted = traits.map((trait) => {
     const severity = ['red', 'yellow', 'blue', 'purple', 'black', 'colorful'].indexOf(trait.severity);
-    return { trait, weight: SEVERITY_BASE[Math.max(0, severity)]! * (1 + 0.006 * setting) ** Math.max(0, severity) };
+    return { value: trait.id, weight: SEVERITY_BASE[Math.max(0, severity)]! * (1 + 0.006 * setting) ** Math.max(0, severity) };
   });
-  const total = weighted.reduce((sum, entry) => sum + entry.weight, 0);
-  let roll = random() * total;
-  for (const entry of weighted) {
-    roll -= entry.weight;
-    if (roll < 0) return entry.trait.id;
-  }
-  return weighted.at(-1)?.trait.id ?? null;
+  return weightedPick(weighted, random);
 }
 
 function toView(row: ProblemLibraryEntry): ProblemView {
