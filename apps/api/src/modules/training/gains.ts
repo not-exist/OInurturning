@@ -1,5 +1,5 @@
 import type { Student } from '../../generated/prisma/client.js';
-import type { DimensionKey } from '@oinur/shared';
+import { clamp, type DimensionKey } from '@oinur/shared';
 import type { MetaAggregate } from '../students/meta.js';
 
 /**
@@ -111,10 +111,6 @@ export interface SecondaryGainsResult {
   patch: Partial<Record<NumericGainColumn, number>>;
   /** 实际生效的附带成长清单（仅列增量>0 者） */
   rareGains: RareGain[];
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v));
 }
 
 /**

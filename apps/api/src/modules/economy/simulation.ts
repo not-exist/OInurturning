@@ -1,4 +1,4 @@
-import { lectureConfigSchema, type EconomyConfig, type ItemDef, type SimulationProfile, type StageConfig } from '@oinur/shared';
+import { clamp, lectureConfigSchema, type EconomyConfig, type ItemDef, type SimulationProfile, type StageConfig } from '@oinur/shared';
 
 export interface SimulationInput { economy: EconomyConfig; items: Record<string, ItemDef>; stages: Record<string, StageConfig> }
 export interface SimulationLine { key: string; amount: number }
@@ -106,8 +106,8 @@ export function simulateEconomy(input: SimulationInput): EconomySimulationReport
     const tier = lecture.audience_tiers.find((entry) => entry.id === profile.lectures.tier);
     if (!tier) throw new Error(`simulation.profiles.${profile.id}.lectures.tier: missing lecture tier ${profile.lectures.tier}`);
     const repCurve = lecture.reputation_pay_curve;
-    const repMult = Math.max(repCurve.min_mult, Math.min(repCurve.max_mult, 1 + profile.reputation / repCurve.rep_divisor));
-    const overflow = Math.min(lecture.overflow_bonus.overflow_cap_pct, Math.max(0, Math.floor(Math.max(0, profile.ability - tier.threshold) / lecture.overflow_bonus.overflow_step) * lecture.overflow_bonus.overflow_pct));
+    const repMult = clamp(1 + profile.reputation / repCurve.rep_divisor, repCurve.min_mult, repCurve.max_mult);
+    const overflow = clamp(Math.floor(Math.max(0, profile.ability - tier.threshold) / lecture.overflow_bonus.overflow_step) * lecture.overflow_bonus.overflow_pct, 0, lecture.overflow_bonus.overflow_cap_pct);
     income.push(moneyLine('lectures', round(tier.base_money * repMult * (1 + overflow)) * profile.lectures.sessions));
     const ranges = adventure?.money_ranges_by_rarity;
     if (!ranges) throw new Error('adventure.money_ranges_by_rarity: configuration is required');

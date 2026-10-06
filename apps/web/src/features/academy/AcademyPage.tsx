@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { RefreshCw, UserSearch } from 'lucide-react';
+import { clamp } from '@oinur/shared';
 import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import { useAcademyPool, useNow, useRecruit, useRefreshPool } from '../../lib/hooks';
 import type { CandidatePayload, PoolView } from '../../lib/hooks';
@@ -66,7 +67,7 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
   const generatedAt = new Date(pool.generatedAt).getTime();
   const freeLeftMs = Math.max(0, generatedAt + FREE_REFRESH_HOURS * HOUR_MS - now);
   const freeReady = freeLeftMs === 0;
-  const cyclePct = Math.min(100, Math.max(0, ((now - generatedAt) / (FREE_REFRESH_HOURS * HOUR_MS)) * 100));
+  const cyclePct = clamp(((now - generatedAt) / (FREE_REFRESH_HOURS * HOUR_MS)) * 100, 0, 100);
 
   return (
     <div data-testid="academy-page" className="space-y-5">

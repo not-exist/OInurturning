@@ -1,4 +1,5 @@
 import type { Student } from '../../generated/prisma/client.js';
+import { clamp } from '@oinur/shared';
 import { crossedDayBoundaries } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -10,10 +11,6 @@ const HOUR_MS = 3_600_000;
 export const STAMINA_CAP = 5;
 export const MINDSET_MIN = -10;
 export const MINDSET_MAX = 10;
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v));
-}
 
 /**
  * 懒结算纯投影（权威：docs/systems/student.md §5/§7）：

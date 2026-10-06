@@ -8,7 +8,7 @@ import type {
   RewardLine,
   StoryProgressView,
 } from '@oinur/shared';
-import type { ContestRecordView } from '@oinur/shared';
+import { clamp, type ContestRecordView } from '@oinur/shared';
 import { prisma } from '../../lib/prisma.js';
 import { stableSerialize } from './engine/report.js';
 
@@ -180,7 +180,7 @@ export async function listRecentContestRecords(
     where: { userId },
     select: { id: true, type: true, format: true, stageKey: true, ngLevel: true, createdAt: true },
     orderBy: { createdAt: 'desc' },
-    take: Math.min(Math.max(limit, 1), 20),
+    take: clamp(limit, 1, 20),
   });
   return rows.map((row) => ({
     id: row.id,

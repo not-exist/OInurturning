@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ITEM_USE_LIMITS, USABLE_ITEM_ID_SET } from '@oinur/shared';
+import { clamp, ITEM_USE_LIMITS, USABLE_ITEM_ID_SET } from '@oinur/shared';
 import type { Student } from '../../generated/prisma/client.js';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
@@ -161,10 +161,6 @@ export function applyItemEffect(input: EffectApplyInput): EffectApplyResult {
 
   // 白名单剩余项即直用书（book-thinking/coding/setting × 五档）；科目合法性由 directBook 内部收口
   return directBook(itemId, def.effect, student, meta, now);
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v));
 }
 
 /** 通用「每日限额」判定：跨 04:00 日界即归零（items.yaml 未给机器可读限额时兜底） */

@@ -1,7 +1,7 @@
 import { useState, type JSX } from 'react';
 import { Link } from 'react-router';
 import { Lock, PenLine, Sparkles, type LucideIcon } from 'lucide-react';
-import type { CountersView, StudentView } from '@oinur/shared';
+import { clamp, type CountersView, type StudentView } from '@oinur/shared';
 import { ITEM_USE_LIMITS, USABLE_ITEM_ID_SET } from '@oinur/shared/item-usage';
 import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import { useInventory, useStudents, useUseItem, type ItemView } from '../../lib/hooks';
@@ -452,7 +452,7 @@ function bookOutcome(
   const headroom = ITEM_USE_LIMITS.bookWeekCap - (student.counters.bookWeek?.[subject] ?? 0);
   const gain = DIRECT_BOOK_GAIN[normRarity(item.rarity)];
   const cur = student[BOOK_ATTR_FIELD[subject]];
-  const actual = Math.max(0, Math.min(cur + Math.max(0, Math.min(gain, headroom)), ATTR_CAP) - cur);
+  const actual = Math.max(0, Math.min(cur + clamp(gain, 0, headroom), ATTR_CAP) - cur);
   return { headroom: Math.max(0, headroom), loss: Math.max(0, Math.round(gain - actual)) };
 }
 

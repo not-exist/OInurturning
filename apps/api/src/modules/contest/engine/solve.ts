@@ -11,6 +11,7 @@ import type {
   SolveEstimateInput,
   SolveQuestionInput,
 } from './models.js';
+import { clamp } from '@oinur/shared';
 
 interface EffectiveHooks {
   timeKMul: number;
@@ -26,10 +27,6 @@ interface EffectiveHooks {
   partialOverride?: PartialOverride;
   thinkWeightMul: number;
   probabilityAmplify: number;
-}
-
-function clamp(value: number, lower: number, upper: number): number {
-  return Math.min(upper, Math.max(lower, value));
 }
 
 function finite(value: number | undefined, fallback: number): number {

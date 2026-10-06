@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react';
-import type { ShopItemView } from '@oinur/shared';
+import { clamp, type ShopItemView } from '@oinur/shared';
 import { useShopCatalog, useBuyShopItem } from '../../lib/shop';
 import { apiErrorMessage } from '../../lib/api';
 import { Btn, Chip, ErrorNote, InlineLoader, Empty, Meter, Modal, Numeral, PageHeader, Card } from '../../components/ui';
@@ -26,7 +26,7 @@ export function ShopPage(): JSX.Element {
   const filtered = filter === 'all' ? data.items : data.items.filter((i) => i.category === filter || i.rarity === filter);
 
   const getQty = (id: string) => qty[id] ?? 1;
-  const setQtyFor = (id: string, v: number) => setQty((prev) => ({ ...prev, [id]: Math.max(1, Math.min(99, v)) }));
+  const setQtyFor = (id: string, v: number) => setQty((prev) => ({ ...prev, [id]: clamp(v, 1, 99) }));
 
   /** 本次可买上限：日限/周限/金币三者取最小，0 表示买不动（限购用尽或钱不够一件） */
   const maxQtyOf = (item: ShopItemView): number =>

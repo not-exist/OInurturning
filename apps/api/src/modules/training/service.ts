@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type ProblemLibraryEntry, type Student } from '../../generated/prisma/client.js';
-import { DIMENSIONS, type DimensionKey } from '@oinur/shared';
+import { clamp, DIMENSIONS, type DimensionKey } from '@oinur/shared';
 import { getConfig } from '../../config/loader.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -39,10 +39,6 @@ function requireConfig() {
 /** 运行时种子：训练无需跨请求复现，取密码学随机；可复现性由注入 rng 的 gains 层保证 */
 function newRng(): () => number {
   return mulberry32(randomInt(0, 2 ** 32));
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v));
 }
 
 interface TrainingInput {
@@ -134,7 +130,7 @@ export async function listTrainingLogs(
   userId: number,
   opts: { studentId?: number; kind?: TrainingLogKindFilter; limit?: number; cursor?: number } = {},
 ): Promise<TrainingLogPage> {
-  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 100);
+  const limit = clamp(opts.limit ?? 20, 1, 100);
   const rows = await prisma.trainingLog.findMany({
     where: {
       userId,

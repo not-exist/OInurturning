@@ -1,4 +1,5 @@
 import {
+  clamp,
   rankingSeedSchema,
   type ContestTeam,
   type ParticipantSnapshot,
@@ -14,10 +15,6 @@ export type DuelOpponentKind =
   | 'random_elite'
   | 'platform_reviewer'
   | 'legendary_ghost';
-
-function clamp(value: number, lower: number, upper: number): number {
-  return Math.min(upper, Math.max(lower, value));
-}
 
 function normal(random: RandomSource, mean: number, standardDeviation: number): number {
   const first = Math.max(Number.EPSILON, random());

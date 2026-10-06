@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type AdventureLog, type Student } from '../../generated/prisma/client.js';
 import {
+  clamp,
   type BattleReplay,
   type ConfigRarity,
   type DuelInput,
@@ -476,10 +477,6 @@ function resolveCheck(
   };
 }
 
-function clamp(value: number, lower: number, upper: number): number {
-  return Math.min(upper, Math.max(lower, value));
-}
-
 const DUEL_DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
 
 function studentParticipant(
@@ -681,11 +678,11 @@ function applyStatGain(
   for (const [key, rawValue] of Object.entries(raw)) {
     const value = numberValue(rawValue, random, `stat_gain.${key}`);
     if (key === 'mindset') {
-      mindset = Math.min(10, Math.max(-10, mindset + value));
+      mindset = clamp(mindset + value, -10, 10);
       continue;
     }
     if (key === 'all_six') {
-      for (const field of SIX_FIELDS) values[field] = Math.min(100, Math.max(1, (student[field] as number) + value));
+      for (const field of SIX_FIELDS) values[field] = clamp((student[field] as number) + value, 1, 100);
       continue;
     }
     if (key === 'chosen_skill') {
@@ -693,12 +690,12 @@ function applyStatGain(
         throw new ApiError('VALIDATION_FAILED', { field: 'skill', reason: 'choose a valid student skill' });
       }
       const field = STAT_FIELDS[chosenSkill as keyof typeof STAT_FIELDS];
-      values[field] = Math.min(100, Math.max(1, (student[field] as number) + value));
+      values[field] = clamp((student[field] as number) + value, 1, 100);
       continue;
     }
     const field = STAT_FIELDS[key as keyof typeof STAT_FIELDS];
     if (field === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'stat', stat: key });
-    values[field] = Math.min(100, Math.max(1, (student[field] as number) + value));
+    values[field] = clamp((student[field] as number) + value, 1, 100);
   }
   return { values, mindset };
 }
@@ -738,8 +735,8 @@ async function addBankProblems(
   for (let index = 0; index < count; index += 1) {
     const quality =
       typeof qualityMultiplier === 'number'
-        ? Math.min(100, Math.max(0, Math.round((sourceQuality ?? 0) * qualityMultiplier)))
-        : Math.min(100, Math.max(0, Math.round(numberValue(bank.quality, random, 'bank_add.quality'))));
+        ? clamp(Math.round((sourceQuality ?? 0) * qualityMultiplier), 0, 100)
+        : clamp(Math.round(numberValue(bank.quality, random, 'bank_add.quality')), 0, 100);
     const dimension = sourceQuestion?.dimension ?? BANK_DIMENSIONS[Math.floor(random() * BANK_DIMENSIONS.length)]!;
     const row = await tx.problemLibraryEntry.create({
       data: {
@@ -1079,7 +1076,7 @@ export async function listAdventureLogs(userId: number, limit = 20): Promise<Adv
   const rows = await prisma.adventureLog.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
-    take: Math.min(Math.max(limit, 1), 100),
+    take: clamp(limit, 1, 100),
   });
   return rows.flatMap((row) => {
     const event = config.events[row.eventId];

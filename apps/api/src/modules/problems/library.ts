@@ -1,4 +1,5 @@
 import { Prisma, type ProblemLibraryEntry } from '../../generated/prisma/client.js';
+import { clamp } from '@oinur/shared';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -128,13 +129,7 @@ export async function createProblem(
 
     const random = createRandomStream(deriveSeed(userId, studentId, CONFIG_DIMENSIONS[dimension], counterKey, used), 'problem');
     const target = DIMENSION_FIELDS[dimension];
-    const quality = Math.min(
-      100,
-      Math.max(
-        0,
-        Math.round(0.55 * settled.setting + 0.25 * settled[target] + 0.2 * settled.thinking + (random() * 17 - 8)),
-      ),
-    );
+    const quality = clamp(Math.round(0.55 * settled.setting + 0.25 * settled[target] + 0.2 * settled.thinking + (random() * 17 - 8)), 0, 100);
     const traitId = drawTrait(settled.setting, random);
     const updated = await tx.student.updateMany({
       where: { id: studentId, updatedAt: current.updatedAt },

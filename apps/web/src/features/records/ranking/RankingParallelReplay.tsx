@@ -1,6 +1,6 @@
 import { useMemo, type JSX } from 'react';
 import { Swords } from 'lucide-react';
-import type { BattleReplayEvent } from '@oinur/shared';
+import { clamp, type BattleReplayEvent } from '@oinur/shared';
 import { Icon } from '../../../components/icons';
 import { FinishedPanel } from '../shared/FinishedPanel';
 import { ReplayControls } from '../shared/ReplayControls';
@@ -84,7 +84,7 @@ export function RankingParallelReplay({
   );
 
   const members = [...memberStates.values()].sort((left, right) => left.memberIndex - right.memberIndex);
-  const columns = Math.max(1, Math.min(members.length, 4));
+  const columns = clamp(members.length, 1, 4);
 
   return (
     <div className="space-y-4">

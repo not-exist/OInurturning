@@ -1,5 +1,6 @@
 import { Prisma, type LectureLog } from '../../generated/prisma/client.js';
 import {
+  clamp,
   computeV,
   lectureConfigSchema,
   type LectureConfig,
@@ -79,17 +80,13 @@ function tierConfig(tier: string) {
 
 function repMultiplier(reputation: number): number {
   const curve = lectureConfig().reputation_pay_curve;
-  return Math.min(curve.max_mult, Math.max(curve.min_mult, 1 + reputation / curve.rep_divisor));
+  return clamp(1 + reputation / curve.rep_divisor, curve.min_mult, curve.max_mult);
 }
 
 function overflowMultiplier(teachingValue: number, threshold: number): number {
   const overflow = lectureConfig().overflow_bonus;
   const steps = Math.floor(Math.max(0, teachingValue - threshold) / overflow.overflow_step);
   return 1 + Math.min(overflow.overflow_cap_pct, steps * overflow.overflow_pct);
-}
-
-function clampMindset(value: number): number {
-  return Math.min(10, Math.max(-10, value));
 }
 
 function toLectureView(row: LectureLog, staminaAfter: number | null = null): LectureResultView {
@@ -198,7 +195,7 @@ export async function teachLecture(
         : success
           ? -ordinal
           : -2 * ordinal;
-    const nextMindset = !forced || success ? settled.mindset : clampMindset(settled.mindset - 2);
+    const nextMindset = !forced || success ? settled.mindset : clamp(settled.mindset - 2, -10, 10);
     // 讲课成长（issue #56）：与讲砸判定同一 base seed、不同 label 的独立随机流 → 同 seed 必复现。
     // 成长只写 setting/thinking 两列，与体力/精力/心态同事务落库，任一失败整体回滚。
     const growth = computeLectureGrowth({
@@ -264,7 +261,7 @@ export async function listLectureLogs(userId: number, limit = 20): Promise<Lectu
   const rows = await prisma.lectureLog.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
-    take: Math.min(Math.max(limit, 1), 100),
+    take: clamp(limit, 1, 100),
   });
   return rows.map(toLectureView);
 }

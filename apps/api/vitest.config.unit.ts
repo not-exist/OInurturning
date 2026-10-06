@@ -24,6 +24,7 @@ export default defineConfig({
       'tests/lecture-growth.test.ts',
       'tests/tutorial-shop.test.ts',
       'tests/shop-limits.test.ts',
+      'tests/shared-clamp.test.ts',
     ],
     setupFiles: ['tests/setup.ts'],
     env: {

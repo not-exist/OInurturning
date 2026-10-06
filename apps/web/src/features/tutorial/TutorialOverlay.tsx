@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { ArrowRight, Check, Sparkles } from 'lucide-react';
+import { clamp } from '@oinur/shared';
 import { Btn, Meter, Panel } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { useAdvanceTutorial, useCompleteTutorial, useTutorial, useTutorialVisitStepSync } from '../../lib/tutorial';
@@ -248,7 +249,7 @@ export function TutorialOverlay(): JSX.Element | null {
     if (top + CARD_H_EST > window.innerHeight - 16) {
       top = rect.top - CARD_H_EST - margin;
     }
-    top = Math.min(Math.max(top, 16), Math.max(16, window.innerHeight - CARD_H_EST - 16));
+    top = clamp(top, 16, Math.max(16, window.innerHeight - CARD_H_EST - 16));
     cardStyle = { position: 'fixed', top, left, width: cardWidth, zIndex: 60 };
   } else {
     // 居中模态

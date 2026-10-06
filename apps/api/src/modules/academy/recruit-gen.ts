@@ -1,4 +1,5 @@
 import {
+  clamp,
   CONFIG_RARITIES,
   type ConfigRarity,
   type EconomyRecruitment,
@@ -128,10 +129,6 @@ function randint(rng: () => number, lo: number, hi: number): number {
   return lo + Math.floor(rng() * (hi - lo + 1));
 }
 
-function clampAttr(v: number): number {
-  return Math.min(100, Math.max(1, v));
-}
-
 /** 按权重表抽下标；weights 无需归一化 */
 function weightedIndex(rng: () => number, weights: readonly number[]): number {
   const total = weights.reduce((a, b) => a + b, 0);
@@ -150,7 +147,7 @@ function weightedIndex(rng: () => number, weights: readonly number[]): number {
  * r = min(声誉, 8000)/8000；common ×(1−0.25r) / good ×(1+0.10r) / elite ×(1+0.60r) / genius ×(1+1.20r)。
  */
 export function qualityWeights(reputation: number): Record<GenQuality, number> {
-  const r = Math.min(Math.max(reputation, 0), 8000) / 8000;
+  const r = clamp(reputation, 0, 8000) / 8000;
   const raw: Record<GenQuality, number> = {
     common: 55 * (1 - 0.25 * r),
     good: 30 * (1 + 0.1 * r),
@@ -176,12 +173,12 @@ export function rollQuality(rng: () => number, reputation: number): GenQuality {
 
 /** E' = round(E × (1 + 0.15×min(声誉,6000)/6000))，仅作用于六维/code/thinking/setting */
 export function repAdjustedE(e: number, reputation: number): number {
-  const mult = 1 + (0.15 * Math.min(Math.max(reputation, 0), 6000)) / 6000;
+  const mult = 1 + (0.15 * clamp(reputation, 0, 6000)) / 6000;
   return Math.round(e * mult);
 }
 
 function rollAttr(rng: () => number, spec: AttrSpec, e: number): number {
-  return clampAttr(randint(rng, e - spec.d, e + spec.d));
+  return clamp(randint(rng, e - spec.d, e + spec.d), 1, 100);
 }
 
 // ── §3.4 天赋抽取 ──

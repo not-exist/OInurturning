@@ -1,4 +1,4 @@
-import { TUTORIAL_ROUTE_KEYS, type TutorialStepDef } from '@oinur/shared';
+import { clampInt, TUTORIAL_ROUTE_KEYS, type TutorialStepDef } from '@oinur/shared';
 
 /**
  * 引导锁的纯逻辑（无 prisma / loader / 任何 module 依赖，可被无 DB 的 unit 测试直接 import）。
@@ -58,7 +58,7 @@ export function isApiAllowed(unlocked: string[], apiPath: string): boolean {
 /** 未完成取当前步 unlock（越界钳到配置范围），已完成取 ['all']，兜底 ['overview'] */
 export function unlockedForStep(step: number, completed: boolean, steps: TutorialStepDef[]): string[] {
   if (completed) return ['all'];
-  const idx = clamp(step, 0, steps.length - 1);
+  const idx = clampInt(step, 0, steps.length - 1);
   return steps[idx]?.unlock ?? ['overview'];
 }
 
@@ -75,11 +75,6 @@ export function resolveProgress(
 ): TutorialProgress {
   const last = steps.length - 1;
   if (user.tutorialCompleted) return { step: last, completed: true, current: null };
-  const step = clamp(user.tutorialStep, 0, last);
+  const step = clampInt(user.tutorialStep, 0, last);
   return { step, completed: false, current: steps[step] ?? null };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(Math.max(Math.trunc(value), min), max);
 }

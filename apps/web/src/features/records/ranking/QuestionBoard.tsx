@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react';
-import type { BattleReplayEvent, FrozenSolveHooks, QuestionSnapshot } from '@oinur/shared';
+import { clamp, type BattleReplayEvent, type FrozenSolveHooks, type QuestionSnapshot } from '@oinur/shared';
 import { Metric } from '../shared/bits';
 import { Modal } from '../../../components/ui';
 import { dimensionLabel, tierLabel, traitInfo } from '../../../lib/labels';
@@ -296,7 +296,7 @@ export function QuestionBoard({
       <div
         className="grid gap-2.5"
         style={{
-          gridTemplateColumns: `repeat(${Math.max(1, Math.min(questions.length, 4))}, minmax(0, 1fr))`,
+          gridTemplateColumns: `repeat(${clamp(questions.length, 1, 4)}, minmax(0, 1fr))`,
         }}
       >
         {questions.map((question) => (

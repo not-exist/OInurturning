@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import type { AbilityKey, DimensionKey, QualityTier, StudentView } from '@oinur/shared';
+import { clamp, type AbilityKey, type DimensionKey, type QualityTier, type StudentView } from '@oinur/shared';
 import { TriangleAlert } from 'lucide-react';
 import type { TalentDefView } from '../../lib/hooks';
 import {
@@ -71,12 +71,8 @@ const MINDSET_SPAN = 20;
 /** m ≤ −6 进入焦虑反噬（student.md §5.3） */
 export const ANXIETY_THRESHOLD = -6;
 
-function clampMindset(v: number): number {
-  return Math.max(MINDSET_MIN, Math.min(MINDSET_MIN + MINDSET_SPAN, v));
-}
-
 function mindsetX(v: number): number {
-  return ((clampMindset(v) - MINDSET_MIN) / MINDSET_SPAN) * 100;
+  return ((clamp(v, MINDSET_MIN, MINDSET_MIN + MINDSET_SPAN) - MINDSET_MIN) / MINDSET_SPAN) * 100;
 }
 
 /**
@@ -90,7 +86,7 @@ export function mindsetBaseline(talents: string[], defs: Map<string, TalentDefVi
       if (effect.stat === 'mindset' && effect.mode === 'flat') sum += effect.value;
     }
   }
-  return clampMindset(1 + sum);
+  return clamp(1 + sum, MINDSET_MIN, MINDSET_MIN + MINDSET_SPAN);
 }
 
 export function MindsetBar({
@@ -162,11 +158,11 @@ export function staminaIntervalMin(regen: number): number {
 }
 
 export function StaminaCells({ stamina, className = '' }: { stamina: number; className?: string }): JSX.Element {
-  const value = Math.max(0, Math.min(5, stamina));
+  const value = clamp(stamina, 0, 5);
   return (
     <span className={`inline-flex items-center gap-1 ${className}`} aria-label={`体力 ${floor(value)}/5`}>
       {[0, 1, 2, 3, 4].map((i) => {
-        const fill = Math.max(0, Math.min(1, value - i));
+        const fill = clamp(value - i, 0, 1);
         return (
           <span key={i} aria-hidden className="relative block h-2 w-4 border border-ink-500/80 bg-ink-850">
             <span
@@ -229,7 +225,7 @@ export function RadarChart({
   // 量程随学员成长动态变化（下限 30）：按 100 归一化会让中前期学员的雷达缩成一个点
   const values = SIX_DIMS.map((d) => s[d.field]);
   const scale = statScale(values);
-  const ratios = values.map((v) => Math.max(0, Math.min(1, v / scale)));
+  const ratios = values.map((v) => clamp(v / scale, 0, 1));
   return (
     <svg
       viewBox="-12 -10 124 120"

@@ -1,9 +1,10 @@
 import type { Student } from '../../generated/prisma/client.js';
-import type {
-  LectureGrowthConfig,
-  LectureGrowthEntry,
-  LectureGrowthStat,
-  LectureTier,
+import {
+  clamp,
+  type LectureGrowthConfig,
+  type LectureGrowthEntry,
+  type LectureGrowthStat,
+  type LectureTier,
 } from '@oinur/shared';
 import type { MetaAggregate } from '../students/meta.js';
 
@@ -48,10 +49,6 @@ export interface LectureGrowthResult {
   gains: LectureGrowthEntry[];
   /** 需写回学员的列增补（已 clamp 到 [0,100]） */
   patch: Partial<Record<LectureGrowthColumn, number>>;
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v));
 }
 
 /** 该档的思维要求 R：economy.yaml 可逐档覆盖，缺省与 V 门槛同值 */

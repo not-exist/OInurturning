@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { Link } from 'react-router';
 import { Inbox, X, type LucideIcon } from 'lucide-react';
+import { clamp } from '@oinur/shared';
 import { Icon } from './icons';
 
 /**
@@ -206,7 +207,7 @@ export function Meter({
   className?: string;
   trackClassName?: string;
 }): JSX.Element {
-  const pct = max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100));
+  const pct = max <= 0 ? 0 : clamp((value / max) * 100, 0, 100);
   return (
     <div className={`relative h-1.5 w-full overflow-hidden ${trackClassName}`}>
       <div
