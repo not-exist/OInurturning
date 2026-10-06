@@ -1,6 +1,7 @@
-import { Prisma, type PvpRegistration, type PvpTournament, type Student } from '../../generated/prisma/client.js';
+import { Prisma, type PvpRegistration, type PvpTournament } from '../../generated/prisma/client.js';
 import { TEAM_SIZE_MAX, TEAM_SIZE_MIN, type ParticipantSnapshot } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
+import { participantSnapshot } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
 
 /** 出战队伍人数即契约的队伍规模域（shared TEAM_SIZE_MIN~MAX），不是可调数值。 */
@@ -49,31 +50,6 @@ export interface PvpRegistrationView {
 
 function json(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
-}
-
-function participantSnapshot(student: Student & { talents: { talentId: string }[] }): ParticipantSnapshot {
-  return {
-    side: 'HOME',
-    userId: student.userId,
-    studentId: student.id,
-    displayName: student.name,
-    abilities: {
-      DS: student.ds,
-      DP: student.dp,
-      MATH: student.math,
-      GRAPH: student.graph,
-      GREEDY: student.greedy,
-      STRING: student.str,
-      CODING: student.code,
-      THINKING: student.thinking,
-      PROBLEM: student.setting,
-    },
-    traits: student.talents.map((talent) => ({ traitId: talent.talentId })),
-    mindset: student.mindset,
-    focusCap: student.focusCap,
-    energy: student.energy,
-    energyMax: student.energyMax,
-  };
 }
 
 function tournamentView(row: PvpTournament & { registrations: { id: number }[] }): PvpTournamentView {

@@ -6,7 +6,6 @@ import {
   type BattleReplay,
   type ContestRecordView,
   type GrowthDelta,
-  type ParticipantSnapshot,
   type ProblemTemplate,
   type QuestionSnapshot,
   type QuestionTraitSnapshot,
@@ -21,6 +20,7 @@ import {
 import { requireConfig } from '../../config/require-config.js';
 import { damping } from '../../lib/damping.js';
 import { ApiError } from '../../lib/errors.js';
+import { participantSnapshot } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { buildBattleReplay } from '../contest/replay.js';
@@ -232,33 +232,6 @@ export async function getContestRecord(
   }
   if (record === null) throw new ApiError('NOT_FOUND', { resource: 'contestRecord', recordId });
   return record;
-}
-
-function studentSnapshot(
-  student: Student & { talents: { talentId: string }[] },
-): ParticipantSnapshot {
-  return {
-    side: 'HOME',
-    userId: student.userId,
-    studentId: student.id,
-    displayName: student.name,
-    abilities: {
-      DS: student.ds,
-      DP: student.dp,
-      MATH: student.math,
-      GRAPH: student.graph,
-      GREEDY: student.greedy,
-      STRING: student.str,
-      CODING: student.code,
-      THINKING: student.thinking,
-      PROBLEM: student.setting,
-    },
-    traits: student.talents.map((talent) => ({ traitId: talent.talentId })),
-    mindset: student.mindset,
-    focusCap: student.focusCap,
-    energy: student.energy,
-    energyMax: student.energyMax,
-  };
 }
 
 function templatesForSlot(
@@ -643,7 +616,7 @@ export async function enterStoryStage(
     const firstClear = (progress.get(requestedStageKey)?.clearCount ?? 0) === 0;
     const seed = deriveSeed(userId, roster.join(','), requestedStageKey, ngLevel, idempotencyKey);
     const playerMembers = members.map(({ settled, talents }) =>
-      studentSnapshot({ ...settled, talents }),
+      participantSnapshot({ ...settled, talents }),
     );
     const input: RankingInput = {
       kind: 'story',

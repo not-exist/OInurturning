@@ -15,6 +15,7 @@ import {
 import { requireConfig } from '../../config/require-config.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
+import { participantSnapshot, type ParticipantStudentInput } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
 import { weightedPick } from '../../lib/weighted-pick.js';
 import { createRandomStream } from '../contest/engine/rng.js';
@@ -463,34 +464,6 @@ function resolveCheck(
 
 const DUEL_DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
 
-function studentParticipant(
-  student: Student & { talents?: { talentId: string }[] },
-  side: 'HOME' | 'AWAY',
-): ParticipantSnapshot {
-  return {
-    side,
-    userId: side === 'HOME' ? student.userId : null,
-    studentId: side === 'HOME' ? student.id : null,
-    displayName: student.name,
-    abilities: {
-      DS: student.ds,
-      DP: student.dp,
-      MATH: student.math,
-      GRAPH: student.graph,
-      GREEDY: student.greedy,
-      STRING: student.str,
-      CODING: student.code,
-      THINKING: student.thinking,
-      PROBLEM: student.setting,
-    },
-    traits: (student.talents ?? []).map((talent) => ({ traitId: talent.talentId })),
-    mindset: student.mindset,
-    focusCap: student.focusCap,
-    energy: student.energy,
-    energyMax: student.energyMax,
-  };
-}
-
 function duelTiebreak(value: unknown): DuelInput['tiebreak'] {
   const modes: Record<string, NonNullable<DuelInput['tiebreak']>> = {
     sudden_death: 'SUDDEN_DEATH',
@@ -555,7 +528,7 @@ function duelQuestions(
 
 /** 参战队伍固定 3 人：HOME 为玩家队伍，AWAY 由事件对手档位生成同人数 NPC。 */
 function duelInput(
-  students: readonly (Student & { talents?: { talentId: string }[] })[],
+  students: readonly ParticipantStudentInput[],
   duel: JsonRecord,
   seed: number,
 ): DuelInput {
@@ -572,7 +545,7 @@ function duelInput(
   }
   const params = record(duel.opponent_params);
   const powerMultiplier = typeof params.power_mult === 'number' ? params.power_mult : 1;
-  const home = students.map((student) => studentParticipant(student, 'HOME'));
+  const home = students.map((student) => participantSnapshot(student));
   const away = home.map((_, index) => {
     const npc = generateDuelOpponent(
       opponent as DuelOpponentKind,
