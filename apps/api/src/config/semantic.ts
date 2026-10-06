@@ -1,10 +1,10 @@
 import {
   CONFIG_RARITIES,
   ECONOMY_QUALITY_TIERS,
+  RARITY_RANK,
   TUTORIAL_ROUTE_KEYS,
   lectureConfigSchema,
   onboardingConfigSchema,
-  type ConfigRarity,
   type EconomyConfig,
   type EventsConfig,
   type ItemDef,
@@ -20,8 +20,6 @@ export interface SemanticIssue {
   path: string;
   message: string;
 }
-
-const RARITY_RANK = new Map<ConfigRarity, number>(CONFIG_RARITIES.map((r, i) => [r, i]));
 
 /**
  * 语义交叉校验（zod 结构校验通过之后执行）：

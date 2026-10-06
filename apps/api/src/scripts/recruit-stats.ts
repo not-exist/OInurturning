@@ -11,7 +11,9 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  CONFIG_RARITIES,
   economyConfigSchema,
+  RARITY_RANK,
   talentsFileSchema,
   type ConfigRarity,
 } from '@oinur/shared';
@@ -40,9 +42,6 @@ const economy = loadYaml('economy.yaml', (d) => economyConfigSchema.parse(d));
 
 const buckets = bucketTalents(Object.fromEntries(talents.map((t) => [t.id, t])));
 const rarityOf = new Map(talents.map((t) => [t.id, t.rarity]));
-const RARITY_RANK = new Map<ConfigRarity, number>(
-  ['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'].map((r, i) => [r as ConfigRarity, i]),
-);
 
 interface Tally {
   quality: Record<GenQuality, number>;
@@ -120,19 +119,19 @@ function reportQuality(reputation: number): void {
 
     console.log('  -- genius 首槽稀有度（保底：应全部 ≥ 绿）--');
     const entries = Object.entries(t.geniusFirstSlot).sort(
-      (a, b) => (RARITY_RANK.get(a[0] as ConfigRarity) ?? 0) - (RARITY_RANK.get(b[0] as ConfigRarity) ?? 0),
+      (a, b) => (RARITY_RANK.get(a[0]) ?? 0) - (RARITY_RANK.get(b[0]) ?? 0),
     );
     const geniusN = entries.reduce((a, [, v]) => a + v, 0);
     for (const [r, v] of entries) {
       console.log(`  ${r.padEnd(10)} ${((v / geniusN) * 100).toFixed(2)}%`);
     }
-    const belowGreen = entries.filter(([r]) => (RARITY_RANK.get(r as ConfigRarity) ?? 0) < 2);
+    const belowGreen = entries.filter(([r]) => (RARITY_RANK.get(r) ?? 0) < 2);
     console.log(belowGreen.length === 0 ? '  保底校验：OK（无绿以下）' : `  保底校验：失败 ${JSON.stringify(belowGreen)}`);
   }
 }
 
 console.log(`recruit-stats: samples=${SAMPLES} seed=${SEED} talents=${talents.length} 条（六档齐全校验：${
-  (['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'] as const).every(
+  CONFIG_RARITIES.every(
     (r) => buckets.byRarity[r].length > 0,
   )
     ? 'OK'

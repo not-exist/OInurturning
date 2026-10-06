@@ -1,3 +1,4 @@
+import { damping } from '../../lib/damping.js';
 import {
   BOOK_MULT,
   QUALITY_MULT,
@@ -78,11 +79,6 @@ interface IncrementPlan {
   targetDim?: DimKey;
 }
 
-function damped(base: number, cur: number): number {
-  if (cur >= STAT_CAP) return 0;
-  return base * (1 - cur / STAT_CAP) ** 2;
-}
-
 function lowestDim(s: StudentStats): DimKey {
   let best = DIM_KEYS[0] as DimKey;
   for (const key of DIM_KEYS) if (s[key] < s[best]) best = key;
@@ -97,18 +93,18 @@ function planForKind(kind: TrainingKind, s: StudentStats, opts: GrowthOptions): 
   };
   if (kind === 'basic') {
     for (const key of DIM_KEYS)
-      plan.dims[key] = (1 / DIM_KEYS.length) * damped(TRAINING_BASE.basic, s[key]);
+      plan.dims[key] = (1 / DIM_KEYS.length) * (TRAINING_BASE.basic * damping(s[key]));
   } else if (kind === 'directed') {
     const target = lowestDim(s);
     plan.targetDim = target;
-    plan.dims[target] = damped(TRAINING_BASE.directed * opts.bookMult, s[target]);
+    plan.dims[target] = TRAINING_BASE.directed * opts.bookMult * damping(s[target]);
   } else {
     const target = lowestDim(s);
     plan.targetDim = target;
-    plan.dims[target] = damped(TRAINING_BASE.specialized * opts.qualityMult, s[target]);
+    plan.dims[target] = TRAINING_BASE.specialized * opts.qualityMult * damping(s[target]);
   }
-  plan.code = SECONDARY_PROB.code[kind] * damped(1, s.code);
-  plan.thinking = SECONDARY_PROB.thinking[kind] * damped(1, s.thinking);
+  plan.code = SECONDARY_PROB.code[kind] * damping(s.code);
+  plan.thinking = SECONDARY_PROB.thinking[kind] * damping(s.thinking);
   return plan;
 }
 

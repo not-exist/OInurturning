@@ -19,6 +19,7 @@ import {
   STAGE_CHAPTERS,
 } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
+import { damping } from '../../lib/damping.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
@@ -431,8 +432,7 @@ function buildRewards(
 }
 
 function growthChance(current: number, base: number): number {
-  const fade = Math.max(0, 1 - current / 100) ** 2;
-  return base * fade;
+  return base * damping(current);
 }
 
 function buildGrowth(

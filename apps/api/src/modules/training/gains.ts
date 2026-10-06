@@ -1,4 +1,5 @@
 import type { Student } from '../../generated/prisma/client.js';
+import { damping } from '../../lib/damping.js';
 import { clamp, type DimensionKey } from '@oinur/shared';
 import type { MetaAggregate } from '../students/meta.js';
 
@@ -67,7 +68,7 @@ export function computeDelta(o: {
   if (o.cur >= 100) return 0;
   const allMult = 1 + (o.meta.training_all ?? 0) / 100;
   const dimMult = 1 + (o.meta[o.dimMetaKey] ?? 0) / 100;
-  return o.base * o.bookMult * o.qualityMult * allMult * dimMult * (1 - o.cur / 100) ** 2;
+  return o.base * o.bookMult * o.qualityMult * allMult * dimMult * damping(o.cur);
 }
 
 /** 单次训练费用：round(money_base × (1 + coeff×(N−1)))（economy.yaml；N=在册学员数） */
@@ -131,7 +132,7 @@ export function computeSecondaryGains(o: {
 
   const codeProb = SECONDARY_PROB.code[type] * (1 + (meta.training_code ?? 0) / 100);
   if (rng() < codeProb && s.code < 100) {
-    const gain = (1 - s.code / 100) ** 2;
+    const gain = damping(s.code);
     const next = clamp(s.code + gain, 0, 100);
     const amount = next - s.code;
     if (amount > 0) {
@@ -142,7 +143,7 @@ export function computeSecondaryGains(o: {
 
   const thinkProb = SECONDARY_PROB.thinking[type] * (1 + (meta.training_thinking ?? 0) / 100);
   if (rng() < thinkProb && s.thinking < 100) {
-    const gain = (1 - s.thinking / 100) ** 2;
+    const gain = damping(s.thinking);
     const next = clamp(s.thinking + gain, 0, 100);
     const amount = next - s.thinking;
     if (amount > 0) {

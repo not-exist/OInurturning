@@ -5,7 +5,7 @@ import {
   type ParticipantSnapshot,
   type StageConfig,
 } from '@oinur/shared';
-import { createRandomStream, deriveStreamSeed } from './engine/rng.js';
+import { createRandomStream, deriveStreamSeed, standardNormal } from './engine/rng.js';
 import type { RandomSource } from './engine/models.js';
 
 const NPC_DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
@@ -17,10 +17,7 @@ export type DuelOpponentKind =
   | 'legendary_ghost';
 
 function normal(random: RandomSource, mean: number, standardDeviation: number): number {
-  const first = Math.max(Number.EPSILON, random());
-  const second = random();
-  const unit = Math.sqrt(-2 * Math.log(first)) * Math.cos(2 * Math.PI * second);
-  return mean + standardDeviation * unit;
+  return mean + standardDeviation * standardNormal(random);
 }
 
 function npcParticipant(

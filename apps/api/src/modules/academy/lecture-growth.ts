@@ -1,4 +1,5 @@
 import type { Student } from '../../generated/prisma/client.js';
+import { damping } from '../../lib/damping.js';
 import {
   clamp,
   type LectureGrowthConfig,
@@ -65,12 +66,6 @@ export function matchFactor(d: number, growth: LectureGrowthConfig): number {
   const { match_span, match_power, deficit_floor } = growth;
   if (d < 0) return clamp(1 + d / match_span, deficit_floor, 1);
   return Math.max(0, 1 - d / match_span) ** match_power;
-}
-
-/** 收益递减阻尼（student.md §4.1：cap=100、k=2）；已到上限即 0 */
-function damping(cur: number): number {
-  if (cur >= 100) return 0;
-  return (1 - cur / 100) ** 2;
 }
 
 /**

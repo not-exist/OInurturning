@@ -2,7 +2,7 @@ import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
-import type { ShopItemView, ShopCatalogView, ShopBuyResult } from '@oinur/shared';
+import { RARITY_RANK, type ShopItemView, type ShopCatalogView, type ShopBuyResult } from '@oinur/shared';
 import {
   bookRaritySuffix,
   dailyLimitForItem,
@@ -122,11 +122,10 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
     });
   }
 
-  // 按稀有度+价格排序：灰<黄<绿<蓝<紫，价格升序
-  const rarityOrder: Record<string, number> = { gray: 0, yellow: 1, green: 2, blue: 3, purple: 4, colorful: 5 };
+  // 按稀有度+价格排序：灰<黄<绿<蓝<紫<彩，价格升序（序数取 shared.RARITY_RANK 单点派生）
   views.sort((a, b) => {
-    const ra = rarityOrder[a.rarity.toLowerCase()] ?? 99;
-    const rb = rarityOrder[b.rarity.toLowerCase()] ?? 99;
+    const ra = RARITY_RANK.get(a.rarity.toLowerCase()) ?? 99;
+    const rb = RARITY_RANK.get(b.rarity.toLowerCase()) ?? 99;
     if (ra !== rb) return ra - rb;
     return a.price - b.price;
   });

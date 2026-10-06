@@ -7,6 +7,11 @@ import { z } from 'zod';
 export const CONFIG_RARITIES = ['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'] as const;
 export type ConfigRarity = (typeof CONFIG_RARITIES)[number];
 
+/** 稀有度 → 序数（gray=0 … colorful=5），由 CONFIG_RARITIES 单点派生；排序/排名统一引用，勿再手写六档映射 */
+export const RARITY_RANK: ReadonlyMap<string, number> = new Map(
+  CONFIG_RARITIES.map((rarity, index) => [rarity, index] as const),
+);
+
 /** 属性键：六维 / 全局能力 / 辅助属性（talents.yaml 头部规则 §效果字段） */
 export const TALENT_ATTRIBUTE_STATS = [
   'ds',

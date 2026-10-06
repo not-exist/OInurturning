@@ -6,6 +6,7 @@ import {
   itemsFileSchema,
   stagesConfigSchema,
   talentsFileSchema,
+  RARITY_RANK,
   STAGE_CHAPTERS,
   type EconomyConfig,
   type EventsConfig,
@@ -169,13 +170,10 @@ function colorfulChains(
       families.set(talent.family, list);
     }
   }
-  const rarityRank = new Map(
-    ['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'].map((r, i) => [r, i]),
-  );
   for (const [family, members] of families) {
     if (!members.some((t) => t.rarity === 'colorful')) continue;
     const base = [...members].sort(
-      (a, b) => rarityRank.get(a.rarity)! - rarityRank.get(b.rarity)!,
+      (a, b) => RARITY_RANK.get(a.rarity)! - RARITY_RANK.get(b.rarity)!,
     )[0]!;
     let total = 0;
     let cursor: TalentDef | undefined = base;

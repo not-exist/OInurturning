@@ -4,6 +4,7 @@ import {
   type QuestionSnapshot,
   type RankingReport,
 } from '@oinur/shared';
+import { fnv1a32 } from './rng.js';
 
 export const ENGINE_VERSION = 'ranking-v2' as const;
 export const PASS_RANK_MAX = 8 as const;
@@ -90,15 +91,7 @@ export function stableSerialize(value: unknown): string {
 }
 
 export function stableHash(value: unknown): string {
-  const serialized = stableSerialize(value);
-  let hash = 0x811c9dc5;
-
-  for (let index = 0; index < serialized.length; index += 1) {
-    hash ^= serialized.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  return fnv1a32(stableSerialize(value)).toString(16).padStart(8, '0');
 }
 
 export function validateRankingReport(report: RankingReport): RankingReport {

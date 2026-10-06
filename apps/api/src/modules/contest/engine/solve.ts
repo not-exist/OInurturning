@@ -12,6 +12,7 @@ import type {
   SolveQuestionInput,
 } from './models.js';
 import { clamp } from '@oinur/shared';
+import { standardNormal } from './rng.js';
 
 interface EffectiveHooks {
   timeKMul: number;
@@ -137,12 +138,6 @@ export function energyCost(input: EnergyCostInput): number {
   return Math.max(0, Math.round(required + failures + submissionCost));
 }
 
-function normalSample(rng: AttemptRng['noise']): number {
-  const first = clamp(finite(rng(), 0.5), Number.EPSILON, 1 - Number.EPSILON);
-  const second = clamp(finite(rng(), 0.5), 0, 1 - Number.EPSILON);
-  return Math.sqrt(-2 * Math.log(first)) * Math.cos(2 * Math.PI * second);
-}
-
 function amplifyProbability(probability: number, amount: number): number {
   return probability + amount * (probability - 0.5);
 }
@@ -155,7 +150,7 @@ export function resolveAttempt(input: ResolveAttemptInput, rng: AttemptRng): Att
   const noiseSigma = Math.max(0, (0.15 + hooks.noiseSigmaAdd) * hooks.noiseSigmaMul);
   const submissionTime = Math.max(
     0,
-    rewriteMultiplier * Math.max(0, finite(input.estimatedTimeMin, 0)) * Math.exp(noiseSigma * normalSample(rng.noise)) +
+    rewriteMultiplier * Math.max(0, finite(input.estimatedTimeMin, 0)) * Math.exp(noiseSigma * standardNormal(rng.noise)) +
       hooks.submitTimeAdd,
   );
 
