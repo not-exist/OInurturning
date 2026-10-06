@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseDocument } from 'yaml';
 import type { Prisma } from '../generated/prisma/client.js';
 import {
   economyConfigSchema,
@@ -27,6 +26,7 @@ import {
   type ShopConfig,
 } from '@oinur/shared';
 import { env } from './env.js';
+import { parseYamlText } from './read-yaml.js';
 import { runSemanticChecks, type SemanticIssue } from './semantic.js';
 import { logger } from '../lib/logger.js';
 import { prisma } from '../lib/prisma.js';
@@ -122,19 +122,18 @@ function readYamlFiles(dir: string): { raws: RawFile[]; errors: LoadError[] } {
       errors.push({ file, path: `${file}.yaml`, message: `文件不可读：${full}` });
       continue;
     }
-    const doc = parseDocument(text);
-    if (doc.errors.length > 0) {
-      for (const e of doc.errors) {
-        const line = e.linePos?.[0]?.line;
+    const { data, errors: yamlErrors } = parseYamlText(text);
+    if (yamlErrors.length > 0) {
+      for (const e of yamlErrors) {
         errors.push({
           file,
-          path: `${file}.yaml${line ? ` (line ${line})` : ''}`,
-          message: `YAML 语法错误：${e.message.split('\n')[0]}`,
+          path: `${file}.yaml${e.line ? ` (line ${e.line})` : ''}`,
+          message: `YAML 语法错误：${e.message}`,
         });
       }
       continue;
     }
-    raws.push({ file, text, data: doc.toJS() });
+    raws.push({ file, text, data });
   }
   return { raws, errors };
 }

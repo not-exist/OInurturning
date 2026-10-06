@@ -11,7 +11,8 @@
  */
 import bcrypt from 'bcryptjs';
 import { Prisma, type QualityTier } from '../generated/prisma/client.js';
-import { getConfig, importConfigs } from '../config/loader.js';
+import { importConfigs } from '../config/loader.js';
+import { requireConfig } from '../config/require-config.js';
 import { env } from '../config/env.js';
 import { dayKey } from '../lib/clock.js';
 import { prisma } from '../lib/prisma.js';
@@ -69,8 +70,7 @@ const PROBLEMS = [
 async function main(): Promise<void> {
   // 运行前先导入配置到 CONFIG（否则招募池生成、道具列表等依赖 CONFIG 的路径会挂）
   await importConfigs();
-  const config = getConfig();
-  if (!config) throw new Error('[seed] importConfigs() 未加载 CONFIG');
+  const config = requireConfig('seed');
 
   const existing = await prisma.user.findUnique({
     where: { username: DEMO_USERNAME },

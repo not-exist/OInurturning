@@ -1,5 +1,5 @@
 import { Prisma, type PvpMatch, type PvpRewardGrant, type PvpTournament } from '../../generated/prisma/client.js';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 
@@ -102,8 +102,7 @@ function normalizePrizes(prizes: unknown, withDefaults = true): PrizeConfig {
 }
 
 function validateItems(config: PrizeConfig): void {
-  const items = getConfig()?.items;
-  if (items === undefined) throw new Error('[pvp] CONFIG.items 未加载');
+  const items = requireConfig('pvp').items;
   for (const bucket of [config.champion, config.runnerUp, config.thirdToFourth, config.otherFirstRoundWinners]) {
     for (const item of bucket.items) {
       if (items[item.itemId] === undefined) {

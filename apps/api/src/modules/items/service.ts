@@ -1,6 +1,6 @@
 import type { Student } from '../../generated/prisma/client.js';
 import { computeV, type StudentView, type Rarity } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { aggregateMeta } from '../students/meta.js';
@@ -13,12 +13,6 @@ import { applyItemEffect } from './effects.js';
  * - POST use：单事务内 锁学员行 → settle → 校验限制 → 应用效果 → 扣道具（quantity−1，0 删行）。
  *   道具扣减与属性变动全部走「条件 UPDATE + 事务」（TECH-DESIGN §5）。
  */
-
-function requireConfig() {
-  const config = getConfig();
-  if (!config) throw new Error('[items] CONFIG 未加载：importConfigs() 必须先于游戏逻辑执行');
-  return config;
-}
 
 /** 背包行视图：库存 + 配置名称/稀有度/类别/描述（join CONFIG.items；已软弃用/缺失不会出现在列表） */
 export interface ItemView {
@@ -33,7 +27,7 @@ export interface ItemView {
 }
 
 export async function listItems(userId: number): Promise<ItemView[]> {
-  const config = requireConfig();
+  const config = requireConfig('items');
   const rows = await prisma.userItem.findMany({ where: { userId }, orderBy: { id: 'asc' } });
   const views: ItemView[] = [];
   for (const row of rows) {
@@ -136,7 +130,7 @@ export async function useItem(
   input: UseItemInput,
   now: Date = new Date(),
 ): Promise<StudentView | AccountItemActivationView> {
-  requireConfig();
+  requireConfig('items');
   if (!input.itemId) throw new ApiError('VALIDATION_FAILED', { resource: 'item', reason: 'itemId 必填' });
   if (input.itemId === 'intel-slip') return activateAdventureIntel(userId);
   if (input.studentId == null) throw new ApiError('VALIDATION_FAILED', { resource: 'student', reason: 'studentId 必填' });
@@ -153,7 +147,7 @@ export async function useItem(
     if (student.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', { resource: 'student', id });
 
     // 2. 道具存在性 + 归属校验
-    const config = requireConfig();
+    const config = requireConfig('items');
     if (!config.items[input.itemId]) {
       throw new ApiError('NOT_FOUND', { resource: 'item', itemId: input.itemId });
     }

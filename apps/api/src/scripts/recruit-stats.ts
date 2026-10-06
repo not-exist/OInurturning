@@ -9,14 +9,13 @@
  *   4. genius 首槽稀有度分布（应全部 ≥ 绿）。
  */
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseDocument } from 'yaml';
 import {
   economyConfigSchema,
   talentsFileSchema,
   type ConfigRarity,
 } from '@oinur/shared';
+import { readYaml } from '../config/read-yaml.js';
 import { mulberry32 } from '../lib/rng.js';
 import {
   bucketTalents,
@@ -33,9 +32,7 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(MODULE_DIR, '../../../../docs/data');
 
 function loadYaml<T>(file: string, parse: (data: unknown) => T): T {
-  const doc = parseDocument(readFileSync(path.join(DATA_DIR, file), 'utf8'));
-  if (doc.errors.length > 0) throw new Error(`${file}: YAML 语法错误`);
-  return parse(doc.toJS());
+  return parse(readYaml(path.join(DATA_DIR, file)));
 }
 
 const talents = loadYaml('talents.yaml', (d) => talentsFileSchema.parse(d).talents);

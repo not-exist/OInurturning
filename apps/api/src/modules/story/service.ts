@@ -18,7 +18,7 @@ import {
   type StoryProgressView,
   STAGE_CHAPTERS,
 } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
@@ -49,14 +49,8 @@ export interface StoryEntryResult {
   firstClear: boolean;
 }
 
-function requireConfig() {
-  const config = getConfig();
-  if (config === undefined) throw new Error('[story] CONFIG 未加载');
-  return config;
-}
-
 function orderedStages(): StageConfig[] {
-  const config = requireConfig();
+  const config = requireConfig('story');
   const chapterOrder = new Map(STAGE_CHAPTERS.map((chapter, index) => [chapter, index]));
   return Object.values(config.stages).sort(
     (left, right) =>
@@ -183,7 +177,7 @@ export async function getStoryOverview(userId: number, ngLevel = 0): Promise<Sto
       name: stage.name,
       recommendedLevel: stage.recommended_level,
       durationMin: stage.duration_min,
-      staminaCost: requireConfig().stageDefaults.stamina_cost_by_chapter[stage.chapter],
+      staminaCost: requireConfig('story').stageDefaults.stamina_cost_by_chapter[stage.chapter],
       unlocked: isStageUnlocked(stages, progress, stage, ngAvailable),
       cleared: (row?.clearCount ?? 0) > 0,
       clearCount: row?.clearCount ?? 0,
@@ -281,7 +275,7 @@ function instantiateQuestions(
   ngLevel: number,
   seed: number,
 ): QuestionSnapshot[] {
-  const config = requireConfig();
+  const config = requireConfig('story');
   const random = createRandomStream(seed, 'order');
   const questions: QuestionSnapshot[] = [];
   const usedTemplates = new Set<string>();
@@ -326,7 +320,7 @@ function instantiateTraits(
   ngLevel: number,
   random: () => number,
 ): QuestionTraitSnapshot[] {
-  const config = requireConfig();
+  const config = requireConfig('story');
   const severityRank = new Map(
     ['red', 'yellow', 'blue', 'purple', 'black', 'colorful'].map((severity, index) => [
       severity,
@@ -375,8 +369,8 @@ function pickRewardItem(
   })?.rarity;
   if (baseRarity === undefined) return undefined;
   const shift =
-    ngLevel >= requireConfig().ngPlus.item_rarity_shift.from_layer
-      ? requireConfig().ngPlus.item_rarity_shift.shift
+    ngLevel >= requireConfig('story').ngPlus.item_rarity_shift.from_layer
+      ? requireConfig('story').ngPlus.item_rarity_shift.shift
       : 0;
   const rarityIndex = CONFIG_RARITIES.indexOf(baseRarity);
   const rarity = CONFIG_RARITIES[Math.min(CONFIG_RARITIES.length - 1, rarityIndex + shift)]!;
@@ -395,7 +389,7 @@ function buildRewards(
   seed: number,
 ): RewardLine[] {
   if (!rank || rank > 8) return [];
-  const config = requireConfig();
+  const config = requireConfig('story');
   const rewards: RewardLine[] = [];
   const random = createRandomStream(seed, 'rewards');
   if (firstClear) {
@@ -569,7 +563,7 @@ export async function enterStoryStage(
 ): Promise<StoryEntryResult> {
   if (!Number.isInteger(ngLevel) || ngLevel < 0)
     throw new ApiError('VALIDATION_FAILED', { field: 'ngLevel' });
-  const config = requireConfig();
+  const config = requireConfig('story');
   const stage = config.stages[requestedStageKey];
   if (stage === undefined)
     throw new ApiError('NOT_FOUND', { resource: 'stage', stageKey: requestedStageKey });

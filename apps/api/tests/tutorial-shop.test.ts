@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseDocument } from 'yaml';
+import { readYaml } from '../src/config/read-yaml.js';
 import { TUTORIAL_ROUTE_KEYS, shopConfigSchema, tutorialConfigSchema } from '@oinur/shared';
 import type { TutorialStepDef } from '@oinur/shared';
 import {
@@ -20,7 +20,7 @@ import {
 
 function loadYaml(file: string): unknown {
   const full = path.resolve(import.meta.dirname, '../../..', 'docs/data', file);
-  return parseDocument(fs.readFileSync(full, 'utf8')).toJS();
+  return readYaml(full);
 }
 
 const tutorialSteps: TutorialStepDef[] = tutorialConfigSchema.parse(loadYaml('tutorial.yaml')).steps;

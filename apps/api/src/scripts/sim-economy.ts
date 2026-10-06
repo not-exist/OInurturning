@@ -1,8 +1,7 @@
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { economyConfigSchema, itemsFileSchema, stagesConfigSchema } from '@oinur/shared';
-import { parseDocument } from 'yaml';
+import { readYaml } from '../config/read-yaml.js';
 import { runSemanticChecks } from '../config/semantic.js';
 import { simulateEconomy, type EconomySimulationReport } from '../modules/economy/simulation.js';
 
@@ -11,12 +10,6 @@ const DATA_DIR = path.resolve(MODULE_DIR, '../../../../docs/data');
 
 export interface RunOptions {
   loadData?: (path: string) => unknown;
-}
-
-function parseYaml(pathname: string): unknown {
-  const document = parseDocument(readFileSync(pathname, 'utf8'));
-  if (document.errors.length > 0) throw new Error(`${pathname}: YAML syntax error`);
-  return document.toJS();
 }
 
 function formatRatio(ratio: number | null): string {
@@ -41,7 +34,7 @@ function renderText(report: EconomySimulationReport): string {
 }
 
 export async function run(argv: readonly string[] = [], options: RunOptions = {}): Promise<number> {
-  const loadData = options.loadData ?? parseYaml;
+  const loadData = options.loadData ?? readYaml;
   const economyPath = path.join(DATA_DIR, 'economy.yaml');
   const itemsPath = path.join(DATA_DIR, 'items.yaml');
   const stagesPath = path.join(DATA_DIR, 'stages.yaml');

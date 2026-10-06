@@ -12,7 +12,7 @@ import {
   type ParticipantSnapshot,
   type QuestionSnapshot,
 } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -105,12 +105,6 @@ const STAT_FIELDS = {
 
 const SIX_FIELDS = ['ds', 'dp', 'math', 'graph', 'greedy', 'str'] as const;
 type StatField = (typeof STAT_FIELDS)[keyof typeof STAT_FIELDS];
-
-function requireConfig() {
-  const config = getConfig();
-  if (config === undefined) throw new Error('[adventure] CONFIG 未加载');
-  return config;
-}
 
 function record(value: unknown): JsonRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -359,7 +353,7 @@ export async function drawAdventure(
   if (roster.length !== ADVENTURE_ROSTER_SIZE || new Set(roster).size !== ADVENTURE_ROSTER_SIZE) {
     throw new ApiError('VALIDATION_FAILED', { field: 'roster', reason: '需要 3 名互不相同的学员' });
   }
-  const config = requireConfig();
+  const config = requireConfig('adventure');
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const pending = await tx.adventureLog.findFirst({ where: { userId, status: 'PENDING' } });
@@ -650,7 +644,7 @@ function rewardItemId(
   rarity: ConfigRarity | undefined,
   random: () => number,
 ): string {
-  const config = requireConfig();
+  const config = requireConfig('adventure');
   if (rawId !== 'dim-book') {
     if (!config.items[rawId]) throw new ApiError('STATE_CONFLICT', { resource: 'item', itemId: rawId });
     return rawId;
@@ -877,7 +871,7 @@ export async function chooseAdventure(
   input: AdventureChoiceInput,
   now: Date = new Date(),
 ): Promise<AdventureChoiceResult> {
-  const config = requireConfig();
+  const config = requireConfig('adventure');
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     await tx.$queryRaw`SELECT id FROM AdventureLog WHERE id = ${adventureId} FOR UPDATE`;
@@ -1072,7 +1066,7 @@ export async function chooseAdventure(
 }
 
 export async function listAdventureLogs(userId: number, limit = 20): Promise<AdventureLogView[]> {
-  const config = requireConfig();
+  const config = requireConfig('adventure');
   const rows = await prisma.adventureLog.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },

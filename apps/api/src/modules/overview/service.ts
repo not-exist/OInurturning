@@ -1,5 +1,5 @@
 import type { StudentView } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { getPool } from '../academy/service.js';
@@ -122,9 +122,7 @@ const RECENT_LIMIT = 5;
 const OVERVIEW_STUDENTS = 5;
 
 function freeIntervalHours(): number {
-  const config = getConfig();
-  if (!config) throw new Error('[overview] CONFIG 未加载：importConfigs() 必须先于游戏逻辑执行');
-  return config.economy.recruitment.manual_refresh.free_interval_hours;
+  return requireConfig('overview').economy.recruitment.manual_refresh.free_interval_hours;
 }
 
 export async function getOverview(userId: number): Promise<OverviewView> {

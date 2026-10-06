@@ -1,4 +1,4 @@
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
@@ -16,8 +16,7 @@ function isPurchasable(item: { price: number | null }): boolean {
 }
 
 export async function getCatalog(userId: number, now: Date = new Date()): Promise<ShopCatalogView> {
-  const cfg = getConfig();
-  if (!cfg) throw new Error('[shop] CONFIG 未加载');
+  const cfg = requireConfig('shop');
   const items = cfg.items;
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const holdings = await prisma.userItem.findMany({ where: { userId } });
@@ -144,8 +143,7 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
   if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) {
     throw new ApiError('VALIDATION_FAILED', { resource: 'quantity', reason: '数量必须为 1-99 的整数' });
   }
-  const cfg = getConfig();
-  if (!cfg) throw new Error('[shop] CONFIG 未加载');
+  const cfg = requireConfig('shop');
   const def = cfg.items[itemId];
   if (!def) throw new ApiError('NOT_FOUND', { resource: 'item', itemId });
   if (!isPurchasable(def)) throw new ApiError('VALIDATION_FAILED', { resource: 'item', reason: '该道具不可购买' });

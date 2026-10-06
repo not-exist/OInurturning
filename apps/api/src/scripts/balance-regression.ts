@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseDocument } from 'yaml';
 import {
   economyConfigSchema,
   eventsConfigSchema,
@@ -17,6 +15,7 @@ import {
   type StagesConfig,
   type TalentDef,
 } from '@oinur/shared';
+import { readYaml } from '../config/read-yaml.js';
 import { runSemanticChecks } from '../config/semantic.js';
 import { ATTR_TABLE, type GenQuality } from '../modules/academy/recruit-gen.js';
 import { BOOK_MULT, QUALITY_MULT } from '../modules/training/gains.js';
@@ -49,12 +48,6 @@ export interface RunOptions {
   /** 测试/冒烟用：跳过耗时的成长矩阵，只跑账本与校验 */
   skipGrowth?: boolean;
   maxSessions?: number;
-}
-
-function parseYaml(pathname: string): unknown {
-  const document = parseDocument(readFileSync(pathname, 'utf8'));
-  if (document.errors.length > 0) throw new Error(`${pathname}: YAML syntax error`);
-  return document.toJS();
 }
 
 interface FinalTarget {
@@ -307,7 +300,7 @@ interface BalanceReport {
 }
 
 export async function run(argv: readonly string[] = [], options: RunOptions = {}): Promise<number> {
-  const loadData = options.loadData ?? parseYaml;
+  const loadData = options.loadData ?? readYaml;
   const economyPath = path.join(DATA_DIR, 'economy.yaml');
   const itemsPath = path.join(DATA_DIR, 'items.yaml');
   const stagesPath = path.join(DATA_DIR, 'stages.yaml');

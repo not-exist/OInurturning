@@ -7,7 +7,7 @@ import {
   type LectureGrowthConfig,
   type LectureGrowthEntry,
 } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -55,8 +55,8 @@ const DAILY_LECTURE_LIMIT = 3;
 const DAILY_STUDENT_LECTURE_LIMIT = 2;
 
 function lectureConfig(): LectureConfig {
-  const config = getConfig();
-  if (!config?.economy.lecture) throw new Error('[academy] economy.lecture 未加载');
+  const config = requireConfig('academy');
+  if (!config.economy.lecture) throw new Error('[academy] economy.lecture 未加载');
   const parsed = lectureConfigSchema.safeParse(config.economy.lecture);
   if (!parsed.success) throw new Error('[academy] economy.lecture 配置不完整');
   return parsed.data;

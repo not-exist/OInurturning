@@ -3,7 +3,7 @@ import { clamp } from '@oinur/shared';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
@@ -38,12 +38,6 @@ const SEVERITY_BASE = [40, 30, 18, 8, 3, 1] as const;
 const DAILY_PROBLEM_LIMIT = 2;
 const PROBLEM_CAPACITY = 120;
 
-function config() {
-  const value = getConfig();
-  if (value === undefined) throw new Error('[problems] CONFIG 未加载');
-  return value;
-}
-
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -60,7 +54,7 @@ function problemRarity(quality: number): ProblemView['rarity'] {
 }
 
 function drawTrait(setting: number, random: () => number): string | null {
-  const traits = Object.values(config().problemTraits).sort((left, right) => left.id.localeCompare(right.id));
+  const traits = Object.values(requireConfig('problems').problemTraits).sort((left, right) => left.id.localeCompare(right.id));
   const probability = Math.min(0.05 + setting * 0.002, 0.35);
   if (random() >= probability || traits.length === 0) return null;
   const weighted = traits.map((trait) => {
@@ -97,7 +91,7 @@ export async function createProblem(
   if (DIMENSION_FIELDS[dimension] === undefined) {
     throw new ApiError('VALIDATION_FAILED', { field: 'dimension' });
   }
-  config();
+  requireConfig('problems');
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
     const available = await tx.problemLibraryEntry.count({ where: { userId, consumedAt: null } });

@@ -1,5 +1,5 @@
 import { TALENT_META_STATS, type TalentDef } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 
 /**
  * 天赋 meta 聚合结果（Record<键, 加算总值>）：
@@ -34,9 +34,5 @@ export function aggregateFromTalents(
 
 /** 从内存 CONFIG.talents 聚合（生产路径；配置在启动时由 importConfigs 冻结进内存） */
 export function aggregateMeta(talentIds: string[]): MetaAggregate {
-  const config = getConfig();
-  if (!config) {
-    throw new Error('[meta] CONFIG 未加载：importConfigs() 必须先于游戏逻辑执行');
-  }
-  return aggregateFromTalents(talentIds, config.talents);
+  return aggregateFromTalents(talentIds, requireConfig('meta').talents);
 }

@@ -1,5 +1,5 @@
 import type { Prisma } from '../../generated/prisma/client.js';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { prisma } from '../../lib/prisma.js';
@@ -7,9 +7,7 @@ import type { TutorialStepDef } from '@oinur/shared';
 import { resolveProgress, unlockedForStep } from './routing.js';
 
 export function tutorialConfig() {
-  const cfg = getConfig();
-  if (!cfg?.tutorial) throw new Error('[tutorial] CONFIG 未加载');
-  return cfg.tutorial;
+  return requireConfig('tutorial').tutorial;
 }
 
 export function getSteps(): TutorialStepDef[] {

@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type QualityTier } from '../../generated/prisma/client.js';
 import { onboardingConfigSchema, type OnboardingConfig } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { mulberry32 } from '../../lib/rng.js';
@@ -24,8 +24,8 @@ import {
  */
 
 export function onboardingConfig(): OnboardingConfig {
-  const config = getConfig();
-  if (!config?.economy?.onboarding) throw new Error('[onboarding] economy.onboarding 未加载：importConfigs() 必须先于游戏逻辑执行');
+  const config = requireConfig('onboarding');
+  if (!config.economy.onboarding) throw new Error('[onboarding] economy.onboarding 未加载');
   const parsed = onboardingConfigSchema.safeParse(config.economy.onboarding);
   if (!parsed.success) throw new Error('[onboarding] economy.onboarding 配置不完整');
   return parsed.data;
@@ -60,8 +60,7 @@ export async function grantOnboardingPackage(
   if (!user) throw new ApiError('NOT_FOUND', { resource: 'user', id: userId });
   if (user.onboardedAt) throw new ApiError('STATE_CONFLICT', { resource: 'onboarding', reason: 'already granted' });
 
-  const config = getConfig();
-  if (!config) throw new Error('[onboarding] CONFIG 未加载：importConfigs() 必须先于游戏逻辑执行');
+  const config = requireConfig('onboarding');
   const cfg = onboardingConfig();
   const genCtx: GenerateContext = {
     reputation: user.reputation + cfg.reputation,

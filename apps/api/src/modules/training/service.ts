@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type ProblemLibraryEntry, type Student } from '../../generated/prisma/client.js';
 import { clamp, DIMENSIONS, type DimensionKey } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
@@ -29,12 +29,6 @@ import { autoAdvanceIfNeeded } from '../tutorial/service.js';
  * - 每次成功训练在同事务内写 TrainingLog（含耗材快照），读路径 listTrainingLogs；
  *   学员被开除后记录保留（studentId 置空 + studentName 快照）。
  */
-
-function requireConfig() {
-  const config = getConfig();
-  if (!config) throw new Error('[training] CONFIG 未加载：importConfigs() 必须先于游戏逻辑执行');
-  return config;
-}
 
 /** 运行时种子：训练无需跨请求复现，取密码学随机；可复现性由注入 rng 的 gains 层保证 */
 function newRng(): () => number {
@@ -226,7 +220,7 @@ async function runTraining(
   rng: () => number,
   now: Date,
 ): Promise<TrainingResult> {
-  const config = requireConfig();
+  const config = requireConfig('training');
   const training = config.economy.training;
   const { kind, userId } = input;
 

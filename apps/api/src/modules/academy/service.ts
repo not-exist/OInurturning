@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type RecruitPool, type Student } from '../../generated/prisma/client.js';
 import { computeV, type StudentView } from '@oinur/shared';
-import { getConfig } from '../../config/loader.js';
+import { requireConfig } from '../../config/require-config.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -29,15 +29,11 @@ export const POOL_SIZE = 5;
 const HOUR_MS = 3_600_000;
 
 function recruitmentCfg() {
-  const config = getConfig();
-  if (!config) throw new Error('[academy] CONFIG 未加载：importConfigs() 必须先于游戏逻辑执行');
-  return config.economy.recruitment;
+  return requireConfig('academy').economy.recruitment;
 }
 
 function talentBuckets() {
-  const config = getConfig();
-  if (!config) throw new Error('[academy] CONFIG 未加载：importConfigs() 必须先于游戏逻辑执行');
-  return bucketTalents(config.talents);
+  return bucketTalents(requireConfig('academy').talents);
 }
 
 /** 运行时种子：生成无需跨请求复现，取密码学随机；可复现性由注入 rng 的 gen 层保证 */
