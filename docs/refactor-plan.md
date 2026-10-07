@@ -178,7 +178,7 @@ main
 | FNV-1a / Box-Muller | 各 2 份，算法一致（FNV 常量与顺序逐位相同） | 归入 `contest/engine/rng.ts` |
 | 稀有度序 | 真副本 **3** 份（`shop/service.ts:127`、`scripts/recruit-stats.ts:47`、`scripts/balance-regression.ts:180`）；`config/semantic.ts` 与 `recruit-gen.ts` **已**用共享 `CONFIG_RARITIES`，不应列为待收敛 | 大小写双轨真源：`talents.ts:7` 小写 `colorful` vs `enums.ts:2` 大写 `RAINBOW` |
 | 状态枚举 | Prisma 10 个 enum 的"第二份声明"**不在 `shared/enums.ts`**（该文件只有 `RARITIES`/`DIMENSIONS`/`ABILITY_KEYS`），而是手抄散落在 5 个文件；`AdventureStatus` 等 2 个**根本没有第二份** | `TrainingKind`/`QualityTier` 大小写双轨，靠两张手写表往返翻译 |
-| 引擎不变量 | `isBetterTeamAttempt`、`aggregateTeam`、排序口径在 shared 与 engine **逐字两份** | 抽离成立，但**不是单文件搬迁**：需整体搬 `engine/`（6 文件）+ `mulberry32`，因 shared 不能 import apps/api |
+| 引擎不变量 | `isBetterTeamAttempt`、`aggregateTeam`、排序口径在 shared 与 engine **逐字两份** | 抽离成立，但**不是单文件搬迁**：需整体搬 `engine/`（6 文件）+ `mulberry32`，因 shared 不能 import apps/api。**（R4-T11 实测证伪该机制主张：闭包完全落在 shared 内，mulberry32 全仓仅 1 份；实际为 import 级收口，2 文件 ±59 行，见台账 R4-T11）** |
 
 ### R5 跨端契约（先 diff，再搬）
 
