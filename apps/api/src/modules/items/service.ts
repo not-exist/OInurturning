@@ -3,6 +3,7 @@ import { computeV, type StudentView, type Rarity } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockStudent, lockUser } from '../../lib/row-lock.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
 import { applyItemEffect } from './effects.js';
@@ -91,7 +92,7 @@ export interface AccountItemActivationView {
 
 async function activateAdventureIntel(userId: number): Promise<AccountItemActivationView> {
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const user = await tx.user.findUniqueOrThrow({
       where: { id: userId },
       select: { adventureIntelReady: true },
@@ -141,7 +142,7 @@ export async function useItem(
 
   return prisma.$transaction(async (tx) => {
     // 1. 锁学员行（写事务内串行化并发使用）
-    await tx.$queryRaw`SELECT id FROM Student WHERE id = ${id} FOR UPDATE`;
+    await lockStudent(tx, id);
     const student = await tx.student.findUniqueOrThrow({ where: { id }, include: { talents: true } });
     if (student.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id });
     if (student.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', { resource: 'student', id });

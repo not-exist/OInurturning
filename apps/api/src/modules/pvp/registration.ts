@@ -1,9 +1,10 @@
-import { Prisma, type PvpRegistration, type PvpTournament } from '../../generated/prisma/client.js';
+import type { PvpRegistration, PvpTournament } from '../../generated/prisma/client.js';
 import { TEAM_SIZE_MAX, TEAM_SIZE_MIN, type ParticipantSnapshot } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
 import { participantSnapshot } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockPvpTournament, lockStudentsByIds, lockUser } from '../../lib/row-lock.js';
 
 /** 出战队伍人数即契约的队伍规模域（shared TEAM_SIZE_MIN~MAX），不是可调数值。 */
 export type PvpRosterSize = typeof TEAM_SIZE_MIN | typeof TEAM_SIZE_MAX;
@@ -108,8 +109,8 @@ export async function registerPvp(
   }
   return prisma.$transaction(async (tx) => {
     // PVP lock ordering is Tournament -> User -> Student, matching scheduler/refund paths.
-    await tx.$queryRaw`SELECT id FROM PvpTournament WHERE id = ${tournamentId} FOR UPDATE`;
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockPvpTournament(tx, tournamentId);
+    await lockUser(tx, userId);
     const tournament = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
     if (tournament === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
     const rosterSize = pvpRosterSize(tournament.config);
@@ -144,7 +145,7 @@ export async function registerPvp(
     }
     // 整支队伍一次性上锁：按 id 升序，避免并发报名互相等锁。
     const lockedIds = [...new Set(studentIds)].sort((left, right) => left - right);
-    await tx.$queryRaw`SELECT id FROM Student WHERE id IN (${Prisma.join(lockedIds)}) FOR UPDATE`;
+    await lockStudentsByIds(tx, lockedIds);
     const studentRows = await tx.student.findMany({
       where: { id: { in: lockedIds } },
       include: { talents: true },

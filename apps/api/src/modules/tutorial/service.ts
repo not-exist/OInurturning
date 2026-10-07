@@ -3,6 +3,7 @@ import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockUser } from '../../lib/row-lock.js';
 import type { TutorialStepDef } from '@oinur/shared';
 import { resolveProgress, unlockedForStep } from './routing.js';
 
@@ -107,7 +108,7 @@ export async function advanceTutorial(
     throw new ApiError('VALIDATION_FAILED', { resource: 'tutorial', reason: 'step 越界' });
   }
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
     const progress = resolveProgress(user, steps);
     // 已完成：幂等返回，不再发任何奖励
@@ -187,7 +188,7 @@ export async function completeTutorial(
 ): Promise<TutorialStateView> {
   const steps = getSteps();
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
     const progress = resolveProgress(user, steps);
     // 已完成：幂等返回，不重复发末步奖励

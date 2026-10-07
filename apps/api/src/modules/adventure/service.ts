@@ -17,6 +17,7 @@ import { dayKey, weekKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { participantSnapshot, type ParticipantStudentInput } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockAdventureLog, lockStudentsByIds, lockUser } from '../../lib/row-lock.js';
 import { weightedPick } from '../../lib/weighted-pick.js';
 import { createRandomStream } from '../contest/engine/rng.js';
 import { deriveStreamSeed } from '../contest/engine/rng.js';
@@ -237,7 +238,7 @@ async function lockStudents(
   now: Date,
 ): Promise<LockedStudent[]> {
   const ids = [...new Set(roster)].sort((left, right) => left - right);
-  await tx.$queryRaw`SELECT id FROM Student WHERE id IN (${Prisma.join(ids)}) FOR UPDATE`;
+  await lockStudentsByIds(tx, ids);
   const rows = await tx.student.findMany({ where: { id: { in: ids } }, include: { talents: true } });
   const byId = new Map(rows.map((row) => [row.id, row]));
   return roster.map((studentId) => {
@@ -346,7 +347,7 @@ export async function drawAdventure(
   }
   const config = requireConfig('adventure');
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const pending = await tx.adventureLog.findFirst({ where: { userId, status: 'PENDING' } });
     if (pending !== null) {
       throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'pending adventure exists' });
@@ -839,8 +840,8 @@ export async function chooseAdventure(
 ): Promise<AdventureChoiceResult> {
   const config = requireConfig('adventure');
   const result = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
-    await tx.$queryRaw`SELECT id FROM AdventureLog WHERE id = ${adventureId} FOR UPDATE`;
+    await lockUser(tx, userId);
+    await lockAdventureLog(tx, adventureId);
     const log = await tx.adventureLog.findUnique({ where: { id: adventureId } });
     if (log === null || log.userId !== userId) throw new ApiError('NOT_FOUND', { resource: 'adventure', id: adventureId });
     const event = config.events[log.eventId];

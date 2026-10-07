@@ -2,6 +2,7 @@ import type { StudentView } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockUser } from '../../lib/row-lock.js';
 import { getPool } from '../academy/service.js';
 import { listLectureLogs, type LectureResultView } from '../academy/lecture.js';
 import { listAdventureLogs, type AdventureLogView } from '../adventure/service.js';
@@ -184,7 +185,7 @@ export interface ClaimResult {
 
 export async function claimChecklistReward(userId: number): Promise<ClaimResult> {
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
     const badges = Array.isArray(user.badges) ? [...(user.badges as string[])] : [];
     if (badges.includes(CHECKLIST_REWARD_BADGE)) {

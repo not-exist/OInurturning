@@ -8,6 +8,7 @@ import {
 } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockPvpTournament } from '../../lib/row-lock.js';
 import { getConfig } from '../../config/loader.js';
 import { deriveSeed } from '../contest/engine/rng.js';
 import { simulateDuel } from '../contest/engine/duel.js';
@@ -288,7 +289,7 @@ async function playPending(tx: Prisma.TransactionClient, tournament: PvpTourname
 
 export async function advancePvpTournament(tournamentId: number, now?: Date, actorAdminId?: number): Promise<PvpTournamentDetail> {
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM PvpTournament WHERE id = ${tournamentId} FOR UPDATE`;
+    await lockPvpTournament(tx, tournamentId);
     const tournament = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
     if (tournament === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
     const auditStart = async (status: string): Promise<void> => {

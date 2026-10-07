@@ -7,6 +7,7 @@ import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
+import { lockRecruitPool } from '../../lib/row-lock.js';
 import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 import {
   TIER_TO_QUALITY,
@@ -93,11 +94,6 @@ function toPoolView(pool: RecruitPool, now: Date): PoolView {
   };
 }
 
-/** 锁池行（写事务内串行化并发招募/刷新）；行不存在时不产生锁 */
-async function lockPoolRow(tx: Prisma.TransactionClient, userId: number): Promise<void> {
-  await tx.$queryRaw`SELECT userId FROM RecruitPool WHERE userId = ${userId} FOR UPDATE`;
-}
-
 /**
  * GET 路径懒结算：无池则建池；距 generatedAt ≥ free_interval_hours 自动重生成；
  * 04:00 日界跨天后 refreshesToday 归零（clock.dayKey 口径）。
@@ -161,7 +157,7 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
 export async function refreshPool(userId: number, now: Date = new Date()): Promise<PoolView> {
   const cfg = recruitmentCfg();
   return prisma.$transaction(async (tx) => {
-    await lockPoolRow(tx, userId);
+    await lockRecruitPool(tx, userId);
     const pool = await tx.recruitPool.findUnique({ where: { userId } });
     if (!pool) throw new ApiError('NOT_FOUND', { resource: 'recruitPool' });
 
@@ -216,7 +212,7 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
 export async function recruit(userId: number, tempId: string, now: Date = new Date()): Promise<StudentView> {
   const cfg = recruitmentCfg();
   const recruited = await prisma.$transaction(async (tx) => {
-    await lockPoolRow(tx, userId);
+    await lockRecruitPool(tx, userId);
     const pool = await tx.recruitPool.findUnique({ where: { userId } });
     if (!pool) throw new ApiError('NOT_FOUND', { resource: 'recruitPool' });
 

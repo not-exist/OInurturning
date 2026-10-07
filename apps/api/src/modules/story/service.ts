@@ -22,6 +22,7 @@ import { damping } from '../../lib/damping.js';
 import { ApiError } from '../../lib/errors.js';
 import { participantSnapshot } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockStudentsByIds, lockUser } from '../../lib/row-lock.js';
 import { toProgressView } from '../../lib/story-progress.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { buildBattleReplay } from '../contest/replay.js';
@@ -541,7 +542,7 @@ export async function enterStoryStage(
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const replay = await getContestRecordByIdempotency(userId, idempotencyKey, tx);
     if (replay !== null) {
       return {
@@ -553,7 +554,7 @@ export async function enterStoryStage(
     }
     // 整支队伍一次性上锁：按 id 升序申请，避免并发入关互相等锁。
     const lockedIds = [...new Set(roster)].sort((left, right) => left - right);
-    await tx.$queryRaw`SELECT id FROM Student WHERE id IN (${Prisma.join(lockedIds)}) FOR UPDATE`;
+    await lockStudentsByIds(tx, lockedIds);
     const rows = await tx.student.findMany({
       where: { id: { in: lockedIds } },
       include: { talents: true },

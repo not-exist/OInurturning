@@ -3,6 +3,7 @@ import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockPvpTournament, lockUser } from '../../lib/row-lock.js';
 
 export type PvpRewardLine =
   | { type: 'item'; itemId: string; count: number }
@@ -205,8 +206,8 @@ export async function listPvpRewardGrants(viewerUserId: number, tournamentId: nu
 
 export async function claimPvpReward(userId: number, tournamentId: number): Promise<PvpRewardGrantView> {
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM PvpTournament WHERE id = ${tournamentId} FOR UPDATE`;
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockPvpTournament(tx, tournamentId);
+    await lockUser(tx, userId);
     const grant = await tx.pvpRewardGrant.findUnique({ where: { tournamentId_userId: { tournamentId, userId } } });
     if (grant === null) throw new ApiError('NOT_FOUND', { resource: 'pvp-reward', id: tournamentId });
     if (grant.claimedAt !== null) return grantView(grant, userId);

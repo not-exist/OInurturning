@@ -1,6 +1,7 @@
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockUser } from '../../lib/row-lock.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
 import { RARITY_RANK, type ShopItemView, type ShopCatalogView, type ShopBuyResult } from '@oinur/shared';
 import {
@@ -155,7 +156,7 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
   const totalCost = def.price! * quantity;
 
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
 
     if (user.reputation < repReq) {

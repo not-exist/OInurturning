@@ -4,6 +4,7 @@ import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockStudent, lockUser } from '../../lib/row-lock.js';
 import { weightedPick } from '../../lib/weighted-pick.js';
 import { requireConfig } from '../../config/require-config.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
@@ -89,12 +90,12 @@ export async function createProblem(
   }
   requireConfig('problems');
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const available = await tx.problemLibraryEntry.count({ where: { userId, consumedAt: null } });
     if (available >= PROBLEM_CAPACITY) {
       throw new ApiError('STATE_CONFLICT', { resource: 'problemLibrary', reason: 'capacity reached' });
     }
-    await tx.$queryRaw`SELECT id FROM Student WHERE id = ${studentId} FOR UPDATE`;
+    await lockStudent(tx, studentId);
     const current = await tx.student.findUnique({ where: { id: studentId }, include: { talents: true } });
     if (current === null || current.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
     if (current.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });

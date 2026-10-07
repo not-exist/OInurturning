@@ -6,6 +6,7 @@ import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
+import { lockStudent } from '../../lib/row-lock.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
 import {
@@ -235,7 +236,7 @@ async function runTraining(
 
   return prisma.$transaction(async (tx) => {
     // 1. 锁学员行（写事务内串行化并发训练）
-    await tx.$queryRaw`SELECT id FROM Student WHERE id = ${input.studentId} FOR UPDATE`;
+    await lockStudent(tx, input.studentId);
     const student = await tx.student.findUniqueOrThrow({ where: { id: input.studentId }, include: { talents: true } });
     if (student.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: input.studentId });
     if (student.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', { resource: 'student', id: input.studentId });

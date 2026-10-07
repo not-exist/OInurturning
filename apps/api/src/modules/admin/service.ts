@@ -1,6 +1,7 @@
 import { Prisma, type AdminAnnouncement, type AdminAuditLog, type PvpTournament } from '../../generated/prisma/client.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockPvpTournament } from '../../lib/row-lock.js';
 import { validatePvpPrizes } from '../pvp/rewards.js';
 
 export interface CreateTournamentInput {
@@ -155,7 +156,7 @@ export async function updateTournamentPrizes(
 ): Promise<TournamentView> {
   validatePvpPrizes(prizes);
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM PvpTournament WHERE id = ${tournamentId} FOR UPDATE`;
+    await lockPvpTournament(tx, tournamentId);
     const current = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
     if (current === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
     if (current.status !== 'REGISTERING' || now >= current.registerEndsAt) {

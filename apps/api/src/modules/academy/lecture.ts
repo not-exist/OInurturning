@@ -12,6 +12,7 @@ import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
+import { lockStudent, lockUser } from '../../lib/row-lock.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
@@ -146,7 +147,7 @@ export async function teachLecture(
 ): Promise<LectureResultView> {
   const { tierId, tierData, ordinal } = tierConfig(tier);
   const result = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    await lockUser(tx, userId);
     const logs = await dailyLogs(tx, userId, now);
     if (logs.length >= DAILY_LECTURE_LIMIT) {
       throw new ApiError('STATE_CONFLICT', { resource: 'lecture', reason: 'daily lecture limit reached' });
@@ -155,7 +156,7 @@ export async function teachLecture(
       throw new ApiError('STATE_CONFLICT', { resource: 'lecture', reason: 'student daily lecture limit reached' });
     }
 
-    await tx.$queryRaw`SELECT id FROM Student WHERE id = ${studentId} FOR UPDATE`;
+    await lockStudent(tx, studentId);
     const current = await tx.student.findUnique({ where: { id: studentId }, include: { talents: true } });
     if (current === null || current.status !== 'ACTIVE') {
       throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
