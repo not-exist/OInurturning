@@ -413,7 +413,7 @@ function teamIdentityKey(team: ContestTeam): string {
   ]);
 }
 
-interface TeamAggregate {
+export interface TeamAggregate {
   totalScore: number;
   rankingPenaltyMin: number;
 }
@@ -441,7 +441,7 @@ interface TeamAttemptScore {
  * 排序口径（确定性可复放）：得分高者优 → 用时少者优 → 队内序号小者优。
  * 罚时沿用 ACM 口径：只有 AC 的成绩才累计用时。
  */
-function aggregateTeam(timelines: readonly ParticipantTimeline[]): TeamAggregate {
+export function aggregateTeam(timelines: readonly ParticipantTimeline[]): TeamAggregate {
   const best = new Map<string, TeamAttemptScore>();
 
   timelines.forEach((timeline, memberIndex) => {
@@ -530,6 +530,7 @@ export const rankingReportSchema = reportHeaderSchema
   }
 
   let memberOffset = 0;
+  // 与引擎共用同一聚合实现（aggregateTeam）：伪造 standings 必须同时骗过引擎自身算术；行为偏差由 golden 字节 pin 兜底。
   const expectedTeamOrder = report.teams
     .map((team, teamIndex) => {
       const timelines = report.participants.slice(memberOffset, memberOffset + team.members.length);

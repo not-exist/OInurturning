@@ -1,4 +1,5 @@
 import {
+  aggregateTeam,
   rankingInputSchema,
   rankingSeedSchema,
   type FrozenSolveHooks,
@@ -9,6 +10,7 @@ import {
   type RankingInput,
   type RankingReport,
   type RankingStanding,
+  type TeamAggregate,
 } from '@oinur/shared';
 import type { AttemptRng, HookContext, QuestionAttempt } from './models.js';
 import { createRandomStream, deriveStreamSeed, RNG_VERSION } from './rng.js';
@@ -23,19 +25,6 @@ import {
 
 interface ParticipantResult {
   timeline: ParticipantTimeline;
-  totalScore: number;
-  rankingPenaltyMin: number;
-}
-
-/** 同一道题在队内的候选成绩；AC 才计入罚时（沿用 ACM 口径）。 */
-interface TeamAttemptCandidate {
-  scoreAwarded: number;
-  minutesUsed: number;
-  memberIndex: number;
-  accepted: boolean;
-}
-
-interface TeamResult {
   totalScore: number;
   rankingPenaltyMin: number;
 }
@@ -205,50 +194,7 @@ function simulateParticipant(
   };
 }
 
-function isBetterTeamAttempt(
-  candidate: TeamAttemptCandidate,
-  incumbent: TeamAttemptCandidate,
-): boolean {
-  if (candidate.scoreAwarded !== incumbent.scoreAwarded)
-    return candidate.scoreAwarded > incumbent.scoreAwarded;
-  if (candidate.minutesUsed !== incumbent.minutesUsed)
-    return candidate.minutesUsed < incumbent.minutesUsed;
-  return candidate.memberIndex < incumbent.memberIndex;
-}
-
-/**
- * 队伍聚合：同一道题被多名队员作答时只把最优的一份成绩计入队伍总分，绝不重复计分。
- * 比较口径（确定性可复放）：得分高者优 → 用时少者优 → 队内序号小者优。
- */
-function aggregateTeam(timelines: readonly ParticipantTimeline[]): TeamResult {
-  const best = new Map<string, TeamAttemptCandidate>();
-
-  timelines.forEach((timeline, memberIndex) => {
-    for (const attempt of timeline.attempts) {
-      const candidate: TeamAttemptCandidate = {
-        scoreAwarded: attempt.resolution.scoreAwarded,
-        minutesUsed: attempt.minutesUsed,
-        memberIndex,
-        accepted: attempt.verdict === 'AC',
-      };
-      const incumbent = best.get(attempt.problemInstanceId);
-      if (incumbent === undefined || isBetterTeamAttempt(candidate, incumbent)) {
-        best.set(attempt.problemInstanceId, candidate);
-      }
-    }
-  });
-
-  let totalScore = 0;
-  let rankingPenaltyMin = 0;
-  for (const attempt of best.values()) {
-    totalScore += attempt.scoreAwarded;
-    if (attempt.accepted) rankingPenaltyMin += attempt.minutesUsed;
-  }
-
-  return { totalScore, rankingPenaltyMin };
-}
-
-function buildStandings(results: readonly TeamResult[]): RankingStanding[] {
+function buildStandings(results: readonly TeamAggregate[]): RankingStanding[] {
   return results
     .map((result, teamIndex) => ({
       teamIndex,
