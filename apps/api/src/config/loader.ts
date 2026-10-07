@@ -155,11 +155,6 @@ function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
 }
 
-/** zod 校验后的配置定义即 JSON 安全结构；passthrough 输出类型无索引签名，此处一次性收口 */
-function toJsonPayload(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
-}
-
 /** 递归冻结：CONFIG 为多模块共享的只读缓存，嵌套结构同样不可改写（F-3） */
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object') {
@@ -210,6 +205,12 @@ async function loadBundleFromDb(
  * 将 DB 调和到与本批 yaml 完全一致：本批条目逐条 upsert（恢复 payload、置 deprecated:false，
  * 即回滚场景下被弃用条目复活、被改写 payload 回滚），本批缺失的活跃条目软弃用。
  * 完整导入与幂等跳过两条路径共用（F-1/F-2）。
+ *
+ * payload 用裸 cast 而非 lib/json 的 jsonWrite（stableSerialize 断言），是刻意保留的行为：
+ * 载荷是 zod 校验后的配置定义，已知字段全部收窄（z.number() 拒绝非有限数），但各 schema 的
+ * .loose() 未知键原样放行，YAML 核心语义可从中带入非 JSON 安全值（.inf/.NaN/1e999 → ±Infinity/NaN、
+ * !!timestamp → Date）。Prisma 对这些值静默容错（Infinity→null 等），当前行为是写入容错结果；
+ * 改用断言会把这类配置从静默容错变成整个导入失败（T5 实测记录），属行为变更，故不统一。
  */
 async function reconcileTables(
   tx: Prisma.TransactionClient,
@@ -228,43 +229,43 @@ async function reconcileTables(
   for (const t of talents) {
     ops.push(tx.configTalent.upsert({
       where: { id: t.id },
-      create: { id: t.id, sourceHash, payload: toJsonPayload(t) },
-      update: { sourceHash, payload: toJsonPayload(t), deprecated: false },
+      create: { id: t.id, sourceHash, payload: t as Prisma.InputJsonValue },
+      update: { sourceHash, payload: t as Prisma.InputJsonValue, deprecated: false },
     }));
   }
   for (const it of items) {
     ops.push(tx.configItem.upsert({
       where: { id: it.id },
-      create: { id: it.id, sourceHash, payload: toJsonPayload(it) },
-      update: { sourceHash, payload: toJsonPayload(it), deprecated: false },
+      create: { id: it.id, sourceHash, payload: it as Prisma.InputJsonValue },
+      update: { sourceHash, payload: it as Prisma.InputJsonValue, deprecated: false },
     }));
   }
   for (const problem of problems.templates) {
     ops.push(tx.configProblem.upsert({
       where: { id: problem.id },
-      create: { id: problem.id, sourceHash, payload: toJsonPayload(problem) },
-      update: { sourceHash, payload: toJsonPayload(problem), deprecated: false },
+      create: { id: problem.id, sourceHash, payload: problem as Prisma.InputJsonValue },
+      update: { sourceHash, payload: problem as Prisma.InputJsonValue, deprecated: false },
     }));
   }
   for (const stage of stages.stages) {
     const id = `${stage.chapter}:${stage.stage_index}`;
     ops.push(tx.configStage.upsert({
       where: { id },
-      create: { id, sourceHash, payload: toJsonPayload(stage) },
-      update: { sourceHash, payload: toJsonPayload(stage), deprecated: false },
+      create: { id, sourceHash, payload: stage as Prisma.InputJsonValue },
+      update: { sourceHash, payload: stage as Prisma.InputJsonValue, deprecated: false },
     }));
   }
   for (const event of events.events) {
     ops.push(tx.configEvent.upsert({
       where: { id: event.id },
-      create: { id: event.id, sourceHash, payload: toJsonPayload(event) },
-      update: { sourceHash, payload: toJsonPayload(event), deprecated: false },
+      create: { id: event.id, sourceHash, payload: event as Prisma.InputJsonValue },
+      update: { sourceHash, payload: event as Prisma.InputJsonValue, deprecated: false },
     }));
   }
   ops.push(tx.configEconomy.upsert({
     where: { id: 'active' },
-    create: { id: 'active', sourceHash, payload: toJsonPayload(economy) },
-    update: { sourceHash, payload: toJsonPayload(economy), deprecated: false },
+    create: { id: 'active', sourceHash, payload: economy as Prisma.InputJsonValue },
+    update: { sourceHash, payload: economy as Prisma.InputJsonValue, deprecated: false },
   }));
   ops.push(tx.configTalent.updateMany({
     where: { deprecated: false, id: { notIn: talents.map((t) => t.id) } },

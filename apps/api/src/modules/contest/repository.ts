@@ -9,10 +9,9 @@ import type {
   StoryProgressView,
 } from '@oinur/shared';
 import { clamp, type ContestRecordView } from '@oinur/shared';
-import { jsonValue } from '../../lib/json.js';
+import { jsonValue, jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { toProgressView } from '../../lib/story-progress.js';
-import { stableSerialize } from './engine/report.js';
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 type ContestRecordRow = NonNullable<Awaited<ReturnType<typeof prisma.contestRecord.findFirst>>>;
@@ -43,13 +42,6 @@ export interface UpsertStoryProgressInput {
   growth: GrowthDelta[];
   lastRecordId?: string;
   lastSummary?: ContestSummary;
-}
-
-function jsonPayload(value: unknown): Prisma.InputJsonValue {
-  // Throws unless the value survives JSON storage unchanged (no undefined members,
-  // non-finite numbers, cycles, accessors, sparse arrays, or non-plain objects).
-  stableSerialize(value);
-  return value as Prisma.InputJsonValue;
 }
 
 function toRecordView(row: ContestRecordRow): ContestRecordView {
@@ -83,10 +75,10 @@ export async function createContestRecord(
         stageKey: input.stageKey,
         ngLevel: input.ngLevel,
         idempotencyKey: input.idempotencyKey,
-        inputSnapshot: jsonPayload(input.inputSnapshot),
-        report: jsonPayload(input.report),
-        summary: jsonPayload(input.summary),
-        rewards: jsonPayload(input.rewards),
+        inputSnapshot: jsonWrite(input.inputSnapshot),
+        report: jsonWrite(input.report),
+        summary: jsonWrite(input.summary),
+        rewards: jsonWrite(input.rewards),
         snapshotHash: input.snapshotHash,
         createdAt: input.createdAt,
       },
@@ -181,10 +173,10 @@ export async function upsertStoryProgress(
     firstClearAt: input.firstClearAt,
     bestRank: input.bestRank,
     clearCount: input.clearCount,
-    rewards: jsonPayload(input.rewards),
-    growth: jsonPayload(input.growth),
+    rewards: jsonWrite(input.rewards),
+    growth: jsonWrite(input.growth),
     lastRecordId: input.lastRecordId,
-    lastSummary: input.lastSummary === undefined ? undefined : jsonPayload(input.lastSummary),
+    lastSummary: input.lastSummary === undefined ? undefined : jsonWrite(input.lastSummary),
   };
   const row = await db.storyProgress.upsert({
     where: {

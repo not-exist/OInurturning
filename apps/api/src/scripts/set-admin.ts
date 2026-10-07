@@ -15,7 +15,7 @@
  * - 依赖 DATABASE_URL（-env-file 注入）；运行前已应用的迁移须包含 User/AdminAuditLog。
  */
 import bcrypt from 'bcryptjs';
-import { Prisma } from '../generated/prisma/client.js';
+import { jsonWrite } from '../lib/json.js';
 import { env } from '../config/env.js';
 import { prisma } from '../lib/prisma.js';
 
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
           action: 'ADMIN_BOOTSTRAP',
           targetType: 'user',
           targetId: String(user.id),
-          payload: { mode: 'create', username } as Prisma.InputJsonValue,
+          payload: jsonWrite({ mode: 'create', username }),
         },
       });
       console.log(`[set-admin] 已创建并提升管理员：${username} (id=${user.id})`);
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
         action: 'ADMIN_BOOTSTRAP',
         targetType: 'user',
         targetId: String(user.id),
-        payload: { mode: 'promote', username } as Prisma.InputJsonValue,
+        payload: jsonWrite({ mode: 'promote', username }),
       },
     });
     console.log(`[set-admin] 已提升管理员：${username} (id=${user.id})；其旧会话已失效需重新登录`);

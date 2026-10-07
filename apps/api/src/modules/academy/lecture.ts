@@ -10,6 +10,7 @@ import {
 import { requireConfig } from '../../config/require-config.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
+import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { aggregateMeta } from '../students/meta.js';
@@ -246,7 +247,7 @@ export async function teachLecture(
         success,
         money,
         reputation: reputationDelta,
-        gains: growth.gains as unknown as Prisma.InputJsonValue,
+        gains: jsonWrite(growth.gains),
         staminaCost: LECTURE_STAMINA_COST,
         createdAt: now,
       },

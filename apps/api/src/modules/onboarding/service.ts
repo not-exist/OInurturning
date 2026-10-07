@@ -4,6 +4,7 @@ import { onboardingConfigSchema, type OnboardingConfig } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
+import { jsonWrite } from '../../lib/json.js';
 import { mulberry32 } from '../../lib/rng.js';
 import { POOL_SIZE } from '../academy/service.js';
 import {
@@ -132,7 +133,7 @@ export async function grantOnboardingPackage(
     await tx.recruitPool.create({
       data: {
         userId,
-        candidates: generatePool(rng, { ...genCtx, reputation: updated.reputation, ownedStudents }, POOL_SIZE) as unknown as Prisma.InputJsonValue,
+        candidates: jsonWrite(generatePool(rng, { ...genCtx, reputation: updated.reputation, ownedStudents }, POOL_SIZE)),
         generatedAt: now,
         refreshDayKey: dayKey(now),
       },

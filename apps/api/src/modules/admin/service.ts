@@ -54,10 +54,13 @@ export interface AuditView {
   createdAt: string;
 }
 
-function json(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
-}
-
+/**
+ * 本文件所有 Json 写入（audit payload、锦标赛 prizes/config）均用裸 cast，而非 lib/json 的
+ * jsonWrite（stableSerialize 断言），是刻意保留的行为：载荷来自管理端请求体——config 是
+ * z.record(z.string(), z.unknown()) 完全未校验，prizes 经 validatePvpPrizes 只校验已知桶、
+ * 不重建（未知键原样保留）。HTTP JSON 可携带非 JSON 安全值（如 1e999 → Infinity），
+ * Prisma 静默容错写入 null；改用断言会把写入变成 500（T5 实测记录），属行为变更，故不统一。
+ */
 function tournamentView(row: PvpTournament): TournamentView {
   return {
     id: row.id,
@@ -112,7 +115,7 @@ async function audit(
       action,
       targetType,
       targetId,
-      payload: json(payload),
+      payload: payload as Prisma.InputJsonValue,
     },
   });
 }
@@ -129,8 +132,8 @@ export async function createTournament(
         size: input.size,
         registerEndsAt: input.registerEndsAt,
         autoStartAt: input.autoStartAt,
-        prizes: json(input.prizes),
-        config: json(input.config),
+        prizes: input.prizes as Prisma.InputJsonValue,
+        config: input.config as Prisma.InputJsonValue,
         createdBy: adminId,
       },
     });
@@ -158,7 +161,7 @@ export async function updateTournamentPrizes(
     if (current.status !== 'REGISTERING' || now >= current.registerEndsAt) {
       throw new ApiError('STATE_CONFLICT', { resource: 'tournament', id: tournamentId, reason: 'prize configuration is frozen' });
     }
-    const row = await tx.pvpTournament.update({ where: { id: tournamentId }, data: { prizes: json(prizes) } });
+    const row = await tx.pvpTournament.update({ where: { id: tournamentId }, data: { prizes: prizes as Prisma.InputJsonValue } });
     await audit(tx, adminId, 'TOURNAMENT_PRIZES_UPDATE', 'PVP_TOURNAMENT', String(tournamentId), { prizes });
     return tournamentView(row);
   });

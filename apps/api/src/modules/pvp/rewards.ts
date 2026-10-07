@@ -1,6 +1,7 @@
 import { Prisma, type PvpMatch, type PvpRewardGrant, type PvpTournament } from '../../generated/prisma/client.js';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
+import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 
 export type PvpRewardLine =
@@ -150,10 +151,6 @@ function standings(matches: readonly PvpMatch[], participantIds: readonly number
   return ordered.map((userId, index) => ({ userId, rank: index + 1, firstRoundWinner: firstRoundWinners.has(userId) }));
 }
 
-function json(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
-}
-
 function storedRewards(value: unknown): PvpRewardLine[] {
   if (!Array.isArray(value)) throw new ApiError('STATE_CONFLICT', { resource: 'pvp-reward', reason: 'invalid reward payload' });
   return value as PvpRewardLine[];
@@ -195,8 +192,8 @@ export async function ensurePvpRewardGrants(tx: Prisma.TransactionClient, tourna
     const rewards = rewardLines(bucket, standing.rank === 1);
     await tx.pvpRewardGrant.upsert({
       where: { tournamentId_userId: { tournamentId: tournament.id, userId: standing.userId } },
-      create: { tournamentId: tournament.id, userId: standing.userId, rank: standing.rank, rewards: json(rewards) },
-      update: { rank: standing.rank, rewards: json(rewards) },
+      create: { tournamentId: tournament.id, userId: standing.userId, rank: standing.rank, rewards: jsonWrite(rewards) },
+      update: { rank: standing.rank, rewards: jsonWrite(rewards) },
     });
   }
 }

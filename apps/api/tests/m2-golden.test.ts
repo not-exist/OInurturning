@@ -11,7 +11,8 @@ import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
 import { simulateDuel } from '../src/modules/contest/engine/duel.js';
 import { simulateRanking } from '../src/modules/contest/engine/ranking.js';
-import { stableHash, stableSerialize } from '../src/modules/contest/engine/report.js';
+import { stableSerialize } from '../src/lib/json.js';
+import { stableHash } from '../src/modules/contest/engine/report.js';
 import { getStoryOverview } from '../src/modules/story/service.js';
 import { resetUsers } from './helpers.js';
 

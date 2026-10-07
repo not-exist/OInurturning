@@ -4,6 +4,7 @@ import { computeV, type StudentView } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
+import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
 import { autoAdvanceIfNeeded } from '../tutorial/service.js';
@@ -115,7 +116,7 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
       const candidates = generatePool(newRng(), ctx, POOL_SIZE);
       try {
         const created = await prisma.recruitPool.create({
-          data: { userId, candidates: candidates as unknown as Prisma.InputJsonValue, generatedAt: now, refreshDayKey: dayKey(now) },
+          data: { userId, candidates: jsonWrite(candidates), generatedAt: now, refreshDayKey: dayKey(now) },
         });
         view = toPoolView(created, now);
         break;
@@ -143,7 +144,7 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
       const updated = await prisma.recruitPool.update({
         where: { userId },
         data: {
-          candidates: candidates as unknown as Prisma.InputJsonValue,
+          candidates: jsonWrite(candidates),
           ...(stale ? { generatedAt: now } : {}),
           refreshesToday: 0,
           refreshDayKey: dayKey(now),
@@ -176,7 +177,7 @@ export async function refreshPool(userId: number, now: Date = new Date()): Promi
     const updated = await tx.recruitPool.update({
       where: { userId },
       data: {
-        candidates: candidates as unknown as Prisma.InputJsonValue,
+        candidates: jsonWrite(candidates),
         generatedAt: now,
         refreshesToday: k + 1,
         refreshDayKey: dayKey(now),
@@ -261,7 +262,7 @@ export async function recruit(userId: number, tempId: string, now: Date = new Da
     const remaining = candidates.filter((c) => c.tempId !== tempId);
     await tx.recruitPool.update({
       where: { userId },
-      data: { candidates: remaining as unknown as Prisma.InputJsonValue },
+      data: { candidates: jsonWrite(remaining) },
     });
 
     return toStudentView(student, candidate.talents.map((t) => t.talentId));

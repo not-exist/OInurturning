@@ -10,11 +10,12 @@
  * 否则依赖 CONFIG 的路径（招募池生成）会挂。
  */
 import bcrypt from 'bcryptjs';
-import { Prisma, type QualityTier } from '../generated/prisma/client.js';
+import { type QualityTier } from '../generated/prisma/client.js';
 import { importConfigs } from '../config/loader.js';
 import { requireConfig } from '../config/require-config.js';
 import { env } from '../config/env.js';
 import { dayKey } from '../lib/clock.js';
+import { jsonWrite } from '../lib/json.js';
 import { prisma } from '../lib/prisma.js';
 import { mulberry32 } from '../lib/rng.js';
 import { bucketTalents, generatePool } from '../modules/academy/recruit-gen.js';
@@ -157,7 +158,7 @@ async function main(): Promise<void> {
     await tx.recruitPool.create({
       data: {
         userId: user.id,
-        candidates: candidates as unknown as Prisma.InputJsonValue,
+        candidates: jsonWrite(candidates),
         generatedAt: now,
         refreshDayKey: dayKey(now),
       },

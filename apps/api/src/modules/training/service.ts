@@ -3,6 +3,7 @@ import { Prisma, type ProblemLibraryEntry, type Student } from '../../generated/
 import { clamp, DIMENSIONS, type DimensionKey } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
+import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
 import { aggregateMeta } from '../students/meta.js';
@@ -332,7 +333,7 @@ async function runTraining(
         kind: KIND_TO_ENUM[kind],
         dim,
         delta,
-        rareGains: secondary.rareGains as unknown as Prisma.InputJsonValue,
+        rareGains: jsonWrite(secondary.rareGains),
         cost,
         staminaAfter,
         ...(kind === 'directed' ? { bookItemId: book!.itemId } : {}),

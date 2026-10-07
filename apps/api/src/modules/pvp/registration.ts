@@ -1,6 +1,7 @@
 import { Prisma, type PvpRegistration, type PvpTournament } from '../../generated/prisma/client.js';
 import { TEAM_SIZE_MAX, TEAM_SIZE_MIN, type ParticipantSnapshot } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
+import { jsonWrite } from '../../lib/json.js';
 import { participantSnapshot } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
 
@@ -46,10 +47,6 @@ export interface PvpRegistrationView {
   problemSnapshots: PvpProblemSnapshot[];
   createdAt: string;
   replayed: boolean;
-}
-
-function json(value: unknown): Prisma.InputJsonValue {
-  return value as Prisma.InputJsonValue;
 }
 
 function tournamentView(row: PvpTournament & { registrations: { id: number }[] }): PvpTournamentView {
@@ -196,9 +193,9 @@ export async function registerPvp(
       data: {
         tournamentId,
         userId,
-        roster: json(roster),
-        problemEntryIds: json([...problemEntryIds]),
-        problemSnapshots: json(snapshots),
+        roster: jsonWrite(roster),
+        problemEntryIds: jsonWrite([...problemEntryIds]),
+        problemSnapshots: jsonWrite(snapshots),
         createdAt: now,
       },
     });

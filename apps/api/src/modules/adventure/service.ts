@@ -819,6 +819,9 @@ async function resolveRewards(
   if (Object.keys(record(rewardObjectValue.buffs)).length > 0 || Array.isArray(rewardObjectValue.buffs)) {
     const buffs = Array.isArray(rewardObjectValue.buffs) ? rewardObjectValue.buffs : [rewardObjectValue.buffs];
     const existing = array(record(student.counters).adventureBuffs);
+    // buffs 源自事件配置 outcome 的 .loose() 未知键（events.ts:47 loose 放行 rewards_* / buffs），
+    // YAML 可带入非 JSON 安全值（.inf→Infinity、!!timestamp→Date），Prisma 静默容错；
+    // 不能改用 lib/json 的 jsonWrite 断言，否则此类配置会从静默容错变成运行时 500（T5 实测）。
     studentData.counters = {
       ...record(student.counters),
       adventureBuffs: [...existing, ...buffs.map((buff) => ({ ...record(buff), appliedAt: now.toISOString() }))],
@@ -1012,6 +1015,7 @@ export async function chooseAdventure(
       data: {
         status: 'RESOLVED',
         choices: [input.optionIndex],
+        // results 内嵌 rewardLines（含上述配置来源的 buffs），同上保留裸 cast
         results: [result] as unknown as Prisma.InputJsonValue,
         contestRecordId: contestRecord?.id,
         resolvedAt: now,

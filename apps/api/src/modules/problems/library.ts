@@ -1,7 +1,8 @@
-import { Prisma, type ProblemLibraryEntry } from '../../generated/prisma/client.js';
+import type { ProblemLibraryEntry } from '../../generated/prisma/client.js';
 import { clamp } from '@oinur/shared';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
+import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { weightedPick } from '../../lib/weighted-pick.js';
 import { requireConfig } from '../../config/require-config.js';
@@ -127,11 +128,11 @@ export async function createProblem(
         energy: settled.energy,
         mindset: settled.mindset,
         lastSettledAt: settled.lastSettledAt,
-        counters: {
+        counters: jsonWrite({
           ...counters,
           problemCreationDaily: used + 1,
           problemCreationDailyKey: counterKey,
-        } as Prisma.InputJsonValue,
+        }),
       },
     });
     if (updated.count !== 1) throw new ApiError('STATE_CONFLICT', { studentId });

@@ -12,11 +12,11 @@ import {
   type RankingInput,
 } from '@oinur/shared';
 import { simulateRanking } from '../src/modules/contest/engine/ranking.js';
+import { jsonWrite, stableSerialize } from '../src/lib/json.js';
 import {
   ENGINE_VERSION,
   buildContestSummary,
   stableHash,
-  stableSerialize,
 } from '../src/modules/contest/engine/report.js';
 import { RNG_VERSION } from '../src/modules/contest/engine/rng.js';
 
@@ -329,5 +329,12 @@ describe('canonical serializer rejection', () => {
     ];
 
     for (const value of unsupported) expect(() => stableSerialize(value)).toThrow();
+  });
+});
+
+describe('jsonWrite assertion wiring', () => {
+  it('asserts payloads through stableSerialize instead of degrading to a bare cast', () => {
+    expect(() => jsonWrite({ a: undefined })).toThrow(/undefined values/i);
+    expect(jsonWrite({ a: 1 })).toEqual({ a: 1 });
   });
 });
