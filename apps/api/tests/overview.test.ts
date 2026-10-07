@@ -5,6 +5,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
+import { DIMENSION_COLUMNS } from '@oinur/shared';
 import { prisma } from '../src/lib/prisma.js';
 import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
@@ -192,10 +193,8 @@ describe('GET /api/overview', () => {
 });
 
 /** 候选池只暴露九维与价格（品质档按 student.md §3.6 隐藏）：用六维和当强度代理。 */
-const STRENGTH_DIMS = ['ds', 'dp', 'math', 'graph', 'greedy', 'str'] as const;
-
 function strengthOf(attrs: Record<string, number>): number {
-  return STRENGTH_DIMS.reduce((sum, dim) => sum + (attrs[dim] ?? 0), 0);
+  return DIMENSION_COLUMNS.reduce((sum, dim) => sum + (attrs[dim] ?? 0), 0);
 }
 
 describe('POST /api/overview/checklist/claim', () => {

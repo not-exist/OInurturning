@@ -1,4 +1,5 @@
 import { damping } from '../../lib/damping.js';
+import { CONFIG_DIMENSIONS, type ConfigDimension } from '@oinur/shared';
 import {
   BOOK_MULT,
   QUALITY_MULT,
@@ -28,8 +29,8 @@ import {
  * training/gains.ts 单点事实源）。
  */
 
-export const DIM_KEYS = ['ds', 'dp', 'math', 'graph', 'greedy', 'string'] as const;
-export type DimKey = (typeof DIM_KEYS)[number];
+/** 六维键取配置 wire 名（string）；权威序列见共享 CONFIG_DIMENSIONS */
+export type DimKey = ConfigDimension;
 export type StatKey = DimKey | 'code' | 'thinking';
 
 /** 学员可成长属性（真实存储值，允许浮点；显示层才 floor） */
@@ -39,8 +40,8 @@ export const STAT_CAP = 100;
 
 /** student.md §1 综合评定值：V = floor((code + thinking + floor(avg6)) / 3) */
 export function compositeV(s: StudentStats): number {
-  const dims = DIM_KEYS.map((key) => s[key]);
-  const avg6 = dims.reduce((sum, value) => sum + value, 0) / DIM_KEYS.length;
+  const dims = CONFIG_DIMENSIONS.map((key) => s[key]);
+  const avg6 = dims.reduce((sum, value) => sum + value, 0) / CONFIG_DIMENSIONS.length;
   return Math.floor((s.code + s.thinking + Math.floor(avg6)) / 3);
 }
 
@@ -80,8 +81,8 @@ interface IncrementPlan {
 }
 
 function lowestDim(s: StudentStats): DimKey {
-  let best = DIM_KEYS[0] as DimKey;
-  for (const key of DIM_KEYS) if (s[key] < s[best]) best = key;
+  let best = CONFIG_DIMENSIONS[0] as DimKey;
+  for (const key of CONFIG_DIMENSIONS) if (s[key] < s[best]) best = key;
   return best;
 }
 
@@ -92,8 +93,8 @@ function planForKind(kind: TrainingKind, s: StudentStats, opts: GrowthOptions): 
     thinking: 0,
   };
   if (kind === 'basic') {
-    for (const key of DIM_KEYS)
-      plan.dims[key] = (1 / DIM_KEYS.length) * (TRAINING_BASE.basic * damping(s[key]));
+    for (const key of CONFIG_DIMENSIONS)
+      plan.dims[key] = (1 / CONFIG_DIMENSIONS.length) * (TRAINING_BASE.basic * damping(s[key]));
   } else if (kind === 'directed') {
     const target = lowestDim(s);
     plan.targetDim = target;
@@ -110,7 +111,7 @@ function planForKind(kind: TrainingKind, s: StudentStats, opts: GrowthOptions): 
 
 function applyPlan(s: StudentStats, plan: IncrementPlan): StudentStats {
   const next: StudentStats = { ...s };
-  for (const key of DIM_KEYS) next[key] = Math.min(STAT_CAP, s[key] + plan.dims[key]);
+  for (const key of CONFIG_DIMENSIONS) next[key] = Math.min(STAT_CAP, s[key] + plan.dims[key]);
   next.code = Math.min(STAT_CAP, s.code + plan.code);
   next.thinking = Math.min(STAT_CAP, s.thinking + plan.thinking);
   return next;
@@ -173,12 +174,12 @@ export function sessionsToV(
     let thinking = 0;
     for (const kind of pattern) {
       const plan = planForKind(kind, s, opts);
-      for (const key of DIM_KEYS) dims[key] += plan.dims[key];
+      for (const key of CONFIG_DIMENSIONS) dims[key] += plan.dims[key];
       code += plan.code;
       thinking += plan.thinking;
     }
 
-    const stepByStat: number[] = [...DIM_KEYS.map((k) => dims[k]), code, thinking].filter(
+    const stepByStat: number[] = [...CONFIG_DIMENSIONS.map((k) => dims[k]), code, thinking].filter(
       (v) => v > 0,
     );
     const maxPerPattern = stepByStat.length > 0 ? Math.max(...stepByStat) : 0;
@@ -189,7 +190,7 @@ export function sessionsToV(
     if (take === 0) break;
 
     const advanced: StudentStats = { ...s };
-    for (const key of DIM_KEYS) advanced[key] = Math.min(STAT_CAP, s[key] + dims[key] * take);
+    for (const key of CONFIG_DIMENSIONS) advanced[key] = Math.min(STAT_CAP, s[key] + dims[key] * take);
     advanced.code = Math.min(STAT_CAP, s.code + code * take);
     advanced.thinking = Math.min(STAT_CAP, s.thinking + thinking * take);
     s = advanced;

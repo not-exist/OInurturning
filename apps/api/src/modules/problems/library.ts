@@ -1,5 +1,5 @@
 import type { ProblemLibraryEntry } from '../../generated/prisma/client.js';
-import { clamp } from '@oinur/shared';
+import { ABILITY_COLUMN, clamp, DIMENSION_CONFIG, type DimensionKey } from '@oinur/shared';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
@@ -12,30 +12,10 @@ import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
 import { listProblems, type ProblemView } from './service.js';
 
-export type ProblemDimension = 'DS' | 'DP' | 'MATH' | 'GRAPH' | 'GREEDY' | 'STRING';
-
 export interface CreateProblemResult extends ProblemView {
   cost: number;
   staminaAfter: number;
 }
-
-const DIMENSION_FIELDS: Record<ProblemDimension, 'ds' | 'dp' | 'math' | 'graph' | 'greedy' | 'str'> = {
-  DS: 'ds',
-  DP: 'dp',
-  MATH: 'math',
-  GRAPH: 'graph',
-  GREEDY: 'greedy',
-  STRING: 'str',
-};
-
-const CONFIG_DIMENSIONS: Record<ProblemDimension, string> = {
-  DS: 'ds',
-  DP: 'dp',
-  MATH: 'math',
-  GRAPH: 'graph',
-  GREEDY: 'greedy',
-  STRING: 'string',
-};
 
 const SEVERITY_BASE = [40, 30, 18, 8, 3, 1] as const;
 const DAILY_PROBLEM_LIMIT = 2;
@@ -71,7 +51,7 @@ function toView(row: ProblemLibraryEntry): ProblemView {
   return {
     id: row.id,
     name: row.name,
-    dominantDim: row.dominantDim as ProblemDimension,
+    dominantDim: row.dominantDim as DimensionKey,
     rarity: row.rarity.toUpperCase().replace('COLORFUL', 'RAINBOW') as ProblemView['rarity'],
     quality: row.quality,
     traitId: row.traitId,
@@ -82,10 +62,10 @@ function toView(row: ProblemLibraryEntry): ProblemView {
 export async function createProblem(
   userId: number,
   studentId: number,
-  dimension: ProblemDimension,
+  dimension: DimensionKey,
   now: Date = new Date(),
 ): Promise<CreateProblemResult> {
-  if (DIMENSION_FIELDS[dimension] === undefined) {
+  if (ABILITY_COLUMN[dimension] === undefined) {
     throw new ApiError('VALIDATION_FAILED', { field: 'dimension' });
   }
   requireConfig('problems');
@@ -118,8 +98,8 @@ export async function createProblem(
     });
     if (paid.count !== 1) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: cost });
 
-    const random = createRandomStream(deriveSeed(userId, studentId, CONFIG_DIMENSIONS[dimension], counterKey, used), 'problem');
-    const target = DIMENSION_FIELDS[dimension];
+    const random = createRandomStream(deriveSeed(userId, studentId, DIMENSION_CONFIG[dimension], counterKey, used), 'problem');
+    const target = ABILITY_COLUMN[dimension];
     const quality = clamp(Math.round(0.55 * settled.setting + 0.25 * settled[target] + 0.2 * settled.thinking + (random() * 17 - 8)), 0, 100);
     const traitId = drawTrait(settled.setting, random);
     const updated = await tx.student.updateMany({

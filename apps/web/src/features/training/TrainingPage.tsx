@@ -1,6 +1,12 @@
 import { useState, type JSX } from 'react';
 import { BookOpen, CircleCheck, Dumbbell, PenTool, Sparkles } from 'lucide-react';
-import type { DimensionKey, StudentView } from '@oinur/shared';
+import {
+  ABILITY_COLUMN,
+  DIMENSIONS,
+  DIMENSION_CONFIG,
+  type DimensionKey,
+  type StudentView,
+} from '@oinur/shared';
 import { apiErrorMessage } from '../../lib/api';
 import {
   DIMENSION_LABEL,
@@ -64,28 +70,6 @@ const MODULE_COST: Record<Tab, string> = {
   specialized: '1 体力 + 训练费 + 预制题×1',
 };
 
-const DIM_ORDER: DimensionKey[] = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'];
-
-/** 六维 → 学员视图字段（string 维在库内记作 str） */
-const DIM_FIELD: Record<DimensionKey, keyof StudentView> = {
-  DS: 'ds',
-  DP: 'dp',
-  MATH: 'math',
-  GRAPH: 'graph',
-  GREEDY: 'greedy',
-  STRING: 'str',
-};
-
-/** 六维 → 六维书 subject 键（定向训练耗材；与后端 DIM_META.bookSubject 一致） */
-const DIM_BOOK: Record<DimensionKey, string> = {
-  DS: 'ds',
-  DP: 'dp',
-  MATH: 'math',
-  GRAPH: 'graph',
-  GREEDY: 'greedy',
-  STRING: 'string',
-};
-
 export function TrainingPage(): JSX.Element {
   const studentsQ = useStudents();
   const inv = useInventory();
@@ -113,7 +97,7 @@ export function TrainingPage(): JSX.Element {
 
   const students = studentsQ.data;
   const chosen = students.find((s) => s.id === studentId) ?? null;
-  const dimBooks = (inv.data ?? []).filter((i) => i.itemId.startsWith(`book-${DIM_BOOK[dim]}-`));
+  const dimBooks = (inv.data ?? []).filter((i) => i.itemId.startsWith(`book-${DIMENSION_CONFIG[dim]}-`));
   const selectable = problems.data ?? [];
   const pending = basic.isPending || directed.isPending || specialized.isPending;
   const noStamina = chosen !== null && floor(chosen.stamina) < 1;
@@ -241,7 +225,7 @@ export function TrainingPage(): JSX.Element {
             {tab === 'directed' && (
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-1.5">
-                  {DIM_ORDER.map((d) => (
+                  {DIMENSIONS.map((d) => (
                     <button
                       key={d}
                       type="button"
@@ -261,7 +245,7 @@ export function TrainingPage(): JSX.Element {
                       {DIMENSION_LABEL[d]}
                       {chosen !== null && (
                         <span className="tnum text-[10px] text-fg-faint">
-                          {floor(chosen[DIM_FIELD[d]] as number)}
+                          {floor(chosen[ABILITY_COLUMN[d]] as number)}
                         </span>
                       )}
                     </button>
@@ -344,8 +328,8 @@ export function TrainingPage(): JSX.Element {
         {chosen !== null && (
           <Panel eyebrow="训练对象" title={chosen.name} bodyClassName="space-y-3 p-4">
             <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              {DIM_ORDER.map((d) => {
-                const v = floor(chosen[DIM_FIELD[d]] as number);
+              {DIMENSIONS.map((d) => {
+                const v = floor(chosen[ABILITY_COLUMN[d]] as number);
                 return (
                   <div key={d}>
                     <div className="flex items-baseline justify-between gap-1 text-[11px]">
@@ -354,7 +338,7 @@ export function TrainingPage(): JSX.Element {
                     </div>
                     <Meter
                       value={v}
-                      max={statScale(DIM_ORDER.map((dimKey) => chosen[DIM_FIELD[dimKey]] as number))}
+                      max={statScale(DIMENSIONS.map((dimKey) => chosen[ABILITY_COLUMN[dimKey]] as number))}
                       className="bg-cyber-500/70"
                     />
                   </div>

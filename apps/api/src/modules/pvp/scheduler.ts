@@ -1,5 +1,6 @@
 import { Prisma, type PvpMatch, type PvpRegistration, type PvpTournament } from '../../generated/prisma/client.js';
 import {
+  DIMENSIONS,
   frozenSolveHooksSchema,
   type DuelInput,
   type ParticipantSnapshot,
@@ -120,7 +121,7 @@ function questionFor(
   snapshotKey: string,
   index: number,
 ): QuestionSnapshot {
-  const dimensions = new Set(['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING']);
+  const dimensions = new Set<string>(DIMENSIONS);
   const dimension = dimensions.has(snapshot.dominantDim.toUpperCase())
     ? snapshot.dominantDim.toUpperCase()
     : 'DS';

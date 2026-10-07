@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { DIMENSIONS } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as service from './library.js';
@@ -7,7 +8,7 @@ import * as service from './library.js';
 const createSchema = z
   .object({
     studentId: z.number().int().positive(),
-    dimension: z.enum(['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING']),
+    dimension: z.enum(DIMENSIONS),
   })
   .strict();
 

@@ -1,5 +1,6 @@
 import {
   clamp,
+  DIMENSIONS,
   rankingSeedSchema,
   type ContestTeam,
   type ParticipantSnapshot,
@@ -8,7 +9,6 @@ import {
 import { createRandomStream, deriveStreamSeed, standardNormal } from './engine/rng.js';
 import type { RandomSource } from './engine/models.js';
 
-const NPC_DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
 export type DuelOpponentKind =
   | 'random_common'
   | 'random_skilled'
@@ -28,13 +28,13 @@ function npcParticipant(
 ): ParticipantSnapshot {
   const { mean_level: meanLevel, spread } = stage.npc_pool;
   const level = clamp(Math.round(normal(random, meanLevel, spread)), 1, 100);
-  const dominant = Math.floor(random() * NPC_DIMENSIONS.length);
+  const dominant = Math.floor(random() * DIMENSIONS.length);
   const abilities = Object.fromEntries(
-    NPC_DIMENSIONS.map((dimension, dimensionIndex) => [
+    DIMENSIONS.map((dimension, dimensionIndex) => [
       dimension,
       clamp(Math.round(normal(random, level + (dimensionIndex === dominant ? 5 : 0), 3)), 1, 100),
     ]),
-  ) as Record<(typeof NPC_DIMENSIONS)[number], number>;
+  ) as Record<(typeof DIMENSIONS)[number], number>;
 
   const energyMax = clamp(Math.round(normal(random, 70, 8)), 40, 100);
 
@@ -92,13 +92,13 @@ export function generateDuelOpponent(
   const params = DUEL_OPPONENTS[kind];
   const random = createRandomStream(seed, 'duel-opponent');
   const level = clamp(Math.round(normal(random, params.level * powerMultiplier, params.spread)), 1, 100);
-  const dominant = Math.floor(random() * NPC_DIMENSIONS.length);
+  const dominant = Math.floor(random() * DIMENSIONS.length);
   const abilities = Object.fromEntries(
-    NPC_DIMENSIONS.map((dimension, index) => [
+    DIMENSIONS.map((dimension, index) => [
       dimension,
       clamp(Math.round(normal(random, level + (index === dominant ? 5 : 0), 3)), 1, 100),
     ]),
-  ) as Record<(typeof NPC_DIMENSIONS)[number], number>;
+  ) as Record<(typeof DIMENSIONS)[number], number>;
   const energyMax = clamp(Math.round(normal(random, params.energy * powerMultiplier, 5)), 20, 100);
   return {
     side: 'AWAY',

@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
+import type { DimensionKey } from '@oinur/shared';
 import { prisma } from '../src/lib/prisma.js';
 import {
   createProblem,
   deleteProblem,
   listProblemLibrary,
-  type ProblemDimension,
 } from '../src/modules/problems/library.js';
 import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';
 
@@ -113,7 +113,7 @@ describe('M3 problem library', () => {
     const created = await request(app)
       .post('/api/problem-library')
       .set(headers)
-      .send({ studentId, dimension: 'GREEDY' satisfies ProblemDimension });
+      .send({ studentId, dimension: 'GREEDY' satisfies DimensionKey });
     expect(created.status).toBe(200);
     const problem = unwrapOk<{ id: number }>(created);
     expect((await request(app).get('/api/problem-library').set(headers)).status).toBe(200);

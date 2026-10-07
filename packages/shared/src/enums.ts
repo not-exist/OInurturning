@@ -6,8 +6,39 @@ export type Rarity = (typeof RARITIES)[number];
 export const DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
 export type DimensionKey = (typeof DIMENSIONS)[number];
 
-export const ABILITY_KEYS = [...DIMENSIONS, 'CODING', 'THINKING', 'PROBLEM'] as const;
+/** 非六维的三项全局能力（code/thinking/setting 的 TS 键） */
+export const GLOBAL_ABILITIES = ['CODING', 'THINKING', 'PROBLEM'] as const;
+export type GlobalAbility = (typeof GLOBAL_ABILITIES)[number];
+// TS/请求侧键：CODING→列 code、THINKING→列 thinking、PROBLEM→列 setting（非直觉映射见 ABILITY_COLUMN）。
+
+export const ABILITY_KEYS = [...DIMENSIONS, ...GLOBAL_ABILITIES] as const;
 export type AbilityKey = (typeof ABILITY_KEYS)[number];
+
+// ---------------------------------------------------------------------------
+// Prisma Student 列名（权威：apps/api/prisma/schema.prisma Student 模型；
+// 字符串维列名是 str，与配置侧 wire 名 string 是两个命名空间）。
+// ---------------------------------------------------------------------------
+
+/** Student 六维列名（schema.prisma ds…str） */
+export const DIMENSION_COLUMNS = ['ds', 'dp', 'math', 'graph', 'greedy', 'str'] as const;
+export type DimensionColumn = (typeof DIMENSION_COLUMNS)[number];
+
+/** Student 全部九项能力列名（六维 + code/thinking/setting） */
+export const ABILITY_COLUMNS = [...DIMENSION_COLUMNS, 'code', 'thinking', 'setting'] as const;
+export type AbilityColumn = (typeof ABILITY_COLUMNS)[number];
+
+/** AbilityKey → Prisma 列名桥（显式逐字，不按下标推导） */
+export const ABILITY_COLUMN = {
+  DS: 'ds',
+  DP: 'dp',
+  MATH: 'math',
+  GRAPH: 'graph',
+  GREEDY: 'greedy',
+  STRING: 'str',
+  CODING: 'code',
+  THINKING: 'thinking',
+  PROBLEM: 'setting',
+} satisfies Record<AbilityKey, AbilityColumn>;
 
 // ---------------------------------------------------------------------------
 // Prisma enum 对齐（权威：apps/api/prisma/schema.prisma）

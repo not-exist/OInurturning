@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
-import type { DimensionKey } from '@oinur/shared';
+import { DIMENSIONS } from '@oinur/shared';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { mulberry32 } from '../src/lib/rng.js';
@@ -85,8 +85,6 @@ async function giveProblem(userId: number, overrides: Record<string, unknown> = 
   return p.id;
 }
 
-const DIM_KEYS: DimensionKey[] = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'];
-
 // ---------------------------------------------------------------------------
 // gains 纯函数（确定性种子可复现 / 锚点）
 // ---------------------------------------------------------------------------
@@ -156,7 +154,7 @@ describe('POST /api/training/basic', () => {
     const res = await request(app).post('/api/training/basic').set(auth(u.token)).send({ studentId: id });
     expect(res.status).toBe(200);
     const r = unwrapOk<HttpResult>(res);
-    expect(DIM_KEYS).toContain(r.dim);
+    expect(DIMENSIONS).toContain(r.dim);
     expect(r.delta).toBeCloseTo(1.296, 6);
     expect(r.cost).toBe(70); // N=3（开局包 2 + 新建 1）：round(60×1.16)=70
     expect(r.staminaAfter).toBe(4); // 5 − 1

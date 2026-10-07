@@ -4,6 +4,16 @@ import { DIMENSIONS, type DimensionKey } from '../enums.js';
 export const CONFIG_DIMENSIONS = ['ds', 'dp', 'math', 'graph', 'greedy', 'string'] as const;
 export type ConfigDimension = (typeof CONFIG_DIMENSIONS)[number];
 
+/** DimensionKey → 配置 wire 名桥（显式逐字；同时是六维书 subject 键与种子派生键） */
+export const DIMENSION_CONFIG: Record<DimensionKey, ConfigDimension> = {
+  DS: 'ds',
+  DP: 'dp',
+  MATH: 'math',
+  GRAPH: 'graph',
+  GREEDY: 'greedy',
+  STRING: 'string',
+};
+
 export const PROBLEM_TIERS = ['cspj', 'csps', 'noip', 'province', 'noi', 'ctt', 'cts', 'ioi'] as const;
 export type ProblemTier = (typeof PROBLEM_TIERS)[number];
 

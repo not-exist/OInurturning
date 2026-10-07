@@ -1,6 +1,13 @@
 import type { Student } from '../../generated/prisma/client.js';
 import { damping } from '../../lib/damping.js';
-import { clamp, type DimensionKey } from '@oinur/shared';
+import {
+  ABILITY_COLUMN,
+  clamp,
+  DIMENSION_CONFIG,
+  type ConfigDimension,
+  type DimensionColumn,
+  type DimensionKey,
+} from '@oinur/shared';
 import type { MetaAggregate } from '../students/meta.js';
 
 /**
@@ -37,23 +44,21 @@ export const QUALITY_MULT: Record<string, number> = {
   colorful: 1.6,
 };
 
-/** 六维 Student 列名（string 维记作 str） */
-export type DimColumn = 'ds' | 'dp' | 'math' | 'graph' | 'greedy' | 'str';
-
 /**
  * 维度索引表：请求/题库 dominantDim 用大写键（DIMENSIONS），映射到
- * Student 列名（string 维记作 str）、六维书 subject 键与 meta 键后缀（student.md 字段口径 M1-R4）。
+ * Student 列名（共享桥 ABILITY_COLUMN，string 维列名 str）、六维书 subject 键
+ * （配置 wire 名，DIMENSION_CONFIG）与 meta 键后缀（student.md 字段口径 M1-R4）。
  */
 export const DIM_META: Record<
   DimensionKey,
-  { column: DimColumn; bookSubject: string; metaKey: string }
+  { column: DimensionColumn; bookSubject: ConfigDimension; metaKey: string }
 > = {
-  DS: { column: 'ds', bookSubject: 'ds', metaKey: 'training_ds' },
-  DP: { column: 'dp', bookSubject: 'dp', metaKey: 'training_dp' },
-  MATH: { column: 'math', bookSubject: 'math', metaKey: 'training_math' },
-  GRAPH: { column: 'graph', bookSubject: 'graph', metaKey: 'training_graph' },
-  GREEDY: { column: 'greedy', bookSubject: 'greedy', metaKey: 'training_greedy' },
-  STRING: { column: 'str', bookSubject: 'string', metaKey: 'training_string' },
+  DS: { column: ABILITY_COLUMN.DS, bookSubject: DIMENSION_CONFIG.DS, metaKey: 'training_ds' },
+  DP: { column: ABILITY_COLUMN.DP, bookSubject: DIMENSION_CONFIG.DP, metaKey: 'training_dp' },
+  MATH: { column: ABILITY_COLUMN.MATH, bookSubject: DIMENSION_CONFIG.MATH, metaKey: 'training_math' },
+  GRAPH: { column: ABILITY_COLUMN.GRAPH, bookSubject: DIMENSION_CONFIG.GRAPH, metaKey: 'training_graph' },
+  GREEDY: { column: ABILITY_COLUMN.GREEDY, bookSubject: DIMENSION_CONFIG.GREEDY, metaKey: 'training_greedy' },
+  STRING: { column: ABILITY_COLUMN.STRING, bookSubject: DIMENSION_CONFIG.STRING, metaKey: 'training_string' },
 };
 
 /** 主收益公式 Δ（student.md §4.3）：浮点累积；cur≥100 计 0 */

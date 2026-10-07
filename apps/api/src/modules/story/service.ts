@@ -1,10 +1,13 @@
 import { Prisma, type Student, type StoryProgress as StoryProgressRow } from '../../generated/prisma/client.js';
 import {
+  ABILITY_COLUMN,
   CONFIG_RARITIES,
+  DIMENSION_CONFIG,
   frozenSolveHooksSchema,
   normalizeProblemTemplate,
   type BattleReplay,
   type ContestRecordView,
+  type DimensionColumn,
   type GrowthDelta,
   type ProblemTemplate,
   type QuestionSnapshot,
@@ -414,22 +417,14 @@ function buildGrowth(
     focusCap: 0,
     staminaRegen: 0,
   };
-  const dimensionField = {
-    DS: ['ds', 'ds'],
-    DP: ['dp', 'dp'],
-    MATH: ['math', 'math'],
-    GRAPH: ['graph', 'graph'],
-    GREEDY: ['greedy', 'greedy'],
-    STRING: ['str', 'string'],
-  } as const;
-
   for (const attempt of report.participants[participantIndex]?.attempts ?? []) {
     if (attempt.verdict !== 'AC') continue;
     const question = report.questions.find(
       (entry) => entry.instanceId === attempt.problemInstanceId,
     );
     if (question === undefined) continue;
-    const [field, attr] = dimensionField[question.dimension];
+    const field: DimensionColumn = ABILITY_COLUMN[question.dimension];
+    const attr = DIMENSION_CONFIG[question.dimension];
     if (student[field] + counts[field] <= 99 && random() < growthChance(student[field], 0.15)) {
       counts[field] += 1;
       lines.push({ attr, delta: 1, sourceProblem: question.instanceId });

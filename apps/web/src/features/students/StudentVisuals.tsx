@@ -1,5 +1,12 @@
 import type { JSX } from 'react';
-import { clamp, type AbilityKey, type DimensionKey, type QualityTier, type StudentView } from '@oinur/shared';
+import {
+  ABILITY_COLUMN,
+  clamp,
+  DIMENSIONS,
+  GLOBAL_ABILITIES,
+  type QualityTier,
+  type StudentView,
+} from '@oinur/shared';
 import { TriangleAlert } from 'lucide-react';
 import type { TalentDefView } from '../../lib/hooks';
 import {
@@ -30,31 +37,11 @@ import { Icon, talentIcon } from '../../components/icons';
  * 品质档一律走 QUALITY_MATERIAL 材质层级，不复用稀有度色相。
  */
 
-type StatField =
-  | 'ds'
-  | 'dp'
-  | 'math'
-  | 'graph'
-  | 'greedy'
-  | 'str'
-  | 'code'
-  | 'thinking'
-  | 'setting';
+/** 六维行（键→学员视图字段，来自共享桥） */
+export const SIX_DIMS = DIMENSIONS.map((key) => ({ key, field: ABILITY_COLUMN[key] }));
 
-export const SIX_DIMS: { key: DimensionKey; field: StatField }[] = [
-  { key: 'DS', field: 'ds' },
-  { key: 'DP', field: 'dp' },
-  { key: 'MATH', field: 'math' },
-  { key: 'GRAPH', field: 'graph' },
-  { key: 'GREEDY', field: 'greedy' },
-  { key: 'STRING', field: 'str' },
-];
-
-export const ABILITY_ROWS: { field: StatField; key: AbilityKey }[] = [
-  { field: 'code', key: 'CODING' },
-  { field: 'thinking', key: 'THINKING' },
-  { field: 'setting', key: 'PROBLEM' },
-];
+/** 三项全局能力行（code/thinking/setting） */
+export const ABILITY_ROWS = GLOBAL_ABILITIES.map((key) => ({ key, field: ABILITY_COLUMN[key] }));
 
 /** 天赋效果模式（flat=定值 / percent=百分比）——labels.ts 暂无此表，随学员视觉就近维护 */
 export const TALENT_MODE_LABEL: Record<string, string> = {

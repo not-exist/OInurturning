@@ -1,6 +1,6 @@
 import { useState, type JSX } from 'react';
 import { PenTool, Trash2 } from 'lucide-react';
-import type { DimensionKey } from '@oinur/shared';
+import { DIMENSIONS, type DimensionKey } from '@oinur/shared';
 import { ApiCallError, apiErrorMessage } from '../../lib/api';
 import {
   DIMENSION_LABEL,
@@ -41,8 +41,6 @@ import {
   useStudents,
   type ProblemView,
 } from '../../lib/hooks';
-
-const DIMENSIONS: DimensionKey[] = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'];
 
 export function ProblemLibraryPage(): JSX.Element {
   const students = useStudents();

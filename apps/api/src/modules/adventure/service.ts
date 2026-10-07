@@ -2,8 +2,13 @@ import { randomInt } from 'node:crypto';
 import { Prisma, type AdventureLog, type Student } from '../../generated/prisma/client.js';
 import {
   clamp,
+  CONFIG_DIMENSIONS,
+  DIMENSIONS,
+  DIMENSION_COLUMNS,
+  type AbilityColumn,
   type AdventureStatus,
   type BattleReplay,
+  type ConfigDimension,
   type ConfigRarity,
   type DuelInput,
   type DuelReport,
@@ -105,9 +110,8 @@ const STAT_FIELDS = {
   code: 'code',
   thinking: 'thinking',
   setting: 'setting',
-} as const;
+} as const satisfies Record<ConfigDimension | 'code' | 'thinking' | 'setting', AbilityColumn>;
 
-const SIX_FIELDS = ['ds', 'dp', 'math', 'graph', 'greedy', 'str'] as const;
 type StatField = (typeof STAT_FIELDS)[keyof typeof STAT_FIELDS];
 
 function record(value: unknown): JsonRecord {
@@ -464,8 +468,6 @@ function resolveCheck(
   };
 }
 
-const DUEL_DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
-
 function duelTiebreak(value: unknown): DuelInput['tiebreak'] {
   const modes: Record<string, NonNullable<DuelInput['tiebreak']>> = {
     sudden_death: 'SUDDEN_DEATH',
@@ -492,12 +494,12 @@ function duelQuestions(
   return Array.from({ length: home.length * 2 }, (_, index) => {
     const side = index % 2 === 0 ? home : away;
     const setter = side[Math.floor(index / 2) % home.length]!;
-    const dimension = DUEL_DIMENSIONS[
+    const dimension = DIMENSIONS[
       Math.max(
         0,
-        DUEL_DIMENSIONS.reduce(
+        DIMENSIONS.reduce(
           (best, key, position) =>
-            setter.abilities[key] > setter.abilities[DUEL_DIMENSIONS[best]!] ? position : best,
+            setter.abilities[key] > setter.abilities[DIMENSIONS[best]!] ? position : best,
           0,
         ),
       )
@@ -617,7 +619,7 @@ function rewardItemId(
   const candidates = Object.values(config.items).filter(
     (item) =>
       item.id.startsWith('book-') &&
-      ['ds', 'dp', 'math', 'graph', 'greedy', 'string'].some((dimension) => item.id.startsWith(`book-${dimension}-`)) &&
+      CONFIG_DIMENSIONS.some((dimension) => item.id.startsWith(`book-${dimension}-`)) &&
       (rarity === undefined || item.rarity === rarity),
   );
   const item = candidates[Math.floor(random() * candidates.length)];
@@ -641,7 +643,7 @@ function applyStatGain(
       continue;
     }
     if (key === 'all_six') {
-      for (const field of SIX_FIELDS) values[field] = clamp((student[field] as number) + value, 1, 100);
+      for (const field of DIMENSION_COLUMNS) values[field] = clamp((student[field] as number) + value, 1, 100);
       continue;
     }
     if (key === 'chosen_skill') {
@@ -658,8 +660,6 @@ function applyStatGain(
   }
   return { values, mindset };
 }
-
-const BANK_DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
 
 function problemRarity(quality: number): string {
   if (quality < 30) return 'gray';
@@ -696,7 +696,7 @@ async function addBankProblems(
       typeof qualityMultiplier === 'number'
         ? clamp(Math.round((sourceQuality ?? 0) * qualityMultiplier), 0, 100)
         : clamp(Math.round(numberValue(bank.quality, random, 'bank_add.quality')), 0, 100);
-    const dimension = sourceQuestion?.dimension ?? BANK_DIMENSIONS[Math.floor(random() * BANK_DIMENSIONS.length)]!;
+    const dimension = sourceQuestion?.dimension ?? DIMENSIONS[Math.floor(random() * DIMENSIONS.length)]!;
     const row = await tx.problemLibraryEntry.create({
       data: {
         userId,
