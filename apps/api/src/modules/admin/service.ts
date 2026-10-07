@@ -1,4 +1,5 @@
 import { Prisma, type AdminAnnouncement, type AdminAuditLog, type PvpTournament } from '../../generated/prisma/client.js';
+import type { Role } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockPvpTournament } from '../../lib/row-lock.js';
@@ -37,7 +38,7 @@ export interface AnnouncementView {
 export interface UserAdminView {
   id: number;
   username: string;
-  role: 'USER' | 'ADMIN';
+  role: Role;
   money: number;
   reputation: number;
   bannedAt: string | null;

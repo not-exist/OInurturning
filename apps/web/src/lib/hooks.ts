@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AdventureStatus,
   BattleReplay,
   ContestRecordView,
   DimensionKey,
   LectureGrowthEntry,
+  MatchStatus,
   MeView,
   Rarity,
+  Role,
   StoryOverview,
   StoryProgressView,
   StudentView,
+  TournamentStatus,
 } from '@oinur/shared';
 import { apiFetch } from './api';
 import type { LectureTierId, TrainingKind } from './labels';
@@ -126,7 +130,7 @@ export interface AdventureLogView {
   studentId: number | null;
   contestRecordId: string | null;
   tier: 1 | 2 | 3;
-  status: 'PENDING' | 'RESOLVED';
+  status: AdventureStatus;
   preview: boolean;
   event: AdventureEventView;
   choices: number[];
@@ -175,7 +179,7 @@ export interface LectureResultView {
 export interface TournamentView {
   id: number;
   name: string;
-  status: 'REGISTERING' | 'RUNNING' | 'FINISHED' | 'CANCELLED';
+  status: TournamentStatus;
   size: number;
   registerEndsAt: string;
   autoStartAt: string;
@@ -196,7 +200,7 @@ export interface AnnouncementView {
 export interface UserAdminView {
   id: number;
   username: string;
-  role: 'USER' | 'ADMIN';
+  role: Role;
   money: number;
   reputation: number;
   bannedAt: string | null;
@@ -217,7 +221,7 @@ export interface AuditView {
 export interface PvpTournamentView {
   id: number;
   name: string;
-  status: 'REGISTERING' | 'RUNNING' | 'FINISHED' | 'CANCELLED';
+  status: TournamentStatus;
   size: number;
   rosterSize: number;
   registerEndsAt: string;
@@ -262,7 +266,7 @@ export interface PvpMatchView {
   homeScore: number | null;
   awayScore: number | null;
   winnerUserId: number | null;
-  status: 'PENDING' | 'DONE' | 'BYE';
+  status: MatchStatus;
   contestRecordId: string | null;
   reportUrl: string | null;
 }

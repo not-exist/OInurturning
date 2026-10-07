@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { Prisma, type AdventureLog, type Student } from '../../generated/prisma/client.js';
 import {
   clamp,
+  type AdventureStatus,
   type BattleReplay,
   type ConfigRarity,
   type DuelInput,
@@ -79,7 +80,7 @@ export interface AdventureLogView {
   studentId: number | null;
   contestRecordId: string | null;
   tier: AdventureStaminaCost;
-  status: 'PENDING' | 'RESOLVED';
+  status: AdventureStatus;
   preview: boolean;
   event: AdventureEventView;
   choices: number[];

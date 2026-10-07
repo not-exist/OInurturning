@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import type { Role } from '@oinur/shared';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
@@ -9,7 +10,7 @@ const REGISTER_END = '2099-01-02T00:00:00.000Z';
 const AUTO_START = '2099-01-03T00:00:00.000Z';
 let sequence = 0;
 
-async function createUser(role: 'USER' | 'ADMIN' = 'USER'): Promise<{ id: number; token: string }> {
+async function createUser(role: Role = 'USER'): Promise<{ id: number; token: string }> {
   sequence += 1;
   const response = await request(app)
     .post('/api/auth/register')

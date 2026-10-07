@@ -1,6 +1,6 @@
 import request from 'supertest';
 import type { Express } from 'express';
-import type { ApiEnvelope } from '@oinur/shared';
+import type { ApiEnvelope, Role } from '@oinur/shared';
 import { prisma } from '../src/lib/prisma.js';
 import { createApp } from '../src/index.js';
 
@@ -94,7 +94,7 @@ export async function resetUsersFast(): Promise<void> {
  * 适用于非 auth 流程的集成测试
  * `tutorialCompleted` 默认 true：业务用例不关心引导锁，需要测锁定行为时显式传 false
  */
-export async function createTestUserDirect(opts: { username: string; passwordHash?: string; money?: number; reputation?: number; role?: 'USER' | 'ADMIN'; tutorialCompleted?: boolean } = { username: `test-${Date.now()}` }) {
+export async function createTestUserDirect(opts: { username: string; passwordHash?: string; money?: number; reputation?: number; role?: Role; tutorialCompleted?: boolean } = { username: `test-${Date.now()}` }) {
   const tutorialCompleted = opts.tutorialCompleted ?? true;
   const user = await prisma.user.create({
     data: {

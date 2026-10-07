@@ -1,5 +1,7 @@
 import type {
   AbilityKey,
+  AcquiredVia,
+  AdventureStatus,
   ContestFormat,
   ContestRecordType,
   ContestSide,
@@ -8,11 +10,15 @@ import type {
   EventCategory,
   ItemEffectKind,
   LectureGrowthStat,
+  MatchStatus,
   ProblemSeverity,
   ProblemTier,
   QualityTier,
   Rarity,
+  Role,
+  StudentStatus,
   TalentEffectStat,
+  TournamentStatus,
 } from '@oinur/shared';
 
 /**
@@ -22,16 +28,12 @@ import type {
  */
 
 // ---------------------------------------------------------------------------
-// wire 上的封闭集合（shared 未导出的补于此）
+// wire 上的封闭集合（web 特有命名，shared 未导出的补于此；
+// Prisma 对齐的枚举类型统一从 @oinur/shared 引入）
 // ---------------------------------------------------------------------------
 
 export type TrainingKind = 'basic' | 'directed' | 'specialized';
 export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
-export type AcquiredVia = 'RECRUIT' | 'EVENT' | 'UPGRADE' | 'REROLL' | 'ADMIN';
-export type MatchStatus = 'PENDING' | 'DONE' | 'BYE';
-export type TournamentStatus = 'REGISTERING' | 'RUNNING' | 'FINISHED' | 'CANCELLED';
-export type StudentStatus = 'ACTIVE' | 'DISMISSED';
-export type Role = 'USER' | 'ADMIN';
 /** 单局判定理由比 verdict 全集少一个 SKIP */
 export type RoundReason = Exclude<ContestVerdict, 'SKIP'>;
 
@@ -574,7 +576,7 @@ export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
   social: '人情',
 };
 
-export const ADVENTURE_STATUS_LABEL: Record<'PENDING' | 'RESOLVED', string> = {
+export const ADVENTURE_STATUS_LABEL: Record<AdventureStatus, string> = {
   PENDING: '待抉择',
   RESOLVED: '已结算',
 };

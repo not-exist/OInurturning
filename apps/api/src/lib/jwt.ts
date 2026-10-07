@@ -1,9 +1,10 @@
 import jwt from 'jsonwebtoken';
+import type { Role } from '@oinur/shared';
 import { env } from '../config/env.js';
 
 export interface AccessClaims {
   uid: number;
-  role: 'USER' | 'ADMIN';
+  role: Role;
   tv: number; // tokenVersion
 }
 

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import type { Role } from '@oinur/shared';
 import { prisma } from '../lib/prisma.js';
 import { verifyAccess } from '../lib/jwt.js';
 import { ApiError } from '../lib/errors.js';
@@ -8,7 +9,7 @@ declare module 'express-serve-static-core' {
   interface Request {
     user?: {
       id: number;
-      role: 'USER' | 'ADMIN';
+      role: Role;
       tokenVersion: number;
       tutorialStep: number;
       tutorialCompleted: boolean;

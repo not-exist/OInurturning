@@ -1,3 +1,5 @@
+import type { Role } from './enums.js';
+
 export const ERROR_CODES = [
   'UNAUTHENTICATED',
   'INVALID_CREDENTIALS',
@@ -25,7 +27,7 @@ export interface Page<T> { items: T[]; page: number; pageSize: number; total: nu
 export interface MeView {
   id: number;
   username: string;
-  role: 'USER' | 'ADMIN';
+  role: Role;
   createdAt: string;
   lastLoginAt: string | null;
   money: number;
