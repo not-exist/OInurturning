@@ -1,6 +1,7 @@
 import type { StudentView } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
+import { readBadgeList } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockUser } from '../../lib/row-lock.js';
 import { getPool } from '../academy/service.js';
@@ -148,7 +149,7 @@ export async function getOverview(userId: number): Promise<OverviewView> {
   const freeRefreshAt = new Date(
     new Date(pool.generatedAt).getTime() + freeIntervalHours() * 3_600_000,
   ).toISOString();
-  const badges = Array.isArray(user.badges) ? (user.badges as string[]) : [];
+  const badges = readBadgeList(user.badges);
 
   return {
     me: {
@@ -187,7 +188,7 @@ export async function claimChecklistReward(userId: number): Promise<ClaimResult>
   return prisma.$transaction(async (tx) => {
     await lockUser(tx, userId);
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
-    const badges = Array.isArray(user.badges) ? [...(user.badges as string[])] : [];
+    const badges = readBadgeList(user.badges);
     if (badges.includes(CHECKLIST_REWARD_BADGE)) {
       return { claimed: true, already: true, badge: CHECKLIST_REWARD_BADGE };
     }

@@ -5,6 +5,17 @@ export function jsonValue<T>(value: Prisma.JsonValue): T {
   return value as unknown as T;
 }
 
+/**
+ * 读侧元素级校验（T6）：User.badges Json → string[]，读/写两侧共用同一元素契约。
+ * 非数组视为空；数组仅保留字符串元素（口径与原 story/service.ts 读侧逐字一致）。
+ * 返回新数组，RMW 调用方可安全 push 后整体写回——写回值恒为 string[]，脏元素不再回写持久化。
+ */
+export function readBadgeList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((badge): badge is string => typeof badge === 'string')
+    : [];
+}
+
 function encodeStable(value: unknown, active: WeakSet<object>): string {
   if (value === null) return 'null';
 

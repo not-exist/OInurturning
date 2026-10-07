@@ -108,6 +108,7 @@ async function expectStepStays(userId: number, expected: number, graceMs = 500):
   expect(await stepOf(userId)).toBe(expected);
 }
 
+// 刻意不过滤：若写回仍持久化脏元素，下方断言必须失败——此助手是回归探测器。
 async function badgesOf(userId: number): Promise<string[]> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   return Array.isArray(user.badges) ? (user.badges as string[]) : [];
@@ -381,5 +382,20 @@ describe('tutorial 服务端锁', () => {
     );
     expect(overview.checklist.rewardBadge).toBe('rookie-done');
     expect(overview.checklist.claimed, '引导完成不得吞掉总览开局任务的领取态').toBe(false);
+  });
+
+  it('脏徽章元素在写回边界被清洗：complete 后非字符串元素不再回写（T6）', async () => {
+    const user = await register();
+    // 直连 prisma 造脏数据（正常路径 badges 只由服务端写入 string[]）
+    await prisma.user.update({
+      where: { id: user.userId },
+      data: { badges: ['kept', 42, null, { junk: 1 }] as unknown as string[] },
+    });
+    await setStep(user.userId, stepIndex('story'));
+    const completed = await request(app).post('/api/tutorial/complete').set(auth(user.token));
+    expect(completed.status).toBe(200);
+
+    const badges = await badgesOf(user.userId);
+    expect(badges).toEqual(['kept', 'onboarding-done']);
   });
 });

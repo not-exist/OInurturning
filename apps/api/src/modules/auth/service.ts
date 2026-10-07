@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { Prisma } from '../../generated/prisma/client.js';
 import { ApiError } from '../../lib/errors.js';
+import { readBadgeList } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { signAccess, signRefresh, type AccessClaims } from '../../lib/jwt.js';
@@ -26,7 +27,7 @@ export function toMeView(u: User): MeView {
     lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
     money: u.money,
     reputation: u.reputation,
-    badges: Array.isArray(u.badges) ? (u.badges as string[]) : [],
+    badges: readBadgeList(u.badges),
   };
 }
 

@@ -23,6 +23,7 @@ import {
 import { requireConfig } from '../../config/require-config.js';
 import { damping } from '../../lib/damping.js';
 import { ApiError } from '../../lib/errors.js';
+import { readBadgeList } from '../../lib/json.js';
 import { participantSnapshot } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockStudentsByIds, lockUser } from '../../lib/row-lock.js';
@@ -495,9 +496,7 @@ async function applyRewards(
       where: { id: userId },
       select: { badges: true },
     });
-    const badges = Array.isArray(user.badges)
-      ? user.badges.filter((badge): badge is string => typeof badge === 'string')
-      : [];
+    const badges = readBadgeList(user.badges);
     if (!badges.includes(accountBadge)) {
       await tx.user.update({
         where: { id: userId },
@@ -643,7 +642,7 @@ export async function enterStoryStage(
       ngLevel === 0
         ? FULL_CLEAR_BADGE
         : config.ngPlus.layer_badge.item_id_template.replace('{k}', String(ngLevel));
-    const alreadyFullClear = Array.isArray(user.badges) && user.badges.includes(layerBadge);
+    const alreadyFullClear = readBadgeList(user.badges).includes(layerBadge);
     if (layerFullClear && !alreadyFullClear) {
       if (ngLevel === 0) {
         rewards = [

@@ -1,6 +1,7 @@
 import type { Prisma } from '../../generated/prisma/client.js';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
+import { readBadgeList } from '../../lib/json.js';
 import { logger } from '../../lib/logger.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockUser } from '../../lib/row-lock.js';
@@ -84,7 +85,7 @@ async function grantReward(tx: Prisma.TransactionClient, userId: number, reward:
   }
   if (reward.badge) {
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
-    const badges = Array.isArray(user.badges) ? [...(user.badges as string[])] : [];
+    const badges = readBadgeList(user.badges);
     if (!badges.includes(reward.badge)) {
       badges.push(reward.badge);
       await tx.user.update({ where: { id: userId }, data: { badges } });
