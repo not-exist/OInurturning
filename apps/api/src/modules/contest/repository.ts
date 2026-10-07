@@ -9,12 +9,13 @@ import type {
   StoryProgressView,
 } from '@oinur/shared';
 import { clamp, type ContestRecordView } from '@oinur/shared';
+import { jsonValue } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
+import { toProgressView } from '../../lib/story-progress.js';
 import { stableSerialize } from './engine/report.js';
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 type ContestRecordRow = NonNullable<Awaited<ReturnType<typeof prisma.contestRecord.findFirst>>>;
-type StoryProgressRow = NonNullable<Awaited<ReturnType<typeof prisma.storyProgress.findUnique>>>;
 
 export interface CreateContestRecordInput {
   userId: number;
@@ -51,10 +52,6 @@ function jsonPayload(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
-function jsonValue<T>(value: Prisma.JsonValue): T {
-  return value as unknown as T;
-}
-
 function toRecordView(row: ContestRecordRow): ContestRecordView {
   return {
     id: row.id,
@@ -70,22 +67,6 @@ function toRecordView(row: ContestRecordRow): ContestRecordView {
     rewards: jsonValue<RewardLine[]>(row.rewards),
     snapshotHash: row.snapshotHash,
     createdAt: row.createdAt.toISOString(),
-  };
-}
-
-function toProgressView(row: StoryProgressRow): StoryProgressView {
-  return {
-    stageKey: row.stageKey,
-    ngLevel: row.ngLevel,
-    firstClearAt: row.firstClearAt?.toISOString() ?? null,
-    bestRank: row.bestRank,
-    clearCount: row.clearCount,
-    rewards: jsonValue<RewardLine[]>(row.rewards),
-    growth: jsonValue<GrowthDelta[]>(row.growth),
-    ...(row.lastRecordId === null ? {} : { lastReportId: row.lastRecordId }),
-    ...(row.lastSummary === null
-      ? {}
-      : { lastSummary: jsonValue<ContestSummary>(row.lastSummary) }),
   };
 }
 

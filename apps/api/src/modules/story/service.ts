@@ -22,6 +22,7 @@ import { damping } from '../../lib/damping.js';
 import { ApiError } from '../../lib/errors.js';
 import { participantSnapshot } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
+import { toProgressView } from '../../lib/story-progress.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { buildBattleReplay } from '../contest/replay.js';
 import {
@@ -75,22 +76,6 @@ function finalStageKeys(): string[] {
   return STAGE_CHAPTERS.map((chapter) => lastByChapter.get(chapter))
     .filter((stage): stage is StageConfig => stage !== undefined)
     .map(stageKey);
-}
-
-function rowToProgress(row: StoryProgressRow): StoryProgressView {
-  return {
-    stageKey: row.stageKey,
-    ngLevel: row.ngLevel,
-    firstClearAt: row.firstClearAt?.toISOString() ?? null,
-    bestRank: row.bestRank,
-    clearCount: row.clearCount,
-    rewards: row.rewards as unknown as RewardLine[],
-    growth: row.growth as unknown as GrowthDelta[],
-    ...(row.lastRecordId === null ? {} : { lastReportId: row.lastRecordId }),
-    ...(row.lastSummary === null || row.lastSummary === undefined
-      ? {}
-      : { lastSummary: row.lastSummary as unknown as StoryProgressView['lastSummary'] }),
-  };
 }
 
 async function hasFullClear(
@@ -206,7 +191,7 @@ export async function getProgress(userId: number, ngLevel?: number): Promise<Sto
     where: { userId, ...(ngLevel === undefined ? {} : { ngLevel }) },
     orderBy: [{ ngLevel: 'asc' }, { stageKey: 'asc' }],
   });
-  return rows.map(rowToProgress);
+  return rows.map(toProgressView);
 }
 
 export async function getContestReplay(userId: number, recordId: string): Promise<BattleReplay> {

@@ -122,6 +122,26 @@ describe('contest repository', () => {
       lastReportId: 'record-2',
     });
     expect(progress?.rewards).toEqual([]);
+    expect(progress?.lastSummary).toEqual(summary);
     expect(await prisma.storyProgress.count({ where: { userId: owner.id } })).toBe(1);
+  });
+
+  it('omits the lastSummary key when upserted without one', async () => {
+    const owner = await prisma.user.create({ data: { username: 'progress-no-summary' } });
+    await upsertStoryProgress({
+      userId: owner.id,
+      ngLevel: 0,
+      stageKey: 'cspj:2',
+      firstClearAt: null,
+      bestRank: 1,
+      clearCount: 1,
+      rewards: [],
+      growth: [],
+      lastRecordId: 'record-3',
+    });
+
+    const progress = await getStoryProgress(owner.id, 0, 'cspj:2');
+    if (progress === null) throw new Error('progress should exist');
+    expect('lastSummary' in progress).toBe(false);
   });
 });
