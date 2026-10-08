@@ -7,6 +7,9 @@ import {
   type ConfigDimension,
   type DimensionColumn,
   type DimensionKey,
+  type RareGain,
+  type RareGainStat,
+  type TrainingKind,
 } from '@oinur/shared';
 import type { MetaAggregate } from '../students/meta.js';
 
@@ -15,8 +18,6 @@ import type { MetaAggregate } from '../students/meta.js';
  * 本模块不落库、不持有 DB 句柄，只负责把 student.md 的收益/费用/附带成长概率表
  * 具象为可单测的纯函数；随机性一律经注入的 rng()（缺省由服务层提供密码学种子）。
  */
-
-export type TrainingKind = 'basic' | 'directed' | 'specialized';
 
 /** 三种训练的主收益 base（student.md §4.2；economy.yaml 只管辖钱与体力，base 归本域） */
 export const TRAINING_BASE: Record<TrainingKind, number> = {
@@ -99,18 +100,9 @@ const ULTRA_RARE: { stat: RareGainStat; prob: number; column: NumericGainColumn;
   { stat: 'stamina_regen', prob: 0.005, column: 'staminaRegen', cap: 100 },
 ];
 
-export type RareGainStat =
-  'code' | 'thinking' | 'setting' | 'mindset' | 'focus_cap' | 'stamina_regen';
-
 /** 附带成长可写入的数值列集合（全部为 Student 的 number 属性） */
 export type NumericGainColumn =
   'code' | 'thinking' | 'setting' | 'mindset' | 'focusCap' | 'staminaRegen';
-
-export interface RareGain {
-  stat: RareGainStat;
-  /** 实际生效的增量（浮点累积，跨整数点为真增量） */
-  amount: number;
-}
 
 export interface SecondaryGainsResult {
   /** 需写回学员的附带成长字段增补（含超上限截断后的值） */

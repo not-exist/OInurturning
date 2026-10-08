@@ -6,6 +6,7 @@ import { createApp } from '../src/index.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
 import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
+import type { PoolView } from '@oinur/shared';
 
 /**
  * 招募补白（academy.test.ts 覆盖生成/权重/懒刷新/招募主路径）：
@@ -33,13 +34,6 @@ async function register(money = 0): Promise<{ token: string; userId: number }> {
   await unlockTutorial(session.me.id);
   if (money > 0) await prisma.user.update({ where: { id: session.me.id }, data: { money } });
   return { token: session.accessToken, userId: session.me.id };
-}
-
-interface PoolView {
-  candidates: Array<{ tempId: string; price: number }>;
-  generatedAt: string;
-  refreshesToday: number;
-  refreshPrice: number;
 }
 
 describe('academy gaps', () => {

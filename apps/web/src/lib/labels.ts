@@ -10,6 +10,7 @@ import type {
   EventCategory,
   ItemEffectKind,
   LectureGrowthStat,
+  LectureTierId,
   MatchStatus,
   ProblemSeverity,
   ProblemTier,
@@ -19,6 +20,7 @@ import type {
   StudentStatus,
   TalentEffectStat,
   TournamentStatus,
+  TrainingKind,
 } from '@oinur/shared';
 
 /**
@@ -32,8 +34,8 @@ import type {
 // Prisma 对齐的枚举类型统一从 @oinur/shared 引入）
 // ---------------------------------------------------------------------------
 
-export type TrainingKind = 'basic' | 'directed' | 'specialized';
-export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
+/** R5 批量 1 上收：训练种别/讲课档位以 shared 的 domain/views 为唯一真源，此处仅 re-export */
+export type { LectureTierId, TrainingKind };
 /** 单局判定理由比 verdict 全集少一个 SKIP */
 export type RoundReason = Exclude<ContestVerdict, 'SKIP'>;
 

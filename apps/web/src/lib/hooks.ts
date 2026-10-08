@@ -3,16 +3,28 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AdventureStatus,
   BattleReplay,
+  CandidateAttrs,
+  CandidatePublicView,
   ContestRecordView,
+  CreateProblemResult,
   DimensionKey,
-  LectureGrowthEntry,
+  DismissResult,
+  ItemView,
+  LectureResultView,
+  LectureTierView,
   MatchStatus,
   MeView,
+  PoolView,
+  ProblemView,
+  RareGain,
   Rarity,
   Role,
   StoryOverview,
   StoryProgressView,
   StudentView,
+  TrainingLogPage,
+  TrainingLogView,
+  TrainingResult,
   TournamentStatus,
 } from '@oinur/shared';
 import { apiFetch } from './api';
@@ -38,73 +50,27 @@ const STALE = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// 领域视图类型（API 返回；shared 未导出的补于此）
+// 领域视图类型：批量 1（items/students/training/academy）已上收 @oinur/shared
+// 的 domain/views（wire 唯一真源），此处只留别名 re-export；其余视图仍就地
+// 声明，待后续批次上收。
 // ---------------------------------------------------------------------------
 
-export interface CandidateAttrs {
-  ds: number;
-  dp: number;
-  math: number;
-  graph: number;
-  greedy: number;
-  str: number;
-  code: number;
-  thinking: number;
-  setting: number;
-  focusCap: number;
-  energyMax: number;
-  staminaRegen: number;
-}
-
-export interface CandidatePayload {
-  tempId: string;
-  name: string;
-  hint: string;
-  attrs: CandidateAttrs;
-  price: number;
-}
-
-export interface PoolView {
-  candidates: CandidatePayload[];
-  generatedAt: string;
-  refreshesToday: number;
-  refreshPrice: number;
-}
-
-export interface ItemView {
-  itemId: string;
-  quantity: number;
-  name: string;
-  rarity: Rarity;
-  category: string;
-  description: string;
-  price: number | null;
-  effectDesc: string | null;
-}
-
-export interface DismissResult {
-  id: number;
-  status: 'DISMISSED';
-  reputationPenalty: number;
-  reputationDelta: number;
-  reputation: number;
-  recycledRenameCard: boolean;
-}
-
-export interface RareGain {
-  stat: 'code' | 'thinking' | 'setting' | 'mindset' | 'focus_cap' | 'stamina_regen';
-  amount: number;
-}
-
-export interface TrainingResult {
-  dim: DimensionKey;
-  delta: number;
-  rareGains: RareGain[];
-  cost: number;
-  staminaAfter: number;
-  /** 同一事务内落库的训练记录 id（GET /api/training/logs 可查） */
-  logId: number;
-}
+export type {
+  CandidateAttrs,
+  CreateProblemResult,
+  DismissResult,
+  ItemView,
+  LectureResultView,
+  LectureTierView,
+  PoolView,
+  ProblemView,
+  RareGain,
+  TrainingLogPage,
+  TrainingLogView,
+  TrainingResult,
+};
+/** wire 出参不含 qualityTier/talents（招募前必须隐性）；沿用 web 侧历史命名 */
+export type CandidatePayload = CandidatePublicView;
 
 export interface AdventureChoiceView {
   index: number;
@@ -143,37 +109,6 @@ export interface AdventureChoiceResult {
   adventure: AdventureLogView;
   completed: boolean;
   replay?: BattleReplay;
-}
-
-export interface LectureTierView {
-  id: LectureTierId;
-  threshold: number;
-  /** 讲课成长的思维要求 R（issue #56；缺省=门槛） */
-  thinkingReq: number;
-  baseMoney: number;
-  baseReputation: number;
-  available: boolean;
-}
-
-export interface LectureResultView {
-  id: number;
-  studentId: number;
-  tier: LectureTierId;
-  teachingValue: number;
-  threshold: number;
-  /** 本场比对的思维要求 R */
-  thinkingReq: number;
-  /** 主讲学员思维是否不足（讲砸时会付出属性代价） */
-  thinkingDeficit: boolean;
-  forced: boolean;
-  success: boolean;
-  money: number;
-  reputation: number;
-  /** 本场成长（出题/思维）；amount 为负表示讲砸回落 */
-  gains: LectureGrowthEntry[];
-  staminaCost: number;
-  staminaAfter: number | null;
-  createdAt: string;
 }
 
 export interface TournamentView {
@@ -297,21 +232,6 @@ export interface TalentDefView {
   effects: { stat: string; mode: string; value: number }[];
 }
 
-export interface ProblemView {
-  id: number;
-  name: string;
-  dominantDim: DimensionKey;
-  rarity: Rarity;
-  quality: number;
-  traitId: string | null;
-  consumedAt: string | null;
-}
-
-export interface CreateProblemResult extends ProblemView {
-  cost: number;
-  staminaAfter: number;
-}
-
 /** 当前时间的 tick（倒计时展示用，缺省每秒刷新） */
 export function useNow(intervalMs = 1000): number {
   const [now, setNow] = useState(() => Date.now());
@@ -416,26 +336,6 @@ export function useClaimChecklist() {
 // ---------------------------------------------------------------------------
 // 训练记录
 // ---------------------------------------------------------------------------
-
-export interface TrainingLogView {
-  id: number;
-  studentId: number | null;
-  studentName: string;
-  kind: TrainingKind;
-  dim: DimensionKey;
-  delta: number;
-  rareGains: RareGain[];
-  cost: number;
-  staminaAfter: number;
-  bookItemId: string | null;
-  problemId: number | null;
-  createdAt: string;
-}
-
-export interface TrainingLogPage {
-  items: TrainingLogView[];
-  nextCursor: number | null;
-}
 
 export interface TrainingLogFilters {
   studentId?: number;

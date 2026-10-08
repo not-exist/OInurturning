@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type RecruitPool, type Student } from '../../generated/prisma/client.js';
-import { computeV, type StudentView } from '@oinur/shared';
+import { computeV, type PoolView, type StudentView } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
@@ -61,20 +61,6 @@ async function genCtx(tx: Querier, userId: number): Promise<GenerateContext> {
 
 function readCandidates(pool: RecruitPool): CandidatePayload[] {
   return pool.candidates as unknown as CandidatePayload[];
-}
-
-/**
- * 候选**出参**：招募前品质档与天赋必须隐性（student.md §3.6）——品质档直接暴露会诱导刷池，
- * 天赋更可由家族链确定性反推品质档。存储结构不动（recruit() 落库仍需这两个字段）。
- */
-export type CandidatePublicView = Omit<CandidatePayload, 'qualityTier' | 'talents'>;
-
-export interface PoolView {
-  candidates: CandidatePublicView[];
-  generatedAt: string;
-  refreshesToday: number;
-  /** 当前再手动刷新一次的价格（04:00 日界重置后从 k=0 重新计） */
-  refreshPrice: number;
 }
 
 function toPoolView(pool: RecruitPool, now: Date): PoolView {

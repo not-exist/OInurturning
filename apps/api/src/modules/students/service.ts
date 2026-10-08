@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import type { Student } from '../../generated/prisma/client.js';
-import { computeV, type QualityTier, type StudentView } from '@oinur/shared';
+import { computeV, type DismissResult, type QualityTier, type StudentView } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { mulberry32 } from '../../lib/rng.js';
@@ -118,18 +118,6 @@ export async function renameStudent(
     const student = await tx.student.findUniqueOrThrow({ where: { id }, include: { talents: true } });
     return toStudentView(student, student.talents.map((t) => t.talentId));
   });
-}
-
-export interface DismissResult {
-  id: number;
-  status: 'DISMISSED';
-  /** 名义扣减（品质档罚则表） */
-  reputationPenalty: number;
-  /** 实际生效 delta（声誉 floor 0 截断后，≤0） */
-  reputationDelta: number;
-  /** 扣后声誉 */
-  reputation: number;
-  recycledRenameCard: boolean;
 }
 
 /**

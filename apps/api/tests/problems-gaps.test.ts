@@ -6,6 +6,7 @@ import { createApp } from '../src/index.js';
 import { getConfig, importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
 import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
+import type { CreateProblemResult } from '@oinur/shared';
 
 /**
  * 出题题库补白（problem-library.test.ts 覆盖确定性质量/日限/归属删除/HTTP）：
@@ -46,17 +47,6 @@ async function makeStudent(userId: number, ability: number): Promise<{ id: numbe
   return { id: student.id };
 }
 
-interface ProblemView {
-  id: number;
-  name: string;
-  dominantDim: string;
-  rarity: string;
-  quality: number;
-  traitId: string | null;
-  cost: number;
-  staminaAfter: number;
-}
-
 function expectedRarity(quality: number): string {
   if (quality < 30) return 'GRAY';
   if (quality < 50) return 'YELLOW';
@@ -73,7 +63,7 @@ describe('problems gaps', () => {
     const strong = await makeStudent(user.userId, 100);
     const strongRes = await request(app).post('/api/problem-library').set(auth).send({ studentId: strong.id, dimension: 'DS' });
     expect(strongRes.status).toBe(200);
-    const hq = unwrapOk<ProblemView>(strongRes);
+    const hq = unwrapOk<CreateProblemResult>(strongRes);
     // round(0.55×100+0.25×100+0.2×100+噪声[-8,9)) → [92,100]
     expect(hq.quality).toBeGreaterThanOrEqual(92);
     expect(hq.quality).toBeLessThanOrEqual(100);
@@ -85,7 +75,7 @@ describe('problems gaps', () => {
       .set('Authorization', `Bearer ${weakUser.token}`)
       .send({ studentId: weak.id, dimension: 'DS' });
     expect(weakRes.status).toBe(200);
-    const lq = unwrapOk<ProblemView>(weakRes);
+    const lq = unwrapOk<CreateProblemResult>(weakRes);
     // round(噪声[-8,9)) → clamp [0,9]
     expect(lq.quality).toBeGreaterThanOrEqual(0);
     expect(lq.quality).toBeLessThanOrEqual(9);
@@ -109,7 +99,7 @@ describe('problems gaps', () => {
       .send({ studentId: author.id, dimension: 'MATH' });
     expect(res.status).toBe(200);
     // round(20×(1+0.15×2)) = 26（library.ts 硬编码公式）
-    expect(unwrapOk<ProblemView>(res).cost).toBe(26);
+    expect(unwrapOk<CreateProblemResult>(res).cost).toBe(26);
     expect(before - (await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })).money).toBe(26);
   });
 
@@ -170,7 +160,7 @@ describe('problems gaps', () => {
       .set('Authorization', `Bearer ${user.token}`)
       .send({ studentId: author.id, dimension: 'DS' });
     expect(res.status).toBe(200);
-    const traitId = unwrapOk<ProblemView>(res).traitId;
+    const traitId = unwrapOk<CreateProblemResult>(res).traitId;
     const traits = getConfig()?.problemTraits ?? {};
     expect(traitId === null || traitId in traits).toBe(true);
   });

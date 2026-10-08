@@ -1,11 +1,10 @@
 import { damping } from '../../lib/damping.js';
-import { CONFIG_DIMENSIONS, type ConfigDimension } from '@oinur/shared';
+import { CONFIG_DIMENSIONS, type ConfigDimension, type TrainingKind } from '@oinur/shared';
 import {
   BOOK_MULT,
   QUALITY_MULT,
   SECONDARY_PROB,
   TRAINING_BASE,
-  type TrainingKind,
 } from '../training/gains.js';
 
 /**

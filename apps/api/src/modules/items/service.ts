@@ -1,5 +1,5 @@
 import type { Student } from '../../generated/prisma/client.js';
-import { computeV, type StudentView, type Rarity } from '@oinur/shared';
+import { computeV, type ItemView, type Rarity, type StudentView } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -14,18 +14,6 @@ import { applyItemEffect } from './effects.js';
  * - POST use：单事务内 锁学员行 → settle → 校验限制 → 应用效果 → 扣道具（quantity−1，0 删行）。
  *   道具扣减与属性变动全部走「条件 UPDATE + 事务」（TECH-DESIGN §5）。
  */
-
-/** 背包行视图：库存 + 配置名称/稀有度/类别/描述（join CONFIG.items；已软弃用/缺失不会出现在列表） */
-export interface ItemView {
-  itemId: string;
-  quantity: number;
-  name: string;
-  rarity: Rarity;
-  category: string;
-  description: string;
-  price: number | null;
-  effectDesc: string | null;
-}
 
 export async function listItems(userId: number): Promise<ItemView[]> {
   const config = requireConfig('items');

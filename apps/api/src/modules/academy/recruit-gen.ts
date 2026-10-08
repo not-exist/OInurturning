@@ -1,6 +1,7 @@
 import {
   clamp,
   CONFIG_RARITIES,
+  type CandidateAttrs,
   type ConfigRarity,
   type EconomyRecruitment,
   type TalentDef,
@@ -269,21 +270,6 @@ export function refreshPrice(
 }
 
 // ── 候选生成 ──
-
-export interface CandidateAttrs {
-  ds: number;
-  dp: number;
-  math: number;
-  graph: number;
-  greedy: number;
-  str: number;
-  code: number;
-  thinking: number;
-  setting: number;
-  focusCap: number;
-  energyMax: number;
-  staminaRegen: number;
-}
 
 /** RecruitPool.candidates Json 元素（price 为生成时快照，招募时按当时在册数重算） */
 export interface CandidatePayload {

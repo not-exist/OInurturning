@@ -1,17 +1,17 @@
-import type { StudentView } from '@oinur/shared';
+import type { LectureResultView, StudentView, TrainingLogView } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { readBadgeList } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockUser } from '../../lib/row-lock.js';
 import { getPool } from '../academy/service.js';
-import { listLectureLogs, type LectureResultView } from '../academy/lecture.js';
+import { listLectureLogs } from '../academy/lecture.js';
 import { listAdventureLogs, type AdventureLogView } from '../adventure/service.js';
 import { listAnnouncements, type AnnouncementView } from '../admin/service.js';
 import { listRecentContestRecords, type ContestRecordSummary } from '../contest/repository.js';
 import { getStoryOverview } from '../story/service.js';
 import { listStudents } from '../students/service.js';
-import { listTrainingLogs, type TrainingLogView } from '../training/service.js';
+import { listTrainingLogs } from '../training/service.js';
 
 /**
  * 总览聚合（GET /api/overview，纯读）：

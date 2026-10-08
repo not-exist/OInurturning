@@ -6,3 +6,4 @@ export * from './config/index.js';
 export * from './domain/student.js';
 export * from './domain/contest.js';
 export * from './domain/story.js';
+export * from './domain/views.js';

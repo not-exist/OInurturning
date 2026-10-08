@@ -6,6 +6,9 @@ import {
   type LectureConfig,
   type LectureGrowthConfig,
   type LectureGrowthEntry,
+  type LectureResultView,
+  type LectureTierId,
+  type LectureTierView,
 } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { dayKey } from '../../lib/clock.js';
@@ -18,39 +21,6 @@ import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
 import { computeLectureGrowth, thinkingReqOf } from './lecture-growth.js';
 import { autoAdvanceIfNeeded } from '../tutorial/service.js';
-
-export type LectureTierId = 'beginner' | 'junior' | 'senior' | 'provincial' | 'national';
-
-export interface LectureTierView {
-  id: LectureTierId;
-  threshold: number;
-  /** 讲课成长的思维要求 R（issue #56；缺省=门槛） */
-  thinkingReq: number;
-  baseMoney: number;
-  baseReputation: number;
-  available: boolean;
-}
-
-export interface LectureResultView {
-  id: number;
-  studentId: number;
-  tier: LectureTierId;
-  teachingValue: number;
-  threshold: number;
-  /** 本场比对的思维要求 R（成长匹配判定的基准，落库审计） */
-  thinkingReq: number;
-  /** 主讲学员思维是否不足（thinking < R）：讲砸时会付出属性代价 */
-  thinkingDeficit: boolean;
-  forced: boolean;
-  success: boolean;
-  money: number;
-  reputation: number;
-  /** 本场成长清单（出题/思维）；amount 为负表示讲砸回落 */
-  gains: LectureGrowthEntry[];
-  staminaCost: number;
-  staminaAfter: number | null;
-  createdAt: string;
-}
 
 const LECTURE_STAMINA_COST = 2;
 const DAILY_LECTURE_LIMIT = 3;

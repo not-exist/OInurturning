@@ -1,5 +1,12 @@
 import type { ProblemLibraryEntry } from '../../generated/prisma/client.js';
-import { ABILITY_COLUMN, clamp, DIMENSION_CONFIG, type DimensionKey } from '@oinur/shared';
+import {
+  ABILITY_COLUMN,
+  clamp,
+  DIMENSION_CONFIG,
+  type CreateProblemResult,
+  type DimensionKey,
+  type ProblemView,
+} from '@oinur/shared';
 import { dayKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
@@ -10,12 +17,7 @@ import { requireConfig } from '../../config/require-config.js';
 import { createRandomStream, deriveSeed } from '../contest/engine/rng.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
-import { listProblems, type ProblemView } from './service.js';
-
-export interface CreateProblemResult extends ProblemView {
-  cost: number;
-  staminaAfter: number;
-}
+import { listProblems } from './service.js';
 
 const SEVERITY_BASE = [40, 30, 18, 8, 3, 1] as const;
 const DAILY_PROBLEM_LIMIT = 2;

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
-import { DIMENSIONS } from '@oinur/shared';
+import { DIMENSIONS, type TrainingResult as HttpResult } from '@oinur/shared';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { mulberry32 } from '../src/lib/rng.js';
@@ -14,7 +14,6 @@ import {
   TRAINING_BASE,
 } from '../src/modules/training/gains.js';
 import { basicTrain } from '../src/modules/training/service.js';
-import type { TrainingResult as HttpResult } from '../src/modules/training/service.js';
 
 const app: Express = createApp();
 

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
+import type { ProblemView } from '@oinur/shared';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
 import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
-import type { ProblemView } from '../src/modules/problems/service.js';
 import type { TalentView } from '../src/modules/talents/service.js';
 
 const app: Express = createApp();

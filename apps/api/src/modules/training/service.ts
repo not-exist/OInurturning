@@ -1,6 +1,15 @@
 import { randomInt } from 'node:crypto';
 import { Prisma, type ProblemLibraryEntry, type Student } from '../../generated/prisma/client.js';
-import { clamp, DIMENSIONS, type DimensionKey } from '@oinur/shared';
+import {
+  clamp,
+  DIMENSIONS,
+  type DimensionKey,
+  type RareGain,
+  type TrainingKind,
+  type TrainingLogPage,
+  type TrainingLogView,
+  type TrainingResult,
+} from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
@@ -17,8 +26,6 @@ import {
   computeCost,
   computeDelta,
   computeSecondaryGains,
-  type RareGain,
-  type TrainingKind,
 } from './gains.js';
 import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
@@ -49,44 +56,9 @@ interface TrainingInput {
   problemId?: number;
 }
 
-export interface TrainingResult {
-  dim: DimensionKey;
-  /** 主收益（浮点累积，落在指定/随机维） */
-  delta: number;
-  /** 附带成长清单（code/thinking/setting/mindset/focus_cap/stamina_regen） */
-  rareGains: RareGain[];
-  cost: number;
-  staminaAfter: number;
-  /** 同一事务内落库的训练记录 id（GET /api/training/logs 可查） */
-  logId: number;
-}
-
 /** API 层训练种别（小写）↔ Prisma 枚举（大写）的双向映射 */
 const KIND_TO_ENUM = { basic: 'BASIC', directed: 'DIRECTED', specialized: 'SPECIALIZED' } as const;
 const ENUM_TO_KIND = { BASIC: 'basic', DIRECTED: 'directed', SPECIALIZED: 'specialized' } as const;
-export type TrainingLogKindFilter = keyof typeof KIND_TO_ENUM;
-
-export interface TrainingLogView {
-  id: number;
-  /** 学员行硬删后 SetNull 置空（开除是软删，保留关联），凭 studentName 快照可读 */
-  studentId: number | null;
-  studentName: string;
-  kind: TrainingLogKindFilter;
-  dim: DimensionKey;
-  delta: number;
-  rareGains: RareGain[];
-  cost: number;
-  staminaAfter: number;
-  bookItemId: string | null;
-  problemId: number | null;
-  createdAt: string;
-}
-
-export interface TrainingLogPage {
-  items: TrainingLogView[];
-  /** id 游标（倒序）：翻页传 cursor=nextCursor；null 表示到底 */
-  nextCursor: number | null;
-}
 
 function toLogView(row: {
   id: number;
@@ -124,7 +96,7 @@ function toLogView(row: {
  */
 export async function listTrainingLogs(
   userId: number,
-  opts: { studentId?: number; kind?: TrainingLogKindFilter; limit?: number; cursor?: number } = {},
+  opts: { studentId?: number; kind?: TrainingKind; limit?: number; cursor?: number } = {},
 ): Promise<TrainingLogPage> {
   const limit = clamp(opts.limit ?? 20, 1, 100);
   const rows = await prisma.trainingLog.findMany({
