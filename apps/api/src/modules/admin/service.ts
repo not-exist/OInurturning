@@ -1,5 +1,5 @@
 import { Prisma, type AdminAnnouncement, type AdminAuditLog, type PvpTournament } from '../../generated/prisma/client.js';
-import type { Role } from '@oinur/shared';
+import type { AnnouncementView, AuditView, TournamentView, UserAdminView } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockPvpTournament } from '../../lib/row-lock.js';
@@ -12,48 +12,6 @@ export interface CreateTournamentInput {
   autoStartAt: Date;
   prizes: unknown;
   config: unknown;
-}
-
-export interface TournamentView {
-  id: number;
-  name: string;
-  status: PvpTournament['status'];
-  size: number;
-  registerEndsAt: string;
-  autoStartAt: string;
-  prizes: unknown;
-  config: unknown;
-  createdBy: number | null;
-  createdAt: string;
-}
-
-export interface AnnouncementView {
-  id: number;
-  title: string;
-  body: string;
-  authorId: number | null; // 作者注销后置空（公告是全站内容，不随作者删除）
-  createdAt: string;
-}
-
-export interface UserAdminView {
-  id: number;
-  username: string;
-  role: Role;
-  money: number;
-  reputation: number;
-  bannedAt: string | null;
-  createdAt: string;
-}
-
-export interface AuditView {
-  id: number;
-  adminId: number | null;
-  adminNameSnapshot: string;
-  action: string;
-  targetType: string | null;
-  targetId: string | null;
-  payload: unknown;
-  createdAt: string;
 }
 
 /**

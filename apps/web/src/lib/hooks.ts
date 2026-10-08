@@ -5,9 +5,15 @@ import type {
   AdventureChoiceView,
   AdventureEventView,
   AdventureLogView,
+  AnnouncementView,
+  AuditView,
   BattleReplay,
   CandidateAttrs,
   CandidatePublicView,
+  ChecklistStepId,
+  ChecklistStepView,
+  ChecklistView,
+  ContestRecordSummary,
   ContestRecordView,
   CreateProblemResult,
   DimensionKey,
@@ -17,11 +23,14 @@ import type {
   LectureTierView,
   MatchStatus,
   MeView,
+  OverviewPoolView,
+  OverviewRecentView,
+  OverviewStoryView,
+  OverviewView,
   PoolView,
   ProblemView,
   RareGain,
   Rarity,
-  Role,
   StoryOverview,
   StoryProgressView,
   StudentView,
@@ -29,6 +38,8 @@ import type {
   TrainingLogView,
   TrainingResult,
   TournamentStatus,
+  TournamentView,
+  UserAdminView,
 } from '@oinur/shared';
 import { apiFetch } from './api';
 import type { LectureTierId, TrainingKind } from './labels';
@@ -53,9 +64,9 @@ const STALE = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// 领域视图类型：批量 1-2（items/students/training/academy/adventure）已上收
-// @oinur/shared 的 domain/views（wire 唯一真源），此处只留别名 re-export；
-// 其余视图仍就地声明，待后续批次上收。
+// 领域视图类型：批量 1-3（items/students/training/academy/adventure/admin/
+// overview）已上收 @oinur/shared 的 domain/views（wire 唯一真源），此处只留
+// 别名 re-export；其余视图仍就地声明，待后续批次上收。
 // ---------------------------------------------------------------------------
 
 export type {
@@ -63,63 +74,33 @@ export type {
   AdventureChoiceView,
   AdventureEventView,
   AdventureLogView,
+  AnnouncementView,
+  AuditView,
   CandidateAttrs,
+  ChecklistStepId,
+  ChecklistStepView,
+  ChecklistView,
+  ContestRecordSummary,
   CreateProblemResult,
   DismissResult,
   ItemView,
   LectureResultView,
   LectureTierView,
+  OverviewPoolView,
+  OverviewRecentView,
+  OverviewStoryView,
+  OverviewView,
   PoolView,
   ProblemView,
   RareGain,
+  TournamentView,
   TrainingLogPage,
   TrainingLogView,
   TrainingResult,
+  UserAdminView,
 };
 /** wire 出参不含 qualityTier/talents（招募前必须隐性）；沿用 web 侧历史命名 */
 export type CandidatePayload = CandidatePublicView;
-
-export interface TournamentView {
-  id: number;
-  name: string;
-  status: TournamentStatus;
-  size: number;
-  registerEndsAt: string;
-  autoStartAt: string;
-  prizes: unknown;
-  config: unknown;
-  createdBy: number | null;
-  createdAt: string;
-}
-
-export interface AnnouncementView {
-  id: number;
-  title: string;
-  body: string;
-  authorId: number | null;
-  createdAt: string;
-}
-
-export interface UserAdminView {
-  id: number;
-  username: string;
-  role: Role;
-  money: number;
-  reputation: number;
-  bannedAt: string | null;
-  createdAt: string;
-}
-
-export interface AuditView {
-  id: number;
-  adminId: number | null;
-  adminNameSnapshot: string;
-  action: string;
-  targetType: string | null;
-  targetId: string | null;
-  payload: unknown;
-  createdAt: string;
-}
 
 export interface PvpTournamentView {
   id: number;
@@ -221,61 +202,6 @@ export function useMe() {
     queryFn: () => apiFetch<MeView>('/api/users/me'),
     staleTime: STALE.wallet,
   });
-}
-
-export type ChecklistStepId = 'train' | 'lecture' | 'adventure' | 'story' | 'recruit3';
-
-export interface ChecklistStepView {
-  id: ChecklistStepId;
-  label: string;
-  hint: string;
-  done: boolean;
-}
-
-export interface ChecklistView {
-  steps: ChecklistStepView[];
-  doneCount: number;
-  total: number;
-  claimed: boolean;
-  rewardBadge: string;
-}
-
-export interface OverviewStoryView {
-  clearedStages: number;
-  totalStages: number;
-  nextStage: { stageKey: string; name: string; chapter: string } | null;
-}
-
-export interface OverviewPoolView {
-  count: number;
-  refreshPrice: number;
-  freeRefreshAt: string;
-}
-
-export interface ContestRecordSummary {
-  id: string;
-  type: string;
-  format: string;
-  stageKey: string | null;
-  ngLevel: number | null;
-  createdAt: string;
-}
-
-export interface OverviewRecentView {
-  training: TrainingLogView[];
-  lectures: LectureResultView[];
-  adventures: AdventureLogView[];
-  contests: ContestRecordSummary[];
-}
-
-export interface OverviewView {
-  me: { money: number; reputation: number; onboardedAt: string | null };
-  students: { total: number; items: StudentView[] };
-  story: OverviewStoryView;
-  pool: OverviewPoolView;
-  recent: OverviewRecentView;
-  announcements: AnnouncementView[];
-  checklist: ChecklistView;
 }
 
 export function useOverview() {

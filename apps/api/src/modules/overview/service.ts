@@ -1,8 +1,8 @@
 import type {
-  AdventureLogView,
-  LectureResultView,
-  StudentView,
-  TrainingLogView,
+  ChecklistRewardBadge,
+  ChecklistStepId,
+  ChecklistView,
+  OverviewView,
 } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
@@ -12,8 +12,8 @@ import { lockUser } from '../../lib/row-lock.js';
 import { getPool } from '../academy/service.js';
 import { listLectureLogs } from '../academy/lecture.js';
 import { listAdventureLogs } from '../adventure/service.js';
-import { listAnnouncements, type AnnouncementView } from '../admin/service.js';
-import { listRecentContestRecords, type ContestRecordSummary } from '../contest/repository.js';
+import { listAnnouncements } from '../admin/service.js';
+import { listRecentContestRecords } from '../contest/repository.js';
 import { getStoryOverview } from '../story/service.js';
 import { listStudents } from '../students/service.js';
 import { listTrainingLogs } from '../training/service.js';
@@ -29,26 +29,8 @@ import { listTrainingLogs } from '../training/service.js';
 // 新手 checklist（派生判定，无新表：以各类记录存在性为准）
 // ---------------------------------------------------------------------------
 
-/** checklist 全完成奖励徽章（User.badges 字符串，无 FK，纯展示） */
-export const CHECKLIST_REWARD_BADGE = 'rookie-done';
-
-export type ChecklistStepId = 'train' | 'lecture' | 'adventure' | 'story' | 'recruit3';
-
-export interface ChecklistStepView {
-  id: ChecklistStepId;
-  label: string;
-  hint: string;
-  done: boolean;
-}
-
-export interface ChecklistView {
-  steps: ChecklistStepView[];
-  doneCount: number;
-  total: number;
-  /** rookie-done 是否已领取 */
-  claimed: boolean;
-  rewardBadge: typeof CHECKLIST_REWARD_BADGE;
-}
+/** checklist 全完成奖励徽章（User.badges 字符串，无 FK，纯展示）；以 shared 类型注解锁值 */
+export const CHECKLIST_REWARD_BADGE: ChecklistRewardBadge = 'rookie-done';
 
 const CHECKLIST_DEFS: { id: ChecklistStepId; label: string; hint: string }[] = [
   { id: 'train', label: '完成一次训练', hint: '前往训练中心' },
@@ -94,36 +76,6 @@ function toChecklistView(done: StepCounts, claimed: boolean): ChecklistView {
 // ---------------------------------------------------------------------------
 // 总览聚合
 // ---------------------------------------------------------------------------
-
-export interface OverviewStoryView {
-  clearedStages: number;
-  totalStages: number;
-  nextStage: { stageKey: string; name: string; chapter: string } | null;
-}
-
-export interface OverviewPoolView {
-  count: number;
-  refreshPrice: number;
-  /** 下次免费刷新的 ISO 时间（generatedAt + free_interval_hours） */
-  freeRefreshAt: string;
-}
-
-export interface OverviewRecentView {
-  training: TrainingLogView[];
-  lectures: LectureResultView[];
-  adventures: AdventureLogView[];
-  contests: ContestRecordSummary[];
-}
-
-export interface OverviewView {
-  me: { money: number; reputation: number; onboardedAt: string | null };
-  students: { total: number; items: StudentView[] };
-  story: OverviewStoryView;
-  pool: OverviewPoolView;
-  recent: OverviewRecentView;
-  announcements: AnnouncementView[];
-  checklist: ChecklistView;
-}
 
 const RECENT_LIMIT = 5;
 const OVERVIEW_STUDENTS = 5;

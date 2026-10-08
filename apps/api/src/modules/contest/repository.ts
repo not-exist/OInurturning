@@ -1,6 +1,7 @@
 import { Prisma } from '../../generated/prisma/client.js';
 import type {
   ContestFormat,
+  ContestRecordSummary,
   ContestRecordType,
   ContestReport,
   ContestSummary,
@@ -132,16 +133,6 @@ export async function getStoryProgress(
     where: { userId_ngLevel_stageKey: { userId, ngLevel, stageKey } },
   });
   return row === null ? null : toProgressView(row);
-}
-
-/** 总览「最近动态」用的战报摘要（瘦身：不含 report/inputSnapshot 大 JSON） */
-export interface ContestRecordSummary {
-  id: string;
-  type: ContestRecordType;
-  format: ContestFormat;
-  stageKey: string | null;
-  ngLevel: number | null;
-  createdAt: string;
 }
 
 export async function listRecentContestRecords(

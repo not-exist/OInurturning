@@ -6,11 +6,18 @@
  * 头注：经根 barrel 带入 zod 实测 +82KB 浏览器包）。api 侧删除本地声明改引
  * shared；web 侧 hooks.ts 以别名 re-export 对应消费点，浏览器包零增量。
  */
-import type { AdventureStatus, DimensionKey, Rarity } from '../enums.js';
-import type { EventConfig } from '../config/events.js';
+import type {
+  AdventureStatus,
+  DimensionKey,
+  Rarity,
+  Role,
+  TournamentStatus,
+} from '../enums.js';
+import type { EventCategory } from '../config/events.js';
 import type { ConfigRarity } from '../config/talents.js';
-import type { BattleReplay } from './contest.js';
-import type { LectureGrowthEntry } from './student.js';
+import type { BattleReplay, ContestFormat } from './contest.js';
+import type { LectureGrowthEntry, StudentView } from './student.js';
+import type { ContestRecordType } from './story.js';
 
 // ---------------------------------------------------------------------------
 // 训练（training）
@@ -207,7 +214,7 @@ export interface AdventureEventView {
   id: string;
   code: string;
   name: string;
-  category: EventConfig['category'];
+  category: EventCategory;
   rarity: ConfigRarity;
   staminaCost: AdventureStaminaCost;
   description: string;
@@ -232,4 +239,113 @@ export interface AdventureChoiceResult {
   adventure: AdventureLogView;
   completed: boolean;
   replay?: BattleReplay;
+}
+
+// ---------------------------------------------------------------------------
+// 管理端与总览（admin / overview）
+// ---------------------------------------------------------------------------
+
+/** 管理端锦标赛行视图；status 与 Prisma TournamentStatus 同值域（R4-T8 对齐） */
+export interface TournamentView {
+  id: number;
+  name: string;
+  status: TournamentStatus;
+  size: number;
+  registerEndsAt: string;
+  autoStartAt: string;
+  prizes: unknown;
+  config: unknown;
+  createdBy: number | null;
+  createdAt: string;
+}
+
+export interface AnnouncementView {
+  id: number;
+  title: string;
+  body: string;
+  /** 作者注销后置空（公告是全站内容，不随作者删除） */
+  authorId: number | null;
+  createdAt: string;
+}
+
+export interface UserAdminView {
+  id: number;
+  username: string;
+  role: Role;
+  money: number;
+  reputation: number;
+  bannedAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditView {
+  id: number;
+  adminId: number | null;
+  adminNameSnapshot: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  payload: unknown;
+  createdAt: string;
+}
+
+/** checklist 全完成奖励徽章（User.badges 字符串，无 FK，纯展示）；api 侧常量以本类型注解锁值 */
+export type ChecklistRewardBadge = 'rookie-done';
+
+export type ChecklistStepId = 'train' | 'lecture' | 'adventure' | 'story' | 'recruit3';
+
+export interface ChecklistStepView {
+  id: ChecklistStepId;
+  label: string;
+  hint: string;
+  done: boolean;
+}
+
+export interface ChecklistView {
+  steps: ChecklistStepView[];
+  doneCount: number;
+  total: number;
+  /** rookie-done 是否已领取 */
+  claimed: boolean;
+  rewardBadge: ChecklistRewardBadge;
+}
+
+export interface OverviewStoryView {
+  clearedStages: number;
+  totalStages: number;
+  nextStage: { stageKey: string; name: string; chapter: string } | null;
+}
+
+export interface OverviewPoolView {
+  count: number;
+  refreshPrice: number;
+  /** 下次免费刷新的 ISO 时间（generatedAt + free_interval_hours） */
+  freeRefreshAt: string;
+}
+
+/** 总览「最近动态」用的战报摘要（瘦身：不含 report/inputSnapshot 大 JSON） */
+export interface ContestRecordSummary {
+  id: string;
+  type: ContestRecordType;
+  format: ContestFormat;
+  stageKey: string | null;
+  ngLevel: number | null;
+  createdAt: string;
+}
+
+export interface OverviewRecentView {
+  training: TrainingLogView[];
+  lectures: LectureResultView[];
+  adventures: AdventureLogView[];
+  contests: ContestRecordSummary[];
+}
+
+export interface OverviewView {
+  me: { money: number; reputation: number; onboardedAt: string | null };
+  students: { total: number; items: StudentView[] };
+  story: OverviewStoryView;
+  pool: OverviewPoolView;
+  recent: OverviewRecentView;
+  announcements: AnnouncementView[];
+  checklist: ChecklistView;
 }
