@@ -6,7 +6,10 @@
  * 头注：经根 barrel 带入 zod 实测 +82KB 浏览器包）。api 侧删除本地声明改引
  * shared；web 侧 hooks.ts 以别名 re-export 对应消费点，浏览器包零增量。
  */
-import type { DimensionKey, Rarity } from '../enums.js';
+import type { AdventureStatus, DimensionKey, Rarity } from '../enums.js';
+import type { EventConfig } from '../config/events.js';
+import type { ConfigRarity } from '../config/talents.js';
+import type { BattleReplay } from './contest.js';
 import type { LectureGrowthEntry } from './student.js';
 
 // ---------------------------------------------------------------------------
@@ -183,4 +186,50 @@ export interface PoolView {
   refreshesToday: number;
   /** 当前再手动刷新一次的价格（04:00 日界重置后从 k=0 重新计） */
   refreshPrice: number;
+}
+
+// ---------------------------------------------------------------------------
+// 历练（adventure）
+// ---------------------------------------------------------------------------
+
+/** 体力投入档（EventConfig['stamina_cost'] 的值域）；抽取稀有度权重按档分层 */
+export type AdventureStaminaCost = 1 | 2 | 3;
+
+export interface AdventureChoiceView {
+  index: number;
+  text: string;
+  available: boolean;
+  requiresItem?: string;
+  costMoney?: number;
+}
+
+export interface AdventureEventView {
+  id: string;
+  code: string;
+  name: string;
+  category: EventConfig['category'];
+  rarity: ConfigRarity;
+  staminaCost: AdventureStaminaCost;
+  description: string;
+  choices: AdventureChoiceView[] | null;
+}
+
+export interface AdventureLogView {
+  id: number;
+  studentId: number | null;
+  contestRecordId: string | null;
+  tier: AdventureStaminaCost;
+  status: AdventureStatus;
+  preview: boolean;
+  event: AdventureEventView;
+  choices: number[];
+  results: unknown[];
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface AdventureChoiceResult {
+  adventure: AdventureLogView;
+  completed: boolean;
+  replay?: BattleReplay;
 }

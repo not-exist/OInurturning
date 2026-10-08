@@ -6,11 +6,11 @@ import request from 'supertest';
 import { importConfigs } from '../src/config/loader.js';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
+import type { AdventureLogView } from '@oinur/shared';
 import {
   chooseAdventure,
   drawAdventure,
   listAdventureLogs,
-  type AdventureLogView,
 } from '../src/modules/adventure/service.js';
 import { useItem } from '../src/modules/items/service.js';
 import { resetUsers, unlockTutorial, unwrapOk } from './helpers.js';

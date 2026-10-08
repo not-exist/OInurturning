@@ -1,4 +1,9 @@
-import type { LectureResultView, StudentView, TrainingLogView } from '@oinur/shared';
+import type {
+  AdventureLogView,
+  LectureResultView,
+  StudentView,
+  TrainingLogView,
+} from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { readBadgeList } from '../../lib/json.js';
@@ -6,7 +11,7 @@ import { prisma } from '../../lib/prisma.js';
 import { lockUser } from '../../lib/row-lock.js';
 import { getPool } from '../academy/service.js';
 import { listLectureLogs } from '../academy/lecture.js';
-import { listAdventureLogs, type AdventureLogView } from '../adventure/service.js';
+import { listAdventureLogs } from '../adventure/service.js';
 import { listAnnouncements, type AnnouncementView } from '../admin/service.js';
 import { listRecentContestRecords, type ContestRecordSummary } from '../contest/repository.js';
 import { getStoryOverview } from '../story/service.js';

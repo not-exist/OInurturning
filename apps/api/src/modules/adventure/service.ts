@@ -6,8 +6,11 @@ import {
   DIMENSIONS,
   DIMENSION_COLUMNS,
   type AbilityColumn,
-  type AdventureStatus,
-  type BattleReplay,
+  type AdventureChoiceResult,
+  type AdventureChoiceView,
+  type AdventureEventView,
+  type AdventureLogView,
+  type AdventureStaminaCost,
   type ConfigDimension,
   type ConfigRarity,
   type DuelInput,
@@ -33,11 +36,7 @@ import { buildBattleReplay } from '../contest/replay.js';
 import { createContestRecord, getContestRecordForUser } from '../contest/repository.js';
 import { aggregateMeta } from '../students/meta.js';
 import { settle } from '../students/settle.js';
-import {
-  drawAdventureEvent,
-  type AdventureEventDrawContext,
-  type AdventureStaminaCost,
-} from './extractor.js';
+import { drawAdventureEvent, type AdventureEventDrawContext } from './extractor.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -59,45 +58,6 @@ export interface AdventureChoiceInput {
   action?: 'accept' | 'avoid';
   optionIndex?: number;
   skill?: string;
-}
-
-export interface AdventureChoiceView {
-  index: number;
-  text: string;
-  available: boolean;
-  requiresItem?: string;
-  costMoney?: number;
-}
-
-export interface AdventureEventView {
-  id: string;
-  code: string;
-  name: string;
-  category: EventConfig['category'];
-  rarity: ConfigRarity;
-  staminaCost: AdventureStaminaCost;
-  description: string;
-  choices: AdventureChoiceView[] | null;
-}
-
-export interface AdventureLogView {
-  id: number;
-  studentId: number | null;
-  contestRecordId: string | null;
-  tier: AdventureStaminaCost;
-  status: AdventureStatus;
-  preview: boolean;
-  event: AdventureEventView;
-  choices: number[];
-  results: unknown[];
-  createdAt: string;
-  resolvedAt: string | null;
-}
-
-export interface AdventureChoiceResult {
-  adventure: AdventureLogView;
-  completed: boolean;
-  replay?: BattleReplay;
 }
 
 const STAT_FIELDS = {

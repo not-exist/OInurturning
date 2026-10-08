@@ -1,8 +1,7 @@
-import type { ConfigRarity, EventConfig } from '@oinur/shared';
+import type { AdventureStaminaCost, ConfigRarity, EventConfig } from '@oinur/shared';
 import type { RandomSource } from '../contest/engine/models.js';
 import { weightedPick } from '../../lib/weighted-pick.js';
 
-export type AdventureStaminaCost = 1 | 2 | 3;
 export type EventTimestamp = Date | string;
 
 /** gameplay.md §3.2：投入档对应的稀有度权重。 */

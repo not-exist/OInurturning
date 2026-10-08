@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  AdventureStatus,
+  AdventureChoiceResult,
+  AdventureChoiceView,
+  AdventureEventView,
+  AdventureLogView,
   BattleReplay,
   CandidateAttrs,
   CandidatePublicView,
@@ -50,12 +53,16 @@ const STALE = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// 领域视图类型：批量 1（items/students/training/academy）已上收 @oinur/shared
-// 的 domain/views（wire 唯一真源），此处只留别名 re-export；其余视图仍就地
-// 声明，待后续批次上收。
+// 领域视图类型：批量 1-2（items/students/training/academy/adventure）已上收
+// @oinur/shared 的 domain/views（wire 唯一真源），此处只留别名 re-export；
+// 其余视图仍就地声明，待后续批次上收。
 // ---------------------------------------------------------------------------
 
 export type {
+  AdventureChoiceResult,
+  AdventureChoiceView,
+  AdventureEventView,
+  AdventureLogView,
   CandidateAttrs,
   CreateProblemResult,
   DismissResult,
@@ -71,45 +78,6 @@ export type {
 };
 /** wire 出参不含 qualityTier/talents（招募前必须隐性）；沿用 web 侧历史命名 */
 export type CandidatePayload = CandidatePublicView;
-
-export interface AdventureChoiceView {
-  index: number;
-  text: string;
-  available: boolean;
-  requiresItem?: string;
-  costMoney?: number;
-}
-
-export interface AdventureEventView {
-  id: string;
-  code: string;
-  name: string;
-  category: string;
-  rarity: string;
-  staminaCost: 1 | 2 | 3;
-  description: string;
-  choices: AdventureChoiceView[] | null;
-}
-
-export interface AdventureLogView {
-  id: number;
-  studentId: number | null;
-  contestRecordId: string | null;
-  tier: 1 | 2 | 3;
-  status: AdventureStatus;
-  preview: boolean;
-  event: AdventureEventView;
-  choices: number[];
-  results: unknown[];
-  createdAt: string;
-  resolvedAt: string | null;
-}
-
-export interface AdventureChoiceResult {
-  adventure: AdventureLogView;
-  completed: boolean;
-  replay?: BattleReplay;
-}
 
 export interface TournamentView {
   id: number;
