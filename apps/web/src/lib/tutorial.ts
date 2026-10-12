@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { TutorialStateView } from '@oinur/shared';
 import { apiFetch } from './api';
 
 export interface TutorialStepDef {
@@ -14,19 +15,6 @@ export interface TutorialStepDef {
   /** 有高亮（洞口可见）时是否拦截洞外点击；缺省拦，recruit 步置 false 放行离页赚钱 */
   block_outside_click?: boolean;
   reward?: { money?: number; reputation?: number; item?: string; count?: number; badge?: string };
-}
-
-export interface TutorialStateView {
-  step: number;
-  completed: boolean;
-  total: number;
-  steps: TutorialStepDef[];
-  unlocked: string[];
-  current: TutorialStepDef | null;
-  /** 招募步（action=do_recruit）：当前在册学员数 */
-  studentsOwned?: number;
-  /** 招募步：达成即自动通过的在册人数要求 */
-  studentsRequired?: number;
 }
 
 export function useTutorial() {

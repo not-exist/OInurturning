@@ -16,6 +16,7 @@ import type {
 } from '../enums.js';
 import type { EventCategory } from '../config/events.js';
 import type { ConfigRarity, TalentDef } from '../config/talents.js';
+import type { TutorialStepDef } from '../config/tutorial.js';
 import type { BattleReplay, ContestFormat, ParticipantSnapshot, TEAM_SIZE_MAX, TEAM_SIZE_MIN } from './contest.js';
 import type { LectureGrowthEntry, StudentView } from './student.js';
 import type { ContestRecordType, ContestRecordView } from './story.js';
@@ -471,4 +472,20 @@ export interface TalentView {
   description: string;
   family: string | null;
   effects: TalentDef['effects'];
+}
+
+// ---------------------------------------------------------------------------
+// 新手引导（tutorial）
+// ---------------------------------------------------------------------------
+
+export interface TutorialStateView {
+  step: number;
+  completed: boolean;
+  total: number;
+  steps: TutorialStepDef[];
+  unlocked: string[];
+  current: TutorialStepDef | null;
+  /** 仅 do_recruit 步下发：在册 ACTIVE 学员数与该步门槛，供前端渲染「还需招募 N 人」 */
+  studentsOwned?: number;
+  studentsRequired?: number;
 }

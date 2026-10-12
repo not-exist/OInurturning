@@ -5,7 +5,7 @@ import { readBadgeList } from '../../lib/json.js';
 import { logger } from '../../lib/logger.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockUser } from '../../lib/row-lock.js';
-import type { TutorialStepDef } from '@oinur/shared';
+import type { TutorialStateView, TutorialStepDef } from '@oinur/shared';
 import { resolveProgress, unlockedForStep } from './routing.js';
 
 export function tutorialConfig() {
@@ -14,18 +14,6 @@ export function tutorialConfig() {
 
 export function getSteps(): TutorialStepDef[] {
   return tutorialConfig().steps;
-}
-
-export interface TutorialStateView {
-  step: number;
-  completed: boolean;
-  total: number;
-  steps: TutorialStepDef[];
-  unlocked: string[];
-  current: TutorialStepDef | null;
-  /** 仅 do_recruit 步下发：在册 ACTIVE 学员数与该步门槛，供前端渲染「还需招募 N 人」 */
-  studentsOwned?: number;
-  studentsRequired?: number;
 }
 
 export type AdvanceReason = 'manual' | 'auto';
