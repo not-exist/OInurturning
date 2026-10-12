@@ -9,15 +9,16 @@
 import type {
   AdventureStatus,
   DimensionKey,
+  MatchStatus,
   Rarity,
   Role,
   TournamentStatus,
 } from '../enums.js';
 import type { EventCategory } from '../config/events.js';
-import type { ConfigRarity } from '../config/talents.js';
-import type { BattleReplay, ContestFormat } from './contest.js';
+import type { ConfigRarity, TalentDef } from '../config/talents.js';
+import type { BattleReplay, ContestFormat, ParticipantSnapshot, TEAM_SIZE_MAX, TEAM_SIZE_MIN } from './contest.js';
 import type { LectureGrowthEntry, StudentView } from './student.js';
-import type { ContestRecordType } from './story.js';
+import type { ContestRecordType, ContestRecordView } from './story.js';
 
 // ---------------------------------------------------------------------------
 // 训练（training）
@@ -348,4 +349,126 @@ export interface OverviewView {
   recent: OverviewRecentView;
   announcements: AnnouncementView[];
   checklist: ChecklistView;
+}
+
+// ---------------------------------------------------------------------------
+// 剧情（story）
+// ---------------------------------------------------------------------------
+
+/** 进关结果（POST /api/story/stages/:key/enter）；replayed 表示命中幂等键重放旧战报 */
+export interface StoryEntryResult {
+  record: ContestRecordView;
+  replay: BattleReplay;
+  replayed: boolean;
+  firstClear: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// PVP（pvp）
+// ---------------------------------------------------------------------------
+
+/** 出战队伍人数即契约的队伍规模域（shared TEAM_SIZE_MIN~MAX），不是可调数值。 */
+export type PvpRosterSize = typeof TEAM_SIZE_MIN | typeof TEAM_SIZE_MAX;
+
+/** 锦标赛列表行；status 与 Prisma TournamentStatus 同值域（R4-T8 对齐） */
+export interface PvpTournamentView {
+  id: number;
+  name: string;
+  status: TournamentStatus;
+  size: number;
+  rosterSize: PvpRosterSize;
+  registerEndsAt: string;
+  autoStartAt: string;
+  registered: boolean;
+}
+
+/**
+ * 报名时冻结的预制题快照。dominantDim/rarity 诚实保留 string：
+ * 快照是 ProblemLibraryEntry 两个 String 列的原样拷贝（写入侧 library.ts 确只喂
+ * DimensionKey 与小写六档），但本类型既经 Json 列 `as unknown` 裸 cast 读出，读侧
+ * scheduler.questionFor 也对脏值有容错回退（Set.has + 兜底 'DS'）——联合收窄会
+ * 谎报 wire 边界且凭空引入构造期 cast，故不加。
+ */
+export interface PvpProblemSnapshot {
+  id: number;
+  name: string;
+  dominantDim: string;
+  rarity: string;
+  quality: number;
+  traitId: string | null;
+}
+
+export interface PvpRegistrationView {
+  id: number;
+  tournamentId: number;
+  userId: number;
+  rosterSize: PvpRosterSize;
+  roster: ParticipantSnapshot[];
+  problemEntryIds: number[];
+  problemSnapshots: PvpProblemSnapshot[];
+  createdAt: string;
+  replayed: boolean;
+}
+
+export interface PvpMatchView {
+  id: number;
+  round: number;
+  slot: number;
+  homeUserId: number | null;
+  awayUserId: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  winnerUserId: number | null;
+  /** 与 Prisma MatchStatus 同值域（R4-T8 对齐） */
+  status: MatchStatus;
+  contestRecordId: string | null;
+  reportUrl: string | null;
+}
+
+/**
+ * 赛事详情（GET /api/pvp/tournaments/:id）。api 侧平铺、无 PvpTournamentView 的
+ * registered 字段（列表才需要；web 旧类型 extends 带来的该幻影字段零消费方，已随上收删除）。
+ */
+export interface PvpTournamentDetail {
+  id: number;
+  name: string;
+  status: TournamentStatus;
+  size: number;
+  rosterSize: PvpRosterSize;
+  registerEndsAt: string;
+  autoStartAt: string;
+  prizes: unknown;
+  config: unknown;
+  registeredCount: number;
+  myRegistration: number | null;
+}
+
+export type PvpRewardLine =
+  | { type: 'item'; itemId: string; count: number }
+  | { type: 'money'; amount: number }
+  | { type: 'reputation'; amount: number };
+
+export interface PvpRewardGrantView {
+  id: number;
+  tournamentId: number;
+  userId: number;
+  rank: number;
+  rewards: PvpRewardLine[];
+  claimedAt: string | null;
+  claimable: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// 天赋目录（talents）
+// ---------------------------------------------------------------------------
+
+/** 天赋目录行（GET /api/talents；family 用于家族标签与净化链位置；effects 复用 config TalentDef） */
+export interface TalentView {
+  id: string;
+  name: string;
+  rarity: Rarity;
+  kind: TalentDef['kind'];
+  description: string;
+  family: string | null;
+  effects: TalentDef['effects'];
 }

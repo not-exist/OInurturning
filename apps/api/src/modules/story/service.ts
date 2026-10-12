@@ -16,6 +16,7 @@ import {
   type RankingReport,
   type RewardLine,
   type StageConfig,
+  type StoryEntryResult,
   type StoryOverview,
   type StoryProgressView,
   STAGE_CHAPTERS,
@@ -48,13 +49,6 @@ import { autoAdvanceIfNeeded } from '../tutorial/service.js';
 
 const FULL_CLEAR_BADGE = 'badge-legend';
 const FULL_CLEAR_TROPHY = 'trophy-gold';
-
-export interface StoryEntryResult {
-  record: ContestRecordView;
-  replay: BattleReplay;
-  replayed: boolean;
-  firstClear: boolean;
-}
 
 function orderedStages(): StageConfig[] {
   const config = requireConfig('story');

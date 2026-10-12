@@ -1,13 +1,19 @@
 import type { PvpRegistration, PvpTournament } from '../../generated/prisma/client.js';
-import { TEAM_SIZE_MAX, TEAM_SIZE_MIN, type ParticipantSnapshot } from '@oinur/shared';
+import {
+  TEAM_SIZE_MAX,
+  TEAM_SIZE_MIN,
+  type ParticipantSnapshot,
+  type PvpProblemSnapshot,
+  type PvpRegistrationView,
+  type PvpRosterSize,
+  type PvpTournamentView,
+} from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
 import { participantSnapshot } from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockPvpTournament, lockStudentsByIds, lockUser } from '../../lib/row-lock.js';
 
-/** 出战队伍人数即契约的队伍规模域（shared TEAM_SIZE_MIN~MAX），不是可调数值。 */
-export type PvpRosterSize = typeof TEAM_SIZE_MIN | typeof TEAM_SIZE_MAX;
 export const DEFAULT_PVP_ROSTER_SIZE: PvpRosterSize = TEAM_SIZE_MIN;
 
 export function pvpRosterSize(config: unknown): PvpRosterSize {
@@ -16,38 +22,6 @@ export function pvpRosterSize(config: unknown): PvpRosterSize {
   if (value === undefined) return DEFAULT_PVP_ROSTER_SIZE;
   if (value === TEAM_SIZE_MIN || value === TEAM_SIZE_MAX) return value;
   throw new ApiError('STATE_CONFLICT', { resource: 'tournament', reason: 'invalid rosterSize' });
-}
-
-export interface PvpTournamentView {
-  id: number;
-  name: string;
-  status: PvpTournament['status'];
-  size: number;
-  rosterSize: PvpRosterSize;
-  registerEndsAt: string;
-  autoStartAt: string;
-  registered: boolean;
-}
-
-export interface PvpProblemSnapshot {
-  id: number;
-  name: string;
-  dominantDim: string;
-  rarity: string;
-  quality: number;
-  traitId: string | null;
-}
-
-export interface PvpRegistrationView {
-  id: number;
-  tournamentId: number;
-  userId: number;
-  rosterSize: PvpRosterSize;
-  roster: ParticipantSnapshot[];
-  problemEntryIds: number[];
-  problemSnapshots: PvpProblemSnapshot[];
-  createdAt: string;
-  replayed: boolean;
 }
 
 function tournamentView(row: PvpTournament & { registrations: { id: number }[] }): PvpTournamentView {

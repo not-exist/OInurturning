@@ -4,6 +4,8 @@ import {
   frozenSolveHooksSchema,
   type DuelInput,
   type ParticipantSnapshot,
+  type PvpMatchView,
+  type PvpTournamentDetail,
   type QuestionSnapshot,
   type QuestionTraitSnapshot,
 } from '@oinur/shared';
@@ -17,7 +19,7 @@ import { stableHash } from '../contest/engine/report.js';
 import { createContestRecord } from '../contest/repository.js';
 import { buildFirstRound, buildNextRound } from './bracket.js';
 import { ensurePvpRewardGrants } from './rewards.js';
-import { pvpRosterSize, type PvpRosterSize } from './registration.js';
+import { pvpRosterSize } from './registration.js';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 type Registration = PvpRegistration;
@@ -60,34 +62,6 @@ function qualityScoringEnabled(config: unknown): boolean {
     if (ruleConfig.qualityScoring === true || ruleConfig.quality_scoring === true) return true;
   }
   return root.qualityScoring === true || root.quality_scoring === true;
-}
-
-export interface PvpMatchView {
-  id: number;
-  round: number;
-  slot: number;
-  homeUserId: number | null;
-  awayUserId: number | null;
-  homeScore: number | null;
-  awayScore: number | null;
-  winnerUserId: number | null;
-  status: PvpMatch['status'];
-  contestRecordId: string | null;
-  reportUrl: string | null;
-}
-
-export interface PvpTournamentDetail {
-  id: number;
-  name: string;
-  status: PvpTournament['status'];
-  size: number;
-  rosterSize: PvpRosterSize;
-  registerEndsAt: string;
-  autoStartAt: string;
-  prizes: unknown;
-  config: unknown;
-  registeredCount: number;
-  myRegistration: number | null;
 }
 
 function members(row: Registration, side: 'HOME' | 'AWAY'): { members: ParticipantSnapshot[] } {

@@ -1,24 +1,10 @@
 import { Prisma, type PvpMatch, type PvpRewardGrant, type PvpTournament } from '../../generated/prisma/client.js';
+import { type PvpRewardGrantView, type PvpRewardLine } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { jsonWrite } from '../../lib/json.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockPvpTournament, lockUser } from '../../lib/row-lock.js';
-
-export type PvpRewardLine =
-  | { type: 'item'; itemId: string; count: number }
-  | { type: 'money'; amount: number }
-  | { type: 'reputation'; amount: number };
-
-export interface PvpRewardGrantView {
-  id: number;
-  tournamentId: number;
-  userId: number;
-  rank: number;
-  rewards: PvpRewardLine[];
-  claimedAt: string | null;
-  claimable: boolean;
-}
 
 interface PrizeBucket {
   money?: number;

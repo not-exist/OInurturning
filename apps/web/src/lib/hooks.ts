@@ -21,7 +21,6 @@ import type {
   ItemView,
   LectureResultView,
   LectureTierView,
-  MatchStatus,
   MeView,
   OverviewPoolView,
   OverviewRecentView,
@@ -29,15 +28,22 @@ import type {
   OverviewView,
   PoolView,
   ProblemView,
+  PvpMatchView,
+  PvpProblemSnapshot,
+  PvpRegistrationView,
+  PvpRewardGrantView,
+  PvpRewardLine,
+  PvpTournamentDetail,
+  PvpTournamentView,
   RareGain,
-  Rarity,
+  StoryEntryResult,
   StoryOverview,
   StoryProgressView,
   StudentView,
+  TalentView,
   TrainingLogPage,
   TrainingLogView,
   TrainingResult,
-  TournamentStatus,
   TournamentView,
   UserAdminView,
 } from '@oinur/shared';
@@ -64,9 +70,10 @@ const STALE = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// 领域视图类型：批量 1-3（items/students/training/academy/adventure/admin/
-// overview）已上收 @oinur/shared 的 domain/views（wire 唯一真源），此处只留
-// 别名 re-export；其余视图仍就地声明，待后续批次上收。
+// 领域视图类型：批量 1-4（items/students/training/academy/adventure/admin/
+// overview/pvp/talents/story）已全部上收 @oinur/shared 的 domain/views
+// （wire 唯一真源），此处只留别名 re-export。本文件仅剩两个 web-only 输入类型
+// （TrainingLogFilters / DirectedTrainInput，非 wire 出参）。
 // ---------------------------------------------------------------------------
 
 export type {
@@ -92,7 +99,15 @@ export type {
   OverviewView,
   PoolView,
   ProblemView,
+  PvpMatchView,
+  PvpProblemSnapshot,
+  PvpRegistrationView,
+  PvpRewardGrantView,
+  PvpRewardLine,
+  PvpTournamentView,
   RareGain,
+  StoryEntryResult,
+  TalentView,
   TournamentView,
   TrainingLogPage,
   TrainingLogView,
@@ -101,85 +116,10 @@ export type {
 };
 /** wire 出参不含 qualityTier/talents（招募前必须隐性）；沿用 web 侧历史命名 */
 export type CandidatePayload = CandidatePublicView;
-
-export interface PvpTournamentView {
-  id: number;
-  name: string;
-  status: TournamentStatus;
-  size: number;
-  rosterSize: number;
-  registerEndsAt: string;
-  autoStartAt: string;
-  registered: boolean;
-}
-
-export interface PvpProblemSnapshot {
-  id: number;
-  name: string;
-  dominantDim: string;
-  rarity: string;
-  quality: number;
-  traitId: string | null;
-}
-
-export interface PvpRegistrationView {
-  id: number;
-  tournamentId: number;
-  userId: number;
-  rosterSize: number;
-  roster: import('@oinur/shared').ParticipantSnapshot[];
-  problemEntryIds: number[];
-  problemSnapshots: PvpProblemSnapshot[];
-  createdAt: string;
-  replayed: boolean;
-}
-
-export interface PvpTournamentDetailView extends PvpTournamentView {
-  prizes: unknown;
-  config: unknown;
-  registeredCount: number;
-  myRegistration: number | null;
-}
-
-export interface PvpMatchView {
-  id: number;
-  round: number;
-  slot: number;
-  homeUserId: number | null;
-  awayUserId: number | null;
-  homeScore: number | null;
-  awayScore: number | null;
-  winnerUserId: number | null;
-  status: MatchStatus;
-  contestRecordId: string | null;
-  reportUrl: string | null;
-}
-
-export type PvpRewardLine =
-  | { type: 'item'; itemId: string; count: number }
-  | { type: 'money'; amount: number }
-  | { type: 'reputation'; amount: number };
-
-export interface PvpRewardGrantView {
-  id: number;
-  tournamentId: number;
-  userId: number;
-  rank: number;
-  rewards: PvpRewardLine[];
-  claimedAt: string | null;
-  claimable: boolean;
-}
-
-/** 天赋目录行（GET /api/talents；family 用于家族标签与净化链位置） */
-export interface TalentDefView {
-  id: string;
-  name: string;
-  rarity: Rarity;
-  kind: 'positive' | 'negative';
-  description: string;
-  family: string | null;
-  effects: { stat: string; mode: string; value: number }[];
-}
+/** 赛事详情沿用 web 侧历史命名；shared 真源为平铺 PvpTournamentDetail（无列表视图的 registered 字段） */
+export type PvpTournamentDetailView = PvpTournamentDetail;
+/** 天赋目录沿用 web 侧历史命名；shared 真源为 api 名 TalentView */
+export type TalentDefView = TalentView;
 
 /** 当前时间的 tick（倒计时展示用，缺省每秒刷新） */
 export function useNow(intervalMs = 1000): number {
@@ -818,13 +758,6 @@ export function useRegisterPvp() {
 // ---------------------------------------------------------------------------
 // 剧情与战报
 // ---------------------------------------------------------------------------
-
-export interface StoryEntryResult {
-  record: ContestRecordView;
-  replay: BattleReplay;
-  replayed: boolean;
-  firstClear: boolean;
-}
 
 export function useStoryOverview(ngLevel = 0) {
   return useQuery({

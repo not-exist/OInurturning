@@ -1,5 +1,4 @@
-import type { Rarity } from '@oinur/shared';
-import type { ConfigRarity, TalentDef } from '@oinur/shared';
+import type { ConfigRarity, Rarity, TalentView } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 
 /**
@@ -10,17 +9,6 @@ import { requireConfig } from '../../config/require-config.js';
 /** config 小写六档 → 共享大写六档（仅为展示/前端消费） */
 function toRarity(r: string): Rarity {
   return r.toUpperCase().replace('COLORFUL', 'RAINBOW') as Rarity;
-}
-
-/** 天赋目录视图（含 effects 供前端渲染描述行；family 可选） */
-export interface TalentView {
-  id: string;
-  name: string;
-  rarity: Rarity;
-  kind: TalentDef['kind'];
-  description: string;
-  family: string | null;
-  effects: TalentDef['effects'];
 }
 
 export async function listTalents(): Promise<TalentView[]> {
