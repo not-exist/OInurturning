@@ -46,6 +46,7 @@ export interface StoryProgressView {
   lastSummary?: ContestSummary;
 }
 
+/** Prisma ContestType 对齐（R6 architecture.test.ts 机械校验） */
 export type ContestRecordType = 'STORY' | 'PVP' | 'ADVENTURE';
 
 export interface ContestRecordView {

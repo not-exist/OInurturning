@@ -3,9 +3,11 @@
  * 命名对齐 Prisma Student 模型：字符串维列名为 str（STRING 维）。
  */
 
+/** Prisma QualityTier 对齐（R6 architecture.test.ts 机械校验） */
 export const QUALITY_TIERS = ['COMMON', 'GOOD', 'ELITE', 'GENIUS'] as const;
 export type QualityTier = (typeof QUALITY_TIERS)[number];
 
+/** Prisma StudentStatus 对齐（R6 architecture.test.ts 机械校验） */
 export const STUDENT_STATUSES = ['ACTIVE', 'DISMISSED'] as const;
 export type StudentStatus = (typeof STUDENT_STATUSES)[number];
 

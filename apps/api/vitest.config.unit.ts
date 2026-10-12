@@ -28,6 +28,7 @@ export default defineConfig({
       'tests/json-badges.test.ts',
       'tests/weighted-pick.test.ts',
       'tests/config-read-yaml.test.ts',
+      'tests/architecture.test.ts',
     ],
     setupFiles: ['tests/setup.ts'],
     env: {

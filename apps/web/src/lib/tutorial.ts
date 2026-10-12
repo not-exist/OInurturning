@@ -3,20 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TutorialStateView } from '@oinur/shared';
 import { apiFetch } from './api';
 
-export interface TutorialStepDef {
-  id: string;
-  title: string;
-  desc: string;
-  target: string | null;
-  unlock: string[];
-  action: string;
-  /** false 表示该展示步只认引导卡上的「下一步」，点被聚光的元素不推进 */
-  advance_on_target_click?: boolean;
-  /** 有高亮（洞口可见）时是否拦截洞外点击；缺省拦，recruit 步置 false 放行离页赚钱 */
-  block_outside_click?: boolean;
-  reward?: { money?: number; reputation?: number; item?: string; count?: number; badge?: string };
-}
-
 export function useTutorial() {
   return useQuery({
     queryKey: ['tutorial'],

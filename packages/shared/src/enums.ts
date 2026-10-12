@@ -43,6 +43,7 @@ export const ABILITY_COLUMN = {
 // ---------------------------------------------------------------------------
 // Prisma enum 对齐（权威：apps/api/prisma/schema.prisma）
 // 值集合/顺序必须与 schema 一致；改 Prisma 侧时同步改这里。
+// R6 架构测试机械校验 schema 对齐（apps/api/tests/architecture.test.ts）。
 // ---------------------------------------------------------------------------
 
 /** 用户角色（Prisma Role） */

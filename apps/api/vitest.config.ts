@@ -9,7 +9,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
-    exclude: ['**/*.e2e.test.ts', '**/fixtures/**'],
+    exclude: ['**/*.e2e.test.ts', '**/fixtures/**', 'tests/architecture.test.ts'],
     globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup.ts'],
     // 共享库 → 串行；Vitest ≥2 默认 pool 为 forks，fileParallelism 控制文件级并行

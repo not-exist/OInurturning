@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { PROBLEM_SEVERITIES, PROBLEM_TIERS } from '../config/problems.js';
 import { ABILITY_KEYS, DIMENSIONS } from '../enums.js';
 
+/** Prisma ContestFormat 对齐（R6 architecture.test.ts 机械校验） */
 export type ContestFormat = 'RANKING' | 'DUEL';
 export type ContestSide = 'HOME' | 'AWAY' | 'NPC';
 export type ContestVerdict = 'AC' | 'WA' | 'TLE' | 'SKIP' | 'UNFINISHED';
