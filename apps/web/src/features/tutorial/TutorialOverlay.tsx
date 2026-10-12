@@ -102,6 +102,9 @@ function recruitHint(owned: number | undefined, required: number | undefined): s
 export function TutorialOverlay(): JSX.Element | null {
   const { data: state } = useTutorial();
   const advance = useAdvanceTutorial();
+  // mutateAsync 引用稳定（mutation observer 单例，随组件只建一次）；整对象每渲染换引用，
+  // 不能进 effect 依赖数组 —— 解构成普通绑定供下方点击推进 effect 使用。
+  const advanceAsync = advance.mutateAsync;
   const complete = useCompleteTutorial();
   const [rect, setRect] = useState<Rect | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -177,11 +180,11 @@ export function TutorialOverlay(): JSX.Element | null {
       const el = getTarget(selector);
       const node = event.target instanceof Node ? event.target : null;
       if (el === null || node === null || !el.contains(node)) return;
-      void advance.mutateAsync(stepIdx + 1);
+      void advanceAsync(stepIdx + 1);
     };
     document.addEventListener('click', onClick, true);
     return () => document.removeEventListener('click', onClick, true);
-  }, [visible, cur, stepIdx, advance.mutateAsync]);
+  }, [visible, cur, stepIdx, advanceAsync]);
 
   if (!state || completed || !cur) return null;
 
