@@ -31,8 +31,7 @@ import type { CandidatePayload } from '../src/modules/academy/recruit-gen.js';
  * src 范围内一并覆盖——仓库不存在 apps/api/scripts 顶层目录）。
  *
  * 已知盲区（如实声明，非修复承诺——修复属未来批次）：
- * - g2 只认 `function NAME` 声明形式，`const NAME = () =>` 箭头重实现不计
- *   （且未剥注释，注释提及函数名会虚报）。
+ * - g2 只认 `function NAME` 声明形式，`const NAME = () =>` 箭头重实现不计。
  * - g6 不防 `badges as unknown as string[]` 双重 cast。
  * - g5 元组指纹只认单引号形态。
  * - g7 不查动态 import(...) 与 export-from 运行时再导出。
@@ -177,7 +176,7 @@ describe('architecture guards (R6-T1)', () => {
         const definition = new RegExp('\\bfunction\\s+' + name + '\\b');
         return {
           name,
-          sites: allSourceFiles.filter((file) => definition.test(fileContents.get(file)!)).map(rel),
+          sites: allSourceFiles.filter((file) => definition.test(stripComments(fileContents.get(file)!))).map(rel),
         };
       }).filter((entry) => entry.sites.length !== 1);
       expect(dupes).toEqual([]);
@@ -211,6 +210,20 @@ describe('architecture guards (R6-T1)', () => {
       const expectedContestType: readonly ContestRecordType[] = ['STORY', 'PVP', 'ADVENTURE'];
       expect(sameSequence(prismaEnums.get('ContestFormat'), expectedContestFormat)).toBe(true);
       expect(sameSequence(prismaEnums.get('ContestType'), expectedContestType)).toBe(true);
+    });
+    it('bare unions are closed: no member beyond the prisma vocabulary', () => {
+      // 反向封闭见证：上面的字面量赋值只证明『prisma 值 ⊆ shared 联合』，
+      // 反向（shared 侧单面加一个 schema 没有的值）会从它手里逃逸——任何字面量
+      // 都是合法成员，extra 不报错。这里反过来要求 Exclude<union, 词表> 为空，
+      // 让 shared 侧单面增值在 tsc 变红。两个方向合起来才钉住『相等』而非『包含』。
+      type ContestFormatClosed = Exclude<ContestFormat, 'RANKING' | 'DUEL'> extends never ? true : never;
+      type ContestRecordTypeClosed = Exclude<ContestRecordType, 'STORY' | 'PVP' | 'ADVENTURE'> extends never
+        ? true
+        : never;
+      const contestFormatClosed: ContestFormatClosed = true;
+      const contestRecordTypeClosed: ContestRecordTypeClosed = true;
+      expect(contestFormatClosed).toBe(true);
+      expect(contestRecordTypeClosed).toBe(true);
     });
 
     it('TrainingKind stays deliberately unfolded (prisma uppercase vs wire lowercase)', () => {
@@ -246,7 +259,11 @@ describe('architecture guards (R6-T1)', () => {
     it('dimension bridge fingerprints appear only in the authoritative homes', () => {
       const offenders = allSourceFiles
         .filter((file) => !BRIDGE_HOMES.includes(file))
-        .filter((file) => uppercaseTuple.test(fileContents.get(file)!) || bridgeRecord.test(fileContents.get(file)!))
+        .filter(
+          (file) =>
+            uppercaseTuple.test(stripComments(fileContents.get(file)!)) ||
+            bridgeRecord.test(stripComments(fileContents.get(file)!)),
+        )
         .map(rel);
       expect(offenders).toEqual([]);
     });
@@ -256,7 +273,7 @@ describe('architecture guards (R6-T1)', () => {
     it('badges raw casts / Array.isArray(badges) stay inside lib/json.ts only', () => {
       const offenders = allSourceFiles
         .filter((file) => file !== JSON_LIB_FILE)
-        .filter((file) => /badges as string\[\]|Array\.isArray\(badges\)/.test(fileContents.get(file)!))
+        .filter((file) => /badges as string\[\]|Array\.isArray\(badges\)/.test(stripComments(fileContents.get(file)!)))
         .map(rel);
       expect(offenders).toEqual([]);
     });
@@ -288,7 +305,7 @@ describe('architecture guards (R6-T1)', () => {
       // 只匹配 interface 声明；`export type X = ...View` 类别名 re-export 不算违规。
       const offenders = allSourceFiles
         .filter((file) => file.startsWith(webSrc))
-        .filter((file) => /export\s+interface\s+\w+View\b/.test(fileContents.get(file)!))
+        .filter((file) => /export\s+interface\s+\w+View\b/.test(stripComments(fileContents.get(file)!)))
         .map(rel);
       expect(offenders).toEqual([]);
     });
