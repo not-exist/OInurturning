@@ -42,7 +42,7 @@ jobs:
         run: mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"
       - name: Collect typecheck output
         run: pnpm -r typecheck 2>&1 | tee typecheck.log; test ${PIPESTATUS[0]} -eq 0
-      - run: pnpm -r lint
+      - run: pnpm lint
       - run: pnpm -r build
       - name: Unit tests (pure, no DB, parallel)
         run: |
