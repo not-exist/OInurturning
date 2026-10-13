@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DIMENSIONS, type DimensionKey } from '../enums.js';
+import type { DimensionKey } from '../enums.js';
 
 export const CONFIG_DIMENSIONS = ['ds', 'dp', 'math', 'graph', 'greedy', 'string'] as const;
 export type ConfigDimension = (typeof CONFIG_DIMENSIONS)[number];
@@ -102,14 +102,10 @@ export const problemConfigSchema = z
   });
 export type ProblemConfig = z.infer<typeof problemConfigSchema>;
 
-const configDimensionToDomain: Record<ConfigDimension, DimensionKey> = {
-  ds: DIMENSIONS[0],
-  dp: DIMENSIONS[1],
-  math: DIMENSIONS[2],
-  graph: DIMENSIONS[3],
-  greedy: DIMENSIONS[4],
-  string: DIMENSIONS[5],
-};
+/** 配置 wire 名 → DimensionKey：DIMENSION_CONFIG 的逆映射（单桥推导，消掉按位对齐 DIMENSIONS 的脆弱写法） */
+const configDimensionToDomain = Object.fromEntries(
+  Object.entries(DIMENSION_CONFIG).map(([domain, config]) => [config, domain]),
+) as Record<ConfigDimension, DimensionKey>;
 
 export function normalizeProblemTemplate(template: ProblemTemplate): Omit<ProblemTemplate, 'dim'> & { dim: DimensionKey } {
   return { ...template, dim: configDimensionToDomain[template.dim] };

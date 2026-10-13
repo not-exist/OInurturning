@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AccountItemActivationView,
   AdventureChoiceResult,
   AdventureChoiceView,
   AdventureEventView,
@@ -13,6 +14,7 @@ import type {
   ChecklistStepId,
   ChecklistStepView,
   ChecklistView,
+  ClaimResult,
   ContestRecordSummary,
   ContestRecordView,
   CreateProblemResult,
@@ -77,6 +79,7 @@ const STALE = {
 // ---------------------------------------------------------------------------
 
 export type {
+  AccountItemActivationView,
   AdventureChoiceResult,
   AdventureChoiceView,
   AdventureEventView,
@@ -87,6 +90,7 @@ export type {
   ChecklistStepId,
   ChecklistStepView,
   ChecklistView,
+  ClaimResult,
   ContestRecordSummary,
   CreateProblemResult,
   DismissResult,
@@ -156,10 +160,7 @@ export function useClaimChecklist() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () =>
-      apiFetch<{ claimed: boolean; already: boolean; badge: string }>(
-        '/api/overview/checklist/claim',
-        { method: 'POST' },
-      ),
+      apiFetch<ClaimResult>('/api/overview/checklist/claim', { method: 'POST' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['overview'] });
       qc.invalidateQueries({ queryKey: ['me'] });
@@ -377,7 +378,7 @@ export function useUseItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ itemId, studentId }: { itemId: string; studentId?: number }) =>
-      apiFetch<StudentView | { itemId: string; activated: true }>('/api/items/use', {
+      apiFetch<StudentView | AccountItemActivationView>('/api/items/use', {
         method: 'POST',
         body: JSON.stringify({ itemId, studentId }),
       }),

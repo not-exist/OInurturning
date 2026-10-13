@@ -6,8 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./enums": "./src/enums.ts",
-    "./item-usage": "./src/item-usage.ts",
-    "./views": "./src/domain/views.ts"
+    "./item-usage": "./src/item-usage.ts"
   },
   "scripts": {
     "lint": "eslint src/",

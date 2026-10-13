@@ -15,7 +15,7 @@
     "test:watch": "pnpm --filter @oinur/api test:watch",
     "test:e2e": "pnpm --filter @oinur/api test:e2e",
     "lint": "pnpm -r lint && eslint scripts/ tests/e2e/",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && pnpm e2e:typecheck",
     "format": "prettier --write .",
     "db:up": "docker compose up -d && until docker compose exec mysql mysqladmin ping -h 127.0.0.1 -uoinur -poinur --silent >/dev/null 2>&1; do sleep 1; done && pnpm db:migrate && echo mysql-ready",
     "bootstrap:offline": "node scripts/dev-bootstrap.mjs",

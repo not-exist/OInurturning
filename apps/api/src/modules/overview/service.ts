@@ -2,6 +2,7 @@ import type {
   ChecklistRewardBadge,
   ChecklistStepId,
   ChecklistView,
+  ClaimResult,
   OverviewView,
 } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
@@ -132,14 +133,8 @@ export async function getOverview(userId: number): Promise<OverviewView> {
 
 // ---------------------------------------------------------------------------
 // checklist 领奖（POST /api/overview/checklist/claim，幂等 200）
+// 出参类型 ClaimResult 由 shared 单源（domain/views）
 // ---------------------------------------------------------------------------
-
-export interface ClaimResult {
-  claimed: boolean;
-  /** 重复领取（徽章已在）：仍 200，前端据此不弹重复提示 */
-  already: boolean;
-  badge: typeof CHECKLIST_REWARD_BADGE;
-}
 
 export async function claimChecklistReward(userId: number): Promise<ClaimResult> {
   return prisma.$transaction(async (tx) => {

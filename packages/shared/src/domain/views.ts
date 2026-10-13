@@ -93,6 +93,12 @@ export interface ItemView {
   effectDesc: string | null;
 }
 
+/** 账号级道具使用出参（POST /api/items/use）：不落学员行的使用（如 intel-slip）返回此形；学员级使用返回 StudentView */
+export interface AccountItemActivationView {
+  itemId: string;
+  activated: true;
+}
+
 export interface DismissResult {
   id: number;
   status: 'DISMISSED';
@@ -310,6 +316,14 @@ export interface ChecklistView {
   /** rookie-done 是否已领取 */
   claimed: boolean;
   rewardBadge: ChecklistRewardBadge;
+}
+
+/** checklist 领奖出参（POST /api/overview/checklist/claim，幂等 200） */
+export interface ClaimResult {
+  claimed: boolean;
+  /** 重复领取（徽章已在）：仍 200，前端据此不弹重复提示 */
+  already: boolean;
+  badge: ChecklistRewardBadge;
 }
 
 export interface OverviewStoryView {

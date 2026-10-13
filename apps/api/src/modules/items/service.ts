@@ -1,5 +1,11 @@
 import type { Student } from '../../generated/prisma/client.js';
-import { computeV, type ItemView, type Rarity, type StudentView } from '@oinur/shared';
+import {
+  computeV,
+  type AccountItemActivationView,
+  type ItemView,
+  type Rarity,
+  type StudentView,
+} from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -73,10 +79,7 @@ export interface UseItemInput {
   payload?: any;
 }
 
-export interface AccountItemActivationView {
-  itemId: string;
-  activated: true;
-}
+// 出参类型 AccountItemActivationView 由 shared 单源（domain/views）
 
 async function activateAdventureIntel(userId: number): Promise<AccountItemActivationView> {
   return prisma.$transaction(async (tx) => {
