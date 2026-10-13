@@ -43,6 +43,8 @@ jobs:
       - name: Collect typecheck output
         run: pnpm -r typecheck 2>&1 | tee typecheck.log; test ${PIPESTATUS[0]} -eq 0
       - run: pnpm lint
+      - name: Prettier check
+        run: pnpm format:check
       - run: pnpm -r build
       - name: Unit tests (pure, no DB, parallel)
         run: |
