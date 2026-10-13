@@ -67,7 +67,9 @@ function TimelineRow({
                   : dimensionLabel(questions.get(attempt.questionIndex)!.dimension)}
               </span>
               <VerdictBadge verdict={attempt.verdict} />
-              <span className="tnum ml-auto text-fg-muted">{Math.ceil(attempt.minutesUsed)} 分钟</span>
+              <span className="tnum ml-auto text-fg-muted">
+                {Math.ceil(attempt.minutesUsed)} 分钟
+              </span>
               {attempt.penaltyMin > 0 && (
                 <span className="tnum text-warn-400">罚时 +{Math.ceil(attempt.penaltyMin)}</span>
               )}
@@ -121,7 +123,9 @@ export function RankingReport({ report }: { report: RankingReportData }): JSX.El
                 key={standing.teamIndex}
                 className={`flex items-center gap-3 px-3 py-2.5 ${isMine ? 'bg-cyber-400/10' : ''}`}
               >
-                <span className={`numeral w-8 shrink-0 text-center text-lg ${rankTone(standing.rank)}`}>
+                <span
+                  className={`numeral w-8 shrink-0 text-center text-lg ${rankTone(standing.rank)}`}
+                >
                   {standing.rank}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm text-fg">
@@ -146,7 +150,9 @@ export function RankingReport({ report }: { report: RankingReportData }): JSX.El
               className={`border ${teamIndex === 0 ? 'border-cyber-500/50' : 'border-ink-600/70'}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-600/60 bg-ink-850/50 px-3 py-2">
-                <span className="min-w-0 truncate text-xs font-medium text-fg">{teamName(team)}</span>
+                <span className="min-w-0 truncate text-xs font-medium text-fg">
+                  {teamName(team)}
+                </span>
                 {teamIndex === 0 && <span className="text-[11px] text-cyber-300">我方</span>}
               </div>
               <div className="divide-y divide-ink-600/40">

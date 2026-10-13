@@ -2,15 +2,16 @@ import { useState, type JSX } from 'react';
 import { Link } from 'react-router';
 import { GraduationCap, Timer } from 'lucide-react';
 import { ApiCallError, apiErrorMessage } from '../../lib/api';
-import {
-  useLectureLogs,
-  useLectureTiers,
-  useStudents,
-  useTeachLecture,
-} from '../../lib/hooks';
+import { useLectureLogs, useLectureTiers, useStudents, useTeachLecture } from '../../lib/hooks';
 import type { StudentView } from '@oinur/shared';
 import type { LectureResultView, LectureTierView } from '../../lib/hooks';
-import { lectureGrowthStatLabel, lectureTierLabel, signed, signedTrim, type LectureTierId } from '../../lib/labels';
+import {
+  lectureGrowthStatLabel,
+  lectureTierLabel,
+  signed,
+  signedTrim,
+  type LectureTierId,
+} from '../../lib/labels';
 import { Icon, NAV_ICON } from '../../components/icons';
 import {
   Btn,
@@ -184,7 +185,9 @@ export function AcademyLecturePage(): JSX.Element {
                       </span>
                     </p>
                   </div>
-                  {selectedStudent !== undefined && <StandingBadge student={selectedStudent} tier={selectedTier} />}
+                  {selectedStudent !== undefined && (
+                    <StandingBadge student={selectedStudent} tier={selectedTier} />
+                  )}
                 </div>
                 <Meter
                   value={Math.min(selectedStudent?.v ?? 0, selectedTier.threshold)}
@@ -247,7 +250,10 @@ export function AcademyLecturePage(): JSX.Element {
             </div>
 
             {canForce && (
-              <label className="mt-4 flex items-start gap-2 border-t border-ink-600/60 pt-3 text-sm text-warn-400" data-tutorial="lecture-force">
+              <label
+                className="mt-4 flex items-start gap-2 border-t border-ink-600/60 pt-3 text-sm text-warn-400"
+                data-tutorial="lecture-force"
+              >
                 <input
                   data-testid="lecture-force"
                   type="checkbox"
@@ -277,7 +283,9 @@ export function AcademyLecturePage(): JSX.Element {
             {teach.isSuccess && teach.data !== undefined && (
               <ResultStrip
                 result={teach.data}
-                studentName={students.data.find((s) => s.id === teach.data?.studentId)?.name ?? '学员'}
+                studentName={
+                  students.data.find((s) => s.id === teach.data?.studentId)?.name ?? '学员'
+                }
               />
             )}
           </Panel>
@@ -294,7 +302,9 @@ export function AcademyLecturePage(): JSX.Element {
                 <LectureLogItem
                   key={entry.id}
                   entry={entry}
-                  studentName={students.data.find((s) => s.id === entry.studentId)?.name ?? '未知学员'}
+                  studentName={
+                    students.data.find((s) => s.id === entry.studentId)?.name ?? '未知学员'
+                  }
                 />
               ))}
             </ul>
@@ -338,7 +348,9 @@ function TierCard({
       <span className="mt-0.5 block text-[11px] text-fg-faint">
         基础金 {entry.baseMoney} · 声誉 {entry.baseReputation} · 思维 {entry.thinkingReq}
       </span>
-      <span className={`mt-1 block text-[11px] ${entry.available ? 'text-good-400' : 'text-fg-faint'}`}>
+      <span
+        className={`mt-1 block text-[11px] ${entry.available ? 'text-good-400' : 'text-fg-faint'}`}
+      >
         {entry.available ? '有学员可承接' : '暂无学员够格'}
       </span>
     </Card>
@@ -376,7 +388,13 @@ function thinkingNote(thinking: number, req: number): string {
   return '思维不足：成长打折；若强接讲砸，出题与思维会小幅回落';
 }
 
-function StandingBadge({ student, tier }: { student: StudentView; tier: LectureTierView }): JSX.Element {
+function StandingBadge({
+  student,
+  tier,
+}: {
+  student: StudentView;
+  tier: LectureTierView;
+}): JSX.Element {
   if (student.v >= tier.threshold) {
     return (
       <span className="border border-good-400/50 bg-good-400/10 px-2 py-1 text-xs text-good-400">
@@ -432,7 +450,9 @@ function ResultStrip({
       <span className={`tnum ${result.reputation >= 0 ? 'text-good-400' : 'text-bad-400'}`}>
         声誉 {signed(result.reputation)}
       </span>
-      {result.staminaAfter !== null && <span className="tnum text-fg-dim">体力 {result.staminaAfter}</span>}
+      {result.staminaAfter !== null && (
+        <span className="tnum text-fg-dim">体力 {result.staminaAfter}</span>
+      )}
       <span
         data-testid="lecture-gains"
         className="flex w-full flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-ink-600/50 pt-2 text-[11px] text-fg-dim"
@@ -442,7 +462,10 @@ function ResultStrip({
           <span>{growthEmptyText(result)}</span>
         ) : (
           result.gains.map((gain) => (
-            <span key={gain.stat} className={`tnum ${gain.amount < 0 ? 'text-bad-400' : 'text-arc-300'}`}>
+            <span
+              key={gain.stat}
+              className={`tnum ${gain.amount < 0 ? 'text-bad-400' : 'text-arc-300'}`}
+            >
               {lectureGrowthStatLabel(gain.stat)} {signedTrim(gain.amount)}
             </span>
           ))
@@ -491,7 +514,9 @@ function LectureLogItem({
         <span className="tnum">
           V {entry.teachingValue} / 门槛 {entry.threshold}
         </span>
-        <span className={`tnum ${entry.money > 0 ? 'text-good-400' : ''}`}>金 {signed(entry.money)}</span>
+        <span className={`tnum ${entry.money > 0 ? 'text-good-400' : ''}`}>
+          金 {signed(entry.money)}
+        </span>
         <span className={`tnum ${entry.reputation < 0 ? 'text-bad-400' : ''}`}>
           声誉 {signed(entry.reputation)}
         </span>
@@ -520,7 +545,8 @@ function fmtTime(iso: string): string {
 
 function lectureErrorText(e: unknown): string {
   if (e instanceof ApiCallError) {
-    if (e.code === 'INSUFFICIENT_RESOURCE') return `体力不足（需 ${STAMINA_COST} 点），稍等恢复或使用体力药水`;
+    if (e.code === 'INSUFFICIENT_RESOURCE')
+      return `体力不足（需 ${STAMINA_COST} 点），稍等恢复或使用体力药水`;
     const details = e.details;
     if (typeof details === 'object' && details !== null && 'reason' in details) {
       const reason = (details as { reason?: unknown }).reason;

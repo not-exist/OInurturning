@@ -74,18 +74,22 @@ export function RosterPicker({
                   <span className="shrink-0 text-[10px] text-fg-faint">
                     {QUALITY_LABEL[student.qualityTier]}
                   </span>
-                  {checked && <Icon icon={Check} className="ml-auto size-3.5 shrink-0 text-cyber-300" />}
+                  {checked && (
+                    <Icon icon={Check} className="ml-auto size-3.5 shrink-0 text-cyber-300" />
+                  )}
                 </span>
                 <span className="mt-1 block font-mono text-[11px] text-fg-dim">
-                  V {floor(student.v)} · 精力 {floor(student.energy)}/{floor(student.energyMax)} · 体力{' '}
-                  {floor(student.stamina)}/5
+                  V {floor(student.v)} · 精力 {floor(student.energy)}/{floor(student.energyMax)} ·
+                  体力 {floor(student.stamina)}/5
                 </span>
               </span>
             </label>
           );
         })}
       </div>
-      {atMax && <p className="text-[11px] text-fg-faint">已选满 {max} 人，取消勾选后可更换人选。</p>}
+      {atMax && (
+        <p className="text-[11px] text-fg-faint">已选满 {max} 人，取消勾选后可更换人选。</p>
+      )}
     </fieldset>
   );
 }

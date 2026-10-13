@@ -45,9 +45,9 @@
 # ======================================================================
 
 meta:
-  version: "0.1"
-  updated: "2026-08-26"
-  authority: "docs/GAME-DESIGN.md §5 §6 §7 §13 §15"
+  version: '0.1'
+  updated: '2026-08-26'
+  authority: 'docs/GAME-DESIGN.md §5 §6 §7 §13 §15'
   rarity_order: [gray, yellow, green, blue, purple, colorful]
   categories: [nurture, book, functional, contest, quest, material]
   book_subjects:
@@ -108,7 +108,7 @@ items:
     effect:
       desc: 使一名学员的指定天赋升阶至下一稀有度，必成功。
       kind: talent_advance
-      cost_by_target_rarity: {yellow: 1, green: 2, blue: 3, purple: 5, colorful: 8}
+      cost_by_target_rarity: { yellow: 1, green: 2, blue: 3, purple: 5, colorful: 8 }
       success_rate: 1.0
       constraints: 目标天赋须在 talents.yaml 登记上级形态；彩为顶点不可再进阶
     price: null
@@ -236,7 +236,7 @@ items:
       kind: event_defuse
       event_ref: L4
       auto_trigger: true
-      on_success_grant: {circuit-board: 2}
+      on_success_grant: { circuit-board: 2 }
     price: 420
     sources:
       - 商城
@@ -366,7 +366,7 @@ items:
     effect:
       desc: 使用后该学员在下一场比赛中精力上限临时 +20，仅当场有效。
       kind: contest_buff
-      buff: {energy_cap_temp: 20}
+      buff: { energy_cap_temp: 20 }
       usage_timing: 报名或进入比赛前使用，单场生效；剧情赛与 PVP 均可用
     price: 220
     sources:
@@ -382,7 +382,7 @@ items:
     effect:
       desc: 使用后下一次历练的高稀有度事件权重整体上调一档（体力投入档不变），用后自动消耗。
       kind: adventure_buff
-      buff: {rarity_weight_shift: +1_tier}
+      buff: { rarity_weight_shift: +1_tier }
       usage_timing: 历练出发前激活；每账号每日限用 1 枚
     price: 650
     sources:
@@ -1112,7 +1112,7 @@ items:
     effect:
       desc: 打开后获得进阶石×4 与结算金 200,000。
       kind: grant_box
-      contents: {advance-stone: 4, gold: 200000}
+      contents: { advance-stone: 4, gold: 200000 }
     price: null
     sources:
       - 剧情正赛里程碑（IOI，一周目唯一）
@@ -1262,7 +1262,7 @@ items:
     effect:
       desc: 集满 10 枚可在天赋界面合成一枚随机彩色天赋。
       kind: compose_input
-      recipe: {count: 10, output: random_colorful_talent}
+      recipe: { count: 10, output: random_colorful_talent }
     price: null
     sources:
       - C2 图灵之遗（全服周限量）
@@ -1277,7 +1277,7 @@ items:
     effect:
       desc: 集满 20 枚自动可合成为一张洗练券。
       kind: compose_input
-      recipe: {count: 20, output: reroll-ticket}
+      recipe: { count: 20, output: reroll-ticket }
     price: null
     sources:
       - R2 绝版书闪现
@@ -1293,7 +1293,7 @@ items:
     effect:
       desc: 集满 5 页可合成一本随机科目的黄级书。
       kind: compose_input
-      recipe: {count: 5, output: "book-{subject}-yellow_random"}
+      recipe: { count: 5, output: 'book-{subject}-yellow_random' }
     price: null
     sources:
       - G3 草稿纸堆淘金
@@ -1308,7 +1308,7 @@ items:
     effect:
       desc: 稀有材料；集满 3 块可合成一面防火墙。
       kind: compose_input
-      recipe: {count: 3, output: firewall}
+      recipe: { count: 3, output: firewall }
     price: null
     sources:
       - L4 OJ 遭黑客攻击（持防火墙反击成功所得）

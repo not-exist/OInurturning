@@ -47,7 +47,9 @@ async function main(): Promise<void> {
     orderBy: { id: 'asc' },
     take: limit,
   });
-  console.log(`[onboarding:backfill] 待回填用户：${targets.length}${dryRun ? '（dry-run，不写库）' : ''}`);
+  console.log(
+    `[onboarding:backfill] 待回填用户：${targets.length}${dryRun ? '（dry-run，不写库）' : ''}`,
+  );
   if (dryRun) {
     for (const t of targets.slice(0, 20)) console.log(`  - id=${t.id} username=${t.username}`);
     if (targets.length > 20) console.log(`  …另有 ${targets.length - 20} 人未列出`);
@@ -63,9 +65,14 @@ async function main(): Promise<void> {
       });
       granted += 1;
     } catch (error) {
-      failed.push({ id: t.id, username: t.username, error: error instanceof Error ? error.message : String(error) });
+      failed.push({
+        id: t.id,
+        username: t.username,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
-    if ((granted + failed.length) % 50 === 0) console.log(`[onboarding:backfill] 进度：${granted + failed.length}/${targets.length}`);
+    if ((granted + failed.length) % 50 === 0)
+      console.log(`[onboarding:backfill] 进度：${granted + failed.length}/${targets.length}`);
   }
   console.log(`[onboarding:backfill] 完成：成功 ${granted}，失败 ${failed.length}`);
   for (const f of failed) console.error(`  - id=${f.id} username=${f.username} error=${f.error}`);

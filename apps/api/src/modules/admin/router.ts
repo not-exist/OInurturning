@@ -37,9 +37,16 @@ adminRouter.use(requireAdmin);
 adminRouter.post('/tournaments', async (req, res, next) => {
   try {
     const parsed = tournamentSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
-    if (parsed.data.registerEndsAt <= new Date() || parsed.data.autoStartAt < parsed.data.registerEndsAt) {
-      throw new ApiError('VALIDATION_FAILED', { field: 'autoStartAt', reason: 'invalid tournament window' });
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    if (
+      parsed.data.registerEndsAt <= new Date() ||
+      parsed.data.autoStartAt < parsed.data.registerEndsAt
+    ) {
+      throw new ApiError('VALIDATION_FAILED', {
+        field: 'autoStartAt',
+        reason: 'invalid tournament window',
+      });
     }
     res.json({ ok: true, data: await service.createTournament(req.user!.id, parsed.data) });
   } catch (error) {
@@ -58,10 +65,18 @@ adminRouter.get('/tournaments', async (_req, res, next) => {
 adminRouter.patch('/pvp-tournaments/:id', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
-    const parsed = z.object({ prizes: z.record(z.string(), z.unknown()) }).strict().safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
-    res.json({ ok: true, data: await service.updateTournamentPrizes(req.user!.id, id, parsed.data.prizes) });
+    if (!Number.isInteger(id) || id <= 0)
+      throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
+    const parsed = z
+      .object({ prizes: z.record(z.string(), z.unknown()) })
+      .strict()
+      .safeParse(req.body);
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    res.json({
+      ok: true,
+      data: await service.updateTournamentPrizes(req.user!.id, id, parsed.data.prizes),
+    });
   } catch (error) {
     next(error);
   }
@@ -70,8 +85,12 @@ adminRouter.patch('/pvp-tournaments/:id', async (req, res, next) => {
 adminRouter.post('/announcements', async (req, res, next) => {
   try {
     const parsed = announcementSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
-    res.json({ ok: true, data: await service.createAnnouncement(req.user!.id, parsed.data.title, parsed.data.body) });
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    res.json({
+      ok: true,
+      data: await service.createAnnouncement(req.user!.id, parsed.data.title, parsed.data.body),
+    });
   } catch (error) {
     next(error);
   }
@@ -88,7 +107,8 @@ adminRouter.get('/announcements', async (req, res, next) => {
 adminRouter.get('/users', async (req, res, next) => {
   try {
     const query = req.query.query;
-    if (query !== undefined && typeof query !== 'string') throw new ApiError('VALIDATION_FAILED', { field: 'query' });
+    if (query !== undefined && typeof query !== 'string')
+      throw new ApiError('VALIDATION_FAILED', { field: 'query' });
     res.json({ ok: true, data: await service.searchUsers(query, limitOf(req.query.limit, 100)) });
   } catch (error) {
     next(error);
@@ -106,7 +126,8 @@ adminRouter.get('/audits', async (req, res, next) => {
 adminRouter.post('/users/:id/ban', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'user', id: req.params.id });
+    if (!Number.isInteger(id) || id <= 0)
+      throw new ApiError('NOT_FOUND', { resource: 'user', id: req.params.id });
     res.json({ ok: true, data: await service.setUserBan(req.user!.id, id, true) });
   } catch (error) {
     next(error);
@@ -116,7 +137,8 @@ adminRouter.post('/users/:id/ban', async (req, res, next) => {
 adminRouter.post('/users/:id/unban', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'user', id: req.params.id });
+    if (!Number.isInteger(id) || id <= 0)
+      throw new ApiError('NOT_FOUND', { resource: 'user', id: req.params.id });
     res.json({ ok: true, data: await service.setUserBan(req.user!.id, id, false) });
   } catch (error) {
     next(error);
@@ -126,7 +148,8 @@ adminRouter.post('/users/:id/unban', async (req, res, next) => {
 adminRouter.post('/pvp-tournaments/:id/actions/start', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
+    if (!Number.isInteger(id) || id <= 0)
+      throw new ApiError('NOT_FOUND', { resource: 'tournament', id: req.params.id });
     res.json({ ok: true, data: await startPvpTournament(req.user!.id, id) });
   } catch (error) {
     next(error);

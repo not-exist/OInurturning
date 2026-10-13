@@ -38,16 +38,38 @@ const playerTeams: ContestTeam[] = [
     teamId: 'player',
     side: 'HOME',
     userId: 1,
-    members: [snapshotParticipant, { ...snapshotParticipant, studentId: 2, displayName: 'Player 2' }, { ...snapshotParticipant, studentId: 3, displayName: 'Player 3' }],
+    members: [
+      snapshotParticipant,
+      { ...snapshotParticipant, studentId: 2, displayName: 'Player 2' },
+      { ...snapshotParticipant, studentId: 3, displayName: 'Player 3' },
+    ],
   },
   {
     teamId: 'npc:0',
     side: 'NPC',
     userId: null,
     members: [
-      { ...snapshotParticipant, side: 'NPC', userId: null, studentId: null, displayName: 'NPC 1-1' },
-      { ...snapshotParticipant, side: 'NPC', userId: null, studentId: null, displayName: 'NPC 1-2' },
-      { ...snapshotParticipant, side: 'NPC', userId: null, studentId: null, displayName: 'NPC 1-3' },
+      {
+        ...snapshotParticipant,
+        side: 'NPC',
+        userId: null,
+        studentId: null,
+        displayName: 'NPC 1-1',
+      },
+      {
+        ...snapshotParticipant,
+        side: 'NPC',
+        userId: null,
+        studentId: null,
+        displayName: 'NPC 1-2',
+      },
+      {
+        ...snapshotParticipant,
+        side: 'NPC',
+        userId: null,
+        studentId: null,
+        displayName: 'NPC 1-3',
+      },
     ],
   },
 ];

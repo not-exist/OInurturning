@@ -52,11 +52,17 @@ function routePrefixes(key: string): readonly string[] {
 export function isApiAllowed(unlocked: string[], apiPath: string): boolean {
   if (unlocked.includes('all')) return true;
   if (ALWAYS_ALLOWED_PREFIXES.some((prefix) => matchesPrefix(apiPath, prefix))) return true;
-  return unlocked.some((key) => routePrefixes(key).some((prefix) => matchesPrefix(apiPath, prefix)));
+  return unlocked.some((key) =>
+    routePrefixes(key).some((prefix) => matchesPrefix(apiPath, prefix)),
+  );
 }
 
 /** 未完成取当前步 unlock（越界钳到配置范围），已完成取 ['all']，兜底 ['overview'] */
-export function unlockedForStep(step: number, completed: boolean, steps: TutorialStepDef[]): string[] {
+export function unlockedForStep(
+  step: number,
+  completed: boolean,
+  steps: TutorialStepDef[],
+): string[] {
   if (completed) return ['all'];
   const idx = clampInt(step, 0, steps.length - 1);
   return steps[idx]?.unlock ?? ['overview'];

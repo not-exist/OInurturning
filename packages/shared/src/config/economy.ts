@@ -12,11 +12,13 @@ export const economyTrainingSchema = z
   .object({
     cost_formula: z.string(),
     student_coeff: z.number(),
-    basic: z
-      .object({ money_base: money, stamina_cost: z.number().int().positive() })
-      .loose(),
+    basic: z.object({ money_base: money, stamina_cost: z.number().int().positive() }).loose(),
     directed: z
-      .object({ money_base: money, stamina_cost: z.number().int().positive(), book_consumed: z.number().int().positive() })
+      .object({
+        money_base: money,
+        stamina_cost: z.number().int().positive(),
+        book_consumed: z.number().int().positive(),
+      })
       .loose(),
     specialized: z
       .object({
@@ -109,16 +111,20 @@ export type LectureGrowthConfig = z.infer<typeof lectureGrowthSchema>;
 export const lectureConfigSchema = z
   .object({
     audience_tiers: z.array(lectureTierSchema).length(5),
-    reputation_pay_curve: z.object({
-      rep_divisor: z.number().positive(),
-      min_mult: z.number().nonnegative(),
-      max_mult: z.number().nonnegative(),
-    }).loose(),
-    overflow_bonus: z.object({
-      overflow_step: z.number().positive(),
-      overflow_pct: z.number().nonnegative(),
-      overflow_cap_pct: z.number().nonnegative(),
-    }).loose(),
+    reputation_pay_curve: z
+      .object({
+        rep_divisor: z.number().positive(),
+        min_mult: z.number().nonnegative(),
+        max_mult: z.number().nonnegative(),
+      })
+      .loose(),
+    overflow_bonus: z
+      .object({
+        overflow_step: z.number().positive(),
+        overflow_pct: z.number().nonnegative(),
+        overflow_cap_pct: z.number().nonnegative(),
+      })
+      .loose(),
     /** 缺省即「讲课不带来成长」（历史配置/精简 fixture 兼容）；docs/data 必须提供 */
     growth: lectureGrowthSchema.optional(),
   })
@@ -153,7 +159,9 @@ export const simulationProfileSchema = z
     adventures: z
       .object({
         sessions: z.number().nonnegative(),
-        rarity_mix: z.record(z.string(), z.number().nonnegative()).refine((mix) => Object.values(mix).some((weight) => weight > 0)),
+        rarity_mix: z
+          .record(z.string(), z.number().nonnegative())
+          .refine((mix) => Object.values(mix).some((weight) => weight > 0)),
       })
       .strict(),
     story: z
@@ -164,7 +172,12 @@ export const simulationProfileSchema = z
         ng_level: z.number().int().nonnegative(),
       })
       .strict(),
-    passive: z.object({ sponsor_contracts: z.number().nonnegative(), substitute_coaches: z.number().nonnegative() }).strict(),
+    passive: z
+      .object({
+        sponsor_contracts: z.number().nonnegative(),
+        substitute_coaches: z.number().nonnegative(),
+      })
+      .strict(),
     fixed_weekly_expense: z.number().nonnegative(),
   })
   .strict();

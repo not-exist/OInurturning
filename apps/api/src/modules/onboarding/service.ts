@@ -59,7 +59,8 @@ export async function grantOnboardingPackage(
   const now = opts.now ?? new Date();
   const user = await tx.user.findUnique({ where: { id: userId } });
   if (!user) throw new ApiError('NOT_FOUND', { resource: 'user', id: userId });
-  if (user.onboardedAt) throw new ApiError('STATE_CONFLICT', { resource: 'onboarding', reason: 'already granted' });
+  if (user.onboardedAt)
+    throw new ApiError('STATE_CONFLICT', { resource: 'onboarding', reason: 'already granted' });
 
   const config = requireConfig('onboarding');
   const cfg = onboardingConfig();
@@ -80,9 +81,15 @@ export async function grantOnboardingPackage(
         userId,
         name: candidate.name,
         qualityTier: QUALITY_TO_TIER[spec.quality],
-        ds: candidate.attrs.ds, dp: candidate.attrs.dp, math: candidate.attrs.math,
-        graph: candidate.attrs.graph, greedy: candidate.attrs.greedy, str: candidate.attrs.str,
-        code: candidate.attrs.code, thinking: candidate.attrs.thinking, setting: candidate.attrs.setting,
+        ds: candidate.attrs.ds,
+        dp: candidate.attrs.dp,
+        math: candidate.attrs.math,
+        graph: candidate.attrs.graph,
+        greedy: candidate.attrs.greedy,
+        str: candidate.attrs.str,
+        code: candidate.attrs.code,
+        thinking: candidate.attrs.thinking,
+        setting: candidate.attrs.setting,
         mindset: 2,
         focusCap: candidate.attrs.focusCap,
         energyMax: candidate.attrs.energyMax,
@@ -123,7 +130,9 @@ export async function grantOnboardingPackage(
     },
   });
   if (cfg.reputation > 0) {
-    await tx.reputationLog.create({ data: { userId, delta: cfg.reputation, reason: 'ONBOARDING' } });
+    await tx.reputationLog.create({
+      data: { userId, delta: cfg.reputation, reason: 'ONBOARDING' },
+    });
   }
 
   // 4. 招募池（缺失才建：注册路径恒新建；回填路径保留老用户已有池）
@@ -133,7 +142,13 @@ export async function grantOnboardingPackage(
     await tx.recruitPool.create({
       data: {
         userId,
-        candidates: jsonWrite(generatePool(rng, { ...genCtx, reputation: updated.reputation, ownedStudents }, POOL_SIZE)),
+        candidates: jsonWrite(
+          generatePool(
+            rng,
+            { ...genCtx, reputation: updated.reputation, ownedStudents },
+            POOL_SIZE,
+          ),
+        ),
         generatedAt: now,
         refreshDayKey: dayKey(now),
       },

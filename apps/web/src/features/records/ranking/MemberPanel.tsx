@@ -25,10 +25,7 @@ export interface MemberPanelState {
   notes: string[];
 }
 
-export function createEmptyMemberState(
-  memberIndex: number,
-  displayName: string,
-): MemberPanelState {
+export function createEmptyMemberState(memberIndex: number, displayName: string): MemberPanelState {
   return {
     memberIndex,
     displayName,

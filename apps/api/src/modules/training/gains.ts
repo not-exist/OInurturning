@@ -56,10 +56,26 @@ export const DIM_META: Record<
 > = {
   DS: { column: ABILITY_COLUMN.DS, bookSubject: DIMENSION_CONFIG.DS, metaKey: 'training_ds' },
   DP: { column: ABILITY_COLUMN.DP, bookSubject: DIMENSION_CONFIG.DP, metaKey: 'training_dp' },
-  MATH: { column: ABILITY_COLUMN.MATH, bookSubject: DIMENSION_CONFIG.MATH, metaKey: 'training_math' },
-  GRAPH: { column: ABILITY_COLUMN.GRAPH, bookSubject: DIMENSION_CONFIG.GRAPH, metaKey: 'training_graph' },
-  GREEDY: { column: ABILITY_COLUMN.GREEDY, bookSubject: DIMENSION_CONFIG.GREEDY, metaKey: 'training_greedy' },
-  STRING: { column: ABILITY_COLUMN.STRING, bookSubject: DIMENSION_CONFIG.STRING, metaKey: 'training_string' },
+  MATH: {
+    column: ABILITY_COLUMN.MATH,
+    bookSubject: DIMENSION_CONFIG.MATH,
+    metaKey: 'training_math',
+  },
+  GRAPH: {
+    column: ABILITY_COLUMN.GRAPH,
+    bookSubject: DIMENSION_CONFIG.GRAPH,
+    metaKey: 'training_graph',
+  },
+  GREEDY: {
+    column: ABILITY_COLUMN.GREEDY,
+    bookSubject: DIMENSION_CONFIG.GREEDY,
+    metaKey: 'training_greedy',
+  },
+  STRING: {
+    column: ABILITY_COLUMN.STRING,
+    bookSubject: DIMENSION_CONFIG.STRING,
+    metaKey: 'training_string',
+  },
 };
 
 /** 主收益公式 Δ（student.md §4.3）：浮点累积；cur≥100 计 0 */

@@ -45,14 +45,14 @@
 
 ### 0.2 技术原则
 
-| # | 原则 | 含义与理由 |
-|---|---|---|
-| P1 | **服务端权威结算** | 客户端只提交意图（"用学员 A 进行定向训练"），一切数值判定、随机、扣减都在服务端完成；客户端只读展示。防作弊做到够用即可的根基。 |
-| P2 | **即时模拟 + 战报回放** | 比赛/对决在请求内同步模拟完毕并落库战报 JSON；无长连接、无后台对局进程。前端渲染的是持久化战报而非实时流。 |
-| P3 | **读时惰性结算** | 时间资源（体力/精力/心态/被动收入）不在时钟上推进，而在读写时按 `now - lastSettledAt` 差值一次性补偿（§6）。免 cron、免重启补偿逻辑。 |
-| P4 | **配置即数据** | `docs/data/*.yaml` 同时是策划文档与运行时数据源，API 启动时经 zod 校验导入 MySQL Config 表（§4）。改数值 = 改 yaml + 重启，无需发版。 |
-| P5 | **最小依赖面** | 明确排除 WebSocket / Redis / 消息队列。若未来确需"PVP 开赛提醒"这类弱实时推送，降级替代方案已内置：前端每 30s 轮询 `/api/pvp/tournaments` + 浏览器 Notification API，服务端零改造。 |
-| P6 | **确定性可复现模拟** | 模拟器是纯函数：`(快照输入, seed) → 战报`，不读时钟、不读数据库、不用 `Math.random()`。同 seed 必得同战报，用于审计、bug 复现与单测（§7）。 |
+| #   | 原则                    | 含义与理由                                                                                                                                                                          |
+| --- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1  | **服务端权威结算**      | 客户端只提交意图（"用学员 A 进行定向训练"），一切数值判定、随机、扣减都在服务端完成；客户端只读展示。防作弊做到够用即可的根基。                                                     |
+| P2  | **即时模拟 + 战报回放** | 比赛/对决在请求内同步模拟完毕并落库战报 JSON；无长连接、无后台对局进程。前端渲染的是持久化战报而非实时流。                                                                          |
+| P3  | **读时惰性结算**        | 时间资源（体力/精力/心态/被动收入）不在时钟上推进，而在读写时按 `now - lastSettledAt` 差值一次性补偿（§6）。免 cron、免重启补偿逻辑。                                               |
+| P4  | **配置即数据**          | `docs/data/*.yaml` 同时是策划文档与运行时数据源，API 启动时经 zod 校验导入 MySQL Config 表（§4）。改数值 = 改 yaml + 重启，无需发版。                                               |
+| P5  | **最小依赖面**          | 明确排除 WebSocket / Redis / 消息队列。若未来确需"PVP 开赛提醒"这类弱实时推送，降级替代方案已内置：前端每 30s 轮询 `/api/pvp/tournaments` + 浏览器 Notification API，服务端零改造。 |
+| P6  | **确定性可复现模拟**    | 模拟器是纯函数：`(快照输入, seed) → 战报`，不读时钟、不读数据库、不用 `Math.random()`。同 seed 必得同战报，用于审计、bug 复现与单测（§7）。                                         |
 
 ### 0.3 规模假设
 
@@ -146,8 +146,7 @@ export type TraitSeverity = (typeof TRAIT_SEVERITIES)[number];
 /** 六维键（GAME-DESIGN §6：六个独立数值，绝不合并） */
 export const DIMENSIONS = ['DS', 'DP', 'MATH', 'GRAPH', 'GREEDY', 'STRING'] as const;
 export type DimensionKey = (typeof DIMENSIONS)[number];
-export type AbilityKey =
-  | DimensionKey | 'CODING' | 'THINKING' | 'PROBLEM';   // 可被训练/书籍提升的能力
+export type AbilityKey = DimensionKey | 'CODING' | 'THINKING' | 'PROBLEM'; // 可被训练/书籍提升的能力
 
 /** 道具六大分类（GAME-DESIGN §15） */
 export type ItemCategory = 'GROWTH' | 'BOOK' | 'FUNCTIONAL' | 'CONTEST' | 'QUEST' | 'MATERIAL';
@@ -156,7 +155,16 @@ export type ItemCategory = 'GROWTH' | 'BOOK' | 'FUNCTIONAL' | 'CONTEST' | 'QUEST
 export type EventCategory = 'DUEL' | 'FORTUNE' | 'TRIAL' | 'SERENDIPITY' | 'TROUBLE' | 'BOND';
 
 /** 剧情章节 */
-export const CHAPTERS = ['CSP_J', 'CSP_S', 'NOIP', 'PROVINCIAL', 'NOI', 'CTT', 'CTS', 'IOI'] as const;
+export const CHAPTERS = [
+  'CSP_J',
+  'CSP_S',
+  'NOIP',
+  'PROVINCIAL',
+  'NOI',
+  'CTT',
+  'CTS',
+  'IOI',
+] as const;
 export type ChapterKey = (typeof CHAPTERS)[number];
 
 /** 讲课受众档位（报酬/门槛数值见 economy.yaml 的 lectureTiers） */
@@ -170,17 +178,17 @@ export type LectureTier = 'ENTRY' | 'BASIC' | 'ADVANCED' | 'PROVINCIAL' | 'NATIO
 ```ts
 /** talents.yaml —— 天赋定义 */
 export interface TalentDef {
-  id: string;                    // 稳定 id，如 "memoize.green"；家族升阶链由 parent 串成
-  name: string;                  // 展示名，如「记忆化·绿」
+  id: string; // 稳定 id，如 "memoize.green"；家族升阶链由 parent 串成
+  name: string; // 展示名，如「记忆化·绿」
   rarity: Rarity;
-  parentId: string | null;       // 升阶目标（至多一个，null=不可升阶）；灰色天赋的 parent 为净化方向
+  parentId: string | null; // 升阶目标（至多一个，null=不可升阶）；灰色天赋的 parent 为净化方向
   description: string;
-  effects: TalentEffect[];       // 效果语义枚举以本文件 zod schema 为准
+  effects: TalentEffect[]; // 效果语义枚举以本文件 zod schema 为准
 }
 export interface TalentEffect {
-  kind: string;                  // TRAIN_BONUS / ADVENTURE_BONUS / STAT_MULTIPLIER / SPECIAL …
+  kind: string; // TRAIN_BONUS / ADVENTURE_BONUS / STAT_MULTIPLIER / SPECIAL …
   target?: AbilityKey | 'ALL';
-  value: number;                 // 数值含义由 kind 决定
+  value: number; // 数值含义由 kind 决定
 }
 
 /** items.yaml —— 道具定义 */
@@ -189,37 +197,37 @@ export interface ItemDef {
   name: string;
   rarity: Rarity;
   category: ItemCategory;
-  price: number | null;          // 非 null → 商城直售（商城列表即 price!=null 的条目，端点见 §12「背包与商城」「引导与商店」）
+  price: number | null; // 非 null → 商城直售（商城列表即 price!=null 的条目，端点见 §12「背包与商城」「引导与商店」）
   stackable: boolean;
   usableOn: 'STUDENT' | 'SELF' | 'NONE';
-  action: ItemAction;            // 判别联合：使用效果
+  action: ItemAction; // 判别联合：使用效果
   description: string;
 }
 export type ItemAction =
-  | { type: 'RENAME_CARD' }                                   // 改名卡
-  | { type: 'TALENT_UPGRADE' }                                // 进阶石（消耗量按目标稀有度查 economy.yaml）
-  | { type: 'TALENT_REROLL' }                                 // 洗练券
+  | { type: 'RENAME_CARD' } // 改名卡
+  | { type: 'TALENT_UPGRADE' } // 进阶石（消耗量按目标稀有度查 economy.yaml）
+  | { type: 'TALENT_REROLL' } // 洗练券
   | { type: 'MINDSET_DELTA'; amount: number }
   | { type: 'ENERGY_MAX_DELTA'; amount: number }
-  | { type: 'BOOK'; ability: AbilityKey }                     // 六维书/思维书/代码书/出题书
+  | { type: 'BOOK'; ability: AbilityKey } // 六维书/思维书/代码书/出题书
   | { type: 'STAMINA_POTION' }
-  | { type: 'TAG_CARD' }                                      // PVP 独占 tag 获取卡
-  | { type: 'BOX'; rolls: BoxRollSpec[] }                     // 礼盒：按权重池开箱
-  | { type: 'EVENT_TOOL'; toolId: string }                    // 奶茶/备用网线/防火墙等事件化解道具
-  | { type: 'QUEST_MARKER' };                                 // 情报/线索类，仅持有判定
+  | { type: 'TAG_CARD' } // PVP 独占 tag 获取卡
+  | { type: 'BOX'; rolls: BoxRollSpec[] } // 礼盒：按权重池开箱
+  | { type: 'EVENT_TOOL'; toolId: string } // 奶茶/备用网线/防火墙等事件化解道具
+  | { type: 'QUEST_MARKER' }; // 情报/线索类，仅持有判定
 
 /** events.yaml —— 历练事件（41 条，GAME-DESIGN §10 底稿的字段化） */
 export interface EventDefinition {
-  id: string;                    // "G1" .. "C2"，稳定且不可复用
+  id: string; // "G1" .. "C2"，稳定且不可复用
   title: string;
   category: EventCategory;
   rarity: Rarity;
   staminaCost: 1 | 2 | 3;
-  once: boolean;                 // 一次性事件
-  cooldownDays?: number;         // 可重复事件的冷却
-  weight: number;                // 同稀有度池内抽取权重
+  once: boolean; // 一次性事件
+  cooldownDays?: number; // 可重复事件的冷却
+  weight: number; // 同稀有度池内抽取权重
   requires?: EventRequirement[];
-  options: EventOption[];        // ≥1 个；多段事件靠 option outcome 分支续接
+  options: EventOption[]; // ≥1 个；多段事件靠 option outcome 分支续接
 }
 export type EventRequirement =
   | { kind: 'REPUTATION_AT_LEAST'; value: number }
@@ -228,7 +236,7 @@ export type EventRequirement =
 export interface EventOption {
   label: string;
   requirements?: EventRequirement[];
-  outcomes: WeightedOutcome[];   // 加权抽取；含 DUEL 型 outcome 时走 §8.2 对决
+  outcomes: WeightedOutcome[]; // 加权抽取；含 DUEL 型 outcome 时走 §8.2 对决
 }
 export interface WeightedOutcome {
   weight: number;
@@ -236,51 +244,62 @@ export interface WeightedOutcome {
     | { type: 'MONEY'; delta: number }
     | { type: 'REPUTATION'; delta: number }
     | { type: 'ITEM_GRANT'; itemId: string; quantity: number }
-    | { type: 'ITEM_CONSUME'; itemId: string }               // 用道具化解麻烦
+    | { type: 'ITEM_CONSUME'; itemId: string } // 用道具化解麻烦
     | { type: 'STAT_DELTA'; ability: AbilityKey; delta: number; studentScope: 'ACTOR' | 'ALL' }
     | { type: 'MINDSET_DELTA'; delta: number }
-    | { type: 'DUEL'; duel: DuelEventSpec }                  // 对决/遭遇战
-    | { type: 'MINI_CONTEST'; contest: MiniContestSpec }     // Y1 校内模拟赛等小型赛
-    | { type: 'RECRUIT_OFFER'; qualityFloor: string }        // P6 天才少年等招募机会
+    | { type: 'DUEL'; duel: DuelEventSpec } // 对决/遭遇战
+    | { type: 'MINI_CONTEST'; contest: MiniContestSpec } // Y1 校内模拟赛等小型赛
+    | { type: 'RECRUIT_OFFER'; qualityFloor: string } // P6 天才少年等招募机会
     | { type: 'PASSIVE_INCOME'; kind: 'SPONSORSHIP' | 'GUEST_LECTURER'; durationDays?: number } // P4/Y6
     | { type: 'BUFF'; buffId: string; durationHours: number } // Y8 曝光 buff 等
-    | { type: 'BRANCH'; eventId: string };                   // 跳转到后续事件
+    | { type: 'BRANCH'; eventId: string }; // 跳转到后续事件
 }
 
 /** stages.yaml —— 剧情章节/关卡/NPC 池/奖励 */
 export interface StageConfig {
-  key: string;                   // 如 "csp-j.s1"
+  key: string; // 如 "csp-j.s1"
   chapter: ChapterKey;
-  index: number;                 // 关位 1..5
+  index: number; // 关位 1..5
   kind: 'WARMUP' | 'MOCK_1' | 'MOCK_2' | 'MOCK_3' | 'FINAL';
-  rosterSize: number;            // 参赛学员数（题目数与之匹配）
-  questions: QuestionTemplateRef[];   // 引用 problems.yaml 模板 id
-  npcPool: NpcPoolParams;             // NPC 选手池参数（人数/属性分布），数值全在 yaml
-  rewards: StageRewardSpec;           // 首通钱/道具池/里程碑道具，引用 items.yaml id
+  rosterSize: number; // 参赛学员数（题目数与之匹配）
+  questions: QuestionTemplateRef[]; // 引用 problems.yaml 模板 id
+  npcPool: NpcPoolParams; // NPC 选手池参数（人数/属性分布），数值全在 yaml
+  rewards: StageRewardSpec; // 首通钱/道具池/里程碑道具，引用 items.yaml id
 }
 export interface QuestionTemplateRef {
-  templateId: string;            // problems.yaml 中的模板 id
-  dimension: DimensionKey;       // 主导六维
-  traitPool?: { severityFloor: TraitSeverity; chanceBps: number }[];  // 特性出现概率随 NG+ 上移
+  templateId: string; // problems.yaml 中的模板 id
+  dimension: DimensionKey; // 主导六维
+  traitPool?: { severityFloor: TraitSeverity; chanceBps: number }[]; // 特性出现概率随 NG+ 上移
 }
 
 /** economy.yaml —— 经济与恢复参数（单文档单对象，非列表） */
 export interface EconomyConfig {
   recovery: {
-    staminaPerHourBase: number;      // 体力恢复速率基准（× 学员 staminaRegen）
+    staminaPerHourBase: number; // 体力恢复速率基准（× 学员 staminaRegen）
     energyPerHourBase: number;
-    mindsetPerHour: number;          // 心态向基线回归速率
-    mindsetBaseline: number;         // 回归目标
+    mindsetPerHour: number; // 心态向基线回归速率
+    mindsetBaseline: number; // 回归目标
   };
-  trainingCostFormula: string;       // 表达式串，随学员数增长（§9 训练消耗）
-  recruitCostFormula: string;        // 招募费递增公式
+  trainingCostFormula: string; // 表达式串，随学员数增长（§9 训练消耗）
+  recruitCostFormula: string; // 招募费递增公式
   poolRefreshCost: number;
-  upgradeStoneCostByTarget: Record<Rarity, number>;   // §7.3 进阶石消耗（灰→黄=1 … 紫→彩=8）
-  lectureTiers: { tier: LectureTier; requirement: Record<AbilityKey, number>; rewardFormula: string }[];
-  passiveIncome: Record<'SPONSORSHIP' | 'GUEST_LECTURER', { moneyPerDay: number; repPerDay?: number }>;
-  dismissRepPenalty: number;         // 开除声誉惩罚
-  dismissRenameCardChanceBps: number;// 开除回收改名卡概率
-  ngPlus: { demandMultiplierPerLevel: number; traitChanceAddBpsPerLevel: number; moneyMultiplierPerLevel: number };
+  upgradeStoneCostByTarget: Record<Rarity, number>; // §7.3 进阶石消耗（灰→黄=1 … 紫→彩=8）
+  lectureTiers: {
+    tier: LectureTier;
+    requirement: Record<AbilityKey, number>;
+    rewardFormula: string;
+  }[];
+  passiveIncome: Record<
+    'SPONSORSHIP' | 'GUEST_LECTURER',
+    { moneyPerDay: number; repPerDay?: number }
+  >;
+  dismissRepPenalty: number; // 开除声誉惩罚
+  dismissRenameCardChanceBps: number; // 开除回收改名卡概率
+  ngPlus: {
+    demandMultiplierPerLevel: number;
+    traitChanceAddBpsPerLevel: number;
+    moneyMultiplierPerLevel: number;
+  };
 }
 ```
 
@@ -293,11 +312,14 @@ export interface EconomyConfig {
 export interface StudentView {
   id: number;
   name: string;
-  abilities: Record<AbilityKey, number>;   // 六维 + coding/thinking/problemSkill
+  abilities: Record<AbilityKey, number>; // 六维 + coding/thinking/problemSkill
   mindset: number;
   focusCap: number;
-  energy: number; energyMax: number;
-  stamina: number; staminaMax: number; staminaRegen: number;
+  energy: number;
+  energyMax: number;
+  stamina: number;
+  staminaMax: number;
+  staminaRegen: number;
   talents: { talentId: string; name: string; rarity: Rarity }[];
   status: 'ACTIVE' | 'DISMISSED';
   recruitedAt: string;
@@ -306,7 +328,7 @@ export interface StudentView {
 /** 参赛者模拟输入快照（进入比赛时冻结，之后学员变化不影响已开赛事） */
 export interface ParticipantSnapshot {
   side: 'HOME' | 'AWAY' | 'NPC';
-  userId: number | null;          // NPC 为 null
+  userId: number | null; // NPC 为 null
   studentId: number | null;
   displayName: string;
   abilities: Record<AbilityKey, number>;
@@ -319,20 +341,20 @@ export interface ParticipantSnapshot {
 export interface QuestionSnapshot {
   index: number;
   dimension: DimensionKey;
-  demand: number;                 // 六维需求 D
-  thought: number;                // 思维量 M
-  codeVolume: number;             // 代码量 C
+  demand: number; // 六维需求 D
+  thought: number; // 思维量 M
+  codeVolume: number; // 代码量 C
   score: number;
   timeLimitMin: number;
   trait?: { traitId: string; severity: TraitSeverity };
-  source: 'GENERATED' | 'PREMADE';   // 临场生成 or 预制题
+  source: 'GENERATED' | 'PREMADE'; // 临场生成 or 预制题
   premadeEntryId?: number;
 }
 
 /** 战报公共头 */
 export interface ReportHeader {
-  reportVersion: 1;               // 引擎结构版本，渲染层按版本兼容
-  seed: number;                   // u32；同 seed 同输入必复现本报告
+  reportVersion: 1; // 引擎结构版本，渲染层按版本兼容
+  seed: number; // u32；同 seed 同输入必复现本报告
   createdAt: string;
 }
 
@@ -347,9 +369,9 @@ export interface ParticipantTimeline {
   participant: ParticipantSnapshot;
   attempts: {
     questionIndex: number;
-    verdict: 'AC' | 'WA' | 'TLE' | 'SKIP';    // SKIP=弃题（精力耗尽）
+    verdict: 'AC' | 'WA' | 'TLE' | 'SKIP'; // SKIP=弃题（精力耗尽）
     minutesUsed: number;
-    penaltyMin?: number;                       // WA +20min 一类罚时由特性/规则注入
+    penaltyMin?: number; // WA +20min 一类罚时由特性/规则注入
     focusGain: number;
     energyCost: number;
     mindsetDelta: number;
@@ -361,19 +383,19 @@ export interface ParticipantTimeline {
 /** §8.2 出题对决战报（PVP/历练遭遇战） */
 export interface DuelReport extends ReportHeader {
   format: 'DUEL';
-  rounds: DuelRoundReport[];      // 2N 局（N = 每侧人数）+ 可能的加赛局
+  rounds: DuelRoundReport[]; // 2N 局（N = 每侧人数）+ 可能的加赛局
   scores: { home: number; away: number };
-  tiebreak?: 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';  // 平局分流侧重，由场景注入
-  qualityRuleOn: boolean;         // 是否启用【考察出题质量】（未解出出题方+2）
+  tiebreak?: 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY'; // 平局分流侧重，由场景注入
+  qualityRuleOn: boolean; // 是否启用【考察出题质量】（未解出出题方+2）
   winnerSide: 'HOME' | 'AWAY' | 'DRAW';
 }
 export interface DuelRoundReport {
-  roundNo: number;                // 1..2N，加赛从 2N+1 起
-  setterSide: 'HOME' | 'AWAY';    // 本局出题方
+  roundNo: number; // 1..2N，加赛从 2N+1 起
+  setterSide: 'HOME' | 'AWAY'; // 本局出题方
   question: QuestionSnapshot;
   answerer: ParticipantSnapshot;
   solved: boolean;
-  scoreAwarded: number;           // 常规 +1；考察出题质量下未解出为 +2
+  scoreAwarded: number; // 常规 +1；考察出题质量下未解出为 +2
   reason: 'AC' | 'WA' | 'TLE';
 }
 
@@ -382,8 +404,12 @@ export type ContestReport = RankingReport | DuelReport;
 /** 结果摘要（落库 ContestRecord.summary，列表页免解析大 JSON） */
 export interface ContestSummary {
   format: 'RANKING' | 'DUEL';
-  rank?: number; participantCount?: number; totalScore?: number;   // RANKING
-  winnerSide?: 'HOME' | 'AWAY' | 'DRAW'; homeScore?: number; awayScore?: number; // DUEL
+  rank?: number;
+  participantCount?: number;
+  totalScore?: number; // RANKING
+  winnerSide?: 'HOME' | 'AWAY' | 'DRAW';
+  homeScore?: number;
+  awayScore?: number; // DUEL
 }
 ```
 
@@ -392,7 +418,10 @@ export interface ContestSummary {
 统一信封与分页：
 
 ```ts
-export interface ApiEnvelope<T> { ok: true; data: T }
+export interface ApiEnvelope<T> {
+  ok: true;
+  data: T;
+}
 export interface ApiError {
   ok: false;
   error: { code: ErrorCode; message: string; details?: unknown };
@@ -400,38 +429,89 @@ export interface ApiError {
 export type Page<T> = { items: T[]; page: number; pageSize: number; total: number };
 
 export type ErrorCode =
-  | 'UNAUTHENTICATED' | 'INVALID_CREDENTIALS' | 'TOKEN_EXPIRED'
-  | 'FORBIDDEN' | 'NOT_FOUND' | 'VALIDATION_FAILED'
-  | 'INSUFFICIENT_RESOURCE' | 'STATE_CONFLICT' | 'ALREADY_EXISTS'
-  | 'RATE_LIMITED' | 'INTERNAL';
+  | 'UNAUTHENTICATED'
+  | 'INVALID_CREDENTIALS'
+  | 'TOKEN_EXPIRED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'VALIDATION_FAILED'
+  | 'INSUFFICIENT_RESOURCE'
+  | 'STATE_CONFLICT'
+  | 'ALREADY_EXISTS'
+  | 'RATE_LIMITED'
+  | 'INTERNAL';
 ```
 
 代表性请求/响应（完整清单随模块实现扩充，命名规约：`XxxReq` / `XxxRes`）：
 
 ```ts
-export interface LoginReq  { username: string; password: string }
-export interface LoginRes  { accessToken: string; user: MeView }   // refreshToken 走 HttpOnly Cookie
-export interface MeView    { id: number; username: string; role: 'USER'|'ADMIN';
-                             money: number; reputation: number; badges: string[];
-                             createdAt: string; lastLoginAt: string|null }
+export interface LoginReq {
+  username: string;
+  password: string;
+}
+export interface LoginRes {
+  accessToken: string;
+  user: MeView;
+} // refreshToken 走 HttpOnly Cookie
+export interface MeView {
+  id: number;
+  username: string;
+  role: 'USER' | 'ADMIN';
+  money: number;
+  reputation: number;
+  badges: string[];
+  createdAt: string;
+  lastLoginAt: string | null;
+}
 
-export interface TrainBasicReq    { studentId: number }
-export interface TrainDirectedReq { studentId: number; ability: AbilityKey }   // 自动扣减对应书籍
-export interface TrainSpecializedReq { studentId: number; ability: AbilityKey; problemEntryId: number }
+export interface TrainBasicReq {
+  studentId: number;
+}
+export interface TrainDirectedReq {
+  studentId: number;
+  ability: AbilityKey;
+} // 自动扣减对应书籍
+export interface TrainSpecializedReq {
+  studentId: number;
+  ability: AbilityKey;
+  problemEntryId: number;
+}
 
-export interface AdventureDrawReq   { studentId: number; tier: 1|2|3 }
-export interface AdventureDrawRes   { logId: number; event: EventDefinition; availableOptions: number[] }
-export interface AdventureChoiceReq { logId: number; optionIndex: number }
+export interface AdventureDrawReq {
+  studentId: number;
+  tier: 1 | 2 | 3;
+}
+export interface AdventureDrawRes {
+  logId: number;
+  event: EventDefinition;
+  availableOptions: number[];
+}
+export interface AdventureChoiceReq {
+  logId: number;
+  optionIndex: number;
+}
 
-export interface StoryEnterReq { roster: number[] }               // 长度=stage.rosterSize
-export interface StoryEnterRes { recordId: number; report: RankingReport }
+export interface StoryEnterReq {
+  roster: number[];
+} // 长度=stage.rosterSize
+export interface StoryEnterRes {
+  recordId: number;
+  report: RankingReport;
+}
 
-export interface PvpRegisterReq { roster: number[]; problemEntryIds?: number[] }
+export interface PvpRegisterReq {
+  roster: number[];
+  problemEntryIds?: number[];
+}
 
-export interface UseConsumableReq { itemId: string; params?: { talentId?: string; targetTalentId?: string } }
+export interface UseConsumableReq {
+  itemId: string;
+  params?: { talentId?: string; targetTalentId?: string };
+}
 ```
 
 ---
+
 ## 3. 数据库设计（Prisma Schema 级）
 
 MySQL 8 + Prisma 最新稳定版（6.x）。设计要点先行：
@@ -880,27 +960,28 @@ model AdminAuditLog {
 
 ### 3.1 索引设计说明
 
-| 表 | 索引 | 支撑的查询 / 理由 |
-|---|---|---|
-| User | `username` unique | 登录与注册重名检查；唯一索引即查询索引 |
-| Student | `(userId, status)` | 学员管理列表恒定按"当前玩家 + 过滤 DISMISSED"查询 |
-| StudentTalent | `(studentId,talentId)` unique、`talentId` | 唯一性防重复持有；talentId 用于全服天赋分布统计 |
-| UserItem | `(userId, itemId)` unique | 背包页整包读 + 使用道具原子扣减定位 |
-| ProblemLibraryEntry | `(ownerId,status,createdAt)` | 题库页按可用状态倒序分页 |
-| ContestRecord | `(userId,createdAt)`、`(userId,type,createdAt)` | 个人战绩时间线；按类型筛选（剧情/PVP/历练） |
-| StoryProgress | `(userId,ngLevel,stageKey)` unique | 进度读写均按此三元组点查；唯一约束兼防重复首通竞态 |
-| AdventureLog | `(userId,createdAt)`、`(userId,status)`、`(userId,eventId)` | 历史、PENDING 判定、once 判定三条热路径 |
-| PvpTournament | `(status,autoStartAt)` | 锦标赛列表 + 懒推进候选扫描 |
-| PvpRegistration | `(tournamentId,userId)` unique | 报名幂等；重复报名直接冲突报错 |
-| PvpMatch | `(tournamentId,round,slot)` unique、`(tournamentId,round)` | 轮次生成防重；对阵树按轮读取 |
-| PvpRewardGrant | `(tournamentId,userId)` unique、`(tournamentId,rank)` | 赛事奖励台账幂等；公示按名次读取 |
-| PassiveIncomeSource | `(userId)` | 用户级惰性收入结算扫描 |
-| Config* 表 | 主键即语义 id | 运行时点查为主；导入走 upsert 主键命中 |
-| ReputationLog / AdminAuditLog | `(userId/adminId,createdAt)` | 审计时间线倒序分页 |
+| 表                            | 索引                                                        | 支撑的查询 / 理由                                  |
+| ----------------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
+| User                          | `username` unique                                           | 登录与注册重名检查；唯一索引即查询索引             |
+| Student                       | `(userId, status)`                                          | 学员管理列表恒定按"当前玩家 + 过滤 DISMISSED"查询  |
+| StudentTalent                 | `(studentId,talentId)` unique、`talentId`                   | 唯一性防重复持有；talentId 用于全服天赋分布统计    |
+| UserItem                      | `(userId, itemId)` unique                                   | 背包页整包读 + 使用道具原子扣减定位                |
+| ProblemLibraryEntry           | `(ownerId,status,createdAt)`                                | 题库页按可用状态倒序分页                           |
+| ContestRecord                 | `(userId,createdAt)`、`(userId,type,createdAt)`             | 个人战绩时间线；按类型筛选（剧情/PVP/历练）        |
+| StoryProgress                 | `(userId,ngLevel,stageKey)` unique                          | 进度读写均按此三元组点查；唯一约束兼防重复首通竞态 |
+| AdventureLog                  | `(userId,createdAt)`、`(userId,status)`、`(userId,eventId)` | 历史、PENDING 判定、once 判定三条热路径            |
+| PvpTournament                 | `(status,autoStartAt)`                                      | 锦标赛列表 + 懒推进候选扫描                        |
+| PvpRegistration               | `(tournamentId,userId)` unique                              | 报名幂等；重复报名直接冲突报错                     |
+| PvpMatch                      | `(tournamentId,round,slot)` unique、`(tournamentId,round)`  | 轮次生成防重；对阵树按轮读取                       |
+| PvpRewardGrant                | `(tournamentId,userId)` unique、`(tournamentId,rank)`       | 赛事奖励台账幂等；公示按名次读取                   |
+| PassiveIncomeSource           | `(userId)`                                                  | 用户级惰性收入结算扫描                             |
+| Config* 表                    | 主键即语义 id                                               | 运行时点查为主；导入走 upsert 主键命中             |
+| ReputationLog / AdminAuditLog | `(userId/adminId,createdAt)`                                | 审计时间线倒序分页                                 |
 
 不建索引的原则：JSON 列一律不建索引（无 JSON_CONTAINS 查询需求，快照只在拿到记录 id 后读取）；低基数列（format）单独索引无意义，仅作为复合索引尾列出现。
 
 ---
+
 ## 4. 配置即数据管线
 
 ### 4.1 总体流程
@@ -930,19 +1011,19 @@ const FILES = ['talents', 'items', 'problems', 'events', 'stages', 'economy'] as
 async function importConfigs(prisma: PrismaClient): Promise<ConfigBundle> {
   // 1. 加载与解析
   const raw = Object.fromEntries(
-    FILES.map(f => [f, loadYamlFileSync(path.join(CONFIG_DIR, `${f}.yaml`))]),
+    FILES.map((f) => [f, loadYamlFileSync(path.join(CONFIG_DIR, `${f}.yaml`))]),
   );
 
   // 2. 结构校验 —— 收集"所有"文件的"所有"错误，一次性报全，绝不逐个试错
   const errors: ZodErrorWithFile[] = [];
   const parsed = {} as ParsedConfigs;
   for (const f of FILES) {
-    const r = configSchemas[f].safeParse(raw[f]);       // shared 包导出的 zod schema
+    const r = configSchemas[f].safeParse(raw[f]); // shared 包导出的 zod schema
     if (r.success) parsed[f] = r.data;
     else errors.push({ file: f, issues: r.error.issues });
   }
   if (errors.length > 0) {
-    printErrorTable(errors);                            // 文件/路径/期望/实得 三列表格
+    printErrorTable(errors); // 文件/路径/期望/实得 三列表格
     throw new FatalStartupError('config validation failed');
   }
 
@@ -957,27 +1038,34 @@ async function importConfigs(prisma: PrismaClient): Promise<ConfigBundle> {
   // 4. 版本指纹与幂等判断
   const sourceHash = sha256(canonicalJson(raw));
   const done = await prisma.configImport.findFirst({ where: { sourceHash, ok: true } });
-  if (done) return loadBundleFromDb(prisma);            // 重启零成本
+  if (done) return loadBundleFromDb(prisma); // 重启零成本
 
   // 5. 事务性导入：配置整体要么全量生效、要么保持旧版
-  await prisma.$transaction(async tx => {
-    for (const t of parsed.talents)
-      await tx.configTalent.upsert({
-        where: { id: t.id },
-        create: { id: t.id, sourceHash, payload: t },
-        update: { sourceHash, payload: t, deprecated: false },   // 复活曾弃用条目
+  await prisma.$transaction(
+    async (tx) => {
+      for (const t of parsed.talents)
+        await tx.configTalent.upsert({
+          where: { id: t.id },
+          create: { id: t.id, sourceHash, payload: t },
+          update: { sourceHash, payload: t, deprecated: false }, // 复活曾弃用条目
+        });
+      // ... items/problems/events/stages/economy 同构循环 ...
+      // 本批消失的条目 → 软弃用（保留行，历史外键仍有效）
+      await markDeprecated(
+        tx,
+        'configTalent',
+        idsOf(parsed.talents),
+        /* where */ { deprecated: false, id: { notIn: idsOf(parsed.talents) } },
+      );
+      // ... 其余 Config 表同理 ...
+      await tx.configImport.create({
+        data: { sourceHash, manifest: buildManifest(raw), ok: true },
       });
-    // ... items/problems/events/stages/economy 同构循环 ...
-    // 本批消失的条目 → 软弃用（保留行，历史外键仍有效）
-    await markDeprecated(tx, 'configTalent',
-      idsOf(parsed.talents), /* where */ { deprecated: false, id: { notIn: idsOf(parsed.talents) } });
-    // ... 其余 Config 表同理 ...
-    await tx.configImport.create({
-      data: { sourceHash, manifest: buildManifest(raw), ok: true },
-    });
-  }, { timeout: 20_000 });
+    },
+    { timeout: 20_000 },
+  );
 
-  return loadBundleFromDb(prisma);                      // 冻结进只读内存缓存 CONFIG
+  return loadBundleFromDb(prisma); // 冻结进只读内存缓存 CONFIG
 }
 ```
 
@@ -1014,19 +1102,19 @@ async function importConfigs(prisma: PrismaClient): Promise<ConfigBundle> {
 
 错误码约定：
 
-| code | HTTP | 场景 |
-|---|---|---|
-| UNAUTHENTICATED | 401 | 未登录 / token 无效或已因 tokenVersion 变更失效 |
-| INVALID_CREDENTIALS | 401 | 用户名或密码错误（不区分二者，防枚举） |
-| TOKEN_EXPIRED | 401 | accessToken 过期；前端应静默调 refresh 后重放 |
-| FORBIDDEN | 403 | 权限不足（含访问他人学员、USER 打 admin 路由、被封禁） |
-| NOT_FOUND | 404 | 资源不存在或不属于当前用户（后者统一 404 防探测） |
-| VALIDATION_FAILED | 400 | zod 校验失败，details 携带字段级问题 |
-| INSUFFICIENT_RESOURCE | 409 | 钱/声誉/体力/精力/道具不足，details.resource 标明种类 |
-| STATE_CONFLICT | 409 | 状态机不允许（报名已截止、赛事已开赛、事件选项非法等） |
-| ALREADY_EXISTS | 409 | 唯一冲突（重复报名、槽位已被招募） |
-| RATE_LIMITED | 429 | 触发限流 |
-| INTERNAL | 500 | 未预期异常（日志含 requestId） |
+| code                  | HTTP | 场景                                                   |
+| --------------------- | ---- | ------------------------------------------------------ |
+| UNAUTHENTICATED       | 401  | 未登录 / token 无效或已因 tokenVersion 变更失效        |
+| INVALID_CREDENTIALS   | 401  | 用户名或密码错误（不区分二者，防枚举）                 |
+| TOKEN_EXPIRED         | 401  | accessToken 过期；前端应静默调 refresh 后重放          |
+| FORBIDDEN             | 403  | 权限不足（含访问他人学员、USER 打 admin 路由、被封禁） |
+| NOT_FOUND             | 404  | 资源不存在或不属于当前用户（后者统一 404 防探测）      |
+| VALIDATION_FAILED     | 400  | zod 校验失败，details 携带字段级问题                   |
+| INSUFFICIENT_RESOURCE | 409  | 钱/声誉/体力/精力/道具不足，details.resource 标明种类  |
+| STATE_CONFLICT        | 409  | 状态机不允许（报名已截止、赛事已开赛、事件选项非法等） |
+| ALREADY_EXISTS        | 409  | 唯一冲突（重复报名、槽位已被招募）                     |
+| RATE_LIMITED          | 429  | 触发限流                                               |
+| INTERNAL              | 500  | 未预期异常（日志含 requestId）                         |
 
 并发控制三件套（贯穿下表所有扣减类端点）：
 
@@ -1049,127 +1137,128 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 
 **认证与元信息**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 1 | POST /api/auth/register | 公开 | username+password（zod 强度校验） | 自动登录，accessToken + 刷新 Cookie | 注册 |
-| 2 | POST /api/auth/login | 公开 | username+password | accessToken + 刷新 Cookie；更新 lastLoginAt | 登录 |
-| 3 | POST /api/auth/refresh | 公开(Cookie) | 无 body，读 HttpOnly 刷新 Cookie | 轮换新 accessToken + 新 Cookie | 会话续期 |
-| 4 | POST /api/auth/logout | 登录 | — | 清 Cookie；tokenVersion+1 全设备失效 | 登出 |
-| 5 | PUT /api/auth/password | 登录 | oldPassword+newPassword | 成功后 tokenVersion+1，需重新登录 | 设置页改密 |
-| 6 | POST /api/auth/deactivate | 登录 | password 确认 | 物理删除账号 + DB 级联清数据（§9.6），清 Cookie；进行中赛事参赛者 409 STATE_CONFLICT | 设置页注销 |
-| 7 | GET /api/users/me | 登录 | — | MeView（id/注册时间/lastLoginAt/钱/声誉/勋章） | 设置页展示 |
-| 8 | GET /api/meta | 公开 | — | configVersion、serverTime、恢复速率常量 | 前端本地投影（**未实现**：源码无此端点；探活走 `GET /api/health`） |
+| #   | 方法 路径                 | 鉴权         | 请求要点                          | 响应要点                                                                             | 玩法                                                               |
+| --- | ------------------------- | ------------ | --------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| 1   | POST /api/auth/register   | 公开         | username+password（zod 强度校验） | 自动登录，accessToken + 刷新 Cookie                                                  | 注册                                                               |
+| 2   | POST /api/auth/login      | 公开         | username+password                 | accessToken + 刷新 Cookie；更新 lastLoginAt                                          | 登录                                                               |
+| 3   | POST /api/auth/refresh    | 公开(Cookie) | 无 body，读 HttpOnly 刷新 Cookie  | 轮换新 accessToken + 新 Cookie                                                       | 会话续期                                                           |
+| 4   | POST /api/auth/logout     | 登录         | —                                 | 清 Cookie；tokenVersion+1 全设备失效                                                 | 登出                                                               |
+| 5   | PUT /api/auth/password    | 登录         | oldPassword+newPassword           | 成功后 tokenVersion+1，需重新登录                                                    | 设置页改密                                                         |
+| 6   | POST /api/auth/deactivate | 登录         | password 确认                     | 物理删除账号 + DB 级联清数据（§9.6），清 Cookie；进行中赛事参赛者 409 STATE_CONFLICT | 设置页注销                                                         |
+| 7   | GET /api/users/me         | 登录         | —                                 | MeView（id/注册时间/lastLoginAt/钱/声誉/勋章）                                       | 设置页展示                                                         |
+| 8   | GET /api/meta             | 公开         | —                                 | configVersion、serverTime、恢复速率常量                                              | 前端本地投影（**未实现**：源码无此端点；探活走 `GET /api/health`） |
 
 **学员管理**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 9 | GET /api/students | 登录 | ?status=&sort= | StudentView[]，含惰性投影后的体力/精力 | 学员列表 |
-| 10 | GET /api/students/:id | 登录 | — | StudentView 详情 + 天赋列表 | 学员详情 |
-| 11 | POST /api/students/:id/rename | 登录 | newName；自动消耗改名卡×1 | 新名字；无改名卡 409 | 改名卡改名 |
-| 12 | POST /api/students/:id/dismiss | 登录 | — | 扣声誉（economy.dismissRepPenalty）、概率回收改名卡、status→DISMISSED | 开除 |
-| 13 | POST /api/students/:id/consumables | 登录 | itemId + params（升阶指明天赋、洗练指定方向锁定等） | 结算结果（升阶成败必成/洗练新天赋/心态增量） | 养成道具 |
+| #   | 方法 路径                          | 鉴权 | 请求要点                                            | 响应要点                                                              | 玩法       |
+| --- | ---------------------------------- | ---- | --------------------------------------------------- | --------------------------------------------------------------------- | ---------- |
+| 9   | GET /api/students                  | 登录 | ?status=&sort=                                      | StudentView[]，含惰性投影后的体力/精力                                | 学员列表   |
+| 10  | GET /api/students/:id              | 登录 | —                                                   | StudentView 详情 + 天赋列表                                           | 学员详情   |
+| 11  | POST /api/students/:id/rename      | 登录 | newName；自动消耗改名卡×1                           | 新名字；无改名卡 409                                                  | 改名卡改名 |
+| 12  | POST /api/students/:id/dismiss     | 登录 | —                                                   | 扣声誉（economy.dismissRepPenalty）、概率回收改名卡、status→DISMISSED | 开除       |
+| 13  | POST /api/students/:id/consumables | 登录 | itemId + params（升阶指明天赋、洗练指定方向锁定等） | 结算结果（升阶成败必成/洗练新天赋/心态增量）                          | 养成道具   |
 
 **训练**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 14 | POST /api/trainings/basic | 登录 | studentId | 扣钱+体力1，随机六维+Δ（递减曲线），极低概率附赠成长 | §9 基础训练 |
-| 15 | POST /api/trainings/directed | 登录 | studentId+ability | 消耗对应书籍，大幅提升指定维度 | 定向训练 |
-| 16 | POST /api/trainings/specialized | 登录 | studentId+ability+problemEntryId | 消耗自制预制题，效率高于定向；题目标记 timesUsed+1 | 专项训练 |
+| #   | 方法 路径                       | 鉴权 | 请求要点                         | 响应要点                                             | 玩法        |
+| --- | ------------------------------- | ---- | -------------------------------- | ---------------------------------------------------- | ----------- |
+| 14  | POST /api/trainings/basic       | 登录 | studentId                        | 扣钱+体力1，随机六维+Δ（递减曲线），极低概率附赠成长 | §9 基础训练 |
+| 15  | POST /api/trainings/directed    | 登录 | studentId+ability                | 消耗对应书籍，大幅提升指定维度                       | 定向训练    |
+| 16  | POST /api/trainings/specialized | 登录 | studentId+ability+problemEntryId | 消耗自制预制题，效率高于定向；题目标记 timesUsed+1   | 专项训练    |
 
 **历练**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 17 | POST /api/adventures/draw | 登录 | roster(3 名学员 id)+tier(1..3)；任一体力不足或已有 PENDING 则失败 | 先抽档过滤再稀有度加权池抽取；返回事件与可用选项 | §10 抽事件 |
-| 18 | POST /api/adventures/:id/choice | 登录 | optionIndex（须满足 requirements） | 分支/对决（内联生成 ContestRecord）/奖励结算；RESOLVED | 事件选项 |
-| 19 | GET /api/adventures/logs | 登录 | 分页 | AdventureLog 历史（含结果摘要） | 历练档案 |
+| #   | 方法 路径                       | 鉴权 | 请求要点                                                          | 响应要点                                               | 玩法       |
+| --- | ------------------------------- | ---- | ----------------------------------------------------------------- | ------------------------------------------------------ | ---------- |
+| 17  | POST /api/adventures/draw       | 登录 | roster(3 名学员 id)+tier(1..3)；任一体力不足或已有 PENDING 则失败 | 先抽档过滤再稀有度加权池抽取；返回事件与可用选项       | §10 抽事件 |
+| 18  | POST /api/adventures/:id/choice | 登录 | optionIndex（须满足 requirements）                                | 分支/对决（内联生成 ContestRecord）/奖励结算；RESOLVED | 事件选项   |
+| 19  | GET /api/adventures/logs        | 登录 | 分页                                                              | AdventureLog 历史（含结果摘要）                        | 历练档案   |
 
 **高级学院**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 20 | GET /api/academy/pool | 登录 | — | 当前学员池（品质档隐藏，只露可见属性）；过期则懒刷新 | §12 招募池 |
-| 21 | POST /api/academy/refresh | 登录 | — | 扣 poolRefreshCost，重掷学员池 | 手动刷新 |
-| 22 | POST /api/academy/recruit | 登录 | slotId；幂等键 | 按 recruitCostFormula 扣钱；声誉微幅加成属性；生成学员+天赋 | 招募 |
-| 23 | GET /api/academy/lecture-tiers | 登录 | — | 五档受众：门槛/报酬公式说明/解锁状态 | 讲课接单面板 |
-| 24 | POST /api/academy/lectures | 登录 | studentId+tier | 能力达标即时结算钱+声誉（溢出加成；不足强接则扣声誉）；同事务结算讲课成长（setting/thinking，返回 gains + thinkingReq + thinkingDeficit；强接思维不足讲砸为负增量）；学员进入讲课冷却 | §12 讲课 + gameplay §4.2.1 |
-| 25 | GET /api/academy/lectures | 登录 | 分页 | 讲课历史与收益 | 讲课记录 |
+| #   | 方法 路径                      | 鉴权 | 请求要点       | 响应要点                                                                                                                                                                              | 玩法                       |
+| --- | ------------------------------ | ---- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| 20  | GET /api/academy/pool          | 登录 | —              | 当前学员池（品质档隐藏，只露可见属性）；过期则懒刷新                                                                                                                                  | §12 招募池                 |
+| 21  | POST /api/academy/refresh      | 登录 | —              | 扣 poolRefreshCost，重掷学员池                                                                                                                                                        | 手动刷新                   |
+| 22  | POST /api/academy/recruit      | 登录 | slotId；幂等键 | 按 recruitCostFormula 扣钱；声誉微幅加成属性；生成学员+天赋                                                                                                                           | 招募                       |
+| 23  | GET /api/academy/lecture-tiers | 登录 | —              | 五档受众：门槛/报酬公式说明/解锁状态                                                                                                                                                  | 讲课接单面板               |
+| 24  | POST /api/academy/lectures     | 登录 | studentId+tier | 能力达标即时结算钱+声誉（溢出加成；不足强接则扣声誉）；同事务结算讲课成长（setting/thinking，返回 gains + thinkingReq + thinkingDeficit；强接思维不足讲砸为负增量）；学员进入讲课冷却 | §12 讲课 + gameplay §4.2.1 |
+| 25  | GET /api/academy/lectures      | 登录 | 分页           | 讲课历史与收益                                                                                                                                                                        | 讲课记录                   |
 
 **出题题库**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 26 | POST /api/problem-library | 登录 | studentId+dimension；扣体力 | 出题能力映射质量评级与特性概率；题目入库 | §11 出题行动 |
-| 27 | GET /api/problem-library | 登录 | ?status=AVAILABLE | 题目列表（参数+质量+特性+用途计数） | 题库页 |
-| 28 | DELETE /api/problem-library/:id | 登录 | — | 仅 AVAILABLE 可删 | 删除预制题 |
+| #   | 方法 路径                       | 鉴权 | 请求要点                    | 响应要点                                 | 玩法         |
+| --- | ------------------------------- | ---- | --------------------------- | ---------------------------------------- | ------------ |
+| 26  | POST /api/problem-library       | 登录 | studentId+dimension；扣体力 | 出题能力映射质量评级与特性概率；题目入库 | §11 出题行动 |
+| 27  | GET /api/problem-library        | 登录 | ?status=AVAILABLE           | 题目列表（参数+质量+特性+用途计数）      | 题库页       |
+| 28  | DELETE /api/problem-library/:id | 登录 | —                           | 仅 AVAILABLE 可删                        | 删除预制题   |
 
 **剧情模式**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 29 | GET /api/story/overview | 登录 | ?ngLevel= | 八章关卡树 + 解锁状态 + 进度合并视图 | §13 章节选择 |
-| 30 | POST /api/story/stages/:stageKey/enter | 登录 | roster[]（长度=rosterSize）；幂等键；校验前置关卡解锁与 NG+ 层级 | 同步模拟 → ContestRecord + RankingReport + 发奖（首通/名次奖金） | §13 开赛 |
-| 31 | GET /api/story/progress | 登录 | — | StoryProgress 全集 | 进度查询 |
-| 32 | GET /api/records/:recordId | 登录 | — | ContestRecord（战报 JSON；剧情/PVP/历练共用查看器） | 战报回放 |
+| #   | 方法 路径                              | 鉴权 | 请求要点                                                         | 响应要点                                                         | 玩法         |
+| --- | -------------------------------------- | ---- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | ------------ |
+| 29  | GET /api/story/overview                | 登录 | ?ngLevel=                                                        | 八章关卡树 + 解锁状态 + 进度合并视图                             | §13 章节选择 |
+| 30  | POST /api/story/stages/:stageKey/enter | 登录 | roster[]（长度=rosterSize）；幂等键；校验前置关卡解锁与 NG+ 层级 | 同步模拟 → ContestRecord + RankingReport + 发奖（首通/名次奖金） | §13 开赛     |
+| 31  | GET /api/story/progress                | 登录 | —                                                                | StoryProgress 全集                                               | 进度查询     |
+| 32  | GET /api/records/:recordId             | 登录 | —                                                                | ContestRecord（战报 JSON；剧情/PVP/历练共用查看器）              | 战报回放     |
 
 **PVP**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 33 | GET /api/pvp/tournaments | 登录 | ?status= | 锦标赛列表（状态/截止/奖池概要） | §14 赛事大厅 |
-| 34 | GET /api/pvp/tournaments/:id | 登录 | — | 详情（规则/奖池/我的报名状态）；顺带触发懒推进 | 赛事详情 |
-| 35 | POST /api/pvp/tournaments/:id/registration | 登录 | roster[]+problemEntryIds[]；截止前可提交 | 冻结阵容快照入库；重复报名 409 | 报名锁阵 |
-| 36 | DELETE /api/pvp/tournaments/:id/registration | 登录 | — | 截止前退赛；截止后 409 | 退赛（**未实现**：pvp router 无 DELETE，仅能报名不能退赛） |
-| 37 | GET /api/pvp/tournaments/:id/bracket | 登录 | — | 对阵树（轮次/比分/胜者/战报链接）；顺带触发懒推进 | 对阵树 |
-| 38 | GET /api/pvp/tournaments/:id/rewards | 登录 | — | 奖励公示与领取状态；顺带触发懒推进 | 公示领奖 |
-| 39 | POST /api/pvp/tournaments/:id/rewards/claim | 登录 | — | 本人奖励原子入账；重复请求返回已领取台账 | 领奖 |
+| #   | 方法 路径                                    | 鉴权 | 请求要点                                 | 响应要点                                          | 玩法                                                       |
+| --- | -------------------------------------------- | ---- | ---------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| 33  | GET /api/pvp/tournaments                     | 登录 | ?status=                                 | 锦标赛列表（状态/截止/奖池概要）                  | §14 赛事大厅                                               |
+| 34  | GET /api/pvp/tournaments/:id                 | 登录 | —                                        | 详情（规则/奖池/我的报名状态）；顺带触发懒推进    | 赛事详情                                                   |
+| 35  | POST /api/pvp/tournaments/:id/registration   | 登录 | roster[]+problemEntryIds[]；截止前可提交 | 冻结阵容快照入库；重复报名 409                    | 报名锁阵                                                   |
+| 36  | DELETE /api/pvp/tournaments/:id/registration | 登录 | —                                        | 截止前退赛；截止后 409                            | 退赛（**未实现**：pvp router 无 DELETE，仅能报名不能退赛） |
+| 37  | GET /api/pvp/tournaments/:id/bracket         | 登录 | —                                        | 对阵树（轮次/比分/胜者/战报链接）；顺带触发懒推进 | 对阵树                                                     |
+| 38  | GET /api/pvp/tournaments/:id/rewards         | 登录 | —                                        | 奖励公示与领取状态；顺带触发懒推进                | 公示领奖                                                   |
+| 39  | POST /api/pvp/tournaments/:id/rewards/claim  | 登录 | —                                        | 本人奖励原子入账；重复请求返回已领取台账          | 领奖                                                       |
 
 **背包与商城**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 38 | GET /api/items | 登录 | — | UserItem[] 合并 ConfigItem 元数据（名称/稀有度/分类） | §15 背包 |
-| 39 | GET /api/shop/catalog | 登录 | — | price!=null 的 ItemDef 列表 + 门槛/限购/持有数（原设计写作 `GET /api/marketplace`） | 商城书架 |
-| 40 | POST /api/shop/buy | 登录 | itemId+quantity(1–99)；可选 `Idempotency-Key` 头 | 事务内 `FOR UPDATE` + 条件 UPDATE 扣钱入账道具；超日/周限购或声誉不足即 400/409（原设计写作 `POST /api/marketplace/orders`） | 购买 |
-| 41 | GET /api/shop/logs | 登录 | ?limit=1..100（默认 20） | `ShopPurchaseLog` 分页：itemId/quantity/dayKey/weekKey | 购买审计 |
+| #   | 方法 路径             | 鉴权 | 请求要点                                         | 响应要点                                                                                                                     | 玩法     |
+| --- | --------------------- | ---- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | -------- |
+| 38  | GET /api/items        | 登录 | —                                                | UserItem[] 合并 ConfigItem 元数据（名称/稀有度/分类）                                                                        | §15 背包 |
+| 39  | GET /api/shop/catalog | 登录 | —                                                | price!=null 的 ItemDef 列表 + 门槛/限购/持有数（原设计写作 `GET /api/marketplace`）                                          | 商城书架 |
+| 40  | POST /api/shop/buy    | 登录 | itemId+quantity(1–99)；可选 `Idempotency-Key` 头 | 事务内 `FOR UPDATE` + 条件 UPDATE 扣钱入账道具；超日/周限购或声誉不足即 400/409（原设计写作 `POST /api/marketplace/orders`） | 购买     |
+| 41  | GET /api/shop/logs    | 登录 | ?limit=1..100（默认 20）                         | `ShopPurchaseLog` 分页：itemId/quantity/dayKey/weekKey                                                                       | 购买审计 |
 
 **引导与商店**（PR #61 引入；`docs/data/tutorial.yaml`、`docs/data/shop.yaml` 为数据源）
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 42 | GET /api/tutorial | 登录 | — | `{ step, completed, total, steps, unlocked, current }`；ADMIN 一律返回已完成 | 引导状态 |
-| 43 | POST /api/tutorial/advance | 登录 | `{ step }` | 仅允许前进 1 步；`manual` 只允许推进 `action==='none'` 的步，回退/跳步 409 | 手动推进（欢迎步） |
-| 44 | POST /api/tutorial/complete | 登录 | — | 必须已走到末步，否则 409；发末步奖励并置 `tutorialCompleted` | 完成引导 |
-| 45 | POST /api/tutorial/skip | 登录 | 仅 `NODE_ENV=test` | 纯状态捷径：置 `tutorialCompleted`，**不发奖励** | 测试后门 |
-| 46 | （守卫）`requireTutorialForApi` | — | 全局 `app.use`，位于所有 router 之前 | 未完成引导的账号仅放行 `/api/tutorial`、`/api/overview`、`/api/users/me`、`/api/auth`、`/api/talents`，其余一律 403（`details.resource='tutorial'`）；ADMIN 豁免 | 强制引导锁 |
+| #   | 方法 路径                       | 鉴权 | 请求要点                             | 响应要点                                                                                                                                                         | 玩法               |
+| --- | ------------------------------- | ---- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 42  | GET /api/tutorial               | 登录 | —                                    | `{ step, completed, total, steps, unlocked, current }`；ADMIN 一律返回已完成                                                                                     | 引导状态           |
+| 43  | POST /api/tutorial/advance      | 登录 | `{ step }`                           | 仅允许前进 1 步；`manual` 只允许推进 `action==='none'` 的步，回退/跳步 409                                                                                       | 手动推进（欢迎步） |
+| 44  | POST /api/tutorial/complete     | 登录 | —                                    | 必须已走到末步，否则 409；发末步奖励并置 `tutorialCompleted`                                                                                                     | 完成引导           |
+| 45  | POST /api/tutorial/skip         | 登录 | 仅 `NODE_ENV=test`                   | 纯状态捷径：置 `tutorialCompleted`，**不发奖励**                                                                                                                 | 测试后门           |
+| 46  | （守卫）`requireTutorialForApi` | —    | 全局 `app.use`，位于所有 router 之前 | 未完成引导的账号仅放行 `/api/tutorial`、`/api/overview`、`/api/users/me`、`/api/auth`、`/api/talents`，其余一律 403（`details.resource='tutorial'`）；ADMIN 豁免 | 强制引导锁         |
 
 数据：`users.tutorialStep`、`users.tutorialCompleted`；购买流水表 `ShopPurchaseLog(userId, itemId, quantity, dayKey, weekKey)`，日/周限购按其聚合（`dayKey`/`weekKey` 口径见 `apps/api/src/lib/clock.ts`，04:00 为日界）。
 引导步骤由服务端按 `action` 自动推进（训练/讲课/剧情/学员页/学院池/商城；历练不设引导步，入口随招募步的 unlock 一并放行），未完成前前端侧栏锁定对应入口并深链重定向到 `/`；上线影响面与运维放行见 `docs/OPERATIONS.md` §11。
 
 **管理端**（requireAdmin，全部写 AdminAuditLog）
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 47 | POST /api/admin/pvp-tournaments | 管理 | name/registerEndsAt/autoStartAt/config | 创建 REGISTERING 锦标赛并全服公告位可见 | §14 发布通告 |
-| 48 | PATCH /api/admin/pvp-tournaments/:id | 管理 | prizes 等（REGISTERING 期可改） | 更新奖池 | 配置奖池 |
-| 49 | POST /api/admin/pvp-tournaments/:id/actions/start | 管理 | — | 截止即开：生成首轮对阵（奇数轮空）；提前触发懒推进 | 手动开赛 |
-| 50 | GET /api/admin/users | 管理 | ?q=&page= | 用户列表（钱/声誉/学员数/封禁态） | 用户管理 |
-| 51 | PATCH /api/admin/users/:id | 管理 | role 或 banned 布尔 | 改角色/封禁解封（封禁即 tokenVersion+1 踢下线） | 用户管理 |
-| 52 | GET /api/admin/audits | 管理 | ?action=&page= | AdminAuditLog 分页 | 审计查询 |
-| 53 | POST /api/admin/config/reload | 管理 | — | 重跑 §4 导入管线并热替换内存缓存 | 运维换配置（**未实现**：源码无此端点，改 yaml 后重启 api 容器，见 `docs/OPERATIONS.md` §8） |
-| 54 | GET /api/health | 公开 | — | { ok, uptime, configVersion }；供容器 healthcheck | 运维探活 |
+| #   | 方法 路径                                         | 鉴权 | 请求要点                               | 响应要点                                           | 玩法                                                                                        |
+| --- | ------------------------------------------------- | ---- | -------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 47  | POST /api/admin/pvp-tournaments                   | 管理 | name/registerEndsAt/autoStartAt/config | 创建 REGISTERING 锦标赛并全服公告位可见            | §14 发布通告                                                                                |
+| 48  | PATCH /api/admin/pvp-tournaments/:id              | 管理 | prizes 等（REGISTERING 期可改）        | 更新奖池                                           | 配置奖池                                                                                    |
+| 49  | POST /api/admin/pvp-tournaments/:id/actions/start | 管理 | —                                      | 截止即开：生成首轮对阵（奇数轮空）；提前触发懒推进 | 手动开赛                                                                                    |
+| 50  | GET /api/admin/users                              | 管理 | ?q=&page=                              | 用户列表（钱/声誉/学员数/封禁态）                  | 用户管理                                                                                    |
+| 51  | PATCH /api/admin/users/:id                        | 管理 | role 或 banned 布尔                    | 改角色/封禁解封（封禁即 tokenVersion+1 踢下线）    | 用户管理                                                                                    |
+| 52  | GET /api/admin/audits                             | 管理 | ?action=&page=                         | AdminAuditLog 分页                                 | 审计查询                                                                                    |
+| 53  | POST /api/admin/config/reload                     | 管理 | —                                      | 重跑 §4 导入管线并热替换内存缓存                   | 运维换配置（**未实现**：源码无此端点，改 yaml 后重启 api 容器，见 `docs/OPERATIONS.md` §8） |
+| 54  | GET /api/health                                   | 公开 | —                                      | { ok, uptime, configVersion }；供容器 healthcheck  | 运维探活                                                                                    |
 
 **总览与训练记录**
 
-| # | 方法 路径 | 鉴权 | 请求要点 | 响应要点 | 玩法 |
-|---|---|---|---|---|---|
-| 55 | GET /api/overview | 登录 | — | 钱包/学员 TOP5/剧情进度/招募池/最近动态/公告/checklist 聚合 | 总览页 |
-| 56 | POST /api/overview/checklist/claim | 登录 | — | 5 步全完成颁发 rookie-done 徽章；事务内重算，重复领取幂等 200（already） | 开局任务领奖 |
-| 57 | GET /api/training/logs | 登录 | ?studentId=&kind=&limit=&cursor=（id 倒序游标） | TrainingLog 分页（含学员名快照/用书/选题） | 训练记录 |
+| #   | 方法 路径                          | 鉴权 | 请求要点                                        | 响应要点                                                                 | 玩法         |
+| --- | ---------------------------------- | ---- | ----------------------------------------------- | ------------------------------------------------------------------------ | ------------ |
+| 55  | GET /api/overview                  | 登录 | —                                               | 钱包/学员 TOP5/剧情进度/招募池/最近动态/公告/checklist 聚合              | 总览页       |
+| 56  | POST /api/overview/checklist/claim | 登录 | —                                               | 5 步全完成颁发 rookie-done 徽章；事务内重算，重复领取幂等 200（already） | 开局任务领奖 |
+| 57  | GET /api/training/logs             | 登录 | ?studentId=&kind=&limit=&cursor=（id 倒序游标） | TrainingLog 分页（含学员名快照/用书/选题）                               | 训练记录     |
 
 ---
+
 ## 6. 行动时钟与懒结算
 
 ### 6.1 问题与方案选择
@@ -1188,17 +1277,17 @@ if (r.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'STAM
 
 ### 6.2 双路径设计：读投影 / 写权威
 
-| 路径 | 行为 | 是否写库 |
-|---|---|---|
-| **读**（GET 学员列表/详情） | 只做**投影**：按恢复速率算出"此刻应有值"，直接返回 | 否 |
-| **写**（训练/历练/开赛/道具） | 在事务内**权威结算**：锁定行 → 补算落库 → 再执行动作扣减 | 是 |
+| 路径                          | 行为                                                     | 是否写库 |
+| ----------------------------- | -------------------------------------------------------- | -------- |
+| **读**（GET 学员列表/详情）   | 只做**投影**：按恢复速率算出"此刻应有值"，直接返回       | 否       |
+| **写**（训练/历练/开赛/道具） | 在事务内**权威结算**：锁定行 → 补算落库 → 再执行动作扣减 | 是       |
 
 读路径永不写库，GET 风暴零写放大；写路径才产生权威状态。前端拿 `/api/meta` 的 serverTime 与恢复速率，可在两次轮询之间自行插值出平滑倒计时条。
 
 ### 6.3 核心伪代码（apps/api/src/domain/settlement.ts）
 
 ```ts
-const MIN_SETTLE_GAP_MS = 30_000;   // 写路径节流：距上次结算不足 30s 视为已新鲜
+const MIN_SETTLE_GAP_MS = 30_000; // 写路径节流：距上次结算不足 30s 视为已新鲜
 
 /** 读路径投影：纯函数，不改库 */
 export function projectStudent(s: StudentRow, now: Date): ProjectedResources {
@@ -1206,41 +1295,55 @@ export function projectStudent(s: StudentRow, now: Date): ProjectedResources {
   const R = CONFIG.economy.recovery;
   return {
     stamina: floor(clamp(s.stamina + R.staminaPerHourBase * s.staminaRegen * dtH, 0, s.staminaMax)),
-    energy:  floor(clamp(s.energy  + R.energyPerHourBase  * dtH, 0, s.energyMax)),
+    energy: floor(clamp(s.energy + R.energyPerHourBase * dtH, 0, s.energyMax)),
     // 心态向基线线性回归（可正可负方向）；速率可为 0 = 关闭回归
-    mindset: Math.round(clamp(
-      s.mindset + Math.sign(R.mindsetBaseline - s.mindset) * R.mindsetPerHour * dtH,
-      MINDSET_MIN, MINDSET_MAX)),
+    mindset: Math.round(
+      clamp(
+        s.mindset + Math.sign(R.mindsetBaseline - s.mindset) * R.mindsetPerHour * dtH,
+        MINDSET_MIN,
+        MINDSET_MAX,
+      ),
+    ),
   };
 }
 
 /** 写路径权威结算：调用方必须处于交互式事务内，且已持有该学员行锁 */
 export function settleStudent(tx: Tx, locked: StudentRow, now: Date): StudentRow {
   if (now.getTime() - locked.lastSettledAt.getTime() < MIN_SETTLE_GAP_MS) return locked;
-  const p = projectRaw(locked, now);            // 同上但不取整（内部保持 Float）
+  const p = projectRaw(locked, now); // 同上但不取整（内部保持 Float）
   return tx.student.update({
     where: { id: locked.id },
     data: {
-      stamina: p.stamina, energy: p.energy, mindset: p.mindset,
-      lastSettledAt: now,                       // 锚点前移，差值只结算一次
+      stamina: p.stamina,
+      energy: p.energy,
+      mindset: p.mindset,
+      lastSettledAt: now, // 锚点前移，差值只结算一次
     },
   });
 }
 
 /** 标准动作包装：锁行 → 结算 → 业务回调（回调内做条件扣减） */
 export async function withSettledStudent<T>(
-  prisma: PrismaClient, userId: number, studentId: number,
+  prisma: PrismaClient,
+  userId: number,
+  studentId: number,
   fn: (tx: Tx, student: StudentRow, now: Date) => Promise<T>,
 ): Promise<T> {
-  return withTxRetry(prisma, async prisma => prisma.$transaction(async tx => {
-    // 固定加锁顺序第一步：先锁 User（§5.1 并发三件套之 3）
-    await tx.$queryRaw`SELECT id FROM \`User\` WHERE id = ${userId} FOR UPDATE`;
-    const [locked] = await tx.$queryRaw<StudentRow[]>(
-      `SELECT * FROM \`Student\` WHERE id = ${studentId} AND userId = ${userId} FOR UPDATE`);
-    if (!locked) throw new ApiError('NOT_FOUND');
-    const settled = settleStudent(tx, locked, new Date());
-    return fn(tx, settled, new Date());         // 例：此处校验 stamina≥cost 后 updateMany 扣减
-  }, { timeout: 10_000 }));
+  return withTxRetry(prisma, async (prisma) =>
+    prisma.$transaction(
+      async (tx) => {
+        // 固定加锁顺序第一步：先锁 User（§5.1 并发三件套之 3）
+        await tx.$queryRaw`SELECT id FROM \`User\` WHERE id = ${userId} FOR UPDATE`;
+        const [locked] = await tx.$queryRaw<StudentRow[]>(
+          `SELECT * FROM \`Student\` WHERE id = ${studentId} AND userId = ${userId} FOR UPDATE`,
+        );
+        if (!locked) throw new ApiError('NOT_FOUND');
+        const settled = settleStudent(tx, locked, new Date());
+        return fn(tx, settled, new Date()); // 例：此处校验 stamina≥cost 后 updateMany 扣减
+      },
+      { timeout: 10_000 },
+    ),
+  );
 }
 ```
 
@@ -1312,8 +1415,8 @@ engine/
 rng.ts 提供：
 
 ```ts
-export type Rng = () => number;                    // [0,1)
-export function mulberry32(seed: number): Rng;     // u32 种子 → 快速高质量 PRNG
+export type Rng = () => number; // [0,1)
+export function mulberry32(seed: number): Rng; // u32 种子 → 快速高质量 PRNG
 export function derive(seed: number, label: string): number;
 // 子流派生：derive(seed, `q${i}:verdict`) —— 每题/每局/每参与者独立子种子，
 // 保证调整某处消耗的随机数个数不影响其它部分的序列（对调试与平衡分析至关重要）
@@ -1363,37 +1466,37 @@ simulateDuel(home: DuelSide, away: DuelSide, opts: DuelOptions, seed: number): D
 
 ### 8.1 技术选型
 
-| 关注点 | 选型 | 理由 |
-|---|---|---|
-| 路由 | React Router v7（library 模式） | SPA 标准解；data router 的 loader 与 TanStack Query 配合良好 |
-| 服务端状态 | **TanStack Query v5** | 本游戏本质是"服务端资源的读写视图"：每个玩法动作=mutation，成功后 invalidate 相关 query 即全站一致（背包、学员、钱声誉联动刷新）。缓存、重试、失效、乐观更新全是现成的 |
-| 客户端状态 | zustand | 只放真正的客户端状态：accessToken（内存，防 XSS 读 localStorage）、抽屉开关、主题偏好。刻意不放任何服务端数据，杜绝双源真相 |
-| 样式 | Tailwind CSS v4 + 少量自建组件 | 无重型 UI 库依赖；稀有度配色等游戏皮肤自定义成本低。六维雷达图用 ~40 行内联 SVG 自绘，不引图表库 |
+| 关注点     | 选型                            | 理由                                                                                                                                                                   |
+| ---------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 路由       | React Router v7（library 模式） | SPA 标准解；data router 的 loader 与 TanStack Query 配合良好                                                                                                           |
+| 服务端状态 | **TanStack Query v5**           | 本游戏本质是"服务端资源的读写视图"：每个玩法动作=mutation，成功后 invalidate 相关 query 即全站一致（背包、学员、钱声誉联动刷新）。缓存、重试、失效、乐观更新全是现成的 |
+| 客户端状态 | zustand                         | 只放真正的客户端状态：accessToken（内存，防 XSS 读 localStorage）、抽屉开关、主题偏好。刻意不放任何服务端数据，杜绝双源真相                                            |
+| 样式       | Tailwind CSS v4 + 少量自建组件  | 无重型 UI 库依赖；稀有度配色等游戏皮肤自定义成本低。六维雷达图用 ~40 行内联 SVG 自绘，不引图表库                                                                       |
 
 API client：薄 fetch 封装（自动带 Bearer、解信封、401 时静默 refresh-and-retry 一次、抛类型化 ApiError），配合小型 codegen 式手写 hooks（`useStudents()`、`useTrainMutation()` …）。
 
 ### 8.2 页面路由表
 
-| 路径 | 页面组件 | 守卫 | 说明 |
-|---|---|---|---|
-| /login | LoginPage | 公开（已登录重定向） | 登录 |
-| /register | RegisterPage | 公开 | 注册 |
-| / | AppLayout | RequireAuth | 主布局：顶栏（≥md）/底部标签栏（<md）+ `<Outlet/>` |
-| /students | StudentManagementPage | 登录 | 学员管理列表 |
-| /students/:id | StudentDetailPage | 登录 | 详情（属性/天赋/养成/训练入口/历史） |
-| /backpack | BackpackPage | 登录 | 背包：道具列表、使用与持有数（**无商城 Tab**；商城是独立一级页 `/shop`） |
-| /shop | ShopPage | 登录 | 商城：书籍/道具购买（声誉门槛 + 日/周限购，04:00 刷新） |
-| /academy/recruit | AcademyRecruitPage | 登录 | 招募池 + 刷新 + 招募 |
-| /academy/lecture | AcademyLecturePage | 登录 | 讲课接单 + 记录 |
-| /adventure | AdventurePage | 登录 | 历练：投入档位 → 事件卡 → 选项 → 结果 |
-| /story | StoryPage | 登录 | 八章关卡树 + NG+ 层切换 |
-| /pvp | PvpListPage | 登录 | 锦标赛大厅 |
-| /pvp/:tournamentId | PvpTournamentPage | 登录 | 详情/报名/对阵树 |
-| /records/:recordId | RecordReportPage | 登录 | 统一战报查看器（剧情/PVP/历练共用） |
-| /settings | SettingsPage | 登录 | 用户信息/改密/注销 |
-| /admin/users | AdminUsersPage | RequireAdmin | 用户管理 |
-| /admin/tournaments | AdminTournamentsPage | RequireAdmin | 发赛/奖池配置 |
-| /admin/audit | AdminAuditPage | RequireAdmin | 审计查询 |
+| 路径               | 页面组件              | 守卫                 | 说明                                                                     |
+| ------------------ | --------------------- | -------------------- | ------------------------------------------------------------------------ |
+| /login             | LoginPage             | 公开（已登录重定向） | 登录                                                                     |
+| /register          | RegisterPage          | 公开                 | 注册                                                                     |
+| /                  | AppLayout             | RequireAuth          | 主布局：顶栏（≥md）/底部标签栏（<md）+ `<Outlet/>`                       |
+| /students          | StudentManagementPage | 登录                 | 学员管理列表                                                             |
+| /students/:id      | StudentDetailPage     | 登录                 | 详情（属性/天赋/养成/训练入口/历史）                                     |
+| /backpack          | BackpackPage          | 登录                 | 背包：道具列表、使用与持有数（**无商城 Tab**；商城是独立一级页 `/shop`） |
+| /shop              | ShopPage              | 登录                 | 商城：书籍/道具购买（声誉门槛 + 日/周限购，04:00 刷新）                  |
+| /academy/recruit   | AcademyRecruitPage    | 登录                 | 招募池 + 刷新 + 招募                                                     |
+| /academy/lecture   | AcademyLecturePage    | 登录                 | 讲课接单 + 记录                                                          |
+| /adventure         | AdventurePage         | 登录                 | 历练：投入档位 → 事件卡 → 选项 → 结果                                    |
+| /story             | StoryPage             | 登录                 | 八章关卡树 + NG+ 层切换                                                  |
+| /pvp               | PvpListPage           | 登录                 | 锦标赛大厅                                                               |
+| /pvp/:tournamentId | PvpTournamentPage     | 登录                 | 详情/报名/对阵树                                                         |
+| /records/:recordId | RecordReportPage      | 登录                 | 统一战报查看器（剧情/PVP/历练共用）                                      |
+| /settings          | SettingsPage          | 登录                 | 用户信息/改密/注销                                                       |
+| /admin/users       | AdminUsersPage        | RequireAdmin         | 用户管理                                                                 |
+| /admin/tournaments | AdminTournamentsPage  | RequireAdmin         | 发赛/奖池配置                                                            |
+| /admin/audit       | AdminAuditPage        | RequireAdmin         | 审计查询                                                                 |
 
 ### 8.3 关键页面组件树
 
@@ -1446,6 +1549,7 @@ API client：薄 fetch 封装（自动带 Bearer、解信封、401 时静默 ref
 - 表格类内容（ standings、背包、审计）在小屏折叠为卡片或启用容器内横向滚动（`overflow-x:auto`），页面本身绝不横滚。
 - 战报时间线的判定色块序列允许横向滚动并带渐隐提示。
 - 触控目标 ≥44px；所有 mutation 按钮提交期间禁用（配 Idempotency-Key 双保险）。
+
 ## 9. 安全基线
 
 定位：朋友/社区小规模服务，防"顺手作恶"与脚本小子，不做企业级加固；但认证存储、注入面、权限边界三项按正确方式做。
@@ -1458,14 +1562,14 @@ API client：薄 fetch 封装（自动带 Bearer、解信封、401 时静默 ref
 
 ### 9.2 JWT 与会话
 
-| 项 | 值 | 说明 |
-|---|---|---|
-| 算法/密钥 | HS256 / `JWT_SECRET` ≥32 字节随机 | 启动时校验长度，不合格拒绝启动 |
-| accessToken | TTL 15 分钟，仅存前端内存（zustand） | 不落 localStorage，XSS 无法持久窃取 |
-| refreshToken | TTL 7 天，HttpOnly + Secure + SameSite=Strict Cookie（Path=/api/auth） | Strict 完全隔离跨站携带，CSRF 面归零；仅 refresh/logout 两端点消费 |
-| 轮换 | 每次 refresh 签发新对 | 旧 access 自然过期 |
-| 全局失效 | 改密/登出全部设备 → `tokenVersion+1` 写回 JWT claim；封禁 → `bannedAt` 标记，`requireAuth` 每次请求读库拦截（即时生效，无 access 15 分钟窗口）；注销 → 账号行物理删除，查库得 null 即拒绝 | 无状态实现"踢下线"，不需要 token 黑名单表 |
-| 已接受风险 | refreshToken 无使用检测（reuse detection 需服务端存储） | 社区规模下风险与成本不成比例；Cookie 属性已限窄路径 |
+| 项           | 值                                                                                                                                                                                        | 说明                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 算法/密钥    | HS256 / `JWT_SECRET` ≥32 字节随机                                                                                                                                                         | 启动时校验长度，不合格拒绝启动                                     |
+| accessToken  | TTL 15 分钟，仅存前端内存（zustand）                                                                                                                                                      | 不落 localStorage，XSS 无法持久窃取                                |
+| refreshToken | TTL 7 天，HttpOnly + Secure + SameSite=Strict Cookie（Path=/api/auth）                                                                                                                    | Strict 完全隔离跨站携带，CSRF 面归零；仅 refresh/logout 两端点消费 |
+| 轮换         | 每次 refresh 签发新对                                                                                                                                                                     | 旧 access 自然过期                                                 |
+| 全局失效     | 改密/登出全部设备 → `tokenVersion+1` 写回 JWT claim；封禁 → `bannedAt` 标记，`requireAuth` 每次请求读库拦截（即时生效，无 access 15 分钟窗口）；注销 → 账号行物理删除，查库得 null 即拒绝 | 无状态实现"踢下线"，不需要 token 黑名单表                          |
+| 已接受风险   | refreshToken 无使用检测（reuse detection 需服务端存储）                                                                                                                                   | 社区规模下风险与成本不成比例；Cookie 属性已限窄路径                |
 
 ### 9.3 HTTP 安全头 / CORS / 限流
 
@@ -1474,11 +1578,11 @@ API client：薄 fetch 封装（自动带 Bearer、解信封、401 时静默 ref
 - **CORS**：生产同源部署（nginx 反代），**不发 CORS 头即是最严策略**；仅开发环境为 vite dev server（默认 `http://localhost:5173`）开白名单，来源取 `WEB_ORIGIN` env。
 - **express-rate-limit**（内存桶，单实例前提；M5 T5.4 起阈值可经 env 覆盖，缺省即下表基线，见 `.env.example` / `docs/OPERATIONS.md §5`）：
 
-| 维度 | 基线值 | env 覆盖 |
-|---|---|---|
-| 全局 | 300 req/min/IP | `RATE_LIMIT_GLOBAL_MAX` + `RATE_LIMIT_WINDOW_MS` |
-| `/api/auth/*`（登录/注册/刷新） | 10 req/15min/IP（爆破缓解） | `RATE_LIMIT_AUTH_MAX` + `RATE_LIMIT_AUTH_WINDOW_MS` |
-| 登录后变更类端点合计 | 60 req/min/user（预留；当前由全局桶覆盖） | — |
+| 维度                            | 基线值                                    | env 覆盖                                            |
+| ------------------------------- | ----------------------------------------- | --------------------------------------------------- |
+| 全局                            | 300 req/min/IP                            | `RATE_LIMIT_GLOBAL_MAX` + `RATE_LIMIT_WINDOW_MS`    |
+| `/api/auth/*`（登录/注册/刷新） | 10 req/15min/IP（爆破缓解）               | `RATE_LIMIT_AUTH_MAX` + `RATE_LIMIT_AUTH_WINDOW_MS` |
+| 登录后变更类端点合计            | 60 req/min/user（预留；当前由全局桶覆盖） | —                                                   |
 
 ### 9.4 权限模型
 
@@ -1552,12 +1656,12 @@ services:
     volumes:
       - dbdata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent']
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
-    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    logging: { driver: json-file, options: { max-size: '10m', max-file: '3' } }
 
   api:
     build: { context: .., dockerfile: deploy/api.Dockerfile }
@@ -1571,20 +1675,20 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CONFIG_DIR: /app/config
     depends_on:
-      mysql: { condition: service_healthy }   # 健康后才启动；启动脚本再跑 migrate deploy
-    expose: ["3000"]
-    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+      mysql: { condition: service_healthy } # 健康后才启动；启动脚本再跑 migrate deploy
+    expose: ['3000']
+    logging: { driver: json-file, options: { max-size: '20m', max-file: '5' } }
 
   nginx:
-    build: { context: .., dockerfile: deploy/web.Dockerfile }   # 多阶段：vite build → nginx 托管产物
+    build: { context: .., dockerfile: deploy/web.Dockerfile } # 多阶段：vite build → nginx 托管产物
     container_name: oinur-web
     restart: unless-stopped
     ports:
-      - "80:80"
+      - '80:80'
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on: [api]
-    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    logging: { driver: json-file, options: { max-size: '10m', max-file: '3' } }
 
 volumes:
   dbdata:
@@ -1615,18 +1719,18 @@ server {
 
 ### 10.2 环境变量清单
 
-| 变量 | 必填 | 示例/默认 | 用途 |
-|---|---|---|---|
-| DATABASE_URL | 是 | mysql://user:pass@mysql:3306/oinur | Prisma 连接串 |
-| JWT_SECRET | 是 | ≥32B 随机串（openssl rand -base64 32） | JWT 签名密钥 |
-| NODE_ENV | 否 | production | 运行模式 |
-| PORT | 否 | 3000 | API 监听端口 |
-| CONFIG_DIR | 否 | /app/config（容器）/ ../docs/data（本地） | yaml 配置目录 |
-| LOG_LEVEL | 否 | info | pino 日志级别 |
-| WEB_ORIGIN | 仅 dev | http://localhost:5173 | 开发期 CORS 白名单 |
-| RATE_LIMIT_GLOBAL_MAX / RATE_LIMIT_WINDOW_MS | 否 | 300 / 60000 | 全局限流阈值与窗口（§9.3） |
-| RATE_LIMIT_AUTH_MAX / RATE_LIMIT_AUTH_WINDOW_MS | 否 | 10 / 900000 | auth 端点限流阈值与窗口（§9.3） |
-| MYSQL_DATABASE / MYSQL_USER / MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD | 是（compose） | — | MySQL 初始化 |
+| 变量                                                               | 必填          | 示例/默认                                 | 用途                            |
+| ------------------------------------------------------------------ | ------------- | ----------------------------------------- | ------------------------------- |
+| DATABASE_URL                                                       | 是            | mysql://user:pass@mysql:3306/oinur        | Prisma 连接串                   |
+| JWT_SECRET                                                         | 是            | ≥32B 随机串（openssl rand -base64 32）    | JWT 签名密钥                    |
+| NODE_ENV                                                           | 否            | production                                | 运行模式                        |
+| PORT                                                               | 否            | 3000                                      | API 监听端口                    |
+| CONFIG_DIR                                                         | 否            | /app/config（容器）/ ../docs/data（本地） | yaml 配置目录                   |
+| LOG_LEVEL                                                          | 否            | info                                      | pino 日志级别                   |
+| WEB_ORIGIN                                                         | 仅 dev        | http://localhost:5173                     | 开发期 CORS 白名单              |
+| RATE_LIMIT_GLOBAL_MAX / RATE_LIMIT_WINDOW_MS                       | 否            | 300 / 60000                               | 全局限流阈值与窗口（§9.3）      |
+| RATE_LIMIT_AUTH_MAX / RATE_LIMIT_AUTH_WINDOW_MS                    | 否            | 10 / 900000                               | auth 端点限流阈值与窗口（§9.3） |
+| MYSQL_DATABASE / MYSQL_USER / MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD | 是（compose） | —                                         | MySQL 初始化                    |
 
 ### 10.3 备份策略
 
@@ -1657,25 +1761,25 @@ server {
 
 ### 11.1 测试体系总览
 
-| 层 | 工具 | 范围与优先级 |
-|---|---|---|
-| 引擎纯函数单测 | vitest | **最高优先**：ranking-sim / duel-sim / rng / npc。golden-seed 快照测试 + 统计性 property 测试 |
-| 领域逻辑单测 | vitest | settlement 投影与结算（固定时钟注入）、growth 递减曲线、economy 公式求值、config zod 对 yaml 样例 fixture 的通过/失败用例 |
-| API 集成测试 | supertest + 一次性 MySQL（testcontainers-node，或本地 compose `--profile test` 起独立库） | 每模块 happy path + 权限矩阵 + 并发双发（同一动作并发两次只扣一次） |
-| 前端 | TS 编译期类型约束为主；E2E **暂缓**（上线后视情况补 Playwright 冒烟） | 手工回归清单随里程碑维护 |
+| 层             | 工具                                                                                      | 范围与优先级                                                                                                              |
+| -------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 引擎纯函数单测 | vitest                                                                                    | **最高优先**：ranking-sim / duel-sim / rng / npc。golden-seed 快照测试 + 统计性 property 测试                             |
+| 领域逻辑单测   | vitest                                                                                    | settlement 投影与结算（固定时钟注入）、growth 递减曲线、economy 公式求值、config zod 对 yaml 样例 fixture 的通过/失败用例 |
+| API 集成测试   | supertest + 一次性 MySQL（testcontainers-node，或本地 compose `--profile test` 起独立库） | 每模块 happy path + 权限矩阵 + 并发双发（同一动作并发两次只扣一次）                                                       |
+| 前端           | TS 编译期类型约束为主；E2E **暂缓**（上线后视情况补 Playwright 冒烟）                     | 手工回归清单随里程碑维护                                                                                                  |
 
 CI 顺序：`pnpm -r lint → typecheck → unit → integration`；集成任务以 service 容器方式提供 MySQL 8.4。
 
 ### 11.2 里程碑可验证产出（对照 GAME-DESIGN §18）
 
-| 阶段 | 可验证产出（Definition of Done） | 关键测试 |
-|---|---|---|
-| M0 | monorepo 骨架 + 注册/登录/设置页（信息展示/改密/注销）+ compose 一键起全栈；`GET /api/health` 绿 | auth 集成套件全绿；注销后数据级联删除断言；安全响应头快照测试 |
-| M1 | 学员管理（招募外的 CRUD/养成道具）、背包、训练三式、体力精力恢复时钟生效 | 训练扣钱扣体力条件 UPDATE 断言；递减曲线 property 测试（属性越高增量越小）；离线恢复投影精度（注入固定时间差）；并发双击训练不多扣不少扣 |
-| M2 | 模拟引擎（排名制）、八章剧情 + NPC 池 + 首通/名次奖励 + NG+ 解锁 | 同 seed 同报告哈希（golden 快照 ×N seed）；"属性↑→期望名次↑"统计性测试（大样本 seeds）；首通幂等（重打不发首通）；奖励与 stages.yaml 断言一致 |
-| M3 | 历练 41 事件、学院招募/讲课、出题题库闭环 | events.yaml 全量过 zod（41/41）；once/冷却行为测试；讲课门槛与报酬公式抽测；出题质量分布单元测 |
-| M4 | 出题对决、PVP 锦标赛全生命周期（报名→懒推进→对阵树→发奖）、管理员工具 | 对决计分规则表驱动测试（含考察出题质量/四类平局分流）；淘汰赛轮转含奇数轮空集成测；USER 打 admin 全 403 矩阵；审计留痕断言 |
-| M5 | economy 收支模拟脚本 + 数值平衡打磨 + 上线 | `scripts/sim-economy.ts` 输出中期玩家周收支落在 GAME-DESIGN §16 目标区间；机器读取使用 `pnpm --silent sim:economy -- --json`，避免 pnpm lifecycle banner 混入 stdout；接口冒烟压测（简单并发脚本）即可 |
+| 阶段 | 可验证产出（Definition of Done）                                                                 | 关键测试                                                                                                                                                                                               |
+| ---- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| M0   | monorepo 骨架 + 注册/登录/设置页（信息展示/改密/注销）+ compose 一键起全栈；`GET /api/health` 绿 | auth 集成套件全绿；注销后数据级联删除断言；安全响应头快照测试                                                                                                                                          |
+| M1   | 学员管理（招募外的 CRUD/养成道具）、背包、训练三式、体力精力恢复时钟生效                         | 训练扣钱扣体力条件 UPDATE 断言；递减曲线 property 测试（属性越高增量越小）；离线恢复投影精度（注入固定时间差）；并发双击训练不多扣不少扣                                                               |
+| M2   | 模拟引擎（排名制）、八章剧情 + NPC 池 + 首通/名次奖励 + NG+ 解锁                                 | 同 seed 同报告哈希（golden 快照 ×N seed）；"属性↑→期望名次↑"统计性测试（大样本 seeds）；首通幂等（重打不发首通）；奖励与 stages.yaml 断言一致                                                          |
+| M3   | 历练 41 事件、学院招募/讲课、出题题库闭环                                                        | events.yaml 全量过 zod（41/41）；once/冷却行为测试；讲课门槛与报酬公式抽测；出题质量分布单元测                                                                                                         |
+| M4   | 出题对决、PVP 锦标赛全生命周期（报名→懒推进→对阵树→发奖）、管理员工具                            | 对决计分规则表驱动测试（含考察出题质量/四类平局分流）；淘汰赛轮转含奇数轮空集成测；USER 打 admin 全 403 矩阵；审计留痕断言                                                                             |
+| M5   | economy 收支模拟脚本 + 数值平衡打磨 + 上线                                                       | `scripts/sim-economy.ts` 输出中期玩家周收支落在 GAME-DESIGN §16 目标区间；机器读取使用 `pnpm --silent sim:economy -- --json`，避免 pnpm lifecycle banner 混入 stdout；接口冒烟压测（简单并发脚本）即可 |
 
 每个里程碑收尾产出：可运行的 compose 环境 + 通过 CI 的测试套件 + 更新相关设计与运维文档的验收记录。
 
@@ -1683,18 +1787,18 @@ CI 顺序：`pnpm -r lint → typecheck → unit → integration`；集成任务
 
 ## 12. 关键技术取舍汇总
 
-| # | 取舍 | 选择与理由 | 放弃项及代价 |
-|---|---|---|---|
-| T1 | 时间资源推进 | 读时惰性结算（§6）：免 cron、离线补偿天然正确、零写放大 | cron 方案；代价：读路径返回投影值与库内值有微小时间差（无害，写路径权威化） |
-| T2 | 实时能力 | 无 WebSocket/Redis/MQ，即时模拟+战报；弱提醒用轮询+浏览器 Notification 降级 | 实时推送；代价：PVP 开赛通知延迟 ≤30s |
-| T3 | 战报存储 | ContestRecord 单表承载 STORY/PVP/ADVENTURE 三类（GAME-DESIGN §17 所述 contest_records/duel_records 合一，format 字段区分）：生命周期与信封完全同构，少一张表一套读写 | 双表方案；代价：无 |
-| T4 | 注销数据处理 | 物理删除（DB 级联清空业务数据、username 立即释放可复用）+ 双护栏（进行中赛事拒绝注销、奖励发放跳过已删账号）：兑现前端「将删除全部数据」承诺与注销即清除个人数据的合规要求 | 软删（deletedAt 标记）；代价：`username` 永久占用致同名不可重注册、个人数据未清除。硬删自身代价：对手丢失该场战报链接、误注销不可恢复 |
-| T5 | 并发控制 | 写路径行锁（FOR UPDATE）+ 固定加锁顺序 + 条件 UPDATE 双保险；读路径零写入投影 | 乐观锁版本号；代价：$queryRaw 一处受控豁免 |
-| T6 | 会话失效 | tokenVersion claim 无状态踢人 | refresh token 存储表/reuse detection；代价：被盗 Cookie 无法定向吊销单个设备（只能全体失效） |
-| T7 | 部署形态 | API 单实例：内存限流桶、内存幂等缓存成立 | 多实例水平扩展；升级路径：限流换 Redis 存储、幂等缓存入库——均为局部改造，架构不推翻 |
-| T8 | 配置生命周期 | Config 表软弃用（deprecated 标记），历史数据外键永不断裂 | 物理删除旧配置；代价：表内残留少量历史行 |
-| T9 | 共享包 | 直发 TS 源码，无构建步骤 | npm 包式产物；代价：消费方必须具备转译能力（本仓两端都有） |
-| T10 | API 版本化 | 无 /v1：同仓前后端同步发布，TS 类型编译期暴露 breaking change | URL 版本协商；代价：未来若出现第三方客户端需补版本层 |
+| #   | 取舍         | 选择与理由                                                                                                                                                                 | 放弃项及代价                                                                                                                          |
+| --- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | 时间资源推进 | 读时惰性结算（§6）：免 cron、离线补偿天然正确、零写放大                                                                                                                    | cron 方案；代价：读路径返回投影值与库内值有微小时间差（无害，写路径权威化）                                                           |
+| T2  | 实时能力     | 无 WebSocket/Redis/MQ，即时模拟+战报；弱提醒用轮询+浏览器 Notification 降级                                                                                                | 实时推送；代价：PVP 开赛通知延迟 ≤30s                                                                                                 |
+| T3  | 战报存储     | ContestRecord 单表承载 STORY/PVP/ADVENTURE 三类（GAME-DESIGN §17 所述 contest_records/duel_records 合一，format 字段区分）：生命周期与信封完全同构，少一张表一套读写       | 双表方案；代价：无                                                                                                                    |
+| T4  | 注销数据处理 | 物理删除（DB 级联清空业务数据、username 立即释放可复用）+ 双护栏（进行中赛事拒绝注销、奖励发放跳过已删账号）：兑现前端「将删除全部数据」承诺与注销即清除个人数据的合规要求 | 软删（deletedAt 标记）；代价：`username` 永久占用致同名不可重注册、个人数据未清除。硬删自身代价：对手丢失该场战报链接、误注销不可恢复 |
+| T5  | 并发控制     | 写路径行锁（FOR UPDATE）+ 固定加锁顺序 + 条件 UPDATE 双保险；读路径零写入投影                                                                                              | 乐观锁版本号；代价：$queryRaw 一处受控豁免                                                                                            |
+| T6  | 会话失效     | tokenVersion claim 无状态踢人                                                                                                                                              | refresh token 存储表/reuse detection；代价：被盗 Cookie 无法定向吊销单个设备（只能全体失效）                                          |
+| T7  | 部署形态     | API 单实例：内存限流桶、内存幂等缓存成立                                                                                                                                   | 多实例水平扩展；升级路径：限流换 Redis 存储、幂等缓存入库——均为局部改造，架构不推翻                                                   |
+| T8  | 配置生命周期 | Config 表软弃用（deprecated 标记），历史数据外键永不断裂                                                                                                                   | 物理删除旧配置；代价：表内残留少量历史行                                                                                              |
+| T9  | 共享包       | 直发 TS 源码，无构建步骤                                                                                                                                                   | npm 包式产物；代价：消费方必须具备转译能力（本仓两端都有）                                                                            |
+| T10 | API 版本化   | 无 /v1：同仓前后端同步发布，TS 类型编译期暴露 breaking change                                                                                                              | URL 版本协商；代价：未来若出现第三方客户端需补版本层                                                                                  |
 
 ---
 
@@ -1702,20 +1806,20 @@ CI 顺序：`pnpm -r lint → typecheck → unit → integration`；集成任务
 
 GAME-DESIGN 未明确、本文按以下假设推进（均已在正文对应位置标注）。数值类假设最终落位 `docs/data/*.yaml`，由策划复核覆盖：
 
-| # | 模糊点 | 本文假设 |
-|---|---|---|
-| A1 | 心态是否随时间恢复（§4 只写明体力/精力恢复） | 心态向基线缓慢线性回归，速率与基线在 `economy.yaml.recovery.mindsetPerHour/mindsetBaseline`；速率置 0 即关闭该机制 |
-| A2 | 心态数值边界 | 闭区间 [−100, +100]，界值在 economy.yaml 定义；专注衰减语义由 systems/contest.md 细化 |
-| A3 | 历练事件的参与者模型 | 3 人队伍（roster 第 1 名为队长）+ 投入档位三选一；对决事件 3 人全上，非对决事件只有队长是行动者 |
-| A4 | 同一时间能否并行多个事件 | 不能：每玩家至多一个 PENDING AdventureLog，抽新事件前必须解决当前事件 |
-| A5 | PVP 出战阵容人数 | 报名锁定 rosterSize 名学员（具体数值入 stages/economy 配置），对阵模拟按报名快照进行 |
-| A6 | 对决中答题学员如何产生 | 服务端从锁定阵容中按当局主导六维确定性择优（可由 seed 复现），不支持实时指定——批量结算架构下无实时交互窗口 |
-| A7 | 专注机制适用范围 | 仅排名制赛（§8.1）；出题对决的一次性 sigmoid 判定不引入专注 |
-| A8 | 讲课结算时机 | 接单即时一次性结算报酬与声誉，学员进入冷却；Y6/P4 的持续收益走 PassiveIncomeSource 表惰性入账 |
-| A9 | 学院招募池刷新节奏 | 懒定时窗：访问池时若超过配置周期则自动重掷，另支持付费立即刷新；周期与价格在 economy.yaml |
-| A10 | NG+ 进度链独立性 | 每个 ngLevel 独立保存进度链（StoryProgress 以 (userId, ngLevel, stageKey) 为粒度），层间解锁仅要求前层全通 |
-| A11 | 会话细节 | 登录态 = 15min access + 7d rotating refresh；"登出"默认登出所有设备（tokenVersion+1）——设置页文案如实告知 |
-| A12 | 商城范围 | 商城 = items.yaml 中 price≠null 条目的直售列表（书籍为主），无购物车/限时上架逻辑 |
-| A13 | 开除概率掉落改名卡 | 概率值 economy.yaml.dismissRenameCardChanceBps，服务端掷点、结果记入 ReputationLog 关联审计 |
+| #   | 模糊点                                       | 本文假设                                                                                                           |
+| --- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A1  | 心态是否随时间恢复（§4 只写明体力/精力恢复） | 心态向基线缓慢线性回归，速率与基线在 `economy.yaml.recovery.mindsetPerHour/mindsetBaseline`；速率置 0 即关闭该机制 |
+| A2  | 心态数值边界                                 | 闭区间 [−100, +100]，界值在 economy.yaml 定义；专注衰减语义由 systems/contest.md 细化                              |
+| A3  | 历练事件的参与者模型                         | 3 人队伍（roster 第 1 名为队长）+ 投入档位三选一；对决事件 3 人全上，非对决事件只有队长是行动者                    |
+| A4  | 同一时间能否并行多个事件                     | 不能：每玩家至多一个 PENDING AdventureLog，抽新事件前必须解决当前事件                                              |
+| A5  | PVP 出战阵容人数                             | 报名锁定 rosterSize 名学员（具体数值入 stages/economy 配置），对阵模拟按报名快照进行                               |
+| A6  | 对决中答题学员如何产生                       | 服务端从锁定阵容中按当局主导六维确定性择优（可由 seed 复现），不支持实时指定——批量结算架构下无实时交互窗口         |
+| A7  | 专注机制适用范围                             | 仅排名制赛（§8.1）；出题对决的一次性 sigmoid 判定不引入专注                                                        |
+| A8  | 讲课结算时机                                 | 接单即时一次性结算报酬与声誉，学员进入冷却；Y6/P4 的持续收益走 PassiveIncomeSource 表惰性入账                      |
+| A9  | 学院招募池刷新节奏                           | 懒定时窗：访问池时若超过配置周期则自动重掷，另支持付费立即刷新；周期与价格在 economy.yaml                          |
+| A10 | NG+ 进度链独立性                             | 每个 ngLevel 独立保存进度链（StoryProgress 以 (userId, ngLevel, stageKey) 为粒度），层间解锁仅要求前层全通         |
+| A11 | 会话细节                                     | 登录态 = 15min access + 7d rotating refresh；"登出"默认登出所有设备（tokenVersion+1）——设置页文案如实告知          |
+| A12 | 商城范围                                     | 商城 = items.yaml 中 price≠null 条目的直售列表（书籍为主），无购物车/限时上架逻辑                                  |
+| A13 | 开除概率掉落改名卡                           | 概率值 economy.yaml.dismissRenameCardChanceBps，服务端掷点、结果记入 ReputationLog 关联审计                        |
 
 > 以上假设如与后续 systems/*.md 细则冲突，以细则为准并回改本文相应段落；结构性假设（A4/A6/A7/A8）若要推翻，需重新评估对应模块设计。

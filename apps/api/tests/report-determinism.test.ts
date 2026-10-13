@@ -51,10 +51,7 @@ function participant(displayName = 'Replay Player', ability = 70): ParticipantSn
 }
 
 /** 把一名学员复制成一支 3 人队伍；队内序号写进名字以便核对扁平成员顺序。 */
-function roster(
-  member: ParticipantSnapshot,
-  displayName = 'Replay Player',
-): ParticipantSnapshot[] {
+function roster(member: ParticipantSnapshot, displayName = 'Replay Player'): ParticipantSnapshot[] {
   return Array.from({ length: 3 }, (_, memberIndex) => ({
     ...member,
     abilities: { ...member.abilities },
@@ -282,8 +279,7 @@ describe('ranking report determinism', () => {
       format: 'RANKING',
       rank: report.standings.find((standing) => standing.teamIndex === 0)?.rank ?? 0,
       participantCount: 2,
-      totalScore:
-        report.standings.find((standing) => standing.teamIndex === 0)?.totalScore ?? 0,
+      totalScore: report.standings.find((standing) => standing.teamIndex === 0)?.totalScore ?? 0,
       rewards: report.rewards,
       growth: report.growth,
     };

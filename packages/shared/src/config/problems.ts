@@ -14,7 +14,16 @@ export const DIMENSION_CONFIG: Record<DimensionKey, ConfigDimension> = {
   STRING: 'string',
 };
 
-export const PROBLEM_TIERS = ['cspj', 'csps', 'noip', 'province', 'noi', 'ctt', 'cts', 'ioi'] as const;
+export const PROBLEM_TIERS = [
+  'cspj',
+  'csps',
+  'noip',
+  'province',
+  'noi',
+  'ctt',
+  'cts',
+  'ioi',
+] as const;
 export type ProblemTier = (typeof PROBLEM_TIERS)[number];
 
 export const PROBLEM_SEVERITIES = ['red', 'yellow', 'blue', 'purple', 'black', 'colorful'] as const;
@@ -107,7 +116,9 @@ const configDimensionToDomain = Object.fromEntries(
   Object.entries(DIMENSION_CONFIG).map(([domain, config]) => [config, domain]),
 ) as Record<ConfigDimension, DimensionKey>;
 
-export function normalizeProblemTemplate(template: ProblemTemplate): Omit<ProblemTemplate, 'dim'> & { dim: DimensionKey } {
+export function normalizeProblemTemplate(
+  template: ProblemTemplate,
+): Omit<ProblemTemplate, 'dim'> & { dim: DimensionKey } {
   return { ...template, dim: configDimensionToDomain[template.dim] };
 }
 

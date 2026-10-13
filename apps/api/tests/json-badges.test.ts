@@ -15,7 +15,10 @@ describe('readBadgeList', () => {
   });
 
   it('drops non-string elements (number/null/bool/object)', () => {
-    expect(readBadgeList(['kept', 42, null, true, { junk: 1 }, 'clean'])).toEqual(['kept', 'clean']);
+    expect(readBadgeList(['kept', 42, null, true, { junk: 1 }, 'clean'])).toEqual([
+      'kept',
+      'clean',
+    ]);
   });
 
   it('maps non-array values to an empty list', () => {

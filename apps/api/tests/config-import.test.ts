@@ -236,7 +236,11 @@ describe('runSemanticChecks', () => {
     const rest = { ...goodEconomy };
     delete rest.onboarding;
     const noOnboarding = economyConfigSchema.parse(rest);
-    const errs = runSemanticChecks({ talents: [makeTalent({})], items: parsedItem, economy: noOnboarding });
+    const errs = runSemanticChecks({
+      talents: [makeTalent({})],
+      items: parsedItem,
+      economy: noOnboarding,
+    });
     expect(errs.some((e) => e.message.includes('onboarding 为必填'))).toBe(true);
   });
 
@@ -298,9 +302,9 @@ describe('runSemanticChecks', () => {
         tutorial: { steps },
       });
     const retracted = run([step('s1', ['all']), step('s2', ['overview'])]);
-    expect(retracted.some((e) => e.path === 'steps.1.unlock' && e.message.includes('单调不减'))).toBe(
-      true,
-    );
+    expect(
+      retracted.some((e) => e.path === 'steps.1.unlock' && e.message.includes('单调不减')),
+    ).toBe(true);
     const grown = run([step('s1', ['overview']), step('s2', ['all'])]);
     expect(grown.some((e) => e.path === 'steps.1.unlock')).toBe(false);
   });
@@ -760,10 +764,7 @@ talents:
     const dir = writeConfigDir(
       { talents: BASE_TALENTS, items: BASE_ITEMS, economy: BASE_ECONOMY },
       {
-        tutorial: MINIMAL_TUTORIAL.replace(
-          'reward: {}',
-          "reward: {item: no-such-item, count: 1}",
-        ),
+        tutorial: MINIMAL_TUTORIAL.replace('reward: {}', 'reward: {item: no-such-item, count: 1}'),
       },
     );
     await expect(importConfigs({ configDir: dir })).rejects.toThrow(/奖励道具不存在/);

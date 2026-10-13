@@ -84,7 +84,9 @@ export function TrainingPage(): JSX.Element {
   const [bookItemId, setBookItemId] = useState('');
   const [problemId, setProblemId] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const [result, setResult] = useState<(TrainingResult & { studentName: string; kind: Tab }) | null>(null);
+  const [result, setResult] = useState<
+    (TrainingResult & { studentName: string; kind: Tab }) | null
+  >(null);
 
   if (studentsQ.isPending) return <InlineLoader>读取学员名册…</InlineLoader>;
   if (studentsQ.isError || studentsQ.data === undefined) {
@@ -97,11 +99,14 @@ export function TrainingPage(): JSX.Element {
 
   const students = studentsQ.data;
   const chosen = students.find((s) => s.id === studentId) ?? null;
-  const dimBooks = (inv.data ?? []).filter((i) => i.itemId.startsWith(`book-${DIMENSION_CONFIG[dim]}-`));
+  const dimBooks = (inv.data ?? []).filter((i) =>
+    i.itemId.startsWith(`book-${DIMENSION_CONFIG[dim]}-`),
+  );
   const selectable = problems.data ?? [];
   const pending = basic.isPending || directed.isPending || specialized.isPending;
   const noStamina = chosen !== null && floor(chosen.stamina) < 1;
-  const runDisabled = pending || chosen === null || noStamina || (tab === 'specialized' && problemId === null);
+  const runDisabled =
+    pending || chosen === null || noStamina || (tab === 'specialized' && problemId === null);
 
   function showResult(r: TrainingResult, s: StudentView, kind: Tab): void {
     setResult({ ...r, studentName: s.name, kind });
@@ -305,7 +310,10 @@ export function TrainingPage(): JSX.Element {
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-ink-600/60 pt-3" data-tutorial="training-basic">
+            <div
+              className="flex flex-wrap items-center gap-3 border-t border-ink-600/60 pt-3"
+              data-tutorial="training-basic"
+            >
               <Btn data-testid="train-run" variant="primary" disabled={runDisabled} onClick={run}>
                 <Icon icon={KIND_ICON[tab]} className="size-3.5" />
                 {pending ? '训练中…' : `开始${TRAINING_KIND_LABEL[tab]}训练`}
@@ -338,7 +346,9 @@ export function TrainingPage(): JSX.Element {
                     </div>
                     <Meter
                       value={v}
-                      max={statScale(DIMENSIONS.map((dimKey) => chosen[ABILITY_COLUMN[dimKey]] as number))}
+                      max={statScale(
+                        DIMENSIONS.map((dimKey) => chosen[ABILITY_COLUMN[dimKey]] as number),
+                      )}
                       className="bg-cyber-500/70"
                     />
                   </div>
@@ -425,7 +435,9 @@ function ProblemOption({
     >
       <input type="radio" name="train-problem" checked={selected} onChange={onSelect} />
       <span className="min-w-0 flex-1 truncate text-fg-muted">{problem.name}</span>
-      <span className={`border px-1.5 py-0.5 ${rarityChip(problem.rarity)}`}>{rarityLabel(problem.rarity)}</span>
+      <span className={`border px-1.5 py-0.5 ${rarityChip(problem.rarity)}`}>
+        {rarityLabel(problem.rarity)}
+      </span>
       <span className="shrink-0 text-fg-dim">{DIMENSION_LABEL[problem.dominantDim]}</span>
       <span className="numeral shrink-0 text-fg">Q {problem.quality}</span>
     </label>
@@ -492,7 +504,9 @@ function LogsList({
   if (q.isPending) return <InlineLoader>读取训练记录…</InlineLoader>;
   if (q.isError) {
     return (
-      <ErrorNote onRetry={() => void q.refetch()}>训练记录读取失败：{apiErrorMessage(q.error)}</ErrorNote>
+      <ErrorNote onRetry={() => void q.refetch()}>
+        训练记录读取失败：{apiErrorMessage(q.error)}
+      </ErrorNote>
     );
   }
   if (items.length === 0) return <Empty icon={Dumbbell} title="暂无训练记录" />;

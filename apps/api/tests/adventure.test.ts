@@ -76,7 +76,9 @@ function writeConfigDir(eventsYaml = EVENT_YAML): string {
 
 async function createUser(money = 0, reputation = 0): Promise<number> {
   userSequence += 1;
-  const user = await prisma.user.create({ data: { username: `adv-${userSequence}-${Date.now().toString(36)}`, money, reputation } });
+  const user = await prisma.user.create({
+    data: { username: `adv-${userSequence}-${Date.now().toString(36)}`, money, reputation },
+  });
   return user.id;
 }
 
@@ -85,7 +87,7 @@ async function createStudent(userId: number, stamina = 2): Promise<number> {
     data: {
       userId,
       name: '历练学员',
-            qualityTier: 'COMMON',
+      qualityTier: 'COMMON',
       ds: 10,
       dp: 10,
       math: 10,
@@ -144,7 +146,12 @@ describe('M3 adventure API service', () => {
     expect(await staminaOf(second)).toBe(1);
     expect(await staminaOf(third)).toBe(1);
 
-    const result = await chooseAdventure(userId, drawn.id, { optionIndex: 0 }, new Date(TEST_NOW.getTime() + 60_000));
+    const result = await chooseAdventure(
+      userId,
+      drawn.id,
+      { optionIndex: 0 },
+      new Date(TEST_NOW.getTime() + 60_000),
+    );
     expect(result.completed).toBe(true);
     expect(result.adventure.results[0]).toMatchObject({ outcomeType: 'fixed' });
     expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).money).toBe(35);
@@ -164,7 +171,9 @@ describe('M3 adventure API service', () => {
     await expect(drawAdventure(userId, [roster[0], roster[1]], 1, TEST_NOW)).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
     });
-    await expect(drawAdventure(userId, [roster[0], roster[0], roster[1]], 1, TEST_NOW)).rejects.toMatchObject({
+    await expect(
+      drawAdventure(userId, [roster[0], roster[0], roster[1]], 1, TEST_NOW),
+    ).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
     });
     for (const member of roster) expect(await staminaOf(member)).toBe(2);
@@ -186,7 +195,16 @@ describe('M3 adventure API service', () => {
     const userId = await createUser(0, 0);
     const roster = await createRoster(userId);
     const log = await prisma.adventureLog.create({
-      data: { userId, studentId: roster[0], studentIds: roster, eventId: 'evt-test-check', tier: 2, seed: 7, choices: [], results: [] },
+      data: {
+        userId,
+        studentId: roster[0],
+        studentIds: roster,
+        eventId: 'evt-test-check',
+        tier: 2,
+        seed: 7,
+        choices: [],
+        results: [],
+      },
     });
 
     const result = await chooseAdventure(userId, log.id, { optionIndex: 0 }, TEST_NOW);
@@ -217,9 +235,16 @@ describe('M3 adventure API service', () => {
     await prisma.userItem.create({ data: { userId, itemId: 'intel-slip', quantity: 1 } });
     await useItem(userId, { itemId: 'intel-slip' });
     const secondPreview = await drawAdventure(userId, roster, 1, TEST_NOW);
-    const accepted = await chooseAdventure(userId, secondPreview.id, { action: 'accept' }, TEST_NOW);
+    const accepted = await chooseAdventure(
+      userId,
+      secondPreview.id,
+      { action: 'accept' },
+      TEST_NOW,
+    );
     expect(accepted.completed).toBe(false);
-    expect(accepted.adventure.event.choices).toEqual([{ index: 0, text: '收下奖励', available: true }]);
+    expect(accepted.adventure.event.choices).toEqual([
+      { index: 0, text: '收下奖励', available: true },
+    ]);
     for (const member of roster) expect(await staminaOf(member)).toBe(1);
     await chooseAdventure(userId, secondPreview.id, { optionIndex: 0 }, TEST_NOW);
   });
@@ -230,9 +255,13 @@ describe('M3 adventure API service', () => {
     const roster = await createRoster(userId);
     const drawn = await drawAdventure(userId, roster, 1, TEST_NOW);
 
-    await expect(drawAdventure(userId, roster, 1)).rejects.toMatchObject({ code: 'STATE_CONFLICT' });
+    await expect(drawAdventure(userId, roster, 1)).rejects.toMatchObject({
+      code: 'STATE_CONFLICT',
+    });
     await expect(listAdventureLogs(otherUserId)).resolves.toEqual([]);
-    await expect(chooseAdventure(otherUserId, drawn.id, { optionIndex: 0 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(chooseAdventure(otherUserId, drawn.id, { optionIndex: 0 })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
   });
 
   it('exposes authenticated draw, choice and log routes', async () => {

@@ -60,7 +60,13 @@ export function DuelReport({ report }: { report: DuelReportData }): JSX.Element 
         <Metric
           label="胜负"
           value={winner}
-          tone={report.winnerSide === 'HOME' ? 'text-good-400' : report.winnerSide === 'AWAY' ? 'text-bad-400' : 'text-fg-muted'}
+          tone={
+            report.winnerSide === 'HOME'
+              ? 'text-good-400'
+              : report.winnerSide === 'AWAY'
+                ? 'text-bad-400'
+                : 'text-fg-muted'
+          }
         />
       </div>
 

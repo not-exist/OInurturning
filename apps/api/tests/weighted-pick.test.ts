@@ -38,9 +38,9 @@ describe('weightedPick', () => {
         () => 0.5,
       ),
     ).toThrow(/weighted pool is empty/);
-    expect(() => weightedPick([{ value: 'a', weight: Number.POSITIVE_INFINITY }], () => 0.5)).toThrow(
-      /weighted pool is empty/,
-    );
+    expect(() =>
+      weightedPick([{ value: 'a', weight: Number.POSITIVE_INFINITY }], () => 0.5),
+    ).toThrow(/weighted pool is empty/);
   });
 
   it('returns the only entry and consumes exactly one rng sample', () => {

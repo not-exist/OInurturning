@@ -6,14 +6,14 @@
 
 ## 0. 硬性约束
 
-| # | 约束 | 缘由 |
-|---|---|---|
-| 0.1 | **任何"删除/合并"提案，先 `git log -S <符号>` 并读周围注释**；注释含 `F-x` / 审查 / 里程碑编号者视为有意设计，只能在 PR 里带反证推翻 | 草案有三处把刻意设计读成冗余（§附A），其中两处回退后会立即产生缺陷 |
-| 0.2 | 优化必须可测：**>10% 的 CPU/内存/存储/耗时改善，或行数净减且复杂度不升**；5ms 内视为噪声 | 性能是主要评估项；草案用它从未测量过的估算给阶段排序 |
-| 0.3 | 每阶段一个 commit，产物完整可编译，可独立回滚；**不 push**，全部完成后统一 push | 便于 reviewer 分阶段审查 |
-| 0.4 | 不碰：`apps/api/src/modules/contest/engine/{duel,solve,ranking}.ts` 的算法、`docs/data/*.yaml` 的任何数值、已应用的 20 个迁移 | 有 `report-determinism` / `m2-golden` / `contest-rng-replay` 三层 golden 快照与 `bal:regress` 数值门保护 |
-| 0.5 | 删除要删干净，不留兼容分支 | 项目既有规则 |
-| 0.6 | 提交信息遵循 §5：**原子化、全英文、`type(scope): subject`** | 孤儿化后 history 是仓库的新门面，而旧的"为什么"记录已不可恢复（§1.4 R2） |
+| #   | 约束                                                                                                                                 | 缘由                                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| 0.1 | **任何"删除/合并"提案，先 `git log -S <符号>` 并读周围注释**；注释含 `F-x` / 审查 / 里程碑编号者视为有意设计，只能在 PR 里带反证推翻 | 草案有三处把刻意设计读成冗余（§附A），其中两处回退后会立即产生缺陷                                       |
+| 0.2 | 优化必须可测：**>10% 的 CPU/内存/存储/耗时改善，或行数净减且复杂度不升**；5ms 内视为噪声                                             | 性能是主要评估项；草案用它从未测量过的估算给阶段排序                                                     |
+| 0.3 | 每阶段一个 commit，产物完整可编译，可独立回滚；**不 push**，全部完成后统一 push                                                      | 便于 reviewer 分阶段审查                                                                                 |
+| 0.4 | 不碰：`apps/api/src/modules/contest/engine/{duel,solve,ranking}.ts` 的算法、`docs/data/*.yaml` 的任何数值、已应用的 20 个迁移        | 有 `report-determinism` / `m2-golden` / `contest-rng-replay` 三层 golden 快照与 `bal:regress` 数值门保护 |
+| 0.5 | 删除要删干净，不留兼容分支                                                                                                           | 项目既有规则                                                                                             |
+| 0.6 | 提交信息遵循 §5：**原子化、全英文、`type(scope): subject`**                                                                          | 孤儿化后 history 是仓库的新门面，而旧的"为什么"记录已不可恢复（§1.4 R2）                                 |
 
 ## 1. 仓库变动方式：Orphan Branch 全量重构
 
@@ -63,16 +63,16 @@ main
 
 ### 1.4 本仓库适配与风险（实测）
 
-| # | 项 | 实测事实 | 处理 |
-|---|---|---|---|
-| R1 | **`git add -A` 会把未跟踪垃圾压进 baseline** | `git status --porcelain` = `?? .codebuddy/`（编辑器配置）+ `?? history.txt`（96,783 字节的会话日志），**二者都不在 `.gitignore` 里** | 先补 `.gitignore`，或用 `git add -A -- ':!history.txt' ':!.codebuddy'`；否则 baseline 提交就带着它们 |
-| R2 | **历史即证据，孤儿化会销毁它** | 本方案 §附A 的多处结论**全部**来自 `git log -S "reconcileTables"` / `-S "F-1/F-2"` 与会话内的注释比对；孤儿分支后"这段代码是有意的"这条链路永久消失 | 硬性前置：**语义审计必须在孤儿化之前完成**；建议把 §附A 作为早期 commit 保留 |
-| R3 | **打开的分支会失去 merge-base** | 远端现有 5 个非 main 分支：`UI-refactor`、`fix-guide`、`fix-test`、`dependabot/npm_and_yarn/dotenv-18.0.0`、`dependabot/.../minor-and-patch-*`（2 个） | 重写 main 前逐个处置（合入或关闭重开）；否则它们的 PR 全部变成不可合并 |
-| R4 | **`--force` 会被分支保护拒绝** | 工作区无法判定服务端规则 | 先在 Settings → Rules 确认 main 是否受保护，必要时临时放开，再恢复 |
-| R5 | **`--force` 应改为 `--force-with-lease`** | 裸 `--force` 会覆盖掉你 fetch 之后别人推到 main 的提交 | `git push origin main --force-with-lease=main:<旧 sha>` |
-| R6 | **其余人的克隆无法 `git pull`** | 孤儿历史与旧 main 无共同祖先 | 通知团队改为 `git fetch && git reset --hard origin/main` 或重新 clone；同时 `git remote set-head origin -a` |
-| R7 | tag / release 迁移成本 | `git tag` 实测为 **0** | 无成本 |
-| R8 | 本地分支清理 | 现有 `refactor`（本次评估用）、`fix-guide`、`fix-test`、`UI-refactor`、`feat/team-battles`、`main` | 孤儿化后统一清理，避免误推 |
+| #   | 项                                           | 实测事实                                                                                                                                               | 处理                                                                                                        |
+| --- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| R1  | **`git add -A` 会把未跟踪垃圾压进 baseline** | `git status --porcelain` = `?? .codebuddy/`（编辑器配置）+ `?? history.txt`（96,783 字节的会话日志），**二者都不在 `.gitignore` 里**                   | 先补 `.gitignore`，或用 `git add -A -- ':!history.txt' ':!.codebuddy'`；否则 baseline 提交就带着它们        |
+| R2  | **历史即证据，孤儿化会销毁它**               | 本方案 §附A 的多处结论**全部**来自 `git log -S "reconcileTables"` / `-S "F-1/F-2"` 与会话内的注释比对；孤儿分支后"这段代码是有意的"这条链路永久消失    | 硬性前置：**语义审计必须在孤儿化之前完成**；建议把 §附A 作为早期 commit 保留                                |
+| R3  | **打开的分支会失去 merge-base**              | 远端现有 5 个非 main 分支：`UI-refactor`、`fix-guide`、`fix-test`、`dependabot/npm_and_yarn/dotenv-18.0.0`、`dependabot/.../minor-and-patch-*`（2 个） | 重写 main 前逐个处置（合入或关闭重开）；否则它们的 PR 全部变成不可合并                                      |
+| R4  | **`--force` 会被分支保护拒绝**               | 工作区无法判定服务端规则                                                                                                                               | 先在 Settings → Rules 确认 main 是否受保护，必要时临时放开，再恢复                                          |
+| R5  | **`--force` 应改为 `--force-with-lease`**    | 裸 `--force` 会覆盖掉你 fetch 之后别人推到 main 的提交                                                                                                 | `git push origin main --force-with-lease=main:<旧 sha>`                                                     |
+| R6  | **其余人的克隆无法 `git pull`**              | 孤儿历史与旧 main 无共同祖先                                                                                                                           | 通知团队改为 `git fetch && git reset --hard origin/main` 或重新 clone；同时 `git remote set-head origin -a` |
+| R7  | tag / release 迁移成本                       | `git tag` 实测为 **0**                                                                                                                                 | 无成本                                                                                                      |
+| R8  | 本地分支清理                                 | 现有 `refactor`（本次评估用）、`fix-guide`、`fix-test`、`UI-refactor`、`feat/team-battles`、`main`                                                     | 孤儿化后统一清理，避免误推                                                                                  |
 
 ### 1.5 与阶段计划的关系
 
@@ -86,13 +86,13 @@ main
 
 **文档（全部实测矛盾）**
 
-| 位置 | 问题 | 证据 |
-|---|---|---|
-| `README.md:194` | 称"管理员可通过 `POST /api/admin/config/reload` 热重载"，该端点不存在 | `admin/router.ts` 仅 10 条路由；`docs/TECH-DESIGN.md:988` 与 `:1161` 均标注**未实现** |
-| `README.md:192` | yaml 清单列 6 个，实际 8 个（漏 `tutorial.yaml`、`shop.yaml`） | `apps/api/src/config/loader.ts:34-43` 的 `FILES` |
-| `README.md:80` | "本地 MySQL 8.4 / MariaDB" | compose 实为 `mysql:26.7` |
-| `README.md:30,78` | "Node.js 22+ / >= 22" | CI 与两个 Dockerfile 均为 node 26 |
-| `.github/dependabot.yml` 注释 | 仍写 "mysql:8.4" | 两个 compose 已是 26.7 —— 这条**过期注释本身就是"dependabot 只 bump compose、碰不到 workflow `services:` 镜像"的物证**，建议写进 PR 描述 |
+| 位置                          | 问题                                                                  | 证据                                                                                                                                     |
+| ----------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `README.md:194`               | 称"管理员可通过 `POST /api/admin/config/reload` 热重载"，该端点不存在 | `admin/router.ts` 仅 10 条路由；`docs/TECH-DESIGN.md:988` 与 `:1161` 均标注**未实现**                                                    |
+| `README.md:192`               | yaml 清单列 6 个，实际 8 个（漏 `tutorial.yaml`、`shop.yaml`）        | `apps/api/src/config/loader.ts:34-43` 的 `FILES`                                                                                         |
+| `README.md:80`                | "本地 MySQL 8.4 / MariaDB"                                            | compose 实为 `mysql:26.7`                                                                                                                |
+| `README.md:30,78`             | "Node.js 22+ / >= 22"                                                 | CI 与两个 Dockerfile 均为 node 26                                                                                                        |
+| `.github/dependabot.yml` 注释 | 仍写 "mysql:8.4"                                                      | 两个 compose 已是 26.7 —— 这条**过期注释本身就是"dependabot 只 bump compose、碰不到 workflow `services:` 镜像"的物证**，建议写进 PR 描述 |
 
 **CI**
 
@@ -142,16 +142,16 @@ main
 
 到 `node_modules/.pnpm/zod@4.6.5/.../v4/classic/*.d.ts` 逐项取证：
 
-| API | 站点 | 状态 | 替代 |
-|---|---|---|---|
-| `.strict()` | 81 | **未废弃**（`schemas.d.ts:498` 仅 `Consider z.strictObject(A.shape) instead`） | 不动 |
-| `.passthrough()` | 23 | 已废弃 `schemas.d.ts:494` | `z.looseObject()` / `.loose()` |
-| `.addIssue()` | 45 | 已废弃 `errors.d.ts:13` | push 到 `.issues` |
-| `z.ZodIssueCode.custom` | 45 | 已废弃 `compat.d.ts:9` | 裸字符串 `'custom'`（与上一行同址，去重） |
-| `.flatten()` | 24 | 已废弃 `errors.d.ts:7` | `z.treeifyError`（`z.flattenError` 亦存在，`core/errors.d.ts:157`） |
-| `z.ZodTypeAny` | 2 | 已废弃 `compat.d.ts:38` | `z.ZodType` |
-| `.url()` | 1 | 已废弃 `schemas.d.ts:115` | `z.url()` |
-| `.datetime()` | 1 | 已废弃 `schemas.d.ts:163` | `z.iso.datetime()` |
+| API                     | 站点 | 状态                                                                           | 替代                                                                |
+| ----------------------- | ---- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `.strict()`             | 81   | **未废弃**（`schemas.d.ts:498` 仅 `Consider z.strictObject(A.shape) instead`） | 不动                                                                |
+| `.passthrough()`        | 23   | 已废弃 `schemas.d.ts:494`                                                      | `z.looseObject()` / `.loose()`                                      |
+| `.addIssue()`           | 45   | 已废弃 `errors.d.ts:13`                                                        | push 到 `.issues`                                                   |
+| `z.ZodIssueCode.custom` | 45   | 已废弃 `compat.d.ts:9`                                                         | 裸字符串 `'custom'`（与上一行同址，去重）                           |
+| `.flatten()`            | 24   | 已废弃 `errors.d.ts:7`                                                         | `z.treeifyError`（`z.flattenError` 亦存在，`core/errors.d.ts:157`） |
+| `z.ZodTypeAny`          | 2    | 已废弃 `compat.d.ts:38`                                                        | `z.ZodType`                                                         |
+| `.url()`                | 1    | 已废弃 `schemas.d.ts:115`                                                      | `z.url()`                                                           |
+| `.datetime()`           | 1    | 已废弃 `schemas.d.ts:163`                                                      | `z.iso.datetime()`                                                  |
 
 真正废弃的是 **96 条语句**（按出现次数 141），草案称 181、其表格相加 222 —— 均不可复现；草案最大的那一块（81 处 `.strict()`）根本不是废弃 API，属**无收益的风格迁移**。按 §0.2，这部分不做独立阶段，合并进必定要改的文件时顺手处理。分布修正：`.passthrough()` 有 3 处在 `shared/config/shop.ts`、1 处在 `tutorial.ts`、1 处在 `apps/api/src/modules/items/effects.ts`。
 
@@ -161,24 +161,24 @@ main
 
 ### R4 重复收口（按模块纵向切）
 
-| 项 | 实测 | 注意 |
-|---|---|---|
-| `clamp` | 命名 helper **12** 份 + 无名内联 **38** 处 / 21 文件 | `tutorial/routing.ts:82` 带 `Math.trunc`，必须拆成 `clampInt` 并单测 |
-| 加权抽取 | **6** 份（两份同名 `weightedPick` 的错误类型不同：`extractor.ts` 抛裸 `Error`→500，`service.ts` 抛 `ApiError`→409，是真实行为分叉） | 合并时先判定哪个语义正确 |
-| `FOR UPDATE` | 字样 29（注释 5）→ **25 处真实站点 / 13 模块**；22 单行 + 3 批量 | **其中 12 处是完全相同的 `SELECT id FROM users … FOR UPDATE`（48%）**，是 helper 的首选收益点；批量形态参数名不统一（`ids` vs `lockedIds`） |
-| 表名口径 | `@@map` 仅 1 处（`users`）；行锁里 `users` 12 / `Student` 7 / `PvpTournament` 4 / `RecruitPool` 1 / `AdventureLog` 1 | 风险面是 **4 个模型 13 条语句**，不是 27 个模型；先落 `lockXxx(tx, …)` 常量表再谈改名 |
-| Json 写入助手 | **11** 份定义，其中裸 cast **5** 处（`loader.ts:160`、`admin/service.ts:57`、`contest/repository.ts:46/50`、`pvp/registration.ts:50`、`pvp/rewards.ts:154`） | 而 `shared` 为同一件事写了 112 行递归 walker —— 两端严格程度不一致 |
-| `requireConfig` 守卫 | **17** 处 / 14 文件，含 5 个同名私有副本 | 可收成一份 |
-| `readYaml` | 4 处同模板 + 1 处（`tests/tutorial-shop.test.ts:23`）**无 errors 检查** | 不是 5 份同构 |
-| `Array.isArray(badges)` | **6** 处 | 写回侧缺元素级校验（`story/service.ts:550` 读侧有） |
-| 六维/能力键 | **28** 处声明/映射；`STRING`/`string`/`str` 三拼写并存，`CODING`/`coding`/`code`、`PROBLEM`/`setting` 双轨 | 无单一真源；Prisma 列名一律 `str`/`code`/`setting` |
-| Student→ParticipantSnapshot | abilities 块 3 份**逐字相同**；但 traits 段已分叉（`adventure` 用 `?? []` 静默空数组，另两处会抛 TypeError） | 合并时必须选一个语义 |
-| `rowToProgress` / `toProgressView` | **不是逐字相同**：4 处差异（story 版多 `undefined` 分支、用裸 cast 而非 `jsonValue`） | **已漂移的复制比重名复制更危险**，合并前逐分支确认语义 |
-| 阻尼公式 `(1 - cur/100)^2` | 3 份等价 | `training/gains.ts`、`economy/progression.ts`、`story/service.ts` |
-| FNV-1a / Box-Muller | 各 2 份，算法一致（FNV 常量与顺序逐位相同） | 归入 `contest/engine/rng.ts` |
-| 稀有度序 | 真副本 **3** 份（`shop/service.ts:127`、`scripts/recruit-stats.ts:47`、`scripts/balance-regression.ts:180`）；`config/semantic.ts` 与 `recruit-gen.ts` **已**用共享 `CONFIG_RARITIES`，不应列为待收敛 | 大小写双轨真源：`talents.ts:7` 小写 `colorful` vs `enums.ts:2` 大写 `RAINBOW` |
-| 状态枚举 | Prisma 10 个 enum 的"第二份声明"**不在 `shared/enums.ts`**（该文件只有 `RARITIES`/`DIMENSIONS`/`ABILITY_KEYS`），而是手抄散落在 5 个文件；`AdventureStatus` 等 2 个**根本没有第二份** | `TrainingKind`/`QualityTier` 大小写双轨，靠两张手写表往返翻译 |
-| 引擎不变量 | `isBetterTeamAttempt`、`aggregateTeam`、排序口径在 shared 与 engine **逐字两份** | 抽离成立，但**不是单文件搬迁**：需整体搬 `engine/`（6 文件）+ `mulberry32`，因 shared 不能 import apps/api。**（R4-T11 实测证伪该机制主张：闭包完全落在 shared 内，mulberry32 全仓仅 1 份；实际为 import 级收口，2 文件 ±59 行，见台账 R4-T11）** |
+| 项                                 | 实测                                                                                                                                                                                                  | 注意                                                                                                                                                                                                                                              |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clamp`                            | 命名 helper **12** 份 + 无名内联 **38** 处 / 21 文件                                                                                                                                                  | `tutorial/routing.ts:82` 带 `Math.trunc`，必须拆成 `clampInt` 并单测                                                                                                                                                                              |
+| 加权抽取                           | **6** 份（两份同名 `weightedPick` 的错误类型不同：`extractor.ts` 抛裸 `Error`→500，`service.ts` 抛 `ApiError`→409，是真实行为分叉）                                                                   | 合并时先判定哪个语义正确                                                                                                                                                                                                                          |
+| `FOR UPDATE`                       | 字样 29（注释 5）→ **25 处真实站点 / 13 模块**；22 单行 + 3 批量                                                                                                                                      | **其中 12 处是完全相同的 `SELECT id FROM users … FOR UPDATE`（48%）**，是 helper 的首选收益点；批量形态参数名不统一（`ids` vs `lockedIds`）                                                                                                       |
+| 表名口径                           | `@@map` 仅 1 处（`users`）；行锁里 `users` 12 / `Student` 7 / `PvpTournament` 4 / `RecruitPool` 1 / `AdventureLog` 1                                                                                  | 风险面是 **4 个模型 13 条语句**，不是 27 个模型；先落 `lockXxx(tx, …)` 常量表再谈改名                                                                                                                                                             |
+| Json 写入助手                      | **11** 份定义，其中裸 cast **5** 处（`loader.ts:160`、`admin/service.ts:57`、`contest/repository.ts:46/50`、`pvp/registration.ts:50`、`pvp/rewards.ts:154`）                                          | 而 `shared` 为同一件事写了 112 行递归 walker —— 两端严格程度不一致                                                                                                                                                                                |
+| `requireConfig` 守卫               | **17** 处 / 14 文件，含 5 个同名私有副本                                                                                                                                                              | 可收成一份                                                                                                                                                                                                                                        |
+| `readYaml`                         | 4 处同模板 + 1 处（`tests/tutorial-shop.test.ts:23`）**无 errors 检查**                                                                                                                               | 不是 5 份同构                                                                                                                                                                                                                                     |
+| `Array.isArray(badges)`            | **6** 处                                                                                                                                                                                              | 写回侧缺元素级校验（`story/service.ts:550` 读侧有）                                                                                                                                                                                               |
+| 六维/能力键                        | **28** 处声明/映射；`STRING`/`string`/`str` 三拼写并存，`CODING`/`coding`/`code`、`PROBLEM`/`setting` 双轨                                                                                            | 无单一真源；Prisma 列名一律 `str`/`code`/`setting`                                                                                                                                                                                                |
+| Student→ParticipantSnapshot        | abilities 块 3 份**逐字相同**；但 traits 段已分叉（`adventure` 用 `?? []` 静默空数组，另两处会抛 TypeError）                                                                                          | 合并时必须选一个语义                                                                                                                                                                                                                              |
+| `rowToProgress` / `toProgressView` | **不是逐字相同**：4 处差异（story 版多 `undefined` 分支、用裸 cast 而非 `jsonValue`）                                                                                                                 | **已漂移的复制比重名复制更危险**，合并前逐分支确认语义                                                                                                                                                                                            |
+| 阻尼公式 `(1 - cur/100)^2`         | 3 份等价                                                                                                                                                                                              | `training/gains.ts`、`economy/progression.ts`、`story/service.ts`                                                                                                                                                                                 |
+| FNV-1a / Box-Muller                | 各 2 份，算法一致（FNV 常量与顺序逐位相同）                                                                                                                                                           | 归入 `contest/engine/rng.ts`                                                                                                                                                                                                                      |
+| 稀有度序                           | 真副本 **3** 份（`shop/service.ts:127`、`scripts/recruit-stats.ts:47`、`scripts/balance-regression.ts:180`）；`config/semantic.ts` 与 `recruit-gen.ts` **已**用共享 `CONFIG_RARITIES`，不应列为待收敛 | 大小写双轨真源：`talents.ts:7` 小写 `colorful` vs `enums.ts:2` 大写 `RAINBOW`                                                                                                                                                                     |
+| 状态枚举                           | Prisma 10 个 enum 的"第二份声明"**不在 `shared/enums.ts`**（该文件只有 `RARITIES`/`DIMENSIONS`/`ABILITY_KEYS`），而是手抄散落在 5 个文件；`AdventureStatus` 等 2 个**根本没有第二份**                 | `TrainingKind`/`QualityTier` 大小写双轨，靠两张手写表往返翻译                                                                                                                                                                                     |
+| 引擎不变量                         | `isBetterTeamAttempt`、`aggregateTeam`、排序口径在 shared 与 engine **逐字两份**                                                                                                                      | 抽离成立，但**不是单文件搬迁**：需整体搬 `engine/`（6 文件）+ `mulberry32`，因 shared 不能 import apps/api。**（R4-T11 实测证伪该机制主张：闭包完全落在 shared 内，mulberry32 全仓仅 1 份；实际为 import 级收口，2 文件 ±59 行，见台账 R4-T11）** |
 
 ### R5 跨端契约（先 diff，再搬）
 
@@ -201,17 +201,17 @@ main
 
 ## 3. 门禁与 KPI
 
-| 阶段 | 必绿 |
-|---|---|
+| 阶段      | 必绿                                                                                                             |
+| --------- | ---------------------------------------------------------------------------------------------------------------- |
 | R0 / R0.5 | `pnpm -r typecheck && pnpm -r lint && pnpm -r build && pnpm test && pnpm e2e:typecheck && pnpm e2e`；CI 时长下降 |
-| R1 | 同上 + `importConfigs()` 耗时前后对比（>10%，分两个配置源） |
-| R2 | 同上 + `report-determinism` / `m2-golden` / `contest-rng-replay` **逐字节不变** + 结算耗时对比 |
-| R3 | 同上 + 完整 `migrate deploy` + `e2e:seed` + 镜像体积对比；zod 按文件分批跑 `test:unit` |
-| R4 | 同上 + `clampInt` 单测 |
-| R5 | 同上 + "改 shared 字段 → API 侧 `tsc` 报错"的实测记录 |
-| R6 | 新规则先 `warn` 跑一轮清零，再改 `error` |
-| 每个提交 | 提交信息匹配 §5 的 `type(scope): subject`（校验命令见 §5.4，应为空输出） |
-| 全程 | `pnpm bal:regress` 与 `pnpm sim:economy` 必须始终 PASS |
+| R1        | 同上 + `importConfigs()` 耗时前后对比（>10%，分两个配置源）                                                      |
+| R2        | 同上 + `report-determinism` / `m2-golden` / `contest-rng-replay` **逐字节不变** + 结算耗时对比                   |
+| R3        | 同上 + 完整 `migrate deploy` + `e2e:seed` + 镜像体积对比；zod 按文件分批跑 `test:unit`                           |
+| R4        | 同上 + `clampInt` 单测                                                                                           |
+| R5        | 同上 + "改 shared 字段 → API 侧 `tsc` 报错"的实测记录                                                            |
+| R6        | 新规则先 `warn` 跑一轮清零，再改 `error`                                                                         |
+| 每个提交  | 提交信息匹配 §5 的 `type(scope): subject`（校验命令见 §5.4，应为空输出）                                         |
+| 全程      | `pnpm bal:regress` 与 `pnpm sim:economy` 必须始终 PASS                                                           |
 
 **KPI 写法**：每阶段给出"**净删除行数 + 一个可测指标**"。不要用"总行数 −10%"——仓库全部跟踪文本实测 **57,895 行**，草案表格各行为 50,414 行（口径不一：web/e2e 只数 `.ts`，api/tests 连 fixture yaml 一起数），而它自己各阶段净删除相加仅约 4,300 行，推不出 −5,661 行。
 
@@ -246,12 +246,12 @@ main
 
 反面 → 正面（前三条改自真实历史）：
 
-| 现状 | 改为 |
-|---|---|
-| `fix(api): 幂等跳过路径调和 DB 回滚不一致 + CONFIG 深冻结（M1 Task 1 审查 F-1/F-2/F-3）` | `fix(config): reconcile config tables on the idempotent import path`，F-1/F-2 的来由放正文 |
-| `feat: 讲课附带出题/思维成长（issue #56）` | `feat(academy): grant problem-setting and thinking growth on lecture`，issue 号放正文 |
-| `docs: 重写 README 为项目介绍，补全 AGPL-3.0 完整协议文本，优化测试脚本` | 拆成多条：`docs: rewrite README as a project introduction` + `chore: add the full AGPL-3.0 license text` |
-| `refactor(items): 取消鸡腿便当「每名学员每日限用 1 份」限额` | `refactor(items): drop the daily use limit on drumstick-bento` |
+| 现状                                                                                     | 改为                                                                                                     |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `fix(api): 幂等跳过路径调和 DB 回滚不一致 + CONFIG 深冻结（M1 Task 1 审查 F-1/F-2/F-3）` | `fix(config): reconcile config tables on the idempotent import path`，F-1/F-2 的来由放正文               |
+| `feat: 讲课附带出题/思维成长（issue #56）`                                               | `feat(academy): grant problem-setting and thinking growth on lecture`，issue 号放正文                    |
+| `docs: 重写 README 为项目介绍，补全 AGPL-3.0 完整协议文本，优化测试脚本`                 | 拆成多条：`docs: rewrite README as a project introduction` + `chore: add the full AGPL-3.0 license text` |
+| `refactor(items): 取消鸡腿便当「每名学员每日限用 1 份」限额`                             | `refactor(items): drop the daily use limit on drumstick-bento`                                           |
 
 §2 阶段计划对应的提交序列：
 
@@ -283,23 +283,23 @@ git log --no-merges --pretty=%s origin/main..HEAD \
 
 ## 附A：草案被证伪的结论（保留备查）
 
-| # | 草案结论 | 实测 | 证据 |
-|---|---|---|---|
-| A1 | "hash 命中跳过 `reconcileTables`"是头号优化 | **回退了 `d85836b` 的审查修复**（F-1/F-2：幂等跳过路径调和 DB 回滚不一致）；且 fixture 调用不走 hash 分支，省不到主要成本 | `loader.ts:209-213` 注释 + `git log -S` |
-| A2 | zod 有 "181 处已废弃 API" | **96 条**（141 次出现）；`.strict()` 81 处**未废弃** | `zod@4.6.5/v4/classic/*.d.ts` |
-| A3 | `prisma-client-js` "官方明确废弃、将移除" | CLI 仅标注 **"Legacy"**，无 deprecated 措辞 → 措辞应降级 | `prisma@7.10.0/build/cli.js` |
-| A4 | "`@prisma/client` 可从 dependencies 移除" | **未证实且有风险**（仍导出 `./runtime/client`）→ 需真实 generate 验证 | `@prisma/client/package.json` exports |
-| A5 | "`noExternal` 需加 generated 路径" | **错**：相对导入 esbuild 无条件打包 | — |
-| A6 | `rejectJsonSafetyIssue` 是死代码（P0 可删） | **被调用 12 次**，删了编译失败 | `grep -c` |
-| A7 | `requireAuth` 的 35 行解析体是死代码 | **每个未认证请求都执行**，且是 `TOKEN_EXPIRED` 唯一产出点；PR #63 的单查询设计被误读 | `index.ts:113-150` 注释原文 |
-| A8 | `listProblemLibrary` 是零调用空壳 | 有真实路由调用者 | `problems/library-router.ts:34`（`index.ts:159` 挂载） |
-| A9 | `unwrap` 零引用 | 被 `health.test.ts` 用 2 次（与 `tests/e2e/fixtures.ts` 同名函数混淆） | `grep` |
-| A10 | "63 个 try/catch 与 63 个 `res.json` 严格 1:1" | **60 对 60**（55 个 `res.json` + 5 个 `res.status().json`） | `grep -c` |
-| A11 | `parseId` 4 处在 students/items/training/academy | 实际在 **adventure / problems-library / pvp / students** | `grep "function parseId"` |
-| A12 | "10 个 enum 在 Prisma 与 `shared/enums.ts` 各声明一遍" | `shared/enums.ts` **一个都没声明**（只有 `RARITIES`/`DIMENSIONS`/`ABILITY_KEYS`）；手抄散落 5 文件 | `cat shared/src/enums.ts` |
-| A13 | `memberIdentityKey`/`teamIdentityKey` "字段顺序敏感" | **不敏感**：stringify 的是显式数组字面量 | `contest.ts:539-561` |
-| A14 | `deleteMany` 15 个 / `withJsonSafety` 22 个 / `dailyUsed` 被 4 处调用 / 测试前导含 `prisma.$disconnect` | 实测 **18 / 24 / 3 / 0**（测试链路里根本没有 disconnect） | `grep` |
-| A15 | 测试失败日志"已在 artifact 里" | **上传前就被 `rm -f` 删掉了**，只传 typecheck 两类 | `test.yml:106` vs `:159` |
+| #   | 草案结论                                                                                                | 实测                                                                                                                      | 证据                                                   |
+| --- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| A1  | "hash 命中跳过 `reconcileTables`"是头号优化                                                             | **回退了 `d85836b` 的审查修复**（F-1/F-2：幂等跳过路径调和 DB 回滚不一致）；且 fixture 调用不走 hash 分支，省不到主要成本 | `loader.ts:209-213` 注释 + `git log -S`                |
+| A2  | zod 有 "181 处已废弃 API"                                                                               | **96 条**（141 次出现）；`.strict()` 81 处**未废弃**                                                                      | `zod@4.6.5/v4/classic/*.d.ts`                          |
+| A3  | `prisma-client-js` "官方明确废弃、将移除"                                                               | CLI 仅标注 **"Legacy"**，无 deprecated 措辞 → 措辞应降级                                                                  | `prisma@7.10.0/build/cli.js`                           |
+| A4  | "`@prisma/client` 可从 dependencies 移除"                                                               | **未证实且有风险**（仍导出 `./runtime/client`）→ 需真实 generate 验证                                                     | `@prisma/client/package.json` exports                  |
+| A5  | "`noExternal` 需加 generated 路径"                                                                      | **错**：相对导入 esbuild 无条件打包                                                                                       | —                                                      |
+| A6  | `rejectJsonSafetyIssue` 是死代码（P0 可删）                                                             | **被调用 12 次**，删了编译失败                                                                                            | `grep -c`                                              |
+| A7  | `requireAuth` 的 35 行解析体是死代码                                                                    | **每个未认证请求都执行**，且是 `TOKEN_EXPIRED` 唯一产出点；PR #63 的单查询设计被误读                                      | `index.ts:113-150` 注释原文                            |
+| A8  | `listProblemLibrary` 是零调用空壳                                                                       | 有真实路由调用者                                                                                                          | `problems/library-router.ts:34`（`index.ts:159` 挂载） |
+| A9  | `unwrap` 零引用                                                                                         | 被 `health.test.ts` 用 2 次（与 `tests/e2e/fixtures.ts` 同名函数混淆）                                                    | `grep`                                                 |
+| A10 | "63 个 try/catch 与 63 个 `res.json` 严格 1:1"                                                          | **60 对 60**（55 个 `res.json` + 5 个 `res.status().json`）                                                               | `grep -c`                                              |
+| A11 | `parseId` 4 处在 students/items/training/academy                                                        | 实际在 **adventure / problems-library / pvp / students**                                                                  | `grep "function parseId"`                              |
+| A12 | "10 个 enum 在 Prisma 与 `shared/enums.ts` 各声明一遍"                                                  | `shared/enums.ts` **一个都没声明**（只有 `RARITIES`/`DIMENSIONS`/`ABILITY_KEYS`）；手抄散落 5 文件                        | `cat shared/src/enums.ts`                              |
+| A13 | `memberIdentityKey`/`teamIdentityKey` "字段顺序敏感"                                                    | **不敏感**：stringify 的是显式数组字面量                                                                                  | `contest.ts:539-561`                                   |
+| A14 | `deleteMany` 15 个 / `withJsonSafety` 22 个 / `dailyUsed` 被 4 处调用 / 测试前导含 `prisma.$disconnect` | 实测 **18 / 24 / 3 / 0**（测试链路里根本没有 disconnect）                                                                 | `grep`                                                 |
+| A15 | 测试失败日志"已在 artifact 里"                                                                          | **上传前就被 `rm -f` 删掉了**，只传 typecheck 两类                                                                        | `test.yml:106` vs `:159`                               |
 
 ## 附B：方法与边界
 

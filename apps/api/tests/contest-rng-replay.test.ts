@@ -63,11 +63,7 @@ describe('ranking RNG replay labels', () => {
           teamId: 'home',
           side: 'HOME',
           userId: 1,
-          members: [
-            player,
-            participant('队友 2', 'HOME', 2),
-            participant('队友 3', 'HOME', 3),
-          ],
+          members: [player, participant('队友 2', 'HOME', 2), participant('队友 3', 'HOME', 3)],
         },
         {
           teamId: 'npc:0',

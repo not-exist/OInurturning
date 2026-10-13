@@ -43,7 +43,8 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
         },
       });
       // 注销账号已物理删除 → findUnique 返回 null，同样落到 UNAUTHENTICATED，无需状态位
-      if (!user || user.bannedAt || user.tokenVersion !== claims.tv) throw new ApiError('UNAUTHENTICATED');
+      if (!user || user.bannedAt || user.tokenVersion !== claims.tv)
+        throw new ApiError('UNAUTHENTICATED');
       req.user = {
         id: user.id,
         role: user.role,
@@ -52,6 +53,8 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
         tutorialCompleted: user.tutorialCompleted,
       };
       next();
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   })();
 }

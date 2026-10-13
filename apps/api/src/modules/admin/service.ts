@@ -1,4 +1,9 @@
-import { Prisma, type AdminAnnouncement, type AdminAuditLog, type PvpTournament } from '../../generated/prisma/client.js';
+import {
+  Prisma,
+  type AdminAnnouncement,
+  type AdminAuditLog,
+  type PvpTournament,
+} from '../../generated/prisma/client.js';
 import type { AnnouncementView, AuditView, TournamentView, UserAdminView } from '@oinur/shared';
 import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
@@ -67,7 +72,10 @@ async function audit(
   targetId: string,
   payload: unknown,
 ): Promise<void> {
-  const admin = await tx.user.findUniqueOrThrow({ where: { id: adminId }, select: { username: true } });
+  const admin = await tx.user.findUniqueOrThrow({
+    where: { id: adminId },
+    select: { username: true },
+  });
   await tx.adminAuditLog.create({
     data: {
       adminId,
@@ -117,12 +125,22 @@ export async function updateTournamentPrizes(
   return prisma.$transaction(async (tx) => {
     await lockPvpTournament(tx, tournamentId);
     const current = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
-    if (current === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
+    if (current === null)
+      throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
     if (current.status !== 'REGISTERING' || now >= current.registerEndsAt) {
-      throw new ApiError('STATE_CONFLICT', { resource: 'tournament', id: tournamentId, reason: 'prize configuration is frozen' });
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'tournament',
+        id: tournamentId,
+        reason: 'prize configuration is frozen',
+      });
     }
-    const row = await tx.pvpTournament.update({ where: { id: tournamentId }, data: { prizes: prizes as Prisma.InputJsonValue } });
-    await audit(tx, adminId, 'TOURNAMENT_PRIZES_UPDATE', 'PVP_TOURNAMENT', String(tournamentId), { prizes });
+    const row = await tx.pvpTournament.update({
+      where: { id: tournamentId },
+      data: { prizes: prizes as Prisma.InputJsonValue },
+    });
+    await audit(tx, adminId, 'TOURNAMENT_PRIZES_UPDATE', 'PVP_TOURNAMENT', String(tournamentId), {
+      prizes,
+    });
     return tournamentView(row);
   });
 }
@@ -145,7 +163,10 @@ export async function createAnnouncement(
 }
 
 export async function listAnnouncements(limit = 50): Promise<AnnouncementView[]> {
-  const rows = await prisma.adminAnnouncement.findMany({ orderBy: { createdAt: 'desc' }, take: limit });
+  const rows = await prisma.adminAnnouncement.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
   return rows.map(announcementView);
 }
 
@@ -154,7 +175,15 @@ export async function searchUsers(query: string | undefined, limit = 50): Promis
     where: query === undefined ? undefined : { username: { contains: query } },
     orderBy: { id: 'desc' },
     take: limit,
-    select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, createdAt: true },
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      money: true,
+      reputation: true,
+      bannedAt: true,
+      createdAt: true,
+    },
   });
   return rows.map((row) => ({
     ...row,
@@ -177,14 +206,28 @@ export async function setUserBan(
     const target = await tx.user.findUnique({ where: { id: targetId } });
     if (target === null) throw new ApiError('NOT_FOUND', { resource: 'user', id: targetId });
     if (target.role === 'ADMIN') {
-      throw new ApiError('FORBIDDEN', { resource: 'user', id: targetId, reason: 'cannot ban an admin' });
+      throw new ApiError('FORBIDDEN', {
+        resource: 'user',
+        id: targetId,
+        reason: 'cannot ban an admin',
+      });
     }
     const row = await tx.user.update({
       where: { id: targetId },
       data: { bannedAt: banned ? new Date() : null },
-      select: { id: true, username: true, role: true, money: true, reputation: true, bannedAt: true, createdAt: true },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        money: true,
+        reputation: true,
+        bannedAt: true,
+        createdAt: true,
+      },
     });
-    await audit(tx, adminId, banned ? 'USER_BAN' : 'USER_UNBAN', 'USER', String(targetId), { banned });
+    await audit(tx, adminId, banned ? 'USER_BAN' : 'USER_UNBAN', 'USER', String(targetId), {
+      banned,
+    });
     return {
       ...row,
       bannedAt: row.bannedAt?.toISOString() ?? null,

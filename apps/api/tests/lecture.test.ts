@@ -104,13 +104,20 @@ describe('M3 lecture flow', () => {
     const studentId = await createStudent(userId, 45);
     const result = await teachLecture(userId, studentId, 'senior', false, NOW);
 
-    expect(result).toMatchObject({ money: 360, reputation: 4, thinkingReq: 45, thinkingDeficit: false });
+    expect(result).toMatchObject({
+      money: 360,
+      reputation: 4,
+      thinkingReq: 45,
+      thinkingDeficit: false,
+    });
     expect(result.gains.length).toBeGreaterThan(0);
     // 思维=要求 → 匹配系数 1；cur=45 → 主成长 0.75×(1−0.45)^2，附带成长为其 35%
     const full = 0.75 * (1 - 0.45) ** 2;
     for (const gain of result.gains) {
       expect(['setting', 'thinking']).toContain(gain.stat);
-      const known = [full, full * 0.35].some((candidate) => Math.abs(candidate - gain.amount) < 1e-9);
+      const known = [full, full * 0.35].some(
+        (candidate) => Math.abs(candidate - gain.amount) < 1e-9,
+      );
       expect(known).toBe(true);
     }
 
@@ -168,10 +175,22 @@ describe('M3 lecture flow', () => {
         userId,
         name: '思维型讲师',
         qualityTier: 'GOOD',
-        ds: 45, dp: 45, math: 45, graph: 45, greedy: 45, str: 45,
-        code: 25, thinking: 50, setting: 30,
-        mindset: 2, focusCap: 45, energyMax: 60, energy: 30,
-        stamina: 5, staminaRegen: 50, lastSettledAt: NOW,
+        ds: 45,
+        dp: 45,
+        math: 45,
+        graph: 45,
+        greedy: 45,
+        str: 45,
+        code: 25,
+        thinking: 50,
+        setting: 30,
+        mindset: 2,
+        focusCap: 45,
+        energyMax: 60,
+        energy: 30,
+        stamina: 5,
+        staminaRegen: 50,
+        lastSettledAt: NOW,
       },
     });
     const result = await teachLecture(userId, student.id, 'senior', true, NOW);
@@ -230,7 +249,10 @@ describe('M3 lecture flow', () => {
     sequence += 1;
     const registration = await request(app)
       .post('/api/auth/register')
-      .send({ username: `lecture-route-${sequence}-${Date.now().toString(36)}`, password: 'pw-123456' });
+      .send({
+        username: `lecture-route-${sequence}-${Date.now().toString(36)}`,
+        password: 'pw-123456',
+      });
     const session = unwrapOk<{ accessToken: string; me: { id: number } }>(registration);
     await unlockTutorial(session.me.id);
     const studentId = await createStudent(session.me.id, 45);

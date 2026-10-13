@@ -14,7 +14,8 @@ const createSchema = z
 
 function parseId(raw: string | string[]): number {
   const value = typeof raw === 'string' ? Number(raw) : NaN;
-  if (!Number.isInteger(value) || value <= 0) throw new ApiError('NOT_FOUND', { resource: 'problem' });
+  if (!Number.isInteger(value) || value <= 0)
+    throw new ApiError('NOT_FOUND', { resource: 'problem' });
   return value;
 }
 
@@ -23,8 +24,12 @@ export const problemLibraryRouter = Router();
 problemLibraryRouter.post('/', requireAuth, async (req, res, next) => {
   try {
     const parsed = createSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
-    res.json({ ok: true, data: await service.createProblem(req.user!.id, parsed.data.studentId, parsed.data.dimension) });
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    res.json({
+      ok: true,
+      data: await service.createProblem(req.user!.id, parsed.data.studentId, parsed.data.dimension),
+    });
   } catch (error) {
     next(error);
   }

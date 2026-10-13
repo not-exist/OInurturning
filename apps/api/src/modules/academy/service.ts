@@ -98,13 +98,19 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
       const candidates = generatePool(newRng(), ctx, POOL_SIZE);
       try {
         const created = await prisma.recruitPool.create({
-          data: { userId, candidates: jsonWrite(candidates), generatedAt: now, refreshDayKey: dayKey(now) },
+          data: {
+            userId,
+            candidates: jsonWrite(candidates),
+            generatedAt: now,
+            refreshDayKey: dayKey(now),
+          },
         });
         view = toPoolView(created, now);
         break;
       } catch (e) {
         const isRace =
-          e instanceof Prisma.PrismaClientKnownRequestError && (e.code === 'P2002' || e.code === 'P2034');
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          (e.code === 'P2002' || e.code === 'P2034');
         if (isRace) {
           const existing = await prisma.recruitPool.findUnique({ where: { userId } });
           if (existing) {
@@ -117,12 +123,16 @@ export async function getPool(userId: number, now: Date = new Date()): Promise<P
       }
     }
   } else {
-    const stale = now.getTime() - pool.generatedAt.getTime() >= cfg.manual_refresh.free_interval_hours * HOUR_MS;
+    const stale =
+      now.getTime() - pool.generatedAt.getTime() >=
+      cfg.manual_refresh.free_interval_hours * HOUR_MS;
     const dayChanged = pool.refreshDayKey !== dayKey(now);
     if (!stale && !dayChanged) {
       view = toPoolView(pool, now);
     } else {
-      const candidates = stale ? generatePool(newRng(), await genCtx(prisma, userId), POOL_SIZE) : readCandidates(pool);
+      const candidates = stale
+        ? generatePool(newRng(), await genCtx(prisma, userId), POOL_SIZE)
+        : readCandidates(pool);
       const updated = await prisma.recruitPool.update({
         where: { userId },
         data: {
@@ -153,7 +163,8 @@ export async function refreshPool(userId: number, now: Date = new Date()): Promi
       where: { id: userId, money: { gte: price } },
       data: { money: { decrement: price } },
     });
-    if (paid.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { need: price, resource: 'money' });
+    if (paid.count === 0)
+      throw new ApiError('INSUFFICIENT_RESOURCE', { need: price, resource: 'money' });
 
     const candidates = generatePool(newRng(), await genCtx(tx, userId), POOL_SIZE);
     const updated = await tx.recruitPool.update({
@@ -175,8 +186,15 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
     name: s.name,
     qualityTier: s.qualityTier,
     status: s.status,
-    ds: s.ds, dp: s.dp, math: s.math, graph: s.graph, greedy: s.greedy, str: s.str,
-    code: s.code, thinking: s.thinking, setting: s.setting,
+    ds: s.ds,
+    dp: s.dp,
+    math: s.math,
+    graph: s.graph,
+    greedy: s.greedy,
+    str: s.str,
+    code: s.code,
+    thinking: s.thinking,
+    setting: s.setting,
     mindset: s.mindset,
     focusCap: s.focusCap,
     energyMax: s.energyMax,
@@ -195,7 +213,11 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
  * POST 招募：事务内重算价（在册数可能已变）→ 条件 UPDATE 扣钱 → 建 Student+StudentTalent → 池减员。
  * price 快照仅作展示；招募价以重算为准。
  */
-export async function recruit(userId: number, tempId: string, now: Date = new Date()): Promise<StudentView> {
+export async function recruit(
+  userId: number,
+  tempId: string,
+  now: Date = new Date(),
+): Promise<StudentView> {
   const cfg = recruitmentCfg();
   const recruited = await prisma.$transaction(async (tx) => {
     await lockRecruitPool(tx, userId);
@@ -212,16 +234,23 @@ export async function recruit(userId: number, tempId: string, now: Date = new Da
       where: { id: userId, money: { gte: price } },
       data: { money: { decrement: price } },
     });
-    if (paid.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { need: price, resource: 'money' });
+    if (paid.count === 0)
+      throw new ApiError('INSUFFICIENT_RESOURCE', { need: price, resource: 'money' });
 
     const student = await tx.student.create({
       data: {
         userId,
         name: candidate.name,
         qualityTier: candidate.qualityTier,
-        ds: candidate.attrs.ds, dp: candidate.attrs.dp, math: candidate.attrs.math,
-        graph: candidate.attrs.graph, greedy: candidate.attrs.greedy, str: candidate.attrs.str,
-        code: candidate.attrs.code, thinking: candidate.attrs.thinking, setting: candidate.attrs.setting,
+        ds: candidate.attrs.ds,
+        dp: candidate.attrs.dp,
+        math: candidate.attrs.math,
+        graph: candidate.attrs.graph,
+        greedy: candidate.attrs.greedy,
+        str: candidate.attrs.str,
+        code: candidate.attrs.code,
+        thinking: candidate.attrs.thinking,
+        setting: candidate.attrs.setting,
         mindset: 2,
         focusCap: candidate.attrs.focusCap,
         energyMax: candidate.attrs.energyMax,
@@ -247,7 +276,10 @@ export async function recruit(userId: number, tempId: string, now: Date = new Da
       data: { candidates: jsonWrite(remaining) },
     });
 
-    return toStudentView(student, candidate.talents.map((t) => t.talentId));
+    return toStudentView(
+      student,
+      candidate.talents.map((t) => t.talentId),
+    );
   });
   // 招募是引导第 5 步（do_recruit）的唯一证据：事务提交后才推进，避免扣钱失败却算过步
   void autoAdvanceIfNeeded(userId, 'do_recruit');

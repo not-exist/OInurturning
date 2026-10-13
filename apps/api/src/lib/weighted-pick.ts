@@ -3,7 +3,10 @@
  * 浮点兜底取末项。空池或 Σweight 非有限（NaN/±∞）或 ≤ 0 属服务端配置腐坏，抛普通 Error
  * （errorHandler 将非 ApiError 映射为 500 INTERNAL），调用方不可达时不应捕获。
  */
-export function weightedPick<T>(entries: readonly { value: T; weight: number }[], rng: () => number): T {
+export function weightedPick<T>(
+  entries: readonly { value: T; weight: number }[],
+  rng: () => number,
+): T {
   const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
   if (!Number.isFinite(total) || total <= 0) throw new Error('weighted pool is empty');
 

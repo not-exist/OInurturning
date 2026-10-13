@@ -2,13 +2,26 @@ import { useState, type JSX } from 'react';
 import { clamp, type ShopItemView } from '@oinur/shared';
 import { useShopCatalog, useBuyShopItem } from '../../lib/shop';
 import { apiErrorMessage } from '../../lib/api';
-import { Btn, Chip, ErrorNote, InlineLoader, Empty, Meter, Modal, Numeral, PageHeader, Card } from '../../components/ui';
+import {
+  Btn,
+  Chip,
+  ErrorNote,
+  InlineLoader,
+  Empty,
+  Meter,
+  Modal,
+  Numeral,
+  PageHeader,
+  Card,
+} from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { ShoppingBag, Coins, Lock } from 'lucide-react';
 import { rarityText, RARITY_BORDER, normRarity } from '../../lib/rarity';
 
 function RarityBadge({ rarity }: { rarity: string }) {
-  return <span className={`text-[11px] font-medium ${rarityText(rarity)}`}>{rarity.toLowerCase()}</span>;
+  return (
+    <span className={`text-[11px] font-medium ${rarityText(rarity)}`}>{rarity.toLowerCase()}</span>
+  );
 }
 
 export function ShopPage(): JSX.Element {
@@ -19,20 +32,34 @@ export function ShopPage(): JSX.Element {
   const [confirming, setConfirming] = useState<ShopItemView | null>(null);
 
   if (catalog.isLoading) return <InlineLoader>正在加载商店…</InlineLoader>;
-  if (catalog.isError) return <ErrorNote onRetry={() => catalog.refetch()}>商店加载失败：{apiErrorMessage(catalog.error)}</ErrorNote>;
+  if (catalog.isError)
+    return (
+      <ErrorNote onRetry={() => catalog.refetch()}>
+        商店加载失败：{apiErrorMessage(catalog.error)}
+      </ErrorNote>
+    );
   const data = catalog.data!;
   const categories = Array.from(new Set(data.items.map((i) => i.category))).sort();
 
-  const filtered = filter === 'all' ? data.items : data.items.filter((i) => i.category === filter || i.rarity === filter);
+  const filtered =
+    filter === 'all'
+      ? data.items
+      : data.items.filter((i) => i.category === filter || i.rarity === filter);
 
   const getQty = (id: string) => qty[id] ?? 1;
-  const setQtyFor = (id: string, v: number) => setQty((prev) => ({ ...prev, [id]: clamp(v, 1, 99) }));
+  const setQtyFor = (id: string, v: number) =>
+    setQty((prev) => ({ ...prev, [id]: clamp(v, 1, 99) }));
 
   /** 本次可买上限：日限/周限/金币三者取最小，0 表示买不动（限购用尽或钱不够一件） */
   const maxQtyOf = (item: ShopItemView): number =>
     Math.max(
       0,
-      Math.min(99, item.dailyRemaining ?? 99, item.weeklyRemaining ?? 99, Math.floor(data.money / item.price)),
+      Math.min(
+        99,
+        item.dailyRemaining ?? 99,
+        item.weeklyRemaining ?? 99,
+        Math.floor(data.money / item.price),
+      ),
     );
   /** 展示用数量：夹在上限内，但下限 1（上限为 0 时按钮会禁用，不必显示 0 件） */
   const qtyOf = (item: ShopItemView) => Math.min(getQty(item.itemId), Math.max(1, maxQtyOf(item)));
@@ -40,7 +67,8 @@ export function ShopPage(): JSX.Element {
   const totalOf = (item: ShopItemView) => item.price * qtyOf(item);
   const blockReason = (item: ShopItemView): string | null => {
     if (!item.purchasable) return item.reason ?? '不可购买';
-    if ((item.dailyRemaining ?? 99) === 0 || (item.weeklyRemaining ?? 99) === 0) return '已达限购上限';
+    if ((item.dailyRemaining ?? 99) === 0 || (item.weeklyRemaining ?? 99) === 0)
+      return '已达限购上限';
     if (maxQtyOf(item) < 1) return '金币不足';
     return null;
   };
@@ -59,23 +87,40 @@ export function ShopPage(): JSX.Element {
       />
 
       <div className="flex flex-wrap gap-1.5">
-        <Btn variant={filter === 'all' ? 'primary' : 'ghost'} size="sm" onClick={() => setFilter('all')}>
+        <Btn
+          variant={filter === 'all' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => setFilter('all')}
+        >
           全部
         </Btn>
         {categories.map((c) => (
-          <Btn key={c} variant={filter === c ? 'primary' : 'ghost'} size="sm" onClick={() => setFilter(c)}>
+          <Btn
+            key={c}
+            variant={filter === c ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setFilter(c)}
+          >
             {c}
           </Btn>
         ))}
         {['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'].map((r) => (
-          <Btn key={r} variant={filter === r ? 'primary' : 'ghost'} size="sm" onClick={() => setFilter(r)} className={rarityText(r)}>
+          <Btn
+            key={r}
+            variant={filter === r ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setFilter(r)}
+            className={rarityText(r)}
+          >
             {r}
           </Btn>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <Empty icon={ShoppingBag} title="暂无商品">该分类下没有可售道具</Empty>
+        <Empty icon={ShoppingBag} title="暂无商品">
+          该分类下没有可售道具
+        </Empty>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
@@ -105,11 +150,15 @@ export function ShopPage(): JSX.Element {
                 </div>
 
                 <p className="mt-2 line-clamp-2 text-xs text-fg-dim">{item.description}</p>
-                {item.effectDesc && <p className="mt-1 text-[11px] text-fg-faint">效果：{item.effectDesc}</p>}
+                {item.effectDesc && (
+                  <p className="mt-1 text-[11px] text-fg-faint">效果：{item.effectDesc}</p>
+                )}
 
                 <div className="mt-2 space-y-1.5 text-[11px]">
                   {item.reputationRequired > 0 && (
-                    <div className={`inline-flex items-center gap-1 border px-1.5 py-0.5 ${data.reputation >= item.reputationRequired ? 'border-good-400/30 bg-good-400/10 text-good-400' : 'border-warn-400/30 bg-warn-400/10 text-warn-400'}`}>
+                    <div
+                      className={`inline-flex items-center gap-1 border px-1.5 py-0.5 ${data.reputation >= item.reputationRequired ? 'border-good-400/30 bg-good-400/10 text-good-400' : 'border-warn-400/30 bg-warn-400/10 text-warn-400'}`}
+                    >
                       <Icon icon={Lock} className="size-3" />
                       声誉 {item.reputationRequired}
                     </div>
@@ -146,11 +195,21 @@ export function ShopPage(): JSX.Element {
 
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1">
-                    <Btn size="sm" variant="ghost" onClick={() => setQtyFor(item.itemId, q - 1)} disabled={q <= 1}>
+                    <Btn
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setQtyFor(item.itemId, q - 1)}
+                      disabled={q <= 1}
+                    >
                       -
                     </Btn>
                     <span className="w-8 text-center text-xs tnum">{q}</span>
-                    <Btn size="sm" variant="ghost" onClick={() => setQtyFor(item.itemId, q + 1)} disabled={q >= maxQtyOf(item)}>
+                    <Btn
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setQtyFor(item.itemId, q + 1)}
+                      disabled={q >= maxQtyOf(item)}
+                    >
                       +
                     </Btn>
                   </div>

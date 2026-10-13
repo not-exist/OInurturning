@@ -60,7 +60,10 @@ export function AuthFrame({
           {statusLines !== undefined && (
             <div className="relative mt-8 space-y-1 border-t border-ink-600/70 pt-3">
               {statusLines.map((line) => (
-                <p key={line} className="flex items-center gap-2 font-mono text-[11px] text-fg-faint">
+                <p
+                  key={line}
+                  className="flex items-center gap-2 font-mono text-[11px] text-fg-faint"
+                >
                   <span className="size-1 animate-pulse-dot rounded-full bg-good-400" aria-hidden />
                   {line}
                 </p>

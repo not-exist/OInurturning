@@ -51,7 +51,9 @@ export function Panel({
               <h2 className="truncate text-sm font-semibold tracking-wide">{title}</h2>
             )}
           </div>
-          {actions !== undefined && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          {actions !== undefined && (
+            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          )}
         </header>
       )}
       <div className={bodyClassName}>{children}</div>
@@ -105,9 +107,7 @@ export function PageHeader({
       <div className="min-w-0">
         {eyebrow !== undefined && <p className="eyebrow mb-1">{eyebrow}</p>}
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {description !== undefined && (
-          <p className="mt-1 text-sm text-fg-muted">{description}</p>
-        )}
+        {description !== undefined && <p className="mt-1 text-sm text-fg-muted">{description}</p>}
       </div>
       {actions !== undefined && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
@@ -134,7 +134,10 @@ export function Btn({
   className = '',
   children,
   ...rest
-}: { variant?: BtnVariant; size?: 'sm' | 'md' } & ButtonHTMLAttributes<HTMLButtonElement>): JSX.Element {
+}: {
+  variant?: BtnVariant;
+  size?: 'sm' | 'md';
+} & ButtonHTMLAttributes<HTMLButtonElement>): JSX.Element {
   return (
     <button
       type="button"
@@ -258,7 +261,13 @@ export function Numeral({
  * 数字滚动：值变化时在 ~420ms 内插值到新值（HUD 金币/声誉）。
  * prefers-reduced-motion 下直接落定（样式层已降级动画，这里同步短路）。
  */
-export function RollingNumber({ value, className = '' }: { value: number; className?: string }): JSX.Element {
+export function RollingNumber({
+  value,
+  className = '',
+}: {
+  value: number;
+  className?: string;
+}): JSX.Element {
   const [shown, setShown] = useState(value);
   const fromRef = useRef(value);
   const rafRef = useRef<number | null>(null);
@@ -332,7 +341,13 @@ export function Empty({
   );
 }
 
-export function ErrorNote({ children, onRetry }: { children: ReactNode; onRetry?: () => void }): JSX.Element {
+export function ErrorNote({
+  children,
+  onRetry,
+}: {
+  children: ReactNode;
+  onRetry?: () => void;
+}): JSX.Element {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border border-bad-400/40 bg-bad-400/10 px-3 py-2 text-sm text-bad-400">
       <span>{children}</span>

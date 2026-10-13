@@ -89,7 +89,8 @@ export async function finishTutorial(
 ): Promise<void> {
   const token = await loginUser(request, username, password);
   const res = await apiCall(request, 'POST', '/api/tutorial/skip', token);
-  if (res.status !== 200) throw new Error(`skip 引导失败：${res.status} ${JSON.stringify(res.body)}`);
+  if (res.status !== 200)
+    throw new Error(`skip 引导失败：${res.status} ${JSON.stringify(res.body)}`);
 }
 
 export async function loginUser(
@@ -131,11 +132,7 @@ export async function apiCall(
 }
 
 /** 经 UI 登录（覆盖真实登录链路；断言 Salt 后落在 / 首页）。 */
-export async function loginViaUI(
-  page: Page,
-  username: string,
-  password: string,
-): Promise<void> {
+export async function loginViaUI(page: Page, username: string, password: string): Promise<void> {
   await page.goto('/login');
   await page.getByTestId('login-username').fill(username);
   await page.getByTestId('login-password').fill(password);
@@ -162,16 +159,30 @@ export async function fund(username: string, opts: FundOptions): Promise<void> {
   }
   await execFileAsync('pnpm', args, {
     cwd: process.cwd(),
-    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: E2E_DATABASE_URL, JWT_SECRET: E2E_JWT_SECRET },
+    env: {
+      ...process.env,
+      NODE_ENV: 'test',
+      DATABASE_URL: E2E_DATABASE_URL,
+      JWT_SECRET: E2E_JWT_SECRET,
+    },
   });
 }
 
 /** 回拨赛事时间窗（串行：spec 内按需调用）。 */
 export async function backdateTournament(tournamentId: number): Promise<void> {
-  await execFileAsync('pnpm', ['-C', 'apps/api', 'e2e:seed', 'backdate-tournament', String(tournamentId)], {
-    cwd: process.cwd(),
-    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: E2E_DATABASE_URL, JWT_SECRET: E2E_JWT_SECRET },
-  });
+  await execFileAsync(
+    'pnpm',
+    ['-C', 'apps/api', 'e2e:seed', 'backdate-tournament', String(tournamentId)],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        DATABASE_URL: E2E_DATABASE_URL,
+        JWT_SECRET: E2E_JWT_SECRET,
+      },
+    },
+  );
 }
 
 export interface AdminAccount {

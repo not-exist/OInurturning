@@ -40,8 +40,15 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
     name: s.name,
     qualityTier: s.qualityTier,
     status: s.status,
-    ds: s.ds, dp: s.dp, math: s.math, graph: s.graph, greedy: s.greedy, str: s.str,
-    code: s.code, thinking: s.thinking, setting: s.setting,
+    ds: s.ds,
+    dp: s.dp,
+    math: s.math,
+    graph: s.graph,
+    greedy: s.greedy,
+    str: s.str,
+    code: s.code,
+    thinking: s.thinking,
+    setting: s.setting,
     mindset: s.mindset,
     focusCap: s.focusCap,
     energyMax: s.energyMax,
@@ -80,7 +87,11 @@ export async function listStudents(userId: number, now: Date = new Date()): Prom
 }
 
 /** GET 详情：本人学员任意状态可见（含 counters） */
-export async function getStudent(userId: number, id: number, now: Date = new Date()): Promise<StudentView> {
+export async function getStudent(
+  userId: number,
+  id: number,
+  now: Date = new Date(),
+): Promise<StudentView> {
   const s = await prisma.student.findUnique({ where: { id }, include: { talents: true } });
   if (!s) throw new ApiError('NOT_FOUND', { resource: 'student', id });
   if (s.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id });
@@ -107,7 +118,9 @@ export async function renameStudent(
     if (consumed.count === 0) {
       throw new ApiError('INSUFFICIENT_RESOURCE', { resource: RENAME_CARD_ID, need: 1 });
     }
-    await tx.userItem.deleteMany({ where: { userId, itemId: RENAME_CARD_ID, quantity: { lte: 0 } } });
+    await tx.userItem.deleteMany({
+      where: { userId, itemId: RENAME_CARD_ID, quantity: { lte: 0 } },
+    });
 
     const renamed = await tx.student.updateMany({
       where: { id, status: 'ACTIVE' },
@@ -115,8 +128,14 @@ export async function renameStudent(
     });
     if (renamed.count === 0) throw new ApiError('STATE_CONFLICT', { studentId: id });
 
-    const student = await tx.student.findUniqueOrThrow({ where: { id }, include: { talents: true } });
-    return toStudentView(student, student.talents.map((t) => t.talentId));
+    const student = await tx.student.findUniqueOrThrow({
+      where: { id },
+      include: { talents: true },
+    });
+    return toStudentView(
+      student,
+      student.talents.map((t) => t.talentId),
+    );
   });
 }
 
@@ -168,6 +187,13 @@ export async function dismissStudent(
       data: { authorStudentId: null },
     });
 
-    return { id, status: 'DISMISSED', reputationPenalty: penalty, reputationDelta: delta, reputation, recycledRenameCard: recycled };
+    return {
+      id,
+      status: 'DISMISSED',
+      reputationPenalty: penalty,
+      reputationDelta: delta,
+      reputation,
+      recycledRenameCard: recycled,
+    };
   });
 }

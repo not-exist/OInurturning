@@ -16,9 +16,15 @@ import {
  */
 const dataPath = (file: string) => path.resolve(import.meta.dirname, '../../../docs/data', file);
 
-const shop = shopConfigSchema.parse(parseYaml(readFileSync(dataPath('shop.yaml'), 'utf8')) as unknown);
-const itemsFile = itemsFileSchema.parse(parseYaml(readFileSync(dataPath('items.yaml'), 'utf8')) as unknown);
-const items: Record<string, ItemDef> = Object.fromEntries(itemsFile.items.map((def) => [def.id, def]));
+const shop = shopConfigSchema.parse(
+  parseYaml(readFileSync(dataPath('shop.yaml'), 'utf8')) as unknown,
+);
+const itemsFile = itemsFileSchema.parse(
+  parseYaml(readFileSync(dataPath('items.yaml'), 'utf8')) as unknown,
+);
+const items: Record<string, ItemDef> = Object.fromEntries(
+  itemsFile.items.map((def) => [def.id, def]),
+);
 
 describe('bookRaritySuffix', () => {
   it('提取书籍稀有度后缀', () => {

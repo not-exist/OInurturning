@@ -122,9 +122,7 @@ export function DuelReplay({
             </div>
             <div className="min-w-0 flex-1 text-right">
               <p className="eyebrow">{contestSideLabel('AWAY')}</p>
-              <p className="truncate text-sm font-medium text-fg">
-                {matchup?.away ?? '对手队伍'}
-              </p>
+              <p className="truncate text-sm font-medium text-fg">{matchup?.away ?? '对手队伍'}</p>
             </div>
           </div>
 
@@ -139,8 +137,8 @@ export function DuelReplay({
                       : 'border-ink-600 text-fg-dim'
                   }`}
                 >
-                  第 {mark.roundNo} 局 · {mark.solved ? '答题成功' : roundReasonLabel(mark.reason)} ·{' '}
-                  {contestSideLabel(mark.awardedTo)} +{mark.score}
+                  第 {mark.roundNo} 局 · {mark.solved ? '答题成功' : roundReasonLabel(mark.reason)}{' '}
+                  · {contestSideLabel(mark.awardedTo)} +{mark.score}
                 </span>
               ))}
             </div>

@@ -31,7 +31,10 @@ async function register(username?: string): Promise<{ token: string; userId: num
   seq += 1;
   const res = await request(app)
     .post('/api/auth/register')
-    .send({ username: username ?? `admcov-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
+    .send({
+      username: username ?? `admcov-${Date.now().toString(36)}-${seq}`,
+      password: 'pw-12345678',
+    });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
   await unlockTutorial(session.me.id);
@@ -57,7 +60,10 @@ describe('admin coverage：鉴权矩阵', () => {
     const auth = { Authorization: `Bearer ${user.token}` };
     const window = futureWindow();
     const calls = [
-      request(app).post('/api/admin/tournaments').set(auth).send({ name: 'x', size: 8, ...window }),
+      request(app)
+        .post('/api/admin/tournaments')
+        .set(auth)
+        .send({ name: 'x', size: 8, ...window }),
       request(app).get('/api/admin/tournaments').set(auth),
       request(app).patch('/api/admin/pvp-tournaments/1').set(auth).send({ prizes: {} }),
       request(app).post('/api/admin/announcements').set(auth).send({ title: 't', body: 'b' }),
@@ -83,18 +89,39 @@ describe('admin coverage：锦标赛', () => {
     const res = await request(app)
       .post('/api/admin/tournaments')
       .set('Authorization', `Bearer ${admin.token}`)
-      .send({ name: '覆盖杯', size: 16, prizes: { champion: { money: 100 } }, config: {}, ...futureWindow() });
+      .send({
+        name: '覆盖杯',
+        size: 16,
+        prizes: { champion: { money: 100 } },
+        config: {},
+        ...futureWindow(),
+      });
     expect(res.status).toBe(200);
-    const created = unwrapOk<{ id: number; name: string; status: string; size: number; createdBy: number }>(res);
-    expect(created).toMatchObject({ name: '覆盖杯', status: 'REGISTERING', size: 16, createdBy: admin.userId });
+    const created = unwrapOk<{
+      id: number;
+      name: string;
+      status: string;
+      size: number;
+      createdBy: number;
+    }>(res);
+    expect(created).toMatchObject({
+      name: '覆盖杯',
+      status: 'REGISTERING',
+      size: 16,
+      createdBy: admin.userId,
+    });
 
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'TOURNAMENT_CREATE', targetId: String(created.id) } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({
+      where: { action: 'TOURNAMENT_CREATE', targetId: String(created.id) },
+    });
     expect(audit.adminId).toBe(admin.userId);
     expect(audit.targetType).toBe('PVP_TOURNAMENT');
     expect(audit.targetId).toBe(String(created.id));
     expect(audit.payload as object).toMatchObject({ name: '覆盖杯', size: 16 });
 
-    const list = await request(app).get('/api/admin/tournaments').set('Authorization', `Bearer ${admin.token}`);
+    const list = await request(app)
+      .get('/api/admin/tournaments')
+      .set('Authorization', `Bearer ${admin.token}`);
     expect(unwrapOk<Array<{ id: number }>>(list).map((t) => t.id)).toContain(created.id);
   });
 
@@ -103,25 +130,47 @@ describe('admin coverage：锦标赛', () => {
     const auth = { Authorization: `Bearer ${admin.token}` };
     const window = futureWindow();
 
-    const badSize = await request(app).post('/api/admin/tournaments').set(auth).send({ name: 'x', size: 4, ...window });
+    const badSize = await request(app)
+      .post('/api/admin/tournaments')
+      .set(auth)
+      .send({ name: 'x', size: 4, ...window });
     expect(badSize.status).toBe(400);
     const pastEnd = await request(app)
-      .post('/api/admin/tournaments').set(auth)
-      .send({ name: 'x', size: 8, registerEndsAt: new Date(Date.now() - 1000).toISOString(), autoStartAt: window.autoStartAt });
+      .post('/api/admin/tournaments')
+      .set(auth)
+      .send({
+        name: 'x',
+        size: 8,
+        registerEndsAt: new Date(Date.now() - 1000).toISOString(),
+        autoStartAt: window.autoStartAt,
+      });
     expect(pastEnd.status).toBe(400);
-    const badOrder = await request(app)
-      .post('/api/admin/tournaments').set(auth)
-      .send({ name: 'x', size: 8, registerEndsAt: window.autoStartAt, autoStartAt: window.registerEndsAt });
+    const badOrder = await request(app).post('/api/admin/tournaments').set(auth).send({
+      name: 'x',
+      size: 8,
+      registerEndsAt: window.autoStartAt,
+      autoStartAt: window.registerEndsAt,
+    });
     expect(badOrder.status).toBe(400);
-    const noName = await request(app).post('/api/admin/tournaments').set(auth).send({ size: 8, ...window });
+    const noName = await request(app)
+      .post('/api/admin/tournaments')
+      .set(auth)
+      .send({ size: 8, ...window });
     expect(noName.status).toBe(400);
     const unknownItem = await request(app)
-      .post('/api/admin/tournaments').set(auth)
-      .send({ name: 'x', size: 8, prizes: { champion: { items: [{ itemId: 'no-such-item', count: 1 }] } }, ...window });
+      .post('/api/admin/tournaments')
+      .set(auth)
+      .send({
+        name: 'x',
+        size: 8,
+        prizes: { champion: { items: [{ itemId: 'no-such-item', count: 1 }] } },
+        ...window,
+      });
     expect(unknownItem.status).toBe(400);
     expect(unwrapErr(unknownItem).code).toBe('VALIDATION_FAILED');
     const negativeMoney = await request(app)
-      .post('/api/admin/tournaments').set(auth)
+      .post('/api/admin/tournaments')
+      .set(auth)
       .send({ name: 'x', size: 8, prizes: { champion: { money: -5 } }, ...window });
     expect(negativeMoney.status).toBe(400);
   });
@@ -130,7 +179,10 @@ describe('admin coverage：锦标赛', () => {
     const admin = await registerAdmin();
     const auth = { Authorization: `Bearer ${admin.token}` };
     const created = unwrapOk<{ id: number }>(
-      await request(app).post('/api/admin/tournaments').set(auth).send({ name: '冻奖杯', size: 8, ...futureWindow() }),
+      await request(app)
+        .post('/api/admin/tournaments')
+        .set(auth)
+        .send({ name: '冻奖杯', size: 8, ...futureWindow() }),
     );
     const updated = await request(app)
       .patch(`/api/admin/pvp-tournaments/${created.id}`)
@@ -139,14 +191,26 @@ describe('admin coverage：锦标赛', () => {
     expect(updated.status).toBe(200);
     expect(unwrapOk<{ prizes: unknown }>(updated).prizes).toEqual({ champion: { money: 3000 } });
 
-    await prisma.pvpTournament.update({ where: { id: created.id }, data: { registerEndsAt: new Date(Date.now() - 1000) } });
-    const frozen = await request(app).patch(`/api/admin/pvp-tournaments/${created.id}`).set(auth).send({ prizes: {} });
+    await prisma.pvpTournament.update({
+      where: { id: created.id },
+      data: { registerEndsAt: new Date(Date.now() - 1000) },
+    });
+    const frozen = await request(app)
+      .patch(`/api/admin/pvp-tournaments/${created.id}`)
+      .set(auth)
+      .send({ prizes: {} });
     expect(frozen.status).toBe(409);
     expect(unwrapErr(frozen).code).toBe('STATE_CONFLICT');
 
-    const missing = await request(app).patch('/api/admin/pvp-tournaments/999999').set(auth).send({ prizes: {} });
+    const missing = await request(app)
+      .patch('/api/admin/pvp-tournaments/999999')
+      .set(auth)
+      .send({ prizes: {} });
     expect(missing.status).toBe(404);
-    const badId = await request(app).patch('/api/admin/pvp-tournaments/0').set(auth).send({ prizes: {} });
+    const badId = await request(app)
+      .patch('/api/admin/pvp-tournaments/0')
+      .set(auth)
+      .send({ prizes: {} });
     expect(badId.status).toBe(404);
   });
 
@@ -154,12 +218,19 @@ describe('admin coverage：锦标赛', () => {
     const admin = await registerAdmin();
     const auth = { Authorization: `Bearer ${admin.token}` };
     const created = unwrapOk<{ id: number }>(
-      await request(app).post('/api/admin/tournaments').set(auth).send({ name: '未到杯', size: 8, ...futureWindow() }),
+      await request(app)
+        .post('/api/admin/tournaments')
+        .set(auth)
+        .send({ name: '未到杯', size: 8, ...futureWindow() }),
     );
-    const res = await request(app).post(`/api/admin/pvp-tournaments/${created.id}/actions/start`).set(auth);
+    const res = await request(app)
+      .post(`/api/admin/pvp-tournaments/${created.id}/actions/start`)
+      .set(auth);
     expect(res.status).toBe(200);
     expect(unwrapOk<{ status: string }>(res).status).toBe('REGISTERING');
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START', targetId: String(created.id) } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({
+      where: { action: 'PVP_TOURNAMENT_START', targetId: String(created.id) },
+    });
     expect(audit.payload as object).toMatchObject({ status: 'REGISTERING' });
   });
 });
@@ -169,7 +240,10 @@ describe('admin coverage：公告/用户/审计', () => {
     const admin = await registerAdmin();
     const auth = { Authorization: `Bearer ${admin.token}` };
     const created = unwrapOk<{ id: number; title: string; authorId: number }>(
-      await request(app).post('/api/admin/announcements').set(auth).send({ title: '开赛通知', body: '周五开赛' }),
+      await request(app)
+        .post('/api/admin/announcements')
+        .set(auth)
+        .send({ title: '开赛通知', body: '周五开赛' }),
     );
     expect(created.title).toBe('开赛通知');
     expect(created.authorId).toBe(admin.userId);
@@ -178,9 +252,15 @@ describe('admin coverage：公告/用户/审计', () => {
     );
     expect(list.map((a) => a.id)).toContain(created.id);
 
-    const emptyTitle = await request(app).post('/api/admin/announcements').set(auth).send({ title: '', body: 'b' });
+    const emptyTitle = await request(app)
+      .post('/api/admin/announcements')
+      .set(auth)
+      .send({ title: '', body: 'b' });
     expect(emptyTitle.status).toBe(400);
-    const longBody = await request(app).post('/api/admin/announcements').set(auth).send({ title: 't', body: 'x'.repeat(20001) });
+    const longBody = await request(app)
+      .post('/api/admin/announcements')
+      .set(auth)
+      .send({ title: 't', body: 'x'.repeat(20001) });
     expect(longBody.status).toBe(400);
     const badLimit = await request(app).get('/api/admin/announcements?limit=0').set(auth);
     expect(badLimit.status).toBe(400);
@@ -200,7 +280,9 @@ describe('admin coverage：公告/用户/审计', () => {
     expect(filtered.map((u) => u.username)).toContain('alice-adminsearch');
     expect(filtered.map((u) => u.username)).not.toContain('bob-adminsearch');
 
-    const all = unwrapOk<Array<{ username: string }>>(await request(app).get('/api/admin/users').set(auth));
+    const all = unwrapOk<Array<{ username: string }>>(
+      await request(app).get('/api/admin/users').set(auth),
+    );
     expect(all.length).toBeGreaterThanOrEqual(3);
 
     const badLimit = await request(app).get('/api/admin/users?limit=101').set(auth);
@@ -213,7 +295,10 @@ describe('admin coverage：公告/用户/审计', () => {
   it('审计列表：含建赛/公告记录，上限校验', async () => {
     const admin = await registerAdmin();
     const auth = { Authorization: `Bearer ${admin.token}` };
-    await request(app).post('/api/admin/tournaments').set(auth).send({ name: '审计杯', size: 8, ...futureWindow() });
+    await request(app)
+      .post('/api/admin/tournaments')
+      .set(auth)
+      .send({ name: '审计杯', size: 8, ...futureWindow() });
     await request(app).post('/api/admin/announcements').set(auth).send({ title: 't', body: 'b' });
 
     const audits = unwrapOk<Array<{ action: string; adminId: number; adminNameSnapshot: string }>>(
@@ -242,11 +327,15 @@ describe('admin coverage：封禁/解封', () => {
     expect(banned.bannedAt).toEqual(expect.any(String));
 
     // 封禁即时生效：旧 token 访问被拒
-    const me = await request(app).get('/api/users/me').set('Authorization', `Bearer ${victim.token}`);
+    const me = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${victim.token}`);
     expect(me.status).toBe(401);
     expect(unwrapErr(me).code).toBe('UNAUTHENTICATED');
 
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'USER_BAN', targetId: String(victim.userId) } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({
+      where: { action: 'USER_BAN', targetId: String(victim.userId) },
+    });
     expect(audit.adminId).toBe(admin.userId);
     expect(audit.targetType).toBe('USER');
 
@@ -254,7 +343,9 @@ describe('admin coverage：封禁/解封', () => {
     expect(unban.status).toBe(200);
     expect(unwrapOk<{ bannedAt: string | null }>(unban).bannedAt).toBeNull();
 
-    const meAfter = await request(app).get('/api/users/me').set('Authorization', `Bearer ${victim.token}`);
+    const meAfter = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${victim.token}`);
     expect(meAfter.status).toBe(200);
   });
 

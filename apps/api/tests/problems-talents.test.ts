@@ -16,7 +16,9 @@ let userSeq = 0;
 async function createAuthedUser(): Promise<{ userId: number; token: string }> {
   userSeq += 1;
   const username = `pv-${Date.now().toString(36)}-${userSeq}`;
-  const res = await request(app).post('/api/auth/register').send({ username, password: 'pw-123456' });
+  const res = await request(app)
+    .post('/api/auth/register')
+    .send({ username, password: 'pw-123456' });
   const { accessToken, me } = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
   await unlockTutorial(me.id);
   return { userId: me.id, token: accessToken };
@@ -26,7 +28,10 @@ function auth(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
 
-async function giveProblem(userId: number, overrides: Record<string, unknown> = {}): Promise<number> {
+async function giveProblem(
+  userId: number,
+  overrides: Record<string, unknown> = {},
+): Promise<number> {
   const p = await prisma.problemLibraryEntry.create({
     data: { userId, name: '预制题', dominantDim: 'DS', rarity: 'green', quality: 60, ...overrides },
   });
@@ -44,9 +49,25 @@ describe('GET /api/problems', () => {
     const a = await createAuthedUser();
     const b = await createAuthedUser();
     // 用户 a 两题，其一已消耗；用户 b 一题（不应出现）
-    await giveProblem(a.userId, { name: '题A', dominantDim: 'DP', rarity: 'colorful', quality: 80, createdAt: new Date('2026-01-01') });
-    await giveProblem(a.userId, { name: '题B-已消耗', consumedAt: new Date(), createdAt: new Date('2026-01-02') });
-    await giveProblem(a.userId, { name: '题C', dominantDim: 'STRING', rarity: 'yellow', quality: 40, createdAt: new Date('2026-01-03') });
+    await giveProblem(a.userId, {
+      name: '题A',
+      dominantDim: 'DP',
+      rarity: 'colorful',
+      quality: 80,
+      createdAt: new Date('2026-01-01'),
+    });
+    await giveProblem(a.userId, {
+      name: '题B-已消耗',
+      consumedAt: new Date(),
+      createdAt: new Date('2026-01-02'),
+    });
+    await giveProblem(a.userId, {
+      name: '题C',
+      dominantDim: 'STRING',
+      rarity: 'yellow',
+      quality: 40,
+      createdAt: new Date('2026-01-03'),
+    });
     await giveProblem(b.userId, { name: '他人题' });
 
     const res = await request(app).get('/api/problems').set(auth(a.token));

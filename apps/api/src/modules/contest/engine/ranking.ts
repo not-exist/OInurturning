@@ -70,7 +70,13 @@ function compareQuestionPriority(
 ): number {
   const left = questions[leftPosition]!;
   const right = questions[rightPosition]!;
-  const leftEstimate = estimateSolveTime({ participant, question: left, focus, hooks: hooksFor(left), hookContext: context });
+  const leftEstimate = estimateSolveTime({
+    participant,
+    question: left,
+    focus,
+    hooks: hooksFor(left),
+    hookContext: context,
+  });
   const rightEstimate = estimateSolveTime({
     participant,
     question: right,
@@ -86,7 +92,8 @@ function compareQuestionPriority(
 }
 
 function participantRng(seed: number, participantIndex: number): AttemptRng {
-  const streamSeed = participantIndex === 0 ? seed : deriveStreamSeed(seed, `npc:${participantIndex - 1}`);
+  const streamSeed =
+    participantIndex === 0 ? seed : deriveStreamSeed(seed, `npc:${participantIndex - 1}`);
   return {
     noise: createRandomStream(streamSeed, 'noise'),
     judge: createRandomStream(streamSeed, 'judge'),
@@ -105,7 +112,7 @@ function simulateParticipant(
   const accepted = new Set<number>();
   const attempts: ParticipantAttempt[] = [];
   let remainingClockMin = durationMin;
-   let energy = participant.energy ?? participant.energyMax;
+  let energy = participant.energy ?? participant.energyMax;
   let focus = 0;
   let mindset = participant.mindset;
   let totalScore = 0;
@@ -115,12 +122,18 @@ function simulateParticipant(
     const context = hookContext(attempts.length, accepted.size, questions.length);
     const available = [...remaining].filter((position) => {
       const question = questions[position]!;
-      return energy >= energyCost({ participant, question, hooks: hooksFor(question), hookContext: context });
+      return (
+        energy >=
+        energyCost({ participant, question, hooks: hooksFor(question), hookContext: context })
+      );
     });
 
     if (available.length === 0) {
       const skipped = [...remaining].sort((left, right) => {
-        const instanceDifference = compareCodeUnits(questions[left]!.instanceId, questions[right]!.instanceId);
+        const instanceDifference = compareCodeUnits(
+          questions[left]!.instanceId,
+          questions[right]!.instanceId,
+        );
         return instanceDifference === 0 ? left - right : instanceDifference;
       });
 
@@ -220,7 +233,13 @@ export function simulateRanking(input: RankingInput, seed: number): RankingRepor
   const questions = validatedInput.problems.map(cloneQuestionSnapshot);
   const members = validatedInput.teams.flatMap((team) => team.members);
   const results = members.map((participant, participantIndex) =>
-    simulateParticipant(participant, questions, validatedInput.durationMin, validatedSeed, participantIndex),
+    simulateParticipant(
+      participant,
+      questions,
+      validatedInput.durationMin,
+      validatedSeed,
+      participantIndex,
+    ),
   );
   const timelines = results.map((result) => result.timeline);
 
@@ -232,7 +251,8 @@ export function simulateRanking(input: RankingInput, seed: number): RankingRepor
   });
 
   const standings = buildStandings(teamResults);
-  const playerRank = standings.find((standing) => standing.teamIndex === 0)?.rank ?? Number.POSITIVE_INFINITY;
+  const playerRank =
+    standings.find((standing) => standing.teamIndex === 0)?.rank ?? Number.POSITIVE_INFINITY;
   const report: RankingReport = {
     reportVersion: 1,
     engineVersion: ENGINE_VERSION,

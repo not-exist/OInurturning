@@ -1,11 +1,6 @@
 import { damping } from '../../lib/damping.js';
 import { CONFIG_DIMENSIONS, type ConfigDimension, type TrainingKind } from '@oinur/shared';
-import {
-  BOOK_MULT,
-  QUALITY_MULT,
-  SECONDARY_PROB,
-  TRAINING_BASE,
-} from '../training/gains.js';
+import { BOOK_MULT, QUALITY_MULT, SECONDARY_PROB, TRAINING_BASE } from '../training/gains.js';
 
 /**
  * T5.2 数值平衡回归：训练成长路径估算（纯函数，权威：docs/systems/student.md §1/§4）。
@@ -189,7 +184,8 @@ export function sessionsToV(
     if (take === 0) break;
 
     const advanced: StudentStats = { ...s };
-    for (const key of CONFIG_DIMENSIONS) advanced[key] = Math.min(STAT_CAP, s[key] + dims[key] * take);
+    for (const key of CONFIG_DIMENSIONS)
+      advanced[key] = Math.min(STAT_CAP, s[key] + dims[key] * take);
     advanced.code = Math.min(STAT_CAP, s.code + code * take);
     advanced.thinking = Math.min(STAT_CAP, s.thinking + thinking * take);
     s = advanced;

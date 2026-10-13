@@ -117,7 +117,10 @@ function buildRankingReplay(recordId: string, report: RankingReport, title: stri
       let lastSubmissionAtMs = phaseStartMs;
       for (const submission of attempt.resolution.submissions) {
         const submissionAtMs =
-          phaseStartMs + Math.round((elapsedInQuestionMin + submission.submissionTimeMin) * REPLAY_MS_PER_CONTEST_MINUTE);
+          phaseStartMs +
+          Math.round(
+            (elapsedInQuestionMin + submission.submissionTimeMin) * REPLAY_MS_PER_CONTEST_MINUTE,
+          );
         events.push({
           seq: seq++,
           type: 'SUBMISSION',
@@ -139,10 +142,12 @@ function buildRankingReplay(recordId: string, report: RankingReport, title: stri
         phaseDurationMs = Math.max(phaseDurationMs, submissionAtMs - phaseStartMs + SUBMISSION_MS);
       }
 
-      const rawResultAtMs = phaseStartMs + Math.round(attempt.resolution.timeSpentMin * REPLAY_MS_PER_CONTEST_MINUTE);
+      const rawResultAtMs =
+        phaseStartMs + Math.round(attempt.resolution.timeSpentMin * REPLAY_MS_PER_CONTEST_MINUTE);
       const resultAtMs = Math.max(
         rawResultAtMs,
-        lastSubmissionAtMs + (attempt.resolution.submissions.length > 0 ? SUBMISSION_MS : QUESTION_START_MS),
+        lastSubmissionAtMs +
+          (attempt.resolution.submissions.length > 0 ? SUBMISSION_MS : QUESTION_START_MS),
       );
       memberScores[mi]! += attempt.resolution.scoreAwarded;
       teamScore += attempt.resolution.scoreAwarded;
@@ -187,7 +192,11 @@ function buildRankingReplay(recordId: string, report: RankingReport, title: stri
   events.sort((left, right) => {
     const leftTime = 'timeMs' in left ? (left.timeMs ?? 0) : 0;
     const rightTime = 'timeMs' in right ? (right.timeMs ?? 0) : 0;
-    return leftTime - rightTime || replaySortPriority(left) - replaySortPriority(right) || left.seq - right.seq;
+    return (
+      leftTime - rightTime ||
+      replaySortPriority(left) - replaySortPriority(right) ||
+      left.seq - right.seq
+    );
   });
   events.forEach((event, index) => {
     event.seq = index;

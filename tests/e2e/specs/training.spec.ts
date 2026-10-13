@@ -3,10 +3,7 @@ import { registerUser, loginViaUI, fund, recruitStudent, apiCall, unwrap } from 
 
 /** 训练中心：基础/定向/专项三条链路。 */
 test.describe('训练中心', () => {
-  test('基础训练：选人→开训→"训练完成"面板展示增益与花费', async ({
-    page,
-    request,
-  }) => {
+  test('基础训练：选人→开训→"训练完成"面板展示增益与花费', async ({ page, request }) => {
     const account = await registerUser(request, 'train');
     await fund(account.username, { money: 50000 });
     await recruitStudent(request, account.accessToken);
@@ -36,10 +33,7 @@ test.describe('训练中心', () => {
     await expect(page.getByTestId('train-result')).toContainText('训练完成');
   });
 
-  test('专项训练：无题时提示且按钮禁用；有题后可选题开训', async ({
-    page,
-    request,
-  }) => {
+  test('专项训练：无题时提示且按钮禁用；有题后可选题开训', async ({ page, request }) => {
     const account = await registerUser(request, 'train');
     await fund(account.username, { money: 50000 });
     const studentId = await recruitStudent(request, account.accessToken);
@@ -89,19 +83,17 @@ test.describe('训练中心', () => {
       `/api/training/logs?studentId=${trainee.id}&limit=2`,
       account.accessToken,
     );
-    const page1 = unwrap<
-      {
-        items: {
-          id: number;
-          studentName: string;
-          kind: string;
-          dim: string;
-          delta: number;
-          cost: number;
-        }[];
-        nextCursor: number | null;
-      }
-    >(p1.body, '记录第1页');
+    const page1 = unwrap<{
+      items: {
+        id: number;
+        studentName: string;
+        kind: string;
+        dim: string;
+        delta: number;
+        cost: number;
+      }[];
+      nextCursor: number | null;
+    }>(p1.body, '记录第1页');
     expect(page1.items).toHaveLength(2);
     expect(page1.nextCursor).not.toBeNull();
     expect(page1.items[0].id).toBeGreaterThan(page1.items[1].id);

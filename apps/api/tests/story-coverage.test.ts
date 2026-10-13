@@ -88,11 +88,22 @@ async function maxedStudent(userId: number, index = 0): Promise<{ id: number }> 
     data: {
       userId,
       name: `满级学员${index}`,
-            qualityTier: 'GENIUS',
-      ds: 100, dp: 100, math: 100, graph: 100, greedy: 100, str: 100,
-      code: 100, thinking: 100, setting: 100,
+      qualityTier: 'GENIUS',
+      ds: 100,
+      dp: 100,
+      math: 100,
+      graph: 100,
+      greedy: 100,
+      str: 100,
+      code: 100,
+      thinking: 100,
+      setting: 100,
       mindset: 10,
-      focusCap: 100, energyMax: 100, energy: 100, stamina: 5, staminaRegen: 100,
+      focusCap: 100,
+      energyMax: 100,
+      energy: 100,
+      stamina: 5,
+      staminaRegen: 100,
     },
   });
   return { id: student.id };
@@ -138,7 +149,13 @@ async function clearStage(
   const tag = seq;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await refill(roster);
-    const res = await enter(token, stageKey, roster, `clear-${stageKey}-ng${ngLevel}-${attempt}-${tag}`, ngLevel);
+    const res = await enter(
+      token,
+      stageKey,
+      roster,
+      `clear-${stageKey}-ng${ngLevel}-${attempt}-${tag}`,
+      ngLevel,
+    );
     expect(res.status).toBe(200);
     const data = unwrapOk<EnterResult>(res);
     if (data.record.report.pass) return data;
@@ -177,11 +194,22 @@ describe('story coverage：总览与解锁链', () => {
     const user = await register();
     const data = await overview(user.accessToken);
     expect(data.chapters.map((c) => c.chapter)).toEqual([
-      'cspj', 'csps', 'noip', 'province', 'noi', 'ctt', 'cts', 'ioi',
+      'cspj',
+      'csps',
+      'noip',
+      'province',
+      'noi',
+      'ctt',
+      'cts',
+      'ioi',
     ]);
     const all = data.chapters.flatMap((c) => c.stages);
     expect(all).toHaveLength(33);
-    expect(data.chapters[0]?.stages[0]).toMatchObject({ stageKey: 'cspj:1', unlocked: true, cleared: false });
+    expect(data.chapters[0]?.stages[0]).toMatchObject({
+      stageKey: 'cspj:1',
+      unlocked: true,
+      cleared: false,
+    });
     for (const stage of all) {
       if (stage.stageKey === 'cspj:1') continue;
       expect(stage.unlocked).toBe(false);
@@ -190,8 +218,14 @@ describe('story coverage：总览与解锁链', () => {
     // stamina_cost_by_chapter：前四章 1 点、后四章 2 点（stages.yaml 口径）
     const costByChapter = new Map(data.chapters.map((c) => [c.chapter, c.stages[0]?.staminaCost]));
     expect([...costByChapter.entries()]).toEqual([
-      ['cspj', 1], ['csps', 1], ['noip', 1], ['province', 1],
-      ['noi', 2], ['ctt', 2], ['cts', 2], ['ioi', 2],
+      ['cspj', 1],
+      ['csps', 1],
+      ['noip', 1],
+      ['province', 1],
+      ['noi', 2],
+      ['ctt', 2],
+      ['cts', 2],
+      ['ioi', 2],
     ]);
     expect(data.ngPlusUnlocked).toBe(false);
     expect(data.maxUnlockedNgLevel).toBe(0);
@@ -213,17 +247,32 @@ describe('story coverage：总览与解锁链', () => {
     const roster = await maxedRoster(user.me.id);
     const auth = { Authorization: `Bearer ${user.accessToken}` };
 
-    const empty = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-1' }).send({ roster: [] });
+    const empty = await request(app)
+      .post('/api/story/stages/cspj:1/enter')
+      .set({ ...auth, 'Idempotency-Key': 'v-1' })
+      .send({ roster: [] });
     expect(empty.status).toBe(400);
-    const tooFew = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-1-3' }).send({ roster: roster.slice(0, 3) });
+    const tooFew = await request(app)
+      .post('/api/story/stages/cspj:1/enter')
+      .set({ ...auth, 'Idempotency-Key': 'v-1-3' })
+      .send({ roster: roster.slice(0, 3) });
     expect(tooFew.status).toBe(400);
-    const duplicated = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-2' }).send({ roster: [...roster.slice(0, 3), roster[0]!] });
+    const duplicated = await request(app)
+      .post('/api/story/stages/cspj:1/enter')
+      .set({ ...auth, 'Idempotency-Key': 'v-2' })
+      .send({ roster: [...roster.slice(0, 3), roster[0]!] });
     expect(duplicated.status).toBe(400);
     expect(unwrapErr(duplicated).details).toMatchObject({ field: 'roster' });
-    const noKey = await request(app).post('/api/story/stages/cspj:1/enter').set(auth).send({ roster });
+    const noKey = await request(app)
+      .post('/api/story/stages/cspj:1/enter')
+      .set(auth)
+      .send({ roster });
     expect(noKey.status).toBe(400);
     expect(unwrapErr(noKey).code).toBe('VALIDATION_FAILED');
-    const badNg = await request(app).post('/api/story/stages/cspj:1/enter').set({ ...auth, 'Idempotency-Key': 'v-3' }).send({ roster, ngLevel: -1 });
+    const badNg = await request(app)
+      .post('/api/story/stages/cspj:1/enter')
+      .set({ ...auth, 'Idempotency-Key': 'v-3' })
+      .send({ roster, ngLevel: -1 });
     expect(badNg.status).toBe(400);
     const badQuery = await request(app).get('/api/story/overview?ngLevel=abc').set(auth);
     expect(badQuery.status).toBe(400);
@@ -251,10 +300,17 @@ describe('story coverage：总览与解锁链', () => {
     const mine = await maxedRoster(user.me.id);
     const foreignId = (await maxedStudent(other.me.id)).id;
 
-    const forbidden = await enter(user.accessToken, 'cspj:1', [foreignId, ...mine.slice(1)], 'own-1');
+    const forbidden = await enter(
+      user.accessToken,
+      'cspj:1',
+      [foreignId, ...mine.slice(1)],
+      'own-1',
+    );
     expect(forbidden.status).toBe(403);
     await prisma.student.update({ where: { id: mine[0]! }, data: { status: 'DISMISSED' } });
-    expect((await prisma.student.findUniqueOrThrow({ where: { id: mine[0]! } })).status).toBe('DISMISSED');
+    expect((await prisma.student.findUniqueOrThrow({ where: { id: mine[0]! } })).status).toBe(
+      'DISMISSED',
+    );
     const gone = await enter(user.accessToken, 'cspj:1', mine, 'own-2');
     expect(gone.status).toBe(404);
     const missing = await enter(user.accessToken, 'cspj:1', [...mine.slice(1), 99999999], 'own-3');
@@ -273,14 +329,24 @@ describe('story coverage：首通与复刷', () => {
     expect(data.replayed).toBe(false);
     expect(data.firstClear).toBe(true);
 
-    const record = await request(app).get(`/api/records/${data.record.id}`).set('Authorization', `Bearer ${user.accessToken}`);
+    const record = await request(app)
+      .get(`/api/records/${data.record.id}`)
+      .set('Authorization', `Bearer ${user.accessToken}`);
     expect(record.status).toBe(200);
-    const view = unwrapOk<{ report: { format: string }; summary: { format: string; rank: number }; rewards: RewardLine[] }>(record);
+    const view = unwrapOk<{
+      report: { format: string };
+      summary: { format: string; rank: number };
+      rewards: RewardLine[];
+    }>(record);
     expect(view.report.format).toBe('RANKING');
     expect(view.summary.format).toBe('RANKING');
     expect(view.rewards).toContainEqual({ type: 'first_clear_money', amount: expectedMoney });
     // defaults.first_clear_fixed_items：每关首通固定发放鸡腿便当 ×1（docs/data 口径）
-    expect(view.rewards).toContainEqual({ type: 'first_clear_item', itemId: 'drumstick-bento', count: 1 });
+    expect(view.rewards).toContainEqual({
+      type: 'first_clear_item',
+      itemId: 'drumstick-bento',
+      count: 1,
+    });
     expect(
       await prisma.userItem.findUnique({
         where: { userId_itemId: { userId: user.me.id, itemId: 'drumstick-bento' } },
@@ -290,11 +356,14 @@ describe('story coverage：首通与复刷', () => {
     const after = await prisma.user.findUniqueOrThrow({ where: { id: user.me.id } });
     expect(after.money - before.money).toBe(expectedMoney);
 
-    const progress = await request(app).get('/api/story/progress').set('Authorization', `Bearer ${user.accessToken}`);
-    const rows = unwrapOk<Array<{ stageKey: string; clearCount: number; bestRank: number; firstClearAt: string }>>(progress);
-    expect(rows).toEqual([
-      expect.objectContaining({ stageKey: 'cspj:1', clearCount: 1 }),
-    ]);
+    const progress = await request(app)
+      .get('/api/story/progress')
+      .set('Authorization', `Bearer ${user.accessToken}`);
+    const rows =
+      unwrapOk<
+        Array<{ stageKey: string; clearCount: number; bestRank: number; firstClearAt: string }>
+      >(progress);
+    expect(rows).toEqual([expect.objectContaining({ stageKey: 'cspj:1', clearCount: 1 })]);
     const row = rows[0]!;
     expect(row.bestRank).toBeGreaterThanOrEqual(1);
     expect(row.bestRank).toBeLessThanOrEqual(8);
@@ -317,11 +386,15 @@ describe('story coverage：首通与复刷', () => {
     expect(second.replayed).toBe(false);
     expect(second.firstClear).toBe(false);
 
-    const record = await request(app).get(`/api/records/${second.record.id}`).set('Authorization', `Bearer ${user.accessToken}`);
+    const record = await request(app)
+      .get(`/api/records/${second.record.id}`)
+      .set('Authorization', `Bearer ${user.accessToken}`);
     const rewards = unwrapOk<{ rewards: RewardLine[] }>(record).rewards;
     expect(rewards.some((r) => r.type.startsWith('first_clear'))).toBe(false);
 
-    const progress = await request(app).get('/api/story/progress').set('Authorization', `Bearer ${user.accessToken}`);
+    const progress = await request(app)
+      .get('/api/story/progress')
+      .set('Authorization', `Bearer ${user.accessToken}`);
     const row = unwrapOk<Array<{ clearCount: number; bestRank: number }>>(progress)[0]!;
     expect(row.clearCount).toBe(2);
     expect(row.bestRank).toBe(Math.min(first.record.summary.rank, second.record.summary.rank));
@@ -346,9 +419,13 @@ describe('story coverage：首通与复刷', () => {
     const other = await register();
     const roster = await maxedRoster(user.me.id);
     const data = await clearStage(user.accessToken, 'cspj:1', roster);
-    const foreign = await request(app).get(`/api/records/${data.record.id}`).set('Authorization', `Bearer ${other.accessToken}`);
+    const foreign = await request(app)
+      .get(`/api/records/${data.record.id}`)
+      .set('Authorization', `Bearer ${other.accessToken}`);
     expect(foreign.status).toBe(404);
-    const missing = await request(app).get('/api/records/does-not-exist').set('Authorization', `Bearer ${user.accessToken}`);
+    const missing = await request(app)
+      .get('/api/records/does-not-exist')
+      .set('Authorization', `Bearer ${user.accessToken}`);
     expect(missing.status).toBe(404);
   });
 });
@@ -362,7 +439,9 @@ describe('story coverage：NG+', () => {
   it('未全通：NG+1 总览/参赛均拒绝', async () => {
     const user = await register();
     const roster = await maxedRoster(user.me.id);
-    const ov = await request(app).get('/api/story/overview?ngLevel=1').set('Authorization', `Bearer ${user.accessToken}`);
+    const ov = await request(app)
+      .get('/api/story/overview?ngLevel=1')
+      .set('Authorization', `Bearer ${user.accessToken}`);
     expect(ov.status).toBe(409);
     expect(unwrapErr(ov).code).toBe('STATE_CONFLICT');
     const denied = await enter(user.accessToken, 'cspj:1', roster, 'ng-locked', 1);
@@ -379,7 +458,9 @@ describe('story coverage：NG+', () => {
     const ov1 = await overview(user.accessToken, 1);
     expect(ov1.ngLevel).toBe(1);
     expect(ov1.chapters[0]?.stages[0]).toMatchObject({ stageKey: 'cspj:1', unlocked: true });
-    const ov2 = await request(app).get('/api/story/overview?ngLevel=2').set('Authorization', `Bearer ${user.accessToken}`);
+    const ov2 = await request(app)
+      .get('/api/story/overview?ngLevel=2')
+      .set('Authorization', `Bearer ${user.accessToken}`);
     expect(ov2.status).toBe(409);
   });
 
@@ -391,11 +472,17 @@ describe('story coverage：NG+', () => {
 
     const data = await clearStage(user.accessToken, 'cspj:1', roster, 1);
     expect(data.firstClear).toBe(true);
-    const record = await request(app).get(`/api/records/${data.record.id}`).set('Authorization', `Bearer ${user.accessToken}`);
+    const record = await request(app)
+      .get(`/api/records/${data.record.id}`)
+      .set('Authorization', `Bearer ${user.accessToken}`);
     const rewards = unwrapOk<{ rewards: RewardLine[] }>(record).rewards;
     expect(rewards).toContainEqual({ type: 'first_clear_money', amount: Math.round(base * 1.5) });
     // NG+ 各层首通独立发放 defaults.first_clear_fixed_items（鸡腿便当），不参与稀有度上移
-    expect(rewards).toContainEqual({ type: 'first_clear_item', itemId: 'drumstick-bento', count: 1 });
+    expect(rewards).toContainEqual({
+      type: 'first_clear_item',
+      itemId: 'drumstick-bento',
+      count: 1,
+    });
     expect(
       await prisma.userItem.findUnique({
         where: { userId_itemId: { userId: user.me.id, itemId: 'drumstick-bento' } },
@@ -403,9 +490,13 @@ describe('story coverage：NG+', () => {
     ).toMatchObject({ quantity: 1 });
 
     const auth = { Authorization: `Bearer ${user.accessToken}` };
-    const ng1 = unwrapOk<Array<{ stageKey: string; ngLevel: number }>>(await request(app).get('/api/story/progress?ngLevel=1').set(auth));
+    const ng1 = unwrapOk<Array<{ stageKey: string; ngLevel: number }>>(
+      await request(app).get('/api/story/progress?ngLevel=1').set(auth),
+    );
     expect(ng1).toEqual([expect.objectContaining({ stageKey: 'cspj:1', ngLevel: 1 })]);
-    const ng0 = unwrapOk<Array<{ stageKey: string; ngLevel: number }>>(await request(app).get('/api/story/progress?ngLevel=0').set(auth));
+    const ng0 = unwrapOk<Array<{ stageKey: string; ngLevel: number }>>(
+      await request(app).get('/api/story/progress?ngLevel=0').set(auth),
+    );
     expect(ng0.every((row) => row.ngLevel === 0)).toBe(true);
     expect(ng0.some((row) => row.stageKey === 'cspj:1')).toBe(false);
   });
@@ -425,15 +516,19 @@ describe('story coverage：NG+', () => {
     const data = await clearStage(user.accessToken, 'cspj:4', roster);
     expect(data.firstClear).toBe(true);
 
-    const record = await request(app).get(`/api/records/${data.record.id}`).set('Authorization', `Bearer ${user.accessToken}`);
+    const record = await request(app)
+      .get(`/api/records/${data.record.id}`)
+      .set('Authorization', `Bearer ${user.accessToken}`);
     const rewards = unwrapOk<{ rewards: RewardLine[] }>(record).rewards;
     expect(rewards).toContainEqual({ type: 'first_clear_item', itemId: 'trophy-gold', count: 1 });
 
     const after = await prisma.user.findUniqueOrThrow({ where: { id: user.me.id } });
-    expect((after.badges as string[])).toContain('badge-legend');
+    expect(after.badges as string[]).toContain('badge-legend');
     // full_clear.money=500000 + 本关首通奖，增量必 ≥500000（stages.yaml 口径）
     expect(after.money - before.money).toBeGreaterThanOrEqual(500000);
-    const trophy = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: user.me.id, itemId: 'trophy-gold' } } });
+    const trophy = await prisma.userItem.findUnique({
+      where: { userId_itemId: { userId: user.me.id, itemId: 'trophy-gold' } },
+    });
     expect(trophy?.quantity).toBeGreaterThanOrEqual(1);
 
     const unlocked = await overview(user.accessToken);

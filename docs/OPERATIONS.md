@@ -25,23 +25,23 @@ docker compose ps          # 三容器 healthy/Up
 
 ## 1. 上线检查单（目标：全绿）
 
-| # | 检查项 | 通过标准 | 命令/位置 |
-|---|---|---|---|
-| 1 | 数据库持久化 | `dbdata` 卷存在，容器重建不丢数据 | `docker volume ls` |
-| 2 | 启动即迁移 | api 容器日志无 migrate 失败 | `docker compose logs api \| grep -i migrate` |
-| 3 | 配置即数据导入 | `/api/health` 返回非空 `configVersion` | `curl -s localhost/api/health` |
-| 4 | JWT_SECRET 强随机 | `.env` 非占位、≥32B；production 守卫通过 | `grep -c '^JWT_SECRET=change-me\|xxxxxxx' deploy/.env` 输出 0；重启 api 无 `[env]` 拒绝 |
-| 5 | bcrypt cost | `.env` `BCRYPT_COST` ∈ [10,14]（默认 12） | `grep '^BCRYPT_COST' deploy/.env` |
-| 6 | 限流基线生效 | 全局 300 req/min/IP、auth 10 req/15min/IP | env 覆盖见 §5；`tests/rate-limit.test.ts` 绿 |
-| 7 | 管理员账号就绪 | 至少一名 ADMIN 可登录进 `/admin` | §6 `admin:set promote <你>`, UI 走查 |
-| 8 | 访问日志 | api 容器 stdout 有 `http request` JSON 行（方法/路径/状态码/耗时/requestId） | `docker compose logs api` |
-| 9 | 日志轮转 | compose json-file `max-size/max-file` 生效（api 20m×5、mysql/nginx 10m×3） | `docker inspect oinur-api --format '{{.HostConfig.LogConfig}}'` |
-| 10 | 每日备份 cron | 宿主机 crontab 已装；手跑一次成功 | §4 备份；`ls -la /var/backups/oinur` |
-| 11 | 恢复演练 | 备份可导入临时库 | §4 恢复命令（建议每月一次） |
-| 12 | 安全响应头 | nginx 四头齐全（nosniff/XFO DENY/Referrer-Policy/CSP） | `curl -sI localhost/ \| grep -i 'x-content\|x-frame\|referrer\|content-security'` |
-| 13 | 上传/体积限制 | nginx `client_max_body_size 1m`、express json 256kb | nginx.conf / index.ts |
-| 14 | 探活与重启 | 三容器 `restart: unless-stopped` | `docker compose ps` |
-| 15 | 浏览器冒烟 | 注册→登录→各主页面/战报走查通过 | 部署窗口人工走查 |
+| #   | 检查项            | 通过标准                                                                     | 命令/位置                                                                               |
+| --- | ----------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1   | 数据库持久化      | `dbdata` 卷存在，容器重建不丢数据                                            | `docker volume ls`                                                                      |
+| 2   | 启动即迁移        | api 容器日志无 migrate 失败                                                  | `docker compose logs api \| grep -i migrate`                                            |
+| 3   | 配置即数据导入    | `/api/health` 返回非空 `configVersion`                                       | `curl -s localhost/api/health`                                                          |
+| 4   | JWT_SECRET 强随机 | `.env` 非占位、≥32B；production 守卫通过                                     | `grep -c '^JWT_SECRET=change-me\|xxxxxxx' deploy/.env` 输出 0；重启 api 无 `[env]` 拒绝 |
+| 5   | bcrypt cost       | `.env` `BCRYPT_COST` ∈ [10,14]（默认 12）                                    | `grep '^BCRYPT_COST' deploy/.env`                                                       |
+| 6   | 限流基线生效      | 全局 300 req/min/IP、auth 10 req/15min/IP                                    | env 覆盖见 §5；`tests/rate-limit.test.ts` 绿                                            |
+| 7   | 管理员账号就绪    | 至少一名 ADMIN 可登录进 `/admin`                                             | §6 `admin:set promote <你>`, UI 走查                                                    |
+| 8   | 访问日志          | api 容器 stdout 有 `http request` JSON 行（方法/路径/状态码/耗时/requestId） | `docker compose logs api`                                                               |
+| 9   | 日志轮转          | compose json-file `max-size/max-file` 生效（api 20m×5、mysql/nginx 10m×3）   | `docker inspect oinur-api --format '{{.HostConfig.LogConfig}}'`                         |
+| 10  | 每日备份 cron     | 宿主机 crontab 已装；手跑一次成功                                            | §4 备份；`ls -la /var/backups/oinur`                                                    |
+| 11  | 恢复演练          | 备份可导入临时库                                                             | §4 恢复命令（建议每月一次）                                                             |
+| 12  | 安全响应头        | nginx 四头齐全（nosniff/XFO DENY/Referrer-Policy/CSP）                       | `curl -sI localhost/ \| grep -i 'x-content\|x-frame\|referrer\|content-security'`       |
+| 13  | 上传/体积限制     | nginx `client_max_body_size 1m`、express json 256kb                          | nginx.conf / index.ts                                                                   |
+| 14  | 探活与重启        | 三容器 `restart: unless-stopped`                                             | `docker compose ps`                                                                     |
+| 15  | 浏览器冒烟        | 注册→登录→各主页面/战报走查通过                                              | 部署窗口人工走查                                                                        |
 
 ## 2. 首次上线顺序
 
@@ -54,15 +54,15 @@ docker compose ps          # 三容器 healthy/Up
 
 ## 3. 环境变量（生产 .env）
 
-| 变量 | 必填 | 说明 |
-|---|---|---|
-| `MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` | 是 | compose 强校验 |
-| `MYSQL_DATABASE` / `MYSQL_USER` | 否 | 默认 oinur/oinur |
-| `JWT_SECRET` | 是 | `pnpm secret` 生成；production 拒绝占位值 |
-| `BCRYPT_COST` | 否 | 默认 12 |
-| `LOG_LEVEL` | 否 | pino 级别，默认 info |
-| `RATE_LIMIT_*` | 否 | §5 限流覆盖；`deploy/docker-compose.yml` 已透传，未设即基线（默认值与代码 env.ts 一致） |
-| `CONFIG_DIR` | 容器内 | /app/config（勿改） |
+| 变量                                     | 必填   | 说明                                                                                    |
+| ---------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| `MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` | 是     | compose 强校验                                                                          |
+| `MYSQL_DATABASE` / `MYSQL_USER`          | 否     | 默认 oinur/oinur                                                                        |
+| `JWT_SECRET`                             | 是     | `pnpm secret` 生成；production 拒绝占位值                                               |
+| `BCRYPT_COST`                            | 否     | 默认 12                                                                                 |
+| `LOG_LEVEL`                              | 否     | pino 级别，默认 info                                                                    |
+| `RATE_LIMIT_*`                           | 否     | §5 限流覆盖；`deploy/docker-compose.yml` 已透传，未设即基线（默认值与代码 env.ts 一致） |
+| `CONFIG_DIR`                             | 容器内 | /app/config（勿改）                                                                     |
 
 ## 4. 备份与恢复
 
@@ -89,9 +89,9 @@ rsync -a /var/backups/oinur/ backup@offsite:/var/backups/oinur/
 
 基线（内存桶，单实例前提，TECH-DESIGN §9.3/§12 T7）：
 
-| 作用域 | 默认 | env 覆盖 |
-|---|---|---|
-| 全局 | 300 req/min/IP | `RATE_LIMIT_GLOBAL_MAX` / `RATE_LIMIT_WINDOW_MS` |
+| 作用域    | 默认            | env 覆盖                                            |
+| --------- | --------------- | --------------------------------------------------- |
+| 全局      | 300 req/min/IP  | `RATE_LIMIT_GLOBAL_MAX` / `RATE_LIMIT_WINDOW_MS`    |
 | /api/auth | 10 req/15min/IP | `RATE_LIMIT_AUTH_MAX` / `RATE_LIMIT_AUTH_WINDOW_MS` |
 
 命中返回统一信封 `{"ok":false,"error":{"code":"RATE_LIMITED"}}`（429）。若将来多实例，限流桶需换 Redis 存储（TECH-DESIGN §12 T7 升级路径）。
@@ -198,12 +198,12 @@ pnpm -C apps/api onboarding:backfill             # 正式补发（幂等）
 
 **升级后玩家可见的变化**
 
-| 项 | 说明 |
-|---|---|
-| 老账号 | 被锁在总览/学员/引导自身；打完第一关（末步进关即判完成）后全部解锁（含 PVP、管理端） |
+| 项                  | 说明                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 老账号              | 被锁在总览/学员/引导自身；打完第一关（末步进关即判完成）后全部解锁（含 PVP、管理端）                                                          |
 | 招募步（`recruit`） | 条件式：在册 ACTIVE 学员 **≥4** 即自动通过，不强制发生招募（招募费随在册人数指数增长 `round(300×1.35^n)`，强制招募会让 10 人老号掏 6000+ 金） |
-| 招募步之前的钱不够 | 该步已解锁讲课与历练（挣钱路径），可先赚钱再招人；welcome 步另发 200 训练金 |
-| 管理端 | ADMIN 角色豁免引导锁，不受影响 |
+| 招募步之前的钱不够  | 该步已解锁讲课与历练（挣钱路径），可先赚钱再招人；welcome 步另发 200 训练金                                                                   |
+| 管理端              | ADMIN 角色豁免引导锁，不受影响                                                                                                                |
 
 **个别卡死账号的人工放行**（运维通道，产品上不提供用户可见的"跳过引导"）：
 

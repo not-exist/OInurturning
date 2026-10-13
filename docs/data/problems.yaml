@@ -132,7 +132,7 @@ traits:
     name: 防AK护盾
     severity: purple
     family: null
-    condition: anti_ak          # 仅当该题是选手最后一块拼图时生效（NPC 同受影响）
+    condition: anti_ak # 仅当该题是选手最后一块拼图时生效（NPC 同受影响）
     effect: >
       当选手已 AC 场上其余所有题时，本题判定突然变难：
       AC 概率 −0.15、判题超时 +0.10。用于拉开满分线、制造翻盘叙事。
@@ -143,7 +143,7 @@ traits:
   - id: force-online
     name: 强制在线·完全版
     severity: purple
-    family: interactive         # 家族上级
+    family: interactive # 家族上级
     effect: >
       完全强制在线：每次提交都要重新读入全部历史输入（+8min/次提交），
       每次提交额外耗 1 点精力，且无部分分。
@@ -179,7 +179,7 @@ traits:
     name: 灵光乍现
     severity: colorful
     family: null
-    condition: first_problem    # 仅对该选手本场尝试的第一题生效
+    condition: first_problem # 仅对该选手本场尝试的第一题生效
     effect: >
       传说级正面特性：签到神题让人手感火热——首题用时 ×0.75、
       AC 概率 +0.25。全场节奏的发动机。
@@ -206,11 +206,10 @@ traits:
 # score 统一 100；time_limit_min 为单题参考用时基准（分钟）。
 # =============================================================================
 templates:
-
   # ------------------------------------------------------------------ CSP-J --
   - id: cspj-simulation
     tier: cspj
-    title: "循环模拟小统计"
+    title: '循环模拟小统计'
     dim: ds
     requirements: { d: 12, m: 10, c: 9 }
     score: 100
@@ -220,7 +219,7 @@ templates:
 
   - id: cspj-greedy-queue
     tier: cspj
-    title: "排队接水"
+    title: '排队接水'
     dim: greedy
     requirements: { d: 12, m: 11, c: 8 }
     score: 100
@@ -230,7 +229,7 @@ templates:
 
   - id: cspj-dp-knapsack-01
     tier: cspj
-    title: "01背包变形"
+    title: '01背包变形'
     dim: dp
     requirements: { d: 14, m: 12, c: 10 }
     score: 100
@@ -241,7 +240,7 @@ templates:
 
   - id: cspj-math-gcd-count
     tier: cspj
-    title: "最大公约数计数"
+    title: '最大公约数计数'
     dim: math
     requirements: { d: 15, m: 13, c: 9 }
     score: 100
@@ -253,7 +252,7 @@ templates:
   # ----------------------------------------------------------------- CSP-S --
   - id: csps-graph-shortest
     tier: csps
-    title: "最短路变形"
+    title: '最短路变形'
     dim: graph
     requirements: { d: 28, m: 26, c: 24 }
     score: 100
@@ -263,7 +262,7 @@ templates:
 
   - id: csps-dp-interval
     tier: csps
-    title: "区间DP入门"
+    title: '区间DP入门'
     dim: dp
     requirements: { d: 30, m: 30, c: 26 }
     score: 100
@@ -274,7 +273,7 @@ templates:
 
   - id: csps-ds-monotonic-stack
     tier: csps
-    title: "单调栈应用"
+    title: '单调栈应用'
     dim: ds
     requirements: { d: 27, m: 25, c: 23 }
     score: 100
@@ -284,7 +283,7 @@ templates:
 
   - id: csps-string-hash
     tier: csps
-    title: "字符串哈希匹配"
+    title: '字符串哈希匹配'
     dim: string
     requirements: { d: 29, m: 27, c: 25 }
     score: 100
@@ -296,7 +295,7 @@ templates:
   # ------------------------------------------------------------------ NOIP --
   - id: noip-ds-segment-tree
     tier: noip
-    title: "线段树维护最值"
+    title: '线段树维护最值'
     dim: ds
     requirements: { d: 46, m: 44, c: 40 }
     score: 100
@@ -307,7 +306,7 @@ templates:
 
   - id: noip-dp-tree
     tier: noip
-    title: "树形DP"
+    title: '树形DP'
     dim: dp
     requirements: { d: 50, m: 48, c: 42 }
     score: 100
@@ -317,7 +316,7 @@ templates:
 
   - id: noip-graph-mst
     tier: noip
-    title: "最小生成树变式"
+    title: '最小生成树变式'
     dim: graph
     requirements: { d: 44, m: 42, c: 38 }
     score: 100
@@ -327,7 +326,7 @@ templates:
 
   - id: noip-greedy-exchange
     tier: noip
-    title: "贪心交换论证"
+    title: '贪心交换论证'
     dim: greedy
     requirements: { d: 47, m: 50, c: 36 }
     score: 100
@@ -338,7 +337,7 @@ templates:
 
   - id: noip-math-combinatorics
     tier: noip
-    title: "组合计数"
+    title: '组合计数'
     dim: math
     requirements: { d: 52, m: 53, c: 38 }
     score: 100
@@ -350,7 +349,7 @@ templates:
   # ------------------------------------------------------------------ 省选 --
   - id: prov-ds-bitset-opt
     tier: province
-    title: "bitset优化"
+    title: 'bitset优化'
     dim: ds
     requirements: { d: 62, m: 64, c: 58 }
     score: 100
@@ -360,7 +359,7 @@ templates:
 
   - id: prov-dp-digit
     tier: province
-    title: "数位DP与状压"
+    title: '数位DP与状压'
     dim: dp
     requirements: { d: 66, m: 65, c: 56 }
     score: 100
@@ -371,7 +370,7 @@ templates:
 
   - id: prov-graph-flow
     tier: province
-    title: "网络流建模"
+    title: '网络流建模'
     dim: graph
     requirements: { d: 70, m: 68, c: 62 }
     score: 100
@@ -382,7 +381,7 @@ templates:
 
   - id: prov-math-lagrange
     tier: province
-    title: "拉格朗日插值"
+    title: '拉格朗日插值'
     dim: math
     requirements: { d: 64, m: 70, c: 50 }
     score: 100
@@ -392,7 +391,7 @@ templates:
 
   - id: prov-string-sam
     tier: province
-    title: "后缀自动机入门"
+    title: '后缀自动机入门'
     dim: string
     requirements: { d: 68, m: 66, c: 64 }
     score: 100
@@ -404,7 +403,7 @@ templates:
   # ------------------------------------------------------------------- NOI --
   - id: noi-ds-link-cut
     tier: noi
-    title: "LCT动态树"
+    title: 'LCT动态树'
     dim: ds
     requirements: { d: 80, m: 78, c: 74 }
     score: 100
@@ -415,7 +414,7 @@ templates:
 
   - id: noi-dp-slope
     tier: noi
-    title: "斜率优化与决策单调性"
+    title: '斜率优化与决策单调性'
     dim: dp
     requirements: { d: 82, m: 84, c: 70 }
     score: 100
@@ -425,7 +424,7 @@ templates:
 
   - id: noi-graph-flow-bounds
     tier: noi
-    title: "上下界网络流"
+    title: '上下界网络流'
     dim: graph
     requirements: { d: 78, m: 82, c: 72 }
     score: 100
@@ -435,7 +434,7 @@ templates:
 
   - id: noi-math-poly-mod
     tier: noi
-    title: "多项式取模"
+    title: '多项式取模'
     dim: math
     requirements: { d: 84, m: 86, c: 68 }
     score: 100
@@ -446,19 +445,19 @@ templates:
 
   - id: noi-construct-adhoc
     tier: noi
-    title: "构造证明题"
-    dim: greedy                # 构造/adhoc 归入 greedy（见 conventions）
+    title: '构造证明题'
+    dim: greedy # 构造/adhoc 归入 greedy（见 conventions）
     requirements: { d: 76, m: 88, c: 66 }
     score: 100
     time_limit_min: 95
     trait_pool:
       - { trait: construct-poison, weight: 7 }
-    partial_scores: false      # 构造题答案唯一，无部分分
+    partial_scores: false # 构造题答案唯一，无部分分
 
   # ------------------------------------------------------------------- CTT --
   - id: ctt-ds-ett
     tier: ctt
-    title: "ETT与均摊复杂度分析"
+    title: 'ETT与均摊复杂度分析'
     dim: ds
     requirements: { d: 88, m: 87, c: 82 }
     score: 100
@@ -469,7 +468,7 @@ templates:
 
   - id: ctt-math-genfunc
     tier: ctt
-    title: "生成函数高级变换"
+    title: '生成函数高级变换'
     dim: math
     requirements: { d: 90, m: 91, c: 78 }
     score: 100
@@ -480,7 +479,7 @@ templates:
 
   - id: ctt-string-lyndon
     tier: ctt
-    title: "Lyndon分解应用"
+    title: 'Lyndon分解应用'
     dim: string
     requirements: { d: 87, m: 89, c: 84 }
     score: 100
@@ -490,7 +489,7 @@ templates:
 
   - id: ctt-dp-wqs
     tier: ctt
-    title: "凸优化wqs二分"
+    title: '凸优化wqs二分'
     dim: dp
     requirements: { d: 89, m: 90, c: 80 }
     score: 100
@@ -502,7 +501,7 @@ templates:
   # ------------------------------------------------------------------- CTS --
   - id: cts-ds-top-tree
     tier: cts
-    title: "TopTree"
+    title: 'TopTree'
     dim: ds
     requirements: { d: 92, m: 91, c: 88 }
     score: 100
@@ -513,7 +512,7 @@ templates:
 
   - id: cts-math-algebra
     tier: cts
-    title: "多项式复合与代数变换"
+    title: '多项式复合与代数变换'
     dim: math
     requirements: { d: 93, m: 94, c: 86 }
     score: 100
@@ -524,8 +523,8 @@ templates:
 
   - id: cts-interact-construct
     tier: cts
-    title: "交互式构造挑战"
-    dim: greedy                # 交互/构造归入 greedy（见 conventions）
+    title: '交互式构造挑战'
+    dim: greedy # 交互/构造归入 greedy（见 conventions）
     requirements: { d: 91, m: 93, c: 90 }
     score: 100
     time_limit_min: 110
@@ -537,7 +536,7 @@ templates:
   # ------------------------------------------------------------------- IOI --
   - id: ioi-ds-ktt
     tier: ioi
-    title: "KTT线段树"
+    title: 'KTT线段树'
     dim: ds
     requirements: { d: 95, m: 94, c: 92 }
     score: 100
@@ -548,7 +547,7 @@ templates:
 
   - id: ioi-dp-decision
     tier: ioi
-    title: "决策单调性终极形态"
+    title: '决策单调性终极形态'
     dim: dp
     requirements: { d: 96, m: 96, c: 90 }
     score: 100
@@ -558,7 +557,7 @@ templates:
 
   - id: ioi-graph-theory
     tier: ioi
-    title: "图论综合：流、匹配与对偶"
+    title: '图论综合：流、匹配与对偶'
     dim: graph
     requirements: { d: 94, m: 95, c: 91 }
     score: 100
@@ -569,7 +568,7 @@ templates:
 
   - id: ioi-finale-legend
     tier: ioi
-    title: "传说压轴"
+    title: '传说压轴'
     dim: math
     requirements: { d: 97, m: 97, c: 93 }
     score: 100

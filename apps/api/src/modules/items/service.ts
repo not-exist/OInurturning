@@ -56,8 +56,15 @@ function toStudentView(s: Student, talentIds: string[]): StudentView {
     name: s.name,
     qualityTier: s.qualityTier,
     status: s.status,
-    ds: s.ds, dp: s.dp, math: s.math, graph: s.graph, greedy: s.greedy, str: s.str,
-    code: s.code, thinking: s.thinking, setting: s.setting,
+    ds: s.ds,
+    dp: s.dp,
+    math: s.math,
+    graph: s.graph,
+    greedy: s.greedy,
+    str: s.str,
+    code: s.code,
+    thinking: s.thinking,
+    setting: s.setting,
     mindset: s.mindset,
     focusCap: s.focusCap,
     energyMax: s.energyMax,
@@ -123,9 +130,11 @@ export async function useItem(
   now: Date = new Date(),
 ): Promise<StudentView | AccountItemActivationView> {
   requireConfig('items');
-  if (!input.itemId) throw new ApiError('VALIDATION_FAILED', { resource: 'item', reason: 'itemId 必填' });
+  if (!input.itemId)
+    throw new ApiError('VALIDATION_FAILED', { resource: 'item', reason: 'itemId 必填' });
   if (input.itemId === 'intel-slip') return activateAdventureIntel(userId);
-  if (input.studentId == null) throw new ApiError('VALIDATION_FAILED', { resource: 'student', reason: 'studentId 必填' });
+  if (input.studentId == null)
+    throw new ApiError('VALIDATION_FAILED', { resource: 'student', reason: 'studentId 必填' });
   const id = input.studentId;
 
   // 提交事务前先校验归属/在册（快失败、避免无谓开销）
@@ -134,7 +143,10 @@ export async function useItem(
   return prisma.$transaction(async (tx) => {
     // 1. 锁学员行（写事务内串行化并发使用）
     await lockStudent(tx, id);
-    const student = await tx.student.findUniqueOrThrow({ where: { id }, include: { talents: true } });
+    const student = await tx.student.findUniqueOrThrow({
+      where: { id },
+      include: { talents: true },
+    });
     if (student.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id });
     if (student.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', { resource: 'student', id });
 
@@ -184,10 +196,14 @@ export async function useItem(
       where: { userId, itemId: input.itemId, quantity: { gte: 1 } },
       data: { quantity: { decrement: 1 } },
     });
-    if (consumed.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: input.itemId, need: 1 });
+    if (consumed.count === 0)
+      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: input.itemId, need: 1 });
     await tx.userItem.deleteMany({ where: { userId, itemId: input.itemId, quantity: { lte: 0 } } });
 
     const fresh = await tx.student.findUniqueOrThrow({ where: { id }, include: { talents: true } });
-    return toStudentView(fresh, fresh.talents.map((t) => t.talentId));
+    return toStudentView(
+      fresh,
+      fresh.talents.map((t) => t.talentId),
+    );
   });
 }

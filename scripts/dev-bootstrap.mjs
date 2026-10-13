@@ -69,7 +69,10 @@ async function bootstrapMysql() {
       sh(`mkdir -p "${src}" && curl -sL ${LIBAIO_TGZ} | tar xz -C "${src}" --strip-components=1`);
       sh(`make -s -C "${src}"`);
       fs.mkdirSync(path.join(MYSQL_HOME, 'lib'), { recursive: true });
-      fs.copyFileSync(path.join(src, 'src/libaio.so.1.0.1'), path.join(MYSQL_HOME, 'lib/libaio.so.1'));
+      fs.copyFileSync(
+        path.join(src, 'src/libaio.so.1.0.1'),
+        path.join(MYSQL_HOME, 'lib/libaio.so.1'),
+      );
       // 初始化 datadir
       fs.mkdirSync(path.join(MYSQL_HOME, 'data'), { recursive: true });
       fs.mkdirSync(path.join(MYSQL_HOME, 'files'), { recursive: true });
@@ -101,22 +104,19 @@ async function bootstrapMysql() {
       if (await tcpOpen(MYSQL_PORT)) break;
       await new Promise((r) => setTimeout(r, 500));
     }
-    if (!(await tcpOpen(MYSQL_PORT))) throw new Error(`mysqld 未能在端口 ${MYSQL_PORT} 就绪，查看 ${MYSQL_HOME}/mysqld.err`);
+    if (!(await tcpOpen(MYSQL_PORT)))
+      throw new Error(`mysqld 未能在端口 ${MYSQL_PORT} 就绪，查看 ${MYSQL_HOME}/mysqld.err`);
   }
   await initUsersAndDatabases();
 }
 
 function mysqld(args, capture = false) {
-  const r = spawnSync(
-    `${MYSQL_HOME}/package/server/mysqld`,
-    args,
-    {
-      cwd: MYSQL_HOME,
-      encoding: 'utf8',
-      env: { ...process.env, LD_LIBRARY_PATH: `${MYSQL_HOME}/lib` },
-      ...(capture ? { stdio: ['ignore', 'pipe', 'pipe'] } : { stdio: 'inherit' }),
-    },
-  );
+  const r = spawnSync(`${MYSQL_HOME}/package/server/mysqld`, args, {
+    cwd: MYSQL_HOME,
+    encoding: 'utf8',
+    env: { ...process.env, LD_LIBRARY_PATH: `${MYSQL_HOME}/lib` },
+    ...(capture ? { stdio: ['ignore', 'pipe', 'pipe'] } : { stdio: 'inherit' }),
+  });
   if (r.status !== 0) throw new Error(`mysqld ${args.join(' ')} 失败:\n${r.stdout}${r.stderr}`);
   return r.stdout;
 }
@@ -124,7 +124,10 @@ function mysqld(args, capture = false) {
 async function initUsersAndDatabases() {
   const mariadb = requireFromApi('mariadb');
   // 全新 datadir 只有 root@localhost（空密码，socket 登录）
-  const admin = await mariadb.createConnection({ socketPath: '/tmp/oinur-mysql.sock', user: 'root' });
+  const admin = await mariadb.createConnection({
+    socketPath: '/tmp/oinur-mysql.sock',
+    user: 'root',
+  });
   await admin.query("CREATE USER IF NOT EXISTS 'oinur'@'%' IDENTIFIED BY 'oinur'");
   await admin.query("GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'");
   await admin.query('FLUSH PRIVILEGES');
@@ -144,7 +147,9 @@ async function applyMigrations(mariadb, database) {
     allowPublicKeyRetrieval: true,
   });
   await admin.query(`DROP DATABASE IF EXISTS \`${database}\``);
-  await admin.query(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  await admin.query(
+    `CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  );
   await admin.query(`USE \`${database}\``);
   const dir = path.join(API, 'prisma/migrations');
   for (const d of fs.readdirSync(dir).sort()) {

@@ -15,13 +15,18 @@ const UseBodySchema = z.object({
 itemsRouter.get('/', requireAuth, async (req, res, next) => {
   try {
     res.json({ ok: true, data: await svc.listItems(req.user!.id) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 itemsRouter.post('/use', requireAuth, async (req, res, next) => {
   try {
     const parsed = UseBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await svc.useItem(req.user!.id, parsed.data) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });

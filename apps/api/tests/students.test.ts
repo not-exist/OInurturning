@@ -16,10 +16,15 @@ const app: Express = createApp();
 // ---------------------------------------------------------------------------
 
 let userSeq = 0;
-async function createAuthedUser(money = 0, reputation = 0): Promise<{ userId: number; token: string }> {
+async function createAuthedUser(
+  money = 0,
+  reputation = 0,
+): Promise<{ userId: number; token: string }> {
   userSeq += 1;
   const username = `st-${Date.now().toString(36)}-${userSeq}`;
-  const res = await request(app).post('/api/auth/register').send({ username, password: 'pw-123456' });
+  const res = await request(app)
+    .post('/api/auth/register')
+    .send({ username, password: 'pw-123456' });
   const { accessToken, me } = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
   await unlockTutorial(me.id);
   await prisma.user.update({ where: { id: me.id }, data: { money, reputation } });
@@ -31,15 +36,28 @@ function auth(token: string) {
 }
 
 // 属性取值使 V 可手算：六维均值 floor(90/6)=15，v=floor((22+24+15)/3)=20
-async function createStudent(userId: number, overrides: Record<string, unknown> = {}): Promise<Student> {
+async function createStudent(
+  userId: number,
+  overrides: Record<string, unknown> = {},
+): Promise<Student> {
   return prisma.student.create({
     data: {
       userId,
       name: '学员甲',
-            qualityTier: 'COMMON',
-      ds: 10, dp: 12, math: 14, graph: 16, greedy: 18, str: 20,
-      code: 22, thinking: 24, setting: 5,
-      focusCap: 45, energyMax: 60, energy: 30, staminaRegen: 50,
+      qualityTier: 'COMMON',
+      ds: 10,
+      dp: 12,
+      math: 14,
+      graph: 16,
+      greedy: 18,
+      str: 20,
+      code: 22,
+      thinking: 24,
+      setting: 5,
+      focusCap: 45,
+      energyMax: 60,
+      energy: 30,
+      staminaRegen: 50,
       ...overrides,
     },
   });
@@ -57,8 +75,12 @@ async function renameCardCount(userId: number): Promise<number> {
 }
 
 // 固定两支种子：首值 < 0.35 触发回收 / ≥ 0.35 不回收（mulberry32 确定性）
-const RECYCLE_HIT_SEED = (() => { for (let s = 0; ; s++) if (mulberry32(s)() < 0.35) return s; })();
-const RECYCLE_MISS_SEED = (() => { for (let s = 0; ; s++) if (mulberry32(s)() >= 0.35) return s; })();
+const RECYCLE_HIT_SEED = (() => {
+  for (let s = 0; ; s++) if (mulberry32(s)() < 0.35) return s;
+})();
+const RECYCLE_MISS_SEED = (() => {
+  for (let s = 0; ; s++) if (mulberry32(s)() >= 0.35) return s;
+})();
 
 // ---------------------------------------------------------------------------
 // GET /api/students
@@ -164,7 +186,9 @@ describe('POST /api/students/:id/rename', () => {
     expect(row.name).toBe('新名字');
     expect(await renameCardCount(u.userId)).toBe(0);
     expect(
-      await prisma.userItem.findUnique({ where: { userId_itemId: { userId: u.userId, itemId: 'rename-card' } } }),
+      await prisma.userItem.findUnique({
+        where: { userId_itemId: { userId: u.userId, itemId: 'rename-card' } },
+      }),
     ).toBeNull(); // 扣到 0 删行
   });
 
@@ -209,7 +233,10 @@ describe('POST /api/students/:id/rename', () => {
     const u2 = await createAuthedUser();
     await giveRenameCard(u2.userId, 1);
     const s = await createStudent(u1.userId);
-    const dismissed = await createStudent(u2.userId, { status: 'DISMISSED', dismissedAt: new Date() });
+    const dismissed = await createStudent(u2.userId, {
+      status: 'DISMISSED',
+      dismissedAt: new Date(),
+    });
 
     const forbidden = await request(app)
       .post(`/api/students/${s.id}/rename`)
@@ -253,7 +280,9 @@ describe('POST /api/students/:id/dismiss', () => {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: u.userId } });
     expect(user.reputation).toBe(80);
 
-    const logs = await prisma.reputationLog.findMany({ where: { userId: u.userId, reason: 'DISMISS' } });
+    const logs = await prisma.reputationLog.findMany({
+      where: { userId: u.userId, reason: 'DISMISS' },
+    });
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ delta: -20, reason: 'DISMISS' });
 
@@ -261,7 +290,9 @@ describe('POST /api/students/:id/dismiss', () => {
     expect(row.status).toBe('DISMISSED');
     expect(row.dismissedAt).not.toBeNull();
 
-    const list = unwrapOk<StudentView[]>(await request(app).get('/api/students').set(auth(u.token)));
+    const list = unwrapOk<StudentView[]>(
+      await request(app).get('/api/students').set(auth(u.token)),
+    );
     expect(list.find((x) => x.id === s.id)).toBeUndefined();
 
     // 回收结果与背包一致（HTTP 路径随机种子，只校验自洽）
@@ -278,7 +309,9 @@ describe('POST /api/students/:id/dismiss', () => {
     expect(result.reputationDelta).toBe(-5);
 
     expect((await prisma.user.findUniqueOrThrow({ where: { id: u.userId } })).reputation).toBe(0);
-    const log = await prisma.reputationLog.findFirstOrThrow({ where: { userId: u.userId, reason: 'DISMISS' } });
+    const log = await prisma.reputationLog.findFirstOrThrow({
+      where: { userId: u.userId, reason: 'DISMISS' },
+    });
     expect(log.delta).toBe(-5);
   });
 

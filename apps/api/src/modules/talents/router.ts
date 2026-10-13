@@ -7,5 +7,7 @@ export const talentsRouter = Router();
 talentsRouter.get('/', requireAuth, async (req, res, next) => {
   try {
     res.json({ ok: true, data: await svc.listTalents() });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });

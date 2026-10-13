@@ -11,5 +11,7 @@ usersRouter.get('/me', requireAuth, async (req, res, next) => {
     const u = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (!u) throw new ApiError('UNAUTHENTICATED');
     res.json({ ok: true, data: toMeView(u) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });

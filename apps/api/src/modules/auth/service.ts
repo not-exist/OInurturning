@@ -51,13 +51,22 @@ export function refreshCookie(token: string, secure: boolean): string {
 }
 
 export function clearRefreshCookie(secure: boolean): string {
-  const parts = [`${REFRESH_COOKIE}=`, 'Path=/api/auth', 'HttpOnly', 'SameSite=Strict', 'Max-Age=0'];
+  const parts = [
+    `${REFRESH_COOKIE}=`,
+    'Path=/api/auth',
+    'HttpOnly',
+    'SameSite=Strict',
+    'Max-Age=0',
+  ];
   if (secure) parts.push('Secure');
   return parts.join('; ');
 }
 
 export async function register(input: { username: string; password: string }) {
-  const exists = await prisma.user.findUnique({ where: { username: input.username }, select: { id: true } });
+  const exists = await prisma.user.findUnique({
+    where: { username: input.username },
+    select: { id: true },
+  });
   if (exists) throw new ApiError('ALREADY_EXISTS', { field: 'username' });
   // 哈希放事务外：避免占用事务连接做 ~100ms 的 bcrypt 计算
   const passwordHash = await hash(input.password);
@@ -84,11 +93,18 @@ export async function login(input: { username: string; password: string }) {
   const ok = await bcrypt.compare(input.password, user?.passwordHash ?? DUMMY_HASH);
   // 注销账号已被物理删除，此处 findUnique 自然查不到，无需额外状态位
   if (!user || !user.passwordHash || !ok) throw new ApiError('INVALID_CREDENTIALS');
-  const updated = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
   return sessionFor(updated);
 }
 
-export async function changePassword(userId: number, oldPassword: string, newPassword: string): Promise<void> {
+export async function changePassword(
+  userId: number,
+  oldPassword: string,
+  newPassword: string,
+): Promise<void> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const ok = user.passwordHash ? await bcrypt.compare(oldPassword, user.passwordHash) : false;
   if (!ok) throw new ApiError('INVALID_CREDENTIALS', { field: 'oldPassword' });

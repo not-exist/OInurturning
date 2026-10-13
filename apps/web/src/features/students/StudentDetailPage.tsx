@@ -21,7 +21,16 @@ import {
   signed,
 } from '../../lib/labels';
 import { QUALITY_MATERIAL } from '../../lib/rarity';
-import { Btn, Chip, ErrorNote, InlineLoader, Meter, Modal, Numeral, Panel } from '../../components/ui';
+import {
+  Btn,
+  Chip,
+  ErrorNote,
+  InlineLoader,
+  Meter,
+  Modal,
+  Numeral,
+  Panel,
+} from '../../components/ui';
 import { DIMENSION_ICON, Icon, type LucideIcon } from '../../components/icons';
 import {
   ABILITY_ROWS,
@@ -62,7 +71,10 @@ export function StudentDetailPage(): JSX.Element {
         <ErrorNote onRetry={() => void q.refetch()}>
           学员档案读取失败：该学员可能已被开除或不属于当前账号。
         </ErrorNote>
-        <Link to="/students" className="inline-flex items-center gap-1.5 text-sm text-fg-dim hover:text-fg">
+        <Link
+          to="/students"
+          className="inline-flex items-center gap-1.5 text-sm text-fg-dim hover:text-fg"
+        >
           <Icon icon={ArrowLeft} className="size-4" />
           返回学员列表
         </Link>
@@ -138,7 +150,10 @@ export function StudentDetailPage(): JSX.Element {
               <RenameForm s={s} onDone={() => setRenameOpen(false)} onError={setPageMsg} />
             )}
             {pageMsg !== null && (
-              <p data-testid="student-msg" className="mt-2 border border-bad-400/40 bg-bad-400/10 px-3 py-2 text-sm text-bad-400">
+              <p
+                data-testid="student-msg"
+                className="mt-2 border border-bad-400/40 bg-bad-400/10 px-3 py-2 text-sm text-bad-400"
+              >
                 {pageMsg}
               </p>
             )}
@@ -321,7 +336,10 @@ function RenameForm({
         onError(null);
         rename.mutate(
           { id: s.id, name },
-          { onSuccess: () => onDone(), onError: (err) => onError(`改名失败：${apiErrorMessage(err)}`) },
+          {
+            onSuccess: () => onDone(),
+            onError: (err) => onError(`改名失败：${apiErrorMessage(err)}`),
+          },
         );
       }}
     >

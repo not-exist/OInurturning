@@ -18,7 +18,14 @@ export function requireTutorialForApi(req: Request, _res: Response, next: NextFu
       const apiPath = req.originalUrl.split('?')[0] ?? '';
       if (isApiAllowed(unlocked, apiPath)) return next();
       // 否则锁定
-      return next(new ApiError('FORBIDDEN', { resource: 'tutorial', reason: '功能被锁定，完成新手引导后解锁', requiredStep: user.tutorialStep, apiPath }));
+      return next(
+        new ApiError('FORBIDDEN', {
+          resource: 'tutorial',
+          reason: '功能被锁定，完成新手引导后解锁',
+          requiredStep: user.tutorialStep,
+          apiPath,
+        }),
+      );
     } catch (e) {
       return next(e);
     }

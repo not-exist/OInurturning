@@ -1,4 +1,9 @@
-import { Prisma, type PvpMatch, type PvpRegistration, type PvpTournament } from '../../generated/prisma/client.js';
+import {
+  Prisma,
+  type PvpMatch,
+  type PvpRegistration,
+  type PvpTournament,
+} from '../../generated/prisma/client.js';
 import {
   DIMENSIONS,
   frozenSolveHooksSchema,
@@ -66,9 +71,15 @@ function qualityScoringEnabled(config: unknown): boolean {
 
 function members(row: Registration, side: 'HOME' | 'AWAY'): { members: ParticipantSnapshot[] } {
   const roster = row.roster as unknown as ParticipantSnapshot[];
-  if (roster.length === 0) throw new ApiError('STATE_CONFLICT', { resource: 'registration', id: row.id });
+  if (roster.length === 0)
+    throw new ApiError('STATE_CONFLICT', { resource: 'registration', id: row.id });
   return {
-    members: roster.map((member) => ({ ...member, side, userId: row.userId, studentId: member.studentId })),
+    members: roster.map((member) => ({
+      ...member,
+      side,
+      userId: row.userId,
+      studentId: member.studentId,
+    })),
   };
 }
 
@@ -88,7 +99,13 @@ function premadeTraitSnapshots(traitId: string | null): QuestionTraitSnapshot[] 
 }
 
 function questionFor(
-  snapshot: { id: number; name: string; dominantDim: string; quality: number; traitId: string | null },
+  snapshot: {
+    id: number;
+    name: string;
+    dominantDim: string;
+    quality: number;
+    traitId: string | null;
+  },
   tournamentId: number,
   round: number,
   slot: number,
@@ -117,7 +134,14 @@ function questionFor(
   };
 }
 
-function generatedQuestion(tournamentId: number, round: number, slot: number, snapshotKey: string, index: number, side: 'HOME' | 'AWAY'): QuestionSnapshot {
+function generatedQuestion(
+  tournamentId: number,
+  round: number,
+  slot: number,
+  snapshotKey: string,
+  index: number,
+  side: 'HOME' | 'AWAY',
+): QuestionSnapshot {
   return {
     instanceId: `pvp:${tournamentId}:${round}:${slot}:${snapshotKey}:generated:${side}:${index}`,
     index,
@@ -134,16 +158,45 @@ function generatedQuestion(tournamentId: number, round: number, slot: number, sn
   };
 }
 
-function inputFor(match: PvpMatch, home: Registration, away: Registration, qualityRuleOn: boolean): DuelInput {
-  const homeProblems = (home.problemSnapshots as unknown as { id: number; name: string; dominantDim: string; quality: number; traitId: string | null }[]);
-  const awayProblems = (away.problemSnapshots as unknown as { id: number; name: string; dominantDim: string; quality: number; traitId: string | null }[]);
-  const snapshotKey = stableHash({ home: home.roster, away: away.roster, homeProblems, awayProblems });
+function inputFor(
+  match: PvpMatch,
+  home: Registration,
+  away: Registration,
+  qualityRuleOn: boolean,
+): DuelInput {
+  const homeProblems = home.problemSnapshots as unknown as {
+    id: number;
+    name: string;
+    dominantDim: string;
+    quality: number;
+    traitId: string | null;
+  }[];
+  const awayProblems = away.problemSnapshots as unknown as {
+    id: number;
+    name: string;
+    dominantDim: string;
+    quality: number;
+    traitId: string | null;
+  }[];
+  const snapshotKey = stableHash({
+    home: home.roster,
+    away: away.roster,
+    homeProblems,
+    awayProblems,
+  });
   const rosterSize = (home.roster as unknown as ParticipantSnapshot[]).length;
   const questions = Array.from({ length: 2 * rosterSize }, (_, index) => {
     const isHome = index % 2 === 0;
     const source = isHome ? homeProblems[index / 2] : awayProblems[(index - 1) / 2];
     return source === undefined
-      ? generatedQuestion(match.tournamentId, match.round, match.slot, snapshotKey, index, isHome ? 'HOME' : 'AWAY')
+      ? generatedQuestion(
+          match.tournamentId,
+          match.round,
+          match.slot,
+          snapshotKey,
+          index,
+          isHome ? 'HOME' : 'AWAY',
+        )
       : questionFor(source, match.tournamentId, match.round, match.slot, snapshotKey, index);
   });
   return {
@@ -166,7 +219,12 @@ async function awardProblemReputation(
   const seenInMatch = new Map<number, number>();
 
   for (const round of report.rounds) {
-    if (round.problemSource !== 'PREMADE' || round.solved || round.question.premadeEntryId === undefined) continue;
+    if (
+      round.problemSource !== 'PREMADE' ||
+      round.solved ||
+      round.question.premadeEntryId === undefined
+    )
+      continue;
     const problemId = round.question.premadeEntryId;
     const setterUserId = round.setterSide === 'HOME' ? match.homeUserId : match.awayUserId;
     if (setterUserId === null) continue;
@@ -175,7 +233,10 @@ async function awardProblemReputation(
     if (occurrence > rules.perMatchCap) continue;
 
     const reason = `${PVP_PROBLEM_REASON}:${tournament.id}:${problemId}:${match.id}:${occurrence}`;
-    const existing = await tx.reputationLog.findFirst({ where: { userId: setterUserId, reason }, select: { id: true } });
+    const existing = await tx.reputationLog.findFirst({
+      where: { userId: setterUserId, reason },
+      select: { id: true },
+    });
     if (existing !== null) continue;
 
     const tournamentPrefix = `${PVP_PROBLEM_REASON}:${tournament.id}:${problemId}:`;
@@ -186,7 +247,10 @@ async function awardProblemReputation(
     const remaining = rules.perTournamentCap - (total._sum.delta ?? 0);
     if (remaining <= 0) continue;
     const delta = Math.min(rules.perUnsolved, remaining);
-    await tx.user.update({ where: { id: setterUserId }, data: { reputation: { increment: delta } } });
+    await tx.user.update({
+      where: { id: setterUserId },
+      data: { reputation: { increment: delta } },
+    });
     await tx.reputationLog.create({ data: { userId: setterUserId, delta, reason } });
   }
 }
@@ -204,16 +268,31 @@ function matchView(row: PvpMatch, viewerUserId: number): PvpMatchView {
     winnerUserId: row.winnerUserId,
     status: row.status,
     contestRecordId: canRead ? row.contestRecordId : null,
-    reportUrl: canRead && row.contestRecordId !== null ? `/api/records/${row.contestRecordId}` : null,
+    reportUrl:
+      canRead && row.contestRecordId !== null ? `/api/records/${row.contestRecordId}` : null,
   };
 }
 
-async function ensureRound(tx: Prisma.TransactionClient, tournament: PvpTournament, round: number, winners?: number[]): Promise<void> {
+async function ensureRound(
+  tx: Prisma.TransactionClient,
+  tournament: PvpTournament,
+  round: number,
+  winners?: number[],
+): Promise<void> {
   const existing = await tx.pvpMatch.count({ where: { tournamentId: tournament.id, round } });
   if (existing > 0) return;
-  const regs = await tx.pvpRegistration.findMany({ where: { tournamentId: tournament.id }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
-  const participants = winners === undefined ? regs.map((row) => ({ userId: row.userId })) : winners.map((userId) => ({ userId }));
-  const slots = winners === undefined ? buildFirstRound(participants, tournament.size, tournament.id) : buildNextRound(winners);
+  const regs = await tx.pvpRegistration.findMany({
+    where: { tournamentId: tournament.id },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  const participants =
+    winners === undefined
+      ? regs.map((row) => ({ userId: row.userId }))
+      : winners.map((userId) => ({ userId }));
+  const slots =
+    winners === undefined
+      ? buildFirstRound(participants, tournament.size, tournament.id)
+      : buildNextRound(winners);
   for (const slot of slots) {
     await tx.pvpMatch.create({
       data: {
@@ -242,35 +321,92 @@ async function cancelAndRefund(tx: Prisma.TransactionClient, tournamentId: numbe
   await tx.pvpTournament.update({ where: { id: tournamentId }, data: { status: 'CANCELLED' } });
 }
 
-async function playPending(tx: Prisma.TransactionClient, tournament: PvpTournament, round: number): Promise<void> {
-  const pending = await tx.pvpMatch.findMany({ where: { tournamentId: tournament.id, round, status: 'PENDING' }, orderBy: { slot: 'asc' } });
+async function playPending(
+  tx: Prisma.TransactionClient,
+  tournament: PvpTournament,
+  round: number,
+): Promise<void> {
+  const pending = await tx.pvpMatch.findMany({
+    where: { tournamentId: tournament.id, round, status: 'PENDING' },
+    orderBy: { slot: 'asc' },
+  });
   const qualityRuleOn = qualityScoringEnabled(tournament.config);
   for (const match of pending) {
     if (match.homeUserId === null || match.awayUserId === null) continue;
-    const registrations = await tx.pvpRegistration.findMany({ where: { tournamentId: tournament.id, userId: { in: [match.homeUserId, match.awayUserId] } } });
+    const registrations = await tx.pvpRegistration.findMany({
+      where: { tournamentId: tournament.id, userId: { in: [match.homeUserId, match.awayUserId] } },
+    });
     const home = registrations.find((row) => row.userId === match.homeUserId);
     const away = registrations.find((row) => row.userId === match.awayUserId);
-    if (home === undefined || away === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'registration' });
+    if (home === undefined || away === undefined)
+      throw new ApiError('STATE_CONFLICT', { resource: 'registration' });
     const input = inputFor(match, home, away, qualityRuleOn);
     const seed = deriveSeed(tournament.id, round, match.slot, stableHash(input));
     const report = simulateDuel(input, seed);
     const winnerUserId = report.winnerSide === 'AWAY' ? match.awayUserId : match.homeUserId;
-    const summary = { format: 'DUEL' as const, winnerSide: report.winnerSide, homeScore: report.scores.home, awayScore: report.scores.away, rewards: [], growth: [] };
-    const record = await createContestRecord({ userId: match.homeUserId, type: 'PVP', format: 'DUEL', idempotencyKey: `pvp:${tournament.id}:${round}:${match.slot}`, inputSnapshot: report.inputSnapshot, report, summary, rewards: [], snapshotHash: report.snapshotHash }, tx);
+    const summary = {
+      format: 'DUEL' as const,
+      winnerSide: report.winnerSide,
+      homeScore: report.scores.home,
+      awayScore: report.scores.away,
+      rewards: [],
+      growth: [],
+    };
+    const record = await createContestRecord(
+      {
+        userId: match.homeUserId,
+        type: 'PVP',
+        format: 'DUEL',
+        idempotencyKey: `pvp:${tournament.id}:${round}:${match.slot}`,
+        inputSnapshot: report.inputSnapshot,
+        report,
+        summary,
+        rewards: [],
+        snapshotHash: report.snapshotHash,
+      },
+      tx,
+    );
     await awardProblemReputation(tx, tournament, match, report);
-    await tx.pvpMatch.update({ where: { id: match.id }, data: { homeScore: report.scores.home, awayScore: report.scores.away, winnerUserId, status: 'DONE', contestRecordId: record.id, playedAt: new Date() } });
+    await tx.pvpMatch.update({
+      where: { id: match.id },
+      data: {
+        homeScore: report.scores.home,
+        awayScore: report.scores.away,
+        winnerUserId,
+        status: 'DONE',
+        contestRecordId: record.id,
+        playedAt: new Date(),
+      },
+    });
   }
 }
 
-export async function advancePvpTournament(tournamentId: number, now?: Date, actorAdminId?: number): Promise<PvpTournamentDetail> {
+export async function advancePvpTournament(
+  tournamentId: number,
+  now?: Date,
+  actorAdminId?: number,
+): Promise<PvpTournamentDetail> {
   return prisma.$transaction(async (tx) => {
     await lockPvpTournament(tx, tournamentId);
     const tournament = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
-    if (tournament === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
+    if (tournament === null)
+      throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
     const auditStart = async (status: string): Promise<void> => {
       if (actorAdminId === undefined) return;
-      const admin = await tx.user.findUniqueOrThrow({ where: { id: actorAdminId }, select: { username: true } });
-      await tx.adminAuditLog.create({ data: { adminId: actorAdminId, adminNameSnapshot: admin.username, action: 'PVP_TOURNAMENT_START', targetType: 'PVP_TOURNAMENT', targetId: String(tournamentId), payload: { status } } });
+      const admin = await tx.user.findUniqueOrThrow({
+        where: { id: actorAdminId },
+        select: { username: true },
+      });
+      await tx.adminAuditLog.create({
+        data: {
+          adminId: actorAdminId,
+          adminNameSnapshot: admin.username,
+          action: 'PVP_TOURNAMENT_START',
+          targetType: 'PVP_TOURNAMENT',
+          targetId: String(tournamentId),
+          payload: { status },
+        },
+      });
     };
     const effectiveNow = now ?? new Date();
     if (tournament.status === 'FINISHED') {
@@ -278,7 +414,13 @@ export async function advancePvpTournament(tournamentId: number, now?: Date, act
       await auditStart(tournament.status);
       return detailInTx(tx, tournament, null);
     }
-    if ((tournament.status === 'REGISTERING' && effectiveNow < tournament.autoStartAt) || tournament.status === 'CANCELLED') { await auditStart(tournament.status); return detailInTx(tx, tournament, null); }
+    if (
+      (tournament.status === 'REGISTERING' && effectiveNow < tournament.autoStartAt) ||
+      tournament.status === 'CANCELLED'
+    ) {
+      await auditStart(tournament.status);
+      return detailInTx(tx, tournament, null);
+    }
     const count = await tx.pvpRegistration.count({ where: { tournamentId } });
     if (count < 4) {
       await cancelAndRefund(tx, tournamentId);
@@ -286,16 +428,30 @@ export async function advancePvpTournament(tournamentId: number, now?: Date, act
       await auditStart(cancelled.status);
       return detailInTx(tx, cancelled, null);
     }
-    const running = await tx.pvpTournament.update({ where: { id: tournamentId }, data: { status: 'RUNNING' } });
-    const registrationRows = await tx.pvpRegistration.findMany({ where: { tournamentId }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
+    const running = await tx.pvpTournament.update({
+      where: { id: tournamentId },
+      data: { status: 'RUNNING' },
+    });
+    const registrationRows = await tx.pvpRegistration.findMany({
+      where: { tournamentId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
     await ensureRound(tx, running, 1);
     for (let round = 1; round <= 6; round += 1) {
       await playPending(tx, running, round);
-      const matches = await tx.pvpMatch.findMany({ where: { tournamentId, round }, orderBy: { slot: 'asc' } });
+      const matches = await tx.pvpMatch.findMany({
+        where: { tournamentId, round },
+        orderBy: { slot: 'asc' },
+      });
       if (matches.length === 0 || matches.some((match) => match.status === 'PENDING')) break;
-      const winners = matches.map((match) => match.winnerUserId).filter((id): id is number => id !== null);
+      const winners = matches
+        .map((match) => match.winnerUserId)
+        .filter((id): id is number => id !== null);
       if (winners.length <= 1) {
-        await tx.pvpTournament.update({ where: { id: tournamentId }, data: { status: 'FINISHED' } });
+        await tx.pvpTournament.update({
+          where: { id: tournamentId },
+          data: { status: 'FINISHED' },
+        });
         break;
       }
       await ensureRound(tx, running, round + 1, winners);
@@ -307,23 +463,61 @@ export async function advancePvpTournament(tournamentId: number, now?: Date, act
   });
 }
 
-async function detailInTx(tx: Db, tournament: PvpTournament, userId: number | null, registrations?: Registration[]): Promise<PvpTournamentDetail> {
-  const rows = registrations ?? await tx.pvpRegistration.findMany({ where: { tournamentId: tournament.id } });
-  return { id: tournament.id, name: tournament.name, status: tournament.status, size: tournament.size, rosterSize: pvpRosterSize(tournament.config), registerEndsAt: tournament.registerEndsAt.toISOString(), autoStartAt: tournament.autoStartAt.toISOString(), prizes: tournament.prizes, config: tournament.config, registeredCount: rows.length, myRegistration: userId === null ? null : rows.find((row) => row.userId === userId)?.id ?? null };
+async function detailInTx(
+  tx: Db,
+  tournament: PvpTournament,
+  userId: number | null,
+  registrations?: Registration[],
+): Promise<PvpTournamentDetail> {
+  const rows =
+    registrations ??
+    (await tx.pvpRegistration.findMany({ where: { tournamentId: tournament.id } }));
+  return {
+    id: tournament.id,
+    name: tournament.name,
+    status: tournament.status,
+    size: tournament.size,
+    rosterSize: pvpRosterSize(tournament.config),
+    registerEndsAt: tournament.registerEndsAt.toISOString(),
+    autoStartAt: tournament.autoStartAt.toISOString(),
+    prizes: tournament.prizes,
+    config: tournament.config,
+    registeredCount: rows.length,
+    myRegistration:
+      userId === null ? null : (rows.find((row) => row.userId === userId)?.id ?? null),
+  };
 }
 
-export async function getPvpTournamentDetail(userId: number, tournamentId: number, now?: Date): Promise<PvpTournamentDetail> {
+export async function getPvpTournamentDetail(
+  userId: number,
+  tournamentId: number,
+  now?: Date,
+): Promise<PvpTournamentDetail> {
   const detail = await advancePvpTournament(tournamentId, now);
-  const registration = await prisma.pvpRegistration.findUnique({ where: { tournamentId_userId: { tournamentId, userId } }, select: { id: true } });
+  const registration = await prisma.pvpRegistration.findUnique({
+    where: { tournamentId_userId: { tournamentId, userId } },
+    select: { id: true },
+  });
   return { ...detail, myRegistration: registration?.id ?? null };
 }
 
-export async function getPvpBracket(userId: number, tournamentId: number, now?: Date): Promise<PvpMatchView[]> {
+export async function getPvpBracket(
+  userId: number,
+  tournamentId: number,
+  now?: Date,
+): Promise<PvpMatchView[]> {
   await getPvpTournamentDetail(userId, tournamentId, now);
-  const rows = await prisma.pvpMatch.findMany({ where: { tournamentId }, orderBy: [{ round: 'asc' }, { slot: 'asc' }] });
+  const rows = await prisma.pvpMatch.findMany({
+    where: { tournamentId },
+    orderBy: [{ round: 'asc' }, { slot: 'asc' }],
+  });
   return rows.map((row) => matchView(row, userId));
 }
 
-export async function startPvpTournament(adminId: number, tournamentId: number, now?: Date): Promise<PvpTournamentDetail> {
+export async function startPvpTournament(
+  adminId: number,
+  tournamentId: number,
+  now?: Date,
+): Promise<PvpTournamentDetail> {
   return advancePvpTournament(tournamentId, now, adminId);
 }

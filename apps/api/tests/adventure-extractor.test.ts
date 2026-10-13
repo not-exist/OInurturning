@@ -112,9 +112,7 @@ describe('adventure event extractor', () => {
     const selected = drawAdventureEvent(
       events,
       context({
-        lastTriggeredAtByEvent: new Map([
-          ['evt-test-gray', new Date('2026-09-02T11:00:00.000Z')],
-        ]),
+        lastTriggeredAtByEvent: new Map([['evt-test-gray', new Date('2026-09-02T11:00:00.000Z')]]),
       }),
     );
 

@@ -17,7 +17,13 @@ import type {
 import type { EventCategory } from '../config/events.js';
 import type { ConfigRarity, TalentDef } from '../config/talents.js';
 import type { TutorialStepDef } from '../config/tutorial.js';
-import type { BattleReplay, ContestFormat, ParticipantSnapshot, TEAM_SIZE_MAX, TEAM_SIZE_MIN } from './contest.js';
+import type {
+  BattleReplay,
+  ContestFormat,
+  ParticipantSnapshot,
+  TEAM_SIZE_MAX,
+  TEAM_SIZE_MIN,
+} from './contest.js';
 import type { LectureGrowthEntry, StudentView } from './student.js';
 import type { ContestRecordType, ContestRecordView } from './story.js';
 
@@ -30,12 +36,7 @@ export type TrainingKind = 'basic' | 'directed' | 'specialized';
 
 /** 附带成长命中项（wire 名 snake_case，区别于 Student 列名的 camelCase） */
 export type RareGainStat =
-  | 'code'
-  | 'thinking'
-  | 'setting'
-  | 'mindset'
-  | 'focus_cap'
-  | 'stamina_regen';
+  'code' | 'thinking' | 'setting' | 'mindset' | 'focus_cap' | 'stamina_regen';
 
 export interface RareGain {
   stat: RareGainStat;

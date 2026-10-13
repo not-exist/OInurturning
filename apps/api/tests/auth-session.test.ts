@@ -24,7 +24,9 @@ async function registerAndGetCookies(): Promise<{ token: string; cookies: string
 describe('refresh Cookie 的传输协议', () => {
   it('HTTP 不带 Secure，受信任 HTTPS 反代请求带 Secure', async () => {
     const direct = await request(app).post('/api/auth/register').send(U);
-    expect(setCookies(direct).find((cookie) => cookie.startsWith('oinur_rt='))).not.toContain('Secure');
+    expect(setCookies(direct).find((cookie) => cookie.startsWith('oinur_rt='))).not.toContain(
+      'Secure',
+    );
 
     const proxiedApp = createApp({ trustProxyHops: 1 });
     const proxied = await request(proxiedApp)
@@ -32,7 +34,9 @@ describe('refresh Cookie 的传输协议', () => {
       .set('X-Forwarded-Proto', 'https')
       .send({ username: 'sess-proxy', password: U.password });
     expect(proxied.status).toBe(200);
-    expect(setCookies(proxied).find((cookie) => cookie.startsWith('oinur_rt='))).toContain('Secure');
+    expect(setCookies(proxied).find((cookie) => cookie.startsWith('oinur_rt='))).toContain(
+      'Secure',
+    );
   });
 });
 
@@ -76,7 +80,9 @@ describe('POST /api/auth/refresh', () => {
     const none = await request(app).post('/api/auth/refresh');
     expect(none.status).toBe(401);
     expect(unwrapErr(none).code).toBe('UNAUTHENTICATED');
-    const tampered = await request(app).post('/api/auth/refresh').set('Cookie', 'oinur_rt=abc.def.ghi');
+    const tampered = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', 'oinur_rt=abc.def.ghi');
     expect(tampered.status).toBe(401);
     expect(unwrapErr(tampered).code).toBe('UNAUTHENTICATED');
   });
@@ -93,13 +99,16 @@ describe('改密后的全局失效', () => {
       .send({ oldPassword: U.password, newPassword: 'new-password-9' });
     expect(changed.status).toBe(200);
 
-    const oldAccess = await request(app).get('/api/users/me').set('Authorization', `Bearer ${token}`);
+    const oldAccess = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${token}`);
     expect(oldAccess.status).toBe(401);
 
     const oldRefresh = await request(app).post('/api/auth/refresh').set('Cookie', rt);
     expect(oldRefresh.status).toBe(401);
 
-    const relogin = await request(app).post('/api/auth/login')
+    const relogin = await request(app)
+      .post('/api/auth/login')
       .send({ username: U.username, password: 'new-password-9' });
     expect(relogin.status).toBe(200);
   });
@@ -155,7 +164,10 @@ describe('登出', () => {
     const logout = await request(app)
       .post('/api/auth/logout')
       .set('Authorization', `Bearer ${token}`)
-      .set('Cookie', cookies.map((c) => c.split(';')[0]));
+      .set(
+        'Cookie',
+        cookies.map((c) => c.split(';')[0]),
+      );
     expect(logout.status).toBe(200);
     const me = await request(app).get('/api/users/me').set('Authorization', `Bearer ${token}`);
     expect(me.status).toBe(401);
@@ -169,7 +181,16 @@ describe('MeView 字段', () => {
     const res = await request(app).get('/api/users/me').set('Authorization', `Bearer ${token}`);
     const me = unwrapOk<MeView>(res);
     expect(Object.keys(me).sort()).toEqual(
-      ['badges', 'createdAt', 'id', 'lastLoginAt', 'money', 'reputation', 'role', 'username'].sort(),
+      [
+        'badges',
+        'createdAt',
+        'id',
+        'lastLoginAt',
+        'money',
+        'reputation',
+        'role',
+        'username',
+      ].sort(),
     );
   });
 });

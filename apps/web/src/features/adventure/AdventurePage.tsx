@@ -164,7 +164,10 @@ function EventCard({
             rarity === 'RAINBOW' ? 'animate-rainbow-halo' : ''
           }`}
         >
-          <Icon icon={eventCategoryIcon(event.category)} className={`size-5 ${RARITY_ICON[rarity]}`} />
+          <Icon
+            icon={eventCategoryIcon(event.category)}
+            className={`size-5 ${RARITY_ICON[rarity]}`}
+          />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -212,7 +215,10 @@ function EventCard({
             </Chip>
             <Chip icon={event.category === 'duel' ? Swords : UserRound}>{mode.label}</Chip>
             {oneshot !== undefined && (
-              <Chip icon={TriangleAlert} className="border-warn-400/60 bg-warn-400/10 text-warn-400">
+              <Chip
+                icon={TriangleAlert}
+                className="border-warn-400/60 bg-warn-400/10 text-warn-400"
+              >
                 不可重复 · {oneshot}
               </Chip>
             )}
@@ -242,8 +248,7 @@ function EventCard({
       ) : adventure.status === 'PENDING' && choices !== null ? (
         <div className="space-y-2 p-4">
           {choices.map((choice) => {
-            const missingItem =
-              choice.requiresItem !== undefined && !held(choice.requiresItem);
+            const missingItem = choice.requiresItem !== undefined && !held(choice.requiresItem);
             const shortMoney =
               choice.costMoney !== undefined && money !== undefined && money < choice.costMoney;
             const blocked = !choice.available || missingItem || shortMoney;
@@ -282,10 +287,7 @@ function EventCard({
                   )}
                   {choice.requiresItem !== undefined && (
                     <span className={missingItem ? 'text-bad-400' : 'text-fg-muted'}>
-                      <Icon
-                        icon={itemIcon(choice.requiresItem)}
-                        className="mr-1 inline size-3"
-                      />
+                      <Icon icon={itemIcon(choice.requiresItem)} className="mr-1 inline size-3" />
                       需持有{namedItem(choice.requiresItem)} · 选用后消耗
                     </span>
                   )}
@@ -435,9 +437,7 @@ export function AdventurePage(): JSX.Element {
                   <span className="tnum">×{value}</span>
                 </button>
               ))}
-              <span className="ml-1 text-[11px] text-fg-dim">
-                抽取即扣除全队各 {tier} 点体力
-              </span>
+              <span className="ml-1 text-[11px] text-fg-dim">抽取即扣除全队各 {tier} 点体力</span>
             </div>
           </div>
 
@@ -570,7 +570,9 @@ export function AdventurePage(): JSX.Element {
                     </span>
                   </span>
                   <span className="text-right text-xs">
-                    <span className={pendingLog ? 'text-warn-400' : 'text-fg-muted'}>{summary}</span>
+                    <span className={pendingLog ? 'text-warn-400' : 'text-fg-muted'}>
+                      {summary}
+                    </span>
                     <time className="mt-0.5 block text-[11px] text-fg-faint">
                       {new Date(log.createdAt).toLocaleString()}
                     </time>

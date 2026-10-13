@@ -72,7 +72,12 @@ function npcTeam(teamId: string, member: ParticipantSnapshot, size = ROSTER_SIZE
     teamId,
     side: 'NPC',
     userId: null,
-    members: roster(member, size).map((entry) => ({ ...entry, side: 'NPC', userId: null, studentId: null })),
+    members: roster(member, size).map((entry) => ({
+      ...entry,
+      side: 'NPC',
+      userId: null,
+      studentId: null,
+    })),
   };
 }
 
@@ -180,7 +185,10 @@ describe('ranking simulation and ordering', () => {
       { ...base, displayName: 'Weak·3', abilities: abilities(45), studentId: 12 },
     ];
     const input = rankingInput({
-      teams: [{ teamId: 'home', side: 'HOME', userId: 1, members }, npcTeam('npc:0', participant('NPC', 20))],
+      teams: [
+        { teamId: 'home', side: 'HOME', userId: 1, members },
+        npcTeam('npc:0', participant('NPC', 20)),
+      ],
       problems: [
         question({ instanceId: 'shared#0', index: 0 }),
         question({ instanceId: 'shared#1', index: 1, dimension: 'DP' }),

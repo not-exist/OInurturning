@@ -50,7 +50,10 @@ async function fund(userId: number, money: number): Promise<number> {
 }
 
 async function moneyOf(userId: number): Promise<number> {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { money: true } });
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { money: true },
+  });
   return user.money;
 }
 
@@ -95,8 +98,16 @@ describe('shop buy idempotency', () => {
     });
 
     const [a, b] = await Promise.all([
-      request(app).post('/api/shop/buy').set(auth(token)).set('Idempotency-Key', key).send({ itemId: 'milk-tea', quantity: 1 }),
-      request(app).post('/api/shop/buy').set(auth(token)).set('Idempotency-Key', key).send({ itemId: 'milk-tea', quantity: 1 }),
+      request(app)
+        .post('/api/shop/buy')
+        .set(auth(token))
+        .set('Idempotency-Key', key)
+        .send({ itemId: 'milk-tea', quantity: 1 }),
+      request(app)
+        .post('/api/shop/buy')
+        .set(auth(token))
+        .set('Idempotency-Key', key)
+        .send({ itemId: 'milk-tea', quantity: 1 }),
     ]);
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
@@ -137,7 +148,10 @@ describe('shop buy idempotency', () => {
     const price = getConfig()!.items['milk-tea']!.price!;
 
     for (let i = 1; i <= 2; i += 1) {
-      const res = await request(app).post('/api/shop/buy').set(auth(token)).send({ itemId: 'milk-tea', quantity: 1 });
+      const res = await request(app)
+        .post('/api/shop/buy')
+        .set(auth(token))
+        .send({ itemId: 'milk-tea', quantity: 1 });
       expect(res.status).toBe(200);
     }
     expect(await moneyOf(userId)).toBe(10000 - price * 2);

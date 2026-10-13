@@ -24,7 +24,10 @@ import {
 import { requireConfig } from '../../config/require-config.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
 import { ApiError } from '../../lib/errors.js';
-import { participantSnapshot, type ParticipantStudentInput } from '../../lib/participant-snapshot.js';
+import {
+  participantSnapshot,
+  type ParticipantStudentInput,
+} from '../../lib/participant-snapshot.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockAdventureLog, lockStudentsByIds, lockUser } from '../../lib/row-lock.js';
 import { weightedPick } from '../../lib/weighted-pick.js';
@@ -96,7 +99,11 @@ function numberValue(value: unknown, random: () => number, field: string): numbe
   ) {
     return range.min + Math.floor(random() * (range.max - range.min + 1));
   }
-  throw new ApiError('STATE_CONFLICT', { resource: 'adventure', field, reason: 'invalid reward value' });
+  throw new ApiError('STATE_CONFLICT', {
+    resource: 'adventure',
+    field,
+    reason: 'invalid reward value',
+  });
 }
 
 function outcomeSupported(outcome: EventOutcome): boolean {
@@ -116,7 +123,11 @@ function outcomeSupported(outcome: EventOutcome): boolean {
     if (check.kind !== undefined && check.kind !== 'single') return false;
     if (typeof check.skill !== 'string' || typeof check.dc !== 'number') return false;
   }
-  if (unsupportedRewards(raw.rewards) || unsupportedRewards(raw.rewards_success) || unsupportedRewards(raw.rewards_fail)) {
+  if (
+    unsupportedRewards(raw.rewards) ||
+    unsupportedRewards(raw.rewards_success) ||
+    unsupportedRewards(raw.rewards_fail)
+  ) {
     return false;
   }
   return true;
@@ -158,9 +169,14 @@ function eventView(event: EventConfig, revealChoices: boolean): AdventureEventVi
 
 /** 历练日志记录的 3 人队伍；队长（studentId）始终是 roster[0]。 */
 function adventureRoster(log: AdventureLog): number[] {
-  const roster = array(log.studentIds).filter((value): value is number => typeof value === 'number');
+  const roster = array(log.studentIds).filter(
+    (value): value is number => typeof value === 'number',
+  );
   if (roster.length !== ADVENTURE_ROSTER_SIZE) {
-    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'three-member roster missing' });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'adventure',
+      reason: 'three-member roster missing',
+    });
   }
   return roster;
 }
@@ -175,7 +191,11 @@ function isAvoided(log: { status: string; results: Prisma.JsonValue }): boolean 
   return log.status === 'RESOLVED' && record(array(log.results).at(-1)).status === 'AVOIDED';
 }
 
-function toLogView(log: AdventureLog, event: EventConfig, revealChoices: boolean): AdventureLogView {
+function toLogView(
+  log: AdventureLog,
+  event: EventConfig,
+  revealChoices: boolean,
+): AdventureLogView {
   const tier = log.tier as AdventureStaminaCost;
   return {
     id: log.id,
@@ -204,17 +224,25 @@ async function lockStudents(
 ): Promise<LockedStudent[]> {
   const ids = [...new Set(roster)].sort((left, right) => left - right);
   await lockStudentsByIds(tx, ids);
-  const rows = await tx.student.findMany({ where: { id: { in: ids } }, include: { talents: true } });
+  const rows = await tx.student.findMany({
+    where: { id: { in: ids } },
+    include: { talents: true },
+  });
   const byId = new Map(rows.map((row) => [row.id, row]));
   return roster.map((studentId) => {
     const current = byId.get(studentId);
     if (current === undefined || current.status !== 'ACTIVE') {
       throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
     }
-    if (current.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
+    if (current.userId !== userId)
+      throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
     return {
       current,
-      settled: settle(current, aggregateMeta(current.talents.map((talent) => talent.talentId)), now),
+      settled: settle(
+        current,
+        aggregateMeta(current.talents.map((talent) => talent.talentId)),
+        now,
+      ),
     };
   });
 }
@@ -258,7 +286,10 @@ async function claimWeeklyLimit(
     data: { count: { increment: 1 } },
   });
   if (claimed.count !== 1) {
-    throw new ApiError('STATE_CONFLICT', { resource: event.id, reason: 'weekly event limit reached' });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: event.id,
+      reason: 'weekly event limit reached',
+    });
   }
 }
 
@@ -282,14 +313,22 @@ async function drawContext(
   for (const log of logs) {
     if (isAvoided(log)) continue;
     const previous = lastTriggeredAtByEvent.get(log.eventId);
-    if (previous === undefined || previous < log.createdAt) lastTriggeredAtByEvent.set(log.eventId, log.createdAt);
+    if (previous === undefined || previous < log.createdAt)
+      lastTriggeredAtByEvent.set(log.eventId, log.createdAt);
     if (log.studentId === student.id) oncePerStudentEventIds.add(log.eventId);
   }
   return {
     availableStamina: student.stamina,
     investment,
     reputation: user.reputation,
-    sixMax: Math.max(student.ds, student.dp, student.math, student.graph, student.greedy, student.str),
+    sixMax: Math.max(
+      student.ds,
+      student.dp,
+      student.math,
+      student.graph,
+      student.greedy,
+      student.str,
+    ),
     now,
     lastTriggeredAtByEvent,
     oncePerStudentEventIds,
@@ -315,12 +354,19 @@ export async function drawAdventure(
     await lockUser(tx, userId);
     const pending = await tx.adventureLog.findFirst({ where: { userId, status: 'PENDING' } });
     if (pending !== null) {
-      throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'pending adventure exists' });
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'adventure',
+        reason: 'pending adventure exists',
+      });
     }
     const locked = await lockStudents(tx, userId, roster, now);
     const short = locked.find((member) => member.settled.stamina < investment);
     if (short !== undefined) {
-      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', studentId: short.current.id, need: investment });
+      throw new ApiError('INSUFFICIENT_RESOURCE', {
+        resource: 'stamina',
+        studentId: short.current.id,
+        need: investment,
+      });
     }
     const [captain] = locked;
     const context = await drawContext(
@@ -345,7 +391,12 @@ export async function drawAdventure(
     if (!preview.adventureIntelReady) {
       await claimWeeklyLimit(tx, event, now);
       for (const member of locked) {
-        await persistStudentSettlement(tx, member.current, member.settled, member.settled.stamina - investment);
+        await persistStudentSettlement(
+          tx,
+          member.current,
+          member.settled,
+          member.settled.stamina - investment,
+        );
       }
     }
     const log = await tx.adventureLog.create({
@@ -367,7 +418,14 @@ export async function drawAdventure(
 function skillScore(student: Student, skill: string, meta: Record<string, number>): number {
   let base: number;
   if (skill === 'six_max') {
-    base = Math.max(student.ds, student.dp, student.math, student.graph, student.greedy, student.str);
+    base = Math.max(
+      student.ds,
+      student.dp,
+      student.math,
+      student.graph,
+      student.greedy,
+      student.str,
+    );
   } else if (skill === 'mindset') {
     base = student.mindset;
   } else {
@@ -387,10 +445,16 @@ function rewardObject(outcome: JsonRecord): JsonRecord {
   const rewards = record(outcome.rewards);
   const found = [...unsupported, 'duel'].find((key) => key in rewards);
   if (found !== undefined) {
-    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: `reward ${found} is not implemented` });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'adventure',
+      reason: `reward ${found} is not implemented`,
+    });
   }
   if (rewards.target_student !== undefined && rewards.target_student !== 'participant') {
-    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'non-actor target is not implemented' });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'adventure',
+      reason: 'non-actor target is not implemented',
+    });
   }
   return rewards;
 }
@@ -403,12 +467,18 @@ function resolveCheck(
 ): { rewards: JsonRecord; check: JsonRecord } {
   const check = record(outcome.check);
   if (check.kind !== undefined && check.kind !== 'single') {
-    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'compound check is not implemented' });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'adventure',
+      reason: 'compound check is not implemented',
+    });
   }
   const skill = typeof check.skill === 'string' ? check.skill : undefined;
   const dc = typeof check.dc === 'number' ? check.dc : undefined;
   if (skill === undefined || dc === undefined) {
-    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'invalid check definition' });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'adventure',
+      reason: 'invalid check definition',
+    });
   }
   const score = skillScore(student, skill, meta);
   const margin = score - dc;
@@ -436,7 +506,10 @@ function duelTiebreak(value: unknown): DuelInput['tiebreak'] {
     friendly: 'FRIENDLY',
   };
   if (typeof value !== 'string' || modes[value] === undefined) {
-    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'invalid duel tiebreak' });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'adventure',
+      reason: 'invalid duel tiebreak',
+    });
   }
   return modes[value];
 }
@@ -454,24 +527,33 @@ function duelQuestions(
   return Array.from({ length: home.length * 2 }, (_, index) => {
     const side = index % 2 === 0 ? home : away;
     const setter = side[Math.floor(index / 2) % home.length]!;
-    const dimension = DIMENSIONS[
-      Math.max(
-        0,
-        DIMENSIONS.reduce(
-          (best, key, position) =>
-            setter.abilities[key] > setter.abilities[DIMENSIONS[best]!] ? position : best,
+    const dimension =
+      DIMENSIONS[
+        Math.max(
           0,
-        ),
-      )
-    ]!;
+          DIMENSIONS.reduce(
+            (best, key, position) =>
+              setter.abilities[key] > setter.abilities[DIMENSIONS[best]!] ? position : best,
+            0,
+          ),
+        )
+      ]!;
     const setting = setter.abilities.PROBLEM;
     const dimensionValue = setter.abilities[dimension];
     const thinking = setter.abilities.THINKING;
     const demand = clamp(Math.round(setting + (random() * 2 - 1) * 3), 5, 98);
     const thought = clamp(Math.round(setting * 0.92 + (random() * 2 - 1) * 3), 5, 98);
     const codeVolume = clamp(Math.round(setting * 0.85 + (random() * 2 - 1) * 3), 3, 98);
-    const quality = clamp(Math.round(0.5 * setting + 0.3 * dimensionValue + 0.2 * thinking), 1, 100);
-    const timeLimitMin = clamp(Math.round(0.8 * demand + 0.6 * thought + 0.4 * codeVolume), 45, 160);
+    const quality = clamp(
+      Math.round(0.5 * setting + 0.3 * dimensionValue + 0.2 * thinking),
+      1,
+      100,
+    );
+    const timeLimitMin = clamp(
+      Math.round(0.8 * demand + 0.6 * thought + 0.4 * codeVolume),
+      45,
+      160,
+    );
     return {
       instanceId: `adventure-duel:${seed}:round:${index + 1}`,
       index,
@@ -505,7 +587,10 @@ function duelInput(
     'legendary_ghost',
   ];
   if (typeof opponent !== 'string' || !kinds.includes(opponent as DuelOpponentKind)) {
-    throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'unknown duel opponent' });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'adventure',
+      reason: 'unknown duel opponent',
+    });
   }
   const params = record(duel.opponent_params);
   const powerMultiplier = typeof params.power_mult === 'number' ? params.power_mult : 1;
@@ -528,7 +613,10 @@ function duelInput(
 }
 
 /** 对决后每名参战学员各自的精力/心态（结算只统计自己答题的局）。 */
-function playerDuelStates(report: DuelReport, locked: readonly LockedStudent[]): DuelStudentState[] {
+function playerDuelStates(
+  report: DuelReport,
+  locked: readonly LockedStudent[],
+): DuelStudentState[] {
   return report.inputSnapshot.home.members.map((member, index) => {
     const { settled } = locked[index]!;
     const rounds = report.rounds.filter(
@@ -552,7 +640,12 @@ async function priorWinStreak(
   now: Date,
 ): Promise<number> {
   const rows = await tx.adventureLog.findMany({
-    where: { userId, eventId, status: 'RESOLVED', createdAt: { gte: new Date(now.getTime() - 8 * 86_400_000) } },
+    where: {
+      userId,
+      eventId,
+      status: 'RESOLVED',
+      createdAt: { gte: new Date(now.getTime() - 8 * 86_400_000) },
+    },
     orderBy: { createdAt: 'desc' },
     select: { results: true, createdAt: true },
   });
@@ -573,7 +666,8 @@ function rewardItemId(
 ): string {
   const config = requireConfig('adventure');
   if (rawId !== 'dim-book') {
-    if (!config.items[rawId]) throw new ApiError('STATE_CONFLICT', { resource: 'item', itemId: rawId });
+    if (!config.items[rawId])
+      throw new ApiError('STATE_CONFLICT', { resource: 'item', itemId: rawId });
     return rawId;
   }
   const candidates = Object.values(config.items).filter(
@@ -603,12 +697,16 @@ function applyStatGain(
       continue;
     }
     if (key === 'all_six') {
-      for (const field of DIMENSION_COLUMNS) values[field] = clamp((student[field] as number) + value, 1, 100);
+      for (const field of DIMENSION_COLUMNS)
+        values[field] = clamp((student[field] as number) + value, 1, 100);
       continue;
     }
     if (key === 'chosen_skill') {
       if (chosenSkill === undefined || !(chosenSkill in STAT_FIELDS)) {
-        throw new ApiError('VALIDATION_FAILED', { field: 'skill', reason: 'choose a valid student skill' });
+        throw new ApiError('VALIDATION_FAILED', {
+          field: 'skill',
+          reason: 'choose a valid student skill',
+        });
       }
       const field = STAT_FIELDS[chosenSkill as keyof typeof STAT_FIELDS];
       values[field] = clamp((student[field] as number) + value, 1, 100);
@@ -648,7 +746,10 @@ async function addBankProblems(
   }
   const available = await tx.problemLibraryEntry.count({ where: { userId, consumedAt: null } });
   if (available + count > 120) {
-    throw new ApiError('STATE_CONFLICT', { resource: 'problemLibrary', reason: 'capacity reached' });
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'problemLibrary',
+      reason: 'capacity reached',
+    });
   }
   const lines: Prisma.InputJsonValue[] = [];
   for (let index = 0; index < count; index += 1) {
@@ -656,7 +757,8 @@ async function addBankProblems(
       typeof qualityMultiplier === 'number'
         ? clamp(Math.round((sourceQuality ?? 0) * qualityMultiplier), 0, 100)
         : clamp(Math.round(numberValue(bank.quality, random, 'bank_add.quality')), 0, 100);
-    const dimension = sourceQuestion?.dimension ?? DIMENSIONS[Math.floor(random() * DIMENSIONS.length)]!;
+    const dimension =
+      sourceQuestion?.dimension ?? DIMENSIONS[Math.floor(random() * DIMENSIONS.length)]!;
     const row = await tx.problemLibraryEntry.create({
       data: {
         userId,
@@ -687,7 +789,10 @@ async function resolveRewards(
   chosenSkill?: string,
   bankSourceQuestion?: QuestionSnapshot,
   winStreak = 0,
-): Promise<{ rewardLines: Prisma.InputJsonValue[]; studentData: Prisma.StudentUpdateManyMutationInput }> {
+): Promise<{
+  rewardLines: Prisma.InputJsonValue[];
+  studentData: Prisma.StudentUpdateManyMutationInput;
+}> {
   const outcomeRecord = outcome as unknown as JsonRecord;
   const rewardObjectValue = rewardObject(outcomeRecord);
   const rewardLines: Prisma.InputJsonValue[] = [];
@@ -701,13 +806,22 @@ async function resolveRewards(
     energyCost === undefined
       ? settled.energy
       : settled.energy - numberValue(energyCost, random, 'energy_cost');
-  if (energyAfter < 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'energy', need: settled.energy - energyAfter });
+  if (energyAfter < 0)
+    throw new ApiError('INSUFFICIENT_RESOURCE', {
+      resource: 'energy',
+      need: settled.energy - energyAfter,
+    });
   studentData.energy = energyAfter;
 
-  const moneyBase = rewardObjectValue.money === undefined ? 0 : numberValue(rewardObjectValue.money, random, 'money');
+  const moneyBase =
+    rewardObjectValue.money === undefined
+      ? 0
+      : numberValue(rewardObjectValue.money, random, 'money');
   const streak = record(rewardObjectValue.win_streak_bonus);
   const streakExtra =
-    winStreak > 0 && typeof streak.per_win_extra_money === 'number' && typeof streak.cap === 'number'
+    winStreak > 0 &&
+    typeof streak.per_win_extra_money === 'number' &&
+    typeof streak.cap === 'number'
       ? Math.min(streak.cap, streak.per_win_extra_money * winStreak)
       : 0;
   const money = moneyBase + streakExtra;
@@ -721,15 +835,22 @@ async function resolveRewards(
       where: { id: userId, ...(netMoney < 0 ? { money: { gte: -netMoney } } : {}) },
       data: netMoney > 0 ? { money: { increment: netMoney } } : { money: { decrement: -netMoney } },
     });
-    if (changed.count !== 1) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: -netMoney });
+    if (changed.count !== 1)
+      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: -netMoney });
     rewardLines.push({ type: 'money', amount: netMoney });
   }
-  if (streakExtra > 0) rewardLines.push({ type: 'win_streak_bonus', amount: streakExtra, streak: winStreak });
+  if (streakExtra > 0)
+    rewardLines.push({ type: 'win_streak_bonus', amount: streakExtra, streak: winStreak });
   if (reputation !== 0) {
-    const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { reputation: true } });
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { reputation: true },
+    });
     const next = Math.max(0, user.reputation + reputation);
     await tx.user.update({ where: { id: userId }, data: { reputation: next } });
-    await tx.reputationLog.create({ data: { userId, delta: next - user.reputation, reason: `EVENT:${event.id}` } });
+    await tx.reputationLog.create({
+      data: { userId, delta: next - user.reputation, reason: `EVENT:${event.id}` },
+    });
     rewardLines.push({ type: 'reputation', amount: next - user.reputation });
   }
 
@@ -740,7 +861,8 @@ async function resolveRewards(
       where: { userId, itemId: consume.item, quantity: { gte: quantity } },
       data: { quantity: { decrement: quantity } },
     });
-    if (consumed.count !== 1) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: consume.item, need: quantity });
+    if (consumed.count !== 1)
+      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: consume.item, need: quantity });
     await tx.userItem.deleteMany({ where: { userId, itemId: consume.item, quantity: { lte: 0 } } });
     rewardLines.push({ type: 'consume_item', itemId: consume.item, count: quantity });
   }
@@ -748,7 +870,8 @@ async function resolveRewards(
   if (Array.isArray(rewardObjectValue.items)) {
     for (const entry of rewardObjectValue.items) {
       const item = record(entry);
-      const probability = item.prob === undefined ? 1 : numberValue(item.prob, random, 'items.prob');
+      const probability =
+        item.prob === undefined ? 1 : numberValue(item.prob, random, 'items.prob');
       if (random() >= probability) continue;
       const itemId = rewardItemId(
         typeof item.id === 'string' ? item.id : '',
@@ -778,17 +901,27 @@ async function resolveRewards(
       )),
     );
   }
-  if (Object.keys(record(rewardObjectValue.buffs)).length > 0 || Array.isArray(rewardObjectValue.buffs)) {
-    const buffs = Array.isArray(rewardObjectValue.buffs) ? rewardObjectValue.buffs : [rewardObjectValue.buffs];
+  if (
+    Object.keys(record(rewardObjectValue.buffs)).length > 0 ||
+    Array.isArray(rewardObjectValue.buffs)
+  ) {
+    const buffs = Array.isArray(rewardObjectValue.buffs)
+      ? rewardObjectValue.buffs
+      : [rewardObjectValue.buffs];
     const existing = array(record(student.counters).adventureBuffs);
     // buffs 源自事件配置 outcome 的 .loose() 未知键（events.ts:47 loose 放行 rewards_* / buffs），
     // YAML 可带入非 JSON 安全值（.inf→Infinity、!!timestamp→Date），Prisma 静默容错；
     // 不能改用 lib/json 的 jsonWrite 断言，否则此类配置会从静默容错变成运行时 500（T5 实测）。
     studentData.counters = {
       ...record(student.counters),
-      adventureBuffs: [...existing, ...buffs.map((buff) => ({ ...record(buff), appliedAt: now.toISOString() }))],
+      adventureBuffs: [
+        ...existing,
+        ...buffs.map((buff) => ({ ...record(buff), appliedAt: now.toISOString() })),
+      ],
     } as Prisma.InputJsonValue;
-    rewardLines.push(...buffs.map((buff) => ({ type: 'buff', ...record(buff) })) as Prisma.InputJsonValue[]);
+    rewardLines.push(
+      ...(buffs.map((buff) => ({ type: 'buff', ...record(buff) })) as Prisma.InputJsonValue[]),
+    );
   }
   return { rewardLines, studentData };
 }
@@ -804,9 +937,11 @@ export async function chooseAdventure(
     await lockUser(tx, userId);
     await lockAdventureLog(tx, adventureId);
     const log = await tx.adventureLog.findUnique({ where: { id: adventureId } });
-    if (log === null || log.userId !== userId) throw new ApiError('NOT_FOUND', { resource: 'adventure', id: adventureId });
+    if (log === null || log.userId !== userId)
+      throw new ApiError('NOT_FOUND', { resource: 'adventure', id: adventureId });
     const event = config.events[log.eventId];
-    if (event === undefined) throw new ApiError('STATE_CONFLICT', { resource: 'event', eventId: log.eventId });
+    if (event === undefined)
+      throw new ApiError('STATE_CONFLICT', { resource: 'event', eventId: log.eventId });
     if (log.status === 'RESOLVED') {
       const existingRecord =
         log.contestRecordId === null
@@ -835,11 +970,20 @@ export async function chooseAdventure(
       const locked = await lockStudents(tx, userId, roster, now);
       const short = locked.find((member) => member.settled.stamina < log.tier);
       if (short !== undefined) {
-        throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', studentId: short.current.id, need: log.tier });
+        throw new ApiError('INSUFFICIENT_RESOURCE', {
+          resource: 'stamina',
+          studentId: short.current.id,
+          need: log.tier,
+        });
       }
       await claimWeeklyLimit(tx, event, now);
       for (const member of locked) {
-        await persistStudentSettlement(tx, member.current, member.settled, member.settled.stamina - log.tier);
+        await persistStudentSettlement(
+          tx,
+          member.current,
+          member.settled,
+          member.settled.stamina - log.tier,
+        );
       }
       await tx.user.update({ where: { id: userId }, data: { adventureIntelReady: false } });
       const accepted = await tx.adventureLog.update({
@@ -851,18 +995,28 @@ export async function chooseAdventure(
     if (input.optionIndex === undefined || !Number.isInteger(input.optionIndex)) {
       throw new ApiError('VALIDATION_FAILED', { field: 'optionIndex' });
     }
-    if (preview) throw new ApiError('STATE_CONFLICT', { resource: 'adventure', reason: 'accept preview first' });
+    if (preview)
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'adventure',
+        reason: 'accept preview first',
+      });
     const choice = event.choices[input.optionIndex];
     if (choice === undefined) throw new ApiError('VALIDATION_FAILED', { field: 'optionIndex' });
     if (choice.requires_item !== undefined) {
-      const held = await tx.userItem.findUnique({ where: { userId_itemId: { userId, itemId: choice.requires_item } } });
+      const held = await tx.userItem.findUnique({
+        where: { userId_itemId: { userId, itemId: choice.requires_item } },
+      });
       if (!held || held.quantity < 1) {
         throw new ApiError('INSUFFICIENT_RESOURCE', { resource: choice.requires_item, need: 1 });
       }
     }
     if (choice.cost_money !== undefined) {
-      const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { money: true } });
-      if (user.money < choice.cost_money) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: choice.cost_money });
+      const user = await tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { money: true },
+      });
+      if (user.money < choice.cost_money)
+        throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: choice.cost_money });
     }
     const locked = await lockStudents(tx, userId, adventureRoster(log), now);
     const { current, settled } = locked[0]!;
@@ -881,7 +1035,11 @@ export async function chooseAdventure(
     if (selected.type === 'duel') {
       const duel = record(outcomeRecord.duel);
       const inputSnapshot = duelInput(
-        locked.map((member) => ({ ...member.current, energy: member.settled.energy, mindset: member.settled.mindset })),
+        locked.map((member) => ({
+          ...member.current,
+          energy: member.settled.energy,
+          mindset: member.settled.mindset,
+        })),
         duel,
         log.seed,
       );
@@ -894,9 +1052,16 @@ export async function chooseAdventure(
             : 'rewards_draw';
       outcomeRecord.rewards = record(outcomeRecord[rewardKey]);
       duelStates = playerDuelStates(duelReport, locked);
-      rewardStudent = { ...settled, energy: duelStates[0]!.energy, mindset: duelStates[0]!.mindset };
+      rewardStudent = {
+        ...settled,
+        energy: duelStates[0]!.energy,
+        mindset: duelStates[0]!.mindset,
+      };
       bankSourceQuestion = duelReport.rounds.find((round) => round.setterSide === 'HOME')?.question;
-      if (record(outcomeRecord.rewards).win_streak_bonus !== undefined && duelReport.winnerSide === 'HOME') {
+      if (
+        record(outcomeRecord.rewards).win_streak_bonus !== undefined &&
+        duelReport.winnerSide === 'HOME'
+      ) {
         winStreak = (await priorWinStreak(tx, userId, log.eventId, now)) + 1;
       }
     }
@@ -926,7 +1091,9 @@ export async function chooseAdventure(
       settled,
       settled.stamina,
       typeof applied.studentData.energy === 'number' ? applied.studentData.energy : settled.energy,
-      typeof applied.studentData.mindset === 'number' ? applied.studentData.mindset : settled.mindset,
+      typeof applied.studentData.mindset === 'number'
+        ? applied.studentData.mindset
+        : settled.mindset,
       {
         ...applied.studentData,
       },
@@ -935,7 +1102,14 @@ export async function chooseAdventure(
       for (const [index, state] of duelStates.entries()) {
         if (index === 0) continue;
         const member = locked[index]!;
-        await persistStudentSettlement(tx, member.current, member.settled, member.settled.stamina, state.energy, state.mindset);
+        await persistStudentSettlement(
+          tx,
+          member.current,
+          member.settled,
+          member.settled.stamina,
+          state.energy,
+          state.mindset,
+        );
       }
     }
     const contestRecord =
@@ -1003,6 +1177,8 @@ export async function listAdventureLogs(userId: number, limit = 20): Promise<Adv
   });
   return rows.flatMap((row) => {
     const event = config.events[row.eventId];
-    return event === undefined ? [] : [toLogView(row, event, row.status === 'RESOLVED' || resultPhase(row) === 'ACCEPTED')];
+    return event === undefined
+      ? []
+      : [toLogView(row, event, row.status === 'RESOLVED' || resultPhase(row) === 'ACCEPTED')];
   });
 }

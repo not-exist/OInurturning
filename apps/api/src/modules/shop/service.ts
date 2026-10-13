@@ -3,7 +3,12 @@ import { ApiError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import { lockUser } from '../../lib/row-lock.js';
 import { dayKey, weekKey } from '../../lib/clock.js';
-import { RARITY_RANK, type ShopItemView, type ShopCatalogView, type ShopBuyResult } from '@oinur/shared';
+import {
+  RARITY_RANK,
+  type ShopItemView,
+  type ShopCatalogView,
+  type ShopBuyResult,
+} from '@oinur/shared';
 import {
   bookRaritySuffix,
   dailyLimitForItem,
@@ -138,15 +143,25 @@ export async function getCatalog(userId: number, now: Date = new Date()): Promis
   };
 }
 
-export async function buyItem(userId: number, itemId: string, quantity: number, now: Date = new Date()): Promise<ShopBuyResult> {
-  if (!itemId) throw new ApiError('VALIDATION_FAILED', { resource: 'itemId', reason: 'itemId 必填' });
+export async function buyItem(
+  userId: number,
+  itemId: string,
+  quantity: number,
+  now: Date = new Date(),
+): Promise<ShopBuyResult> {
+  if (!itemId)
+    throw new ApiError('VALIDATION_FAILED', { resource: 'itemId', reason: 'itemId 必填' });
   if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) {
-    throw new ApiError('VALIDATION_FAILED', { resource: 'quantity', reason: '数量必须为 1-99 的整数' });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: 'quantity',
+      reason: '数量必须为 1-99 的整数',
+    });
   }
   const cfg = requireConfig('shop');
   const def = cfg.items[itemId];
   if (!def) throw new ApiError('NOT_FOUND', { resource: 'item', itemId });
-  if (!isPurchasable(def)) throw new ApiError('VALIDATION_FAILED', { resource: 'item', reason: '该道具不可购买' });
+  if (!isPurchasable(def))
+    throw new ApiError('VALIDATION_FAILED', { resource: 'item', reason: '该道具不可购买' });
 
   const repReq = reputationRequiredForItem(itemId, cfg.shop, cfg.items);
   const dLimit = dailyLimitForItem(itemId, cfg.shop);
@@ -160,10 +175,17 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
 
     if (user.reputation < repReq) {
-      throw new ApiError('VALIDATION_FAILED', { resource: 'reputation', reason: `声誉不足，需 ${repReq}，当前 ${user.reputation}` });
+      throw new ApiError('VALIDATION_FAILED', {
+        resource: 'reputation',
+        reason: `声誉不足，需 ${repReq}，当前 ${user.reputation}`,
+      });
     }
     if (user.money < totalCost) {
-      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'money', need: totalCost, have: user.money });
+      throw new ApiError('INSUFFICIENT_RESOURCE', {
+        resource: 'money',
+        need: totalCost,
+        have: user.money,
+      });
     }
 
     // 限购检查
@@ -176,11 +198,17 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
           if (bookRaritySuffix(l.itemId) === suffix) used += l.quantity;
         }
       } else {
-        const agg = await tx.shopPurchaseLog.aggregate({ where: { userId, itemId, dayKey: dk }, _sum: { quantity: true } });
+        const agg = await tx.shopPurchaseLog.aggregate({
+          where: { userId, itemId, dayKey: dk },
+          _sum: { quantity: true },
+        });
         used = agg._sum.quantity ?? 0;
       }
       if (used + quantity > dLimit) {
-        throw new ApiError('VALIDATION_FAILED', { resource: 'daily_limit', reason: `今日限购 ${dLimit}，已购 ${used}，本次 ${quantity} 超限` });
+        throw new ApiError('VALIDATION_FAILED', {
+          resource: 'daily_limit',
+          reason: `今日限购 ${dLimit}，已购 ${used}，本次 ${quantity} 超限`,
+        });
       }
     }
 
@@ -193,11 +221,17 @@ export async function buyItem(userId: number, itemId: string, quantity: number, 
           if (bookRaritySuffix(l.itemId) === suffix) used += l.quantity;
         }
       } else {
-        const agg = await tx.shopPurchaseLog.aggregate({ where: { userId, itemId, weekKey: wk }, _sum: { quantity: true } });
+        const agg = await tx.shopPurchaseLog.aggregate({
+          where: { userId, itemId, weekKey: wk },
+          _sum: { quantity: true },
+        });
         used = agg._sum.quantity ?? 0;
       }
       if (used + quantity > wLimit) {
-        throw new ApiError('VALIDATION_FAILED', { resource: 'weekly_limit', reason: `本周限购 ${wLimit}，已购 ${used}，本次 ${quantity} 超限` });
+        throw new ApiError('VALIDATION_FAILED', {
+          resource: 'weekly_limit',
+          reason: `本周限购 ${wLimit}，已购 ${used}，本次 ${quantity} 超限`,
+        });
       }
     }
 

@@ -32,10 +32,9 @@ test.describe('管理端', () => {
 
     // 审计留痕（heading 的父级只是标题栏，表格在 section 内，须按 section 圈定）
     await expect(page.getByTestId('admin-audits-head')).toBeVisible();
-    const auditSection = page.locator(
-      'section',
-      { has: page.getByRole('heading', { name: '审计日志' }) },
-    );
+    const auditSection = page.locator('section', {
+      has: page.getByRole('heading', { name: '审计日志' }),
+    });
     await expect(auditSection).toContainText('TOURNAMENT_CREATE');
     await expect(auditSection).toContainText('ANNOUNCEMENT_CREATE');
   });
@@ -65,10 +64,7 @@ test.describe('管理端', () => {
     expect(meAfter.status()).toBe(200);
   });
 
-  test('普通玩家访问管理端显示加载失败且无管理端入口', async ({
-    page,
-    request,
-  }) => {
+  test('普通玩家访问管理端显示加载失败且无管理端入口', async ({ page, request }) => {
     const account = await registerUser(request, 'adm');
     await loginViaUI(page, account.username, account.password);
     await expect(page.getByRole('link', { name: '管理端' })).not.toBeVisible();

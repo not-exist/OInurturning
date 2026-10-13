@@ -7,5 +7,7 @@ export const problemsRouter = Router();
 problemsRouter.get('/', requireAuth, async (req, res, next) => {
   try {
     res.json({ ok: true, data: await svc.listProblems(req.user!.id) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });

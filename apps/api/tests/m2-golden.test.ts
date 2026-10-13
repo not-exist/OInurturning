@@ -87,8 +87,18 @@ describe('M2 consolidated golden', () => {
     const rankingInput: RankingInput = {
       kind: 'custom',
       teams: [
-        { teamId: 'player', side: 'HOME', userId: 1, members: roster.map((index) => participant('HOME', index)) },
-        { teamId: 'npc:0', side: 'NPC', userId: null, members: roster.map((index) => participant('NPC', index)) },
+        {
+          teamId: 'player',
+          side: 'HOME',
+          userId: 1,
+          members: roster.map((index) => participant('HOME', index)),
+        },
+        {
+          teamId: 'npc:0',
+          side: 'NPC',
+          userId: null,
+          members: roster.map((index) => participant('NPC', index)),
+        },
       ],
       problems: [question('golden-ranking#0', 0)],
       durationMin: 120,

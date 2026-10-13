@@ -30,7 +30,9 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     title: '指挥中心',
-    items: [{ to: '/', label: '总览', icon: NAV_ICON.overview, end: true, tutorialKey: 'overview' }],
+    items: [
+      { to: '/', label: '总览', icon: NAV_ICON.overview, end: true, tutorialKey: 'overview' },
+    ],
   },
   {
     title: '培养',
@@ -38,13 +40,24 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/students', label: '学员管理', icon: NAV_ICON.students, tutorialKey: 'students' },
       { to: '/training', label: '训练中心', icon: NAV_ICON.training, tutorialKey: 'training' },
       { to: '/backpack', label: '背包', icon: NAV_ICON.backpack, tutorialKey: 'backpack' },
-      { to: '/problem-library', label: '出题题库', icon: NAV_ICON.problems, tutorialKey: 'problem-library' },
+      {
+        to: '/problem-library',
+        label: '出题题库',
+        icon: NAV_ICON.problems,
+        tutorialKey: 'problem-library',
+      },
     ],
   },
   {
     title: '学院',
     items: [
-      { to: '/academy', label: '高级学院', icon: NAV_ICON.academy, end: true, tutorialKey: 'academy' },
+      {
+        to: '/academy',
+        label: '高级学院',
+        icon: NAV_ICON.academy,
+        end: true,
+        tutorialKey: 'academy',
+      },
       { to: '/academy/lecture', label: '讲课', icon: NAV_ICON.lecture, tutorialKey: 'lecture' },
     ],
   },
@@ -77,7 +90,13 @@ export function Layout(): JSX.Element {
   const adminGroup: NavGroup = {
     title: '系统',
     items: [
-      { to: '/settings', label: '用户设置', icon: NAV_ICON.settings, tutorialKey: 'overview', noAnchor: true },
+      {
+        to: '/settings',
+        label: '用户设置',
+        icon: NAV_ICON.settings,
+        tutorialKey: 'overview',
+        noAnchor: true,
+      },
       ...(me?.role === 'ADMIN'
         ? [{ to: '/admin', label: '管理端', icon: NAV_ICON.admin, tutorialKey: 'admin' }]
         : []),
@@ -126,8 +145,12 @@ export function Layout(): JSX.Element {
             <Icon icon={Sparkles} className="size-4" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-display text-sm font-bold tracking-[0.12em]">OINURTURNING</span>
-            <span className="block truncate text-[10px] tracking-[0.2em] text-fg-faint">训练营指挥中心</span>
+            <span className="block truncate font-display text-sm font-bold tracking-[0.12em]">
+              OINURTURNING
+            </span>
+            <span className="block truncate text-[10px] tracking-[0.2em] text-fg-faint">
+              训练营指挥中心
+            </span>
           </span>
         </div>
 
@@ -277,7 +300,11 @@ function HudStat({
   return (
     <div className="flex items-baseline gap-2">
       <dt className="text-[10px] tracking-[0.14em] text-fg-dim uppercase">{label}</dt>
-      <dd className={`font-display ${hero ? 'text-base text-cyber-300' : quiet ? 'text-sm text-fg-muted' : 'text-sm text-fg'}`}>{children}</dd>
+      <dd
+        className={`font-display ${hero ? 'text-base text-cyber-300' : quiet ? 'text-sm text-fg-muted' : 'text-sm text-fg'}`}
+      >
+        {children}
+      </dd>
     </div>
   );
 }

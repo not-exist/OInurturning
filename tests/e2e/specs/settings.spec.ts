@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { uniqueName, DEFAULT_PASSWORD, loginViaUI, registerUser, finishTutorial } from '../fixtures';
+import {
+  uniqueName,
+  DEFAULT_PASSWORD,
+  loginViaUI,
+  registerUser,
+  finishTutorial,
+} from '../fixtures';
 
 /** 用户设置：账户信息/改密/注销。 */
 test.describe('用户设置', () => {
@@ -22,10 +28,7 @@ test.describe('用户设置', () => {
     await expect(page.getByTestId('settings-msg')).toHaveText('两次新密码不一致');
   });
 
-  test('修改密码成功后跳登录页，新密码可登、旧密码失效', async ({
-    page,
-    request,
-  }) => {
+  test('修改密码成功后跳登录页，新密码可登、旧密码失效', async ({ page, request }) => {
     const account = await registerUser(request, 'set');
     await loginViaUI(page, account.username, account.password);
     await page.goto('/settings');

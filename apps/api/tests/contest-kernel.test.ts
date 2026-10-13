@@ -63,7 +63,11 @@ function teams(member: ParticipantSnapshot): ContestTeam[] {
       teamId: 'player',
       side: 'HOME',
       userId: 1,
-      members: [0, 1, 2].map((index) => ({ ...member, studentId: 10 + index, displayName: `Hook Player ${index + 1}` })),
+      members: [0, 1, 2].map((index) => ({
+        ...member,
+        studentId: 10 + index,
+        displayName: `Hook Player ${index + 1}`,
+      })),
     },
     {
       teamId: 'npc:0',

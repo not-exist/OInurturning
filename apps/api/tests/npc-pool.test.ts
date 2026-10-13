@@ -65,7 +65,11 @@ describe('contest NPC teams', () => {
     const rosterSize = 3;
     const base = generateNpcTeams(config, rosterSize, 1234);
     const largerRoster = generateNpcTeams(config, rosterSize + 1, 1234);
-    const fewerTeams = generateNpcTeams(stage({ size: config.npc_pool.size - 1 }), rosterSize, 1234);
+    const fewerTeams = generateNpcTeams(
+      stage({ size: config.npc_pool.size - 1 }),
+      rosterSize,
+      1234,
+    );
 
     expect(largerRoster.map((team) => team.members.slice(0, rosterSize))).toEqual(
       base.map((team) => team.members),

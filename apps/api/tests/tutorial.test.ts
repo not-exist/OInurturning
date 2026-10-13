@@ -76,8 +76,15 @@ async function createActiveStudents(userId: number, count: number): Promise<void
         name: `gen-${i}-${Date.now().toString(36)}`,
         qualityTier: 'COMMON',
         status: 'ACTIVE',
-        ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10,
-        code: 10, thinking: 10, setting: 10,
+        ds: 10,
+        dp: 10,
+        math: 10,
+        graph: 10,
+        greedy: 10,
+        str: 10,
+        code: 10,
+        thinking: 10,
+        setting: 10,
         focusCap: 100,
         energyMax: 100,
         energy: 100,
@@ -186,7 +193,10 @@ describe('tutorial 服务端锁', () => {
       .set(auth(user.token))
       .send({ step: stepIndex('academy') });
     expect(res.status).toBe(409);
-    expect(unwrapErr(res)).toMatchObject({ code: 'STATE_CONFLICT', details: { resource: 'tutorial' } });
+    expect(unwrapErr(res)).toMatchObject({
+      code: 'STATE_CONFLICT',
+      details: { resource: 'tutorial' },
+    });
   });
 
   it('step 越界 → 400 VALIDATION_FAILED', async () => {
@@ -196,7 +206,10 @@ describe('tutorial 服务端锁', () => {
       .set(auth(user.token))
       .send({ step: 99 });
     expect(beyond.status).toBe(400);
-    expect(unwrapErr(beyond)).toMatchObject({ code: 'VALIDATION_FAILED', details: { resource: 'tutorial' } });
+    expect(unwrapErr(beyond)).toMatchObject({
+      code: 'VALIDATION_FAILED',
+      details: { resource: 'tutorial' },
+    });
     const negative = await request(app)
       .post('/api/tutorial/advance')
       .set(auth(user.token))
@@ -327,7 +340,9 @@ describe('tutorial 服务端锁', () => {
 
     const listed = await request(app).get('/api/students').set(auth(user.token));
     expect(listed.status).toBe(200);
-    expect(await waitForStep(user.userId, stepIndex('training-enter'))).toBe(stepIndex('training-enter'));
+    expect(await waitForStep(user.userId, stepIndex('training-enter'))).toBe(
+      stepIndex('training-enter'),
+    );
 
     // none 步（training-enter / training-pick）服务端无法自动推进：前端点锚点手动 advance，这里同口径补上
     for (const id of ['training-enter', 'training-pick', 'training']) {
@@ -352,7 +367,9 @@ describe('tutorial 服务端锁', () => {
     expect(pool.status).toBe(200);
     expect(await waitForStep(user.userId, stepIndex('recruit'))).toBe(stepIndex('recruit'));
 
-    const candidates = unwrapOk<{ candidates: { tempId: string; price: number }[] }>(pool).candidates;
+    const candidates = unwrapOk<{ candidates: { tempId: string; price: number }[] }>(
+      pool,
+    ).candidates;
     const cheapest = [...candidates].sort((a, b) => a.price - b.price).slice(0, 2);
     expect(cheapest.length, '候选池应有 5 人').toBe(2);
     for (const c of cheapest) {

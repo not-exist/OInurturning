@@ -67,7 +67,7 @@ events:
     cooldown_days: 0
     weight: 13
     requirements: null
-    description: "社区 OJ 挂出今日签到题，AC 就有奶茶钱拿。"
+    description: '社区 OJ 挂出今日签到题，AC 就有奶茶钱拿。'
     choices:
       - text: 花几分钟水过去
         outcomes:
@@ -87,13 +87,14 @@ events:
     cooldown_days: 0
     weight: 13
     requirements: null
-    description: "机房里一位路人学员发起友谊切磋，输赢都只是练手。"
+    description: '机房里一位路人学员发起友谊切磋，输赢都只是练手。'
     choices:
       - text: 接受切磋
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_common, party_size: 3, quality_rule: false, tiebreak: friendly }
+            duel:
+              { opponent: random_common, party_size: 3, quality_rule: false, tiebreak: friendly }
             rewards_win: { money: { min: 20, max: 35 }, reputation: 1, stat_gain: { mindset: 1 } }
             rewards_lose: { money: { min: 8, max: 15 } }
             rewards_draw: { money: 12, stat_gain: { mindset: 1 } }
@@ -108,7 +109,7 @@ events:
     cooldown_days: 0
     weight: 14
     requirements: null
-    description: "机房角落堆着小山般的废草稿纸，据说偶尔能翻到好东西。"
+    description: '机房角落堆着小山般的废草稿纸，据说偶尔能翻到好东西。'
     choices:
       - text: 蹲下来翻一翻
         outcomes:
@@ -138,7 +139,7 @@ events:
     cooldown_days: 1
     weight: 12
     requirements: null
-    description: "训练机房的网线突然罢工，提交列表一片红。"
+    description: '训练机房的网线突然罢工，提交列表一片红。'
     choices:
       - text: 掏出备用网线顶上
         requires_item: spare-cable
@@ -169,7 +170,7 @@ events:
     cooldown_days: 0
     weight: 13
     requirements: null
-    description: "邻桌坐着一位陌生学员，聊得投机便互留了联系方式，记入档案（影响日后招募池）。"
+    description: '邻桌坐着一位陌生学员，聊得投机便互留了联系方式，记入档案（影响日后招募池）。'
     choices:
       - text: 打个招呼拼个桌
         outcomes:
@@ -189,7 +190,7 @@ events:
     cooldown_days: 0
     weight: 13
     requirements: null
-    description: "营区交流群今天格外热闹，混个脸熟也有微薄人气。"
+    description: '营区交流群今天格外热闹，混个脸熟也有微薄人气。'
     choices:
       - text: 冒个泡水一帖
         outcomes:
@@ -214,7 +215,7 @@ events:
     cooldown_days: 0
     weight: 12
     requirements: null
-    description: "有人组织限时代码录入比赛，比的是手速与熟练度。"
+    description: '有人组织限时代码录入比赛，比的是手速与熟练度。'
     choices:
       - text: 报名参赛
         outcomes:
@@ -236,7 +237,7 @@ events:
     cooldown_days: 1
     weight: 10
     requirements: null
-    description: "上课摸鱼刷题解被教练逮了个正着，气氛一度十分尴尬。"
+    description: '上课摸鱼刷题解被教练逮了个正着，气氛一度十分尴尬。'
     choices:
       - text: 递上一杯奶茶赔罪
         requires_item: milk-tea
@@ -262,7 +263,7 @@ events:
     cooldown_days: 1
     weight: 21
     requirements: null
-    description: "校内办了场两题小型模拟赛，按得分发奖。"
+    description: '校内办了场两题小型模拟赛，按得分发奖。'
     choices:
       - text: 代表训练营出战
         outcomes:
@@ -284,7 +285,7 @@ events:
     cooldown_days: 1
     weight: 21
     requirements: null
-    description: "巷口旧书店新到一批竞赛书，老板心情好时还肯让价。"
+    description: '巷口旧书店新到一批竞赛书，老板心情好时还肯让价。'
     choices:
       - text: 花 60 钱淘一本
         cost_money: 60
@@ -319,7 +320,7 @@ events:
     cooldown_days: 1
     weight: 20
     requirements: null
-    description: "毕业学长留下一册写满批注的训练笔记，读罢思路清晰。"
+    description: '毕业学长留下一册写满批注的训练笔记，读罢思路清晰。'
     choices:
       - text: 借来研读一晚
         outcomes:
@@ -339,7 +340,7 @@ events:
     cooldown_days: 1
     weight: 20
     requirements: null
-    description: "一个 rm 手滑，写了半天的标程没了。重写还是弃了？"
+    description: '一个 rm 手滑，写了半天的标程没了。重写还是弃了？'
     choices:
       - text: 通宵重写（耗 1 精力换回奖励）
         outcomes:
@@ -365,7 +366,7 @@ events:
     cooldown_days: 1
     weight: 18
     requirements: null
-    description: "之前在商城订购的书到货了，去门卫处签收。"
+    description: '之前在商城订购的书到货了，去门卫处签收。'
     choices:
       - text: 签收快递
         outcomes:
@@ -386,7 +387,7 @@ events:
     cooldown_days: 2
     weight: 34
     requirements: null
-    description: "主战键盘键帽连根崩飞，修还是凑合，是个问题。"
+    description: '主战键盘键帽连根崩飞，修还是凑合，是个问题。'
     choices:
       - text: 送修（花 150 钱）
         cost_money: 150
@@ -412,7 +413,7 @@ events:
     cooldown_days: 2
     weight: 33
     requirements: null
-    description: "蒙眼限时编码的整活挑战赛，成功者赢得功能道具。"
+    description: '蒙眼限时编码的整活挑战赛，成功者赢得功能道具。'
     choices:
       - text: 蒙上眼上机
         outcomes:
@@ -435,7 +436,7 @@ events:
     cooldown_days: 2
     weight: 33
     requirements: null
-    description: "一位赋闲的教练在操场陪跑，聊下来发现颇有货。声誉达标后可在高级学院雇其代课（被动收入）。"
+    description: '一位赋闲的教练在操场陪跑，聊下来发现颇有货。声誉达标后可在高级学院雇其代课（被动收入）。'
     choices:
       - text: 陪他边跑边聊
         outcomes:
@@ -459,13 +460,14 @@ events:
     cooldown_days: 1
     weight: 14
     requirements: null
-    description: "区域赛前的公开对抗赛，对手不好对付。平局时比拼双方剩余精力定胜负。"
+    description: '区域赛前的公开对抗赛，对手不好对付。平局时比拼双方剩余精力定胜负。'
     choices:
       - text: 应战
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_skilled, party_size: 3, quality_rule: false, tiebreak: by_energy }
+            duel:
+              { opponent: random_skilled, party_size: 3, quality_rule: false, tiebreak: by_energy }
             rewards_win: { money: { min: 150, max: 220 }, reputation: 3, stat_gain: { mindset: 1 } }
             rewards_lose: { money: 40, stat_gain: { mindset: -1 } }
 
@@ -479,7 +481,7 @@ events:
     cooldown_days: 2
     weight: 13
     requirements: null
-    description: "书商手里闪现一批绝版好书，价格不菲，但确实值。"
+    description: '书商手里闪现一批绝版好书，价格不菲，但确实值。'
     choices:
       - text: 咬牙买下中阶书（花 400 钱）
         cost_money: 400
@@ -512,7 +514,7 @@ events:
     cooldown_days: 1
     weight: 14
     requirements: { min_stat: { six_max: 25 } }
-    description: "名师讲座招志愿者，要求有真材实料才能上台协助演示。"
+    description: '名师讲座招志愿者，要求有真材实料才能上台协助演示。'
     choices:
       - text: 报名当志愿者
         outcomes:
@@ -530,13 +532,19 @@ events:
     cooldown_days: 2
     weight: 14
     requirements: null
-    description: "OJ 平台公开征题，你的题由平台评审现场试做。【考察出题质量】启用：评审未解出则你 +2 计分；胜出后成品直接入你的预制题库。"
+    description: 'OJ 平台公开征题，你的题由平台评审现场试做。【考察出题质量】启用：评审未解出则你 +2 计分；胜出后成品直接入你的预制题库。'
     choices:
       - text: 提交自己的原创题
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: platform_reviewer, party_size: 3, quality_rule: true, tiebreak: by_quality }
+            duel:
+              {
+                opponent: platform_reviewer,
+                party_size: 3,
+                quality_rule: true,
+                tiebreak: by_quality,
+              }
             rewards_win:
               money: { min: 150, max: 250 }
               reputation: 3
@@ -553,7 +561,7 @@ events:
     cooldown_days: 1
     weight: 13
     requirements: null
-    description: "写到一半忽然断电，UPS 只够撑几分钟——稳住心态才能止损。"
+    description: '写到一半忽然断电，UPS 只够撑几分钟——稳住心态才能止损。'
     choices:
       - text: 摸黑稳住继续写完关键段
         outcomes:
@@ -579,7 +587,7 @@ events:
     cooldown_days: 0
     weight: 17
     requirements: null
-    description: "一位路过的强者随手点拨了几句，被点到的学员豁然开朗（每名学员限一次）。"
+    description: '一位路过的强者随手点拨了几句，被点到的学员豁然开朗（每名学员限一次）。'
     choices:
       - text: 洗耳恭听
         outcomes:
@@ -599,7 +607,7 @@ events:
     cooldown_days: 1
     weight: 15
     requirements: null
-    description: "同行临时有事，请你代讲一堂课。报酬按正常讲课结算，且不占用每日讲课次数。"
+    description: '同行临时有事，请你代讲一堂课。报酬按正常讲课结算，且不占用每日讲课次数。'
     choices:
       - text: 答应代一节课
         outcomes:
@@ -618,7 +626,7 @@ events:
     cooldown_days: 5
     weight: 100
     requirements: null
-    description: "学员的天赋出现罕见的躁动征兆，若有道具引导，可锁定下次洗练或升阶的方向。"
+    description: '学员的天赋出现罕见的躁动征兆，若有道具引导，可锁定下次洗练或升阶的方向。'
     choices:
       - text: 以天命罗盘锁定异动方向
         requires_item: direction-charm
@@ -648,13 +656,14 @@ events:
     cooldown_days: 2
     weight: 17
     requirements: null
-    description: "省选级别的强手发出对抗邀请。平局将进入加赛一局决胜负，胜者捧走紫级书。"
+    description: '省选级别的强手发出对抗邀请。平局将进入加赛一局决胜负，胜者捧走紫级书。'
     choices:
       - text: 登台应战
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_elite, party_size: 3, quality_rule: false, tiebreak: sudden_death }
+            duel:
+              { opponent: random_elite, party_size: 3, quality_rule: false, tiebreak: sudden_death }
             rewards_win:
               items: [{ id: dim-book, rarity: purple, qty: 1 }]
               money: 300
@@ -671,7 +680,7 @@ events:
     cooldown_days: 3
     weight: 17
     requirements: { min_reputation: 150 }
-    description: "退役 ACMer 的线下聚会，没有点名气连门票都拿不到。"
+    description: '退役 ACMer 的线下聚会，没有点名气连门票都拿不到。'
     choices:
       - text: 亮出训练营名片入场
         outcomes:
@@ -693,7 +702,7 @@ events:
     cooldown_days: 3
     weight: 16
     requirements: null
-    description: "旧书摊深处翻出一册无名题册，里面的题质量惊人，可直接整理入你的预制题库。"
+    description: '旧书摊深处翻出一册无名题册，里面的题质量惊人，可直接整理入你的预制题库。'
     choices:
       - text: 收下题册
         outcomes:
@@ -713,7 +722,7 @@ events:
     cooldown_days: 3
     weight: 17
     requirements: null
-    description: "一位隐居名师愿意开高价一对一，指定一名学员获得大幅成长。"
+    description: '一位隐居名师愿意开高价一对一，指定一名学员获得大幅成长。'
     choices:
       - text: 砸重金报名（花 800 钱，指定学员与成长项）
         cost_money: 800
@@ -739,13 +748,14 @@ events:
     cooldown_days: 2
     weight: 17
     requirements: null
-    description: "有人举报你的学员对局作弊，舆论哗然。要么当场用实力自证，要么花钱摆平。"
+    description: '有人举报你的学员对局作弊，舆论哗然。要么当场用实力自证，要么花钱摆平。'
     choices:
       - text: 当场出题对决自证清白
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_skilled, party_size: 3, quality_rule: false, tiebreak: by_quality }
+            duel:
+              { opponent: random_skilled, party_size: 3, quality_rule: false, tiebreak: by_quality }
             rewards_win: { reputation: 8, stat_gain: { mindset: 1 } }
             rewards_lose: { reputation: -6, stat_gain: { mindset: -2 } }
       - text: 破财消灾（花 250 钱）
@@ -770,7 +780,7 @@ events:
     cooldown_days: 3
     weight: 16
     requirements: null
-    description: "直播频道邀你上节目谈培养心得——要拿出声望做曝光，换来的是招募口碑的短期飙升。"
+    description: '直播频道邀你上节目谈培养心得——要拿出声望做曝光，换来的是招募口碑的短期飙升。'
     choices:
       - text: 接受专访（声誉 -20，获曝光 buff）
         outcomes:
@@ -796,7 +806,7 @@ events:
     cooldown_days: 3
     weight: 52
     requirements: null
-    description: "合作 OJ 平台遭黑客入侵，数据面临泄露。持防火墙道具可反击成功，坐视不管则声誉扫地。"
+    description: '合作 OJ 平台遭黑客入侵，数据面临泄露。持防火墙道具可反击成功，坐视不管则声誉扫地。'
     choices:
       - text: 掏出防火墙反杀
         requires_item: firewall
@@ -831,7 +841,7 @@ events:
     cooldown_days: 2
     weight: 48
     requirements: null
-    description: "传说中的地狱调试间：限时在一坨祖传屎山中找出隐藏 bug，找得越多赏金越厚。"
+    description: '传说中的地狱调试间：限时在一坨祖传屎山中找出隐藏 bug，找得越多赏金越厚。'
     choices:
       - text: 进入调试间
         outcomes:
@@ -839,7 +849,11 @@ events:
             type: check
             check: { skill: thinking, dc: 55 }
             grades:
-              - { margin_min: 20, rewards: { money: 550, items: [{ id: coffee, qty: 2 }], stat_gain: { mindset: 1 } } }
+              - {
+                  margin_min: 20,
+                  rewards:
+                    { money: 550, items: [{ id: coffee, qty: 2 }], stat_gain: { mindset: 1 } },
+                }
               - { margin_min: 0, rewards: { money: 320 } }
             rewards_fail: { money: 80, stat_gain: { mindset: -1 } }
 
@@ -854,7 +868,7 @@ events:
     cooldown_days: 3
     weight: 100
     requirements: null
-    description: "云游四方的洗练大师开张营业，今日惠顾一律半价。"
+    description: '云游四方的洗练大师开张营业，今日惠顾一律半价。'
     choices:
       - text: 求大师出手（下次洗练半价券）
         outcomes:
@@ -873,7 +887,7 @@ events:
     cooldown_days: 4
     weight: 21
     requirements: { min_reputation: 350 }
-    description: "国家队冬令营发来表演赛邀约，对手是预备役级别的狠角色。平局加赛突死。"
+    description: '国家队冬令营发来表演赛邀约，对手是预备役级别的狠角色。平局加赛突死。'
     choices:
       - text: 接下邀约
         outcomes:
@@ -901,7 +915,7 @@ events:
     cooldown_days: 4
     weight: 20
     requirements: null
-    description: "一卷传说级难题现世：既要亲手解题，又要鉴赏点评其构造。全对方得天赋升阶材料。【考察出题质量】以反向考核形式生效：鉴赏环节权重加倍。"
+    description: '一卷传说级难题现世：既要亲手解题，又要鉴赏点评其构造。全对方得天赋升阶材料。【考察出题质量】以反向考核形式生效：鉴赏环节权重加倍。'
     choices:
       - text: 接受双重考验
         outcomes:
@@ -914,7 +928,10 @@ events:
                 - { skill: six_max, dc: 70 }
                 - { skill: setting, dc: 70 }
             grades:
-              - { passed_min: 2, rewards: { items: [{ id: advance-stone, qty: 1 }], reputation: 10 } }
+              - {
+                  passed_min: 2,
+                  rewards: { items: [{ id: advance-stone, qty: 1 }], reputation: 10 },
+                }
               - { passed_min: 1, rewards: { items: [{ id: reroll-shard, qty: 2 }], money: 300 } }
             rewards_fail: { stat_gain: { mindset: -2 } }
 
@@ -928,7 +945,7 @@ events:
     cooldown_days: 4
     weight: 19
     requirements: { min_reputation: 300 }
-    description: "赞助商带着合同登门：以声誉背书换取长期资金。同时最多维持 2 份生效契约。"
+    description: '赞助商带着合同登门：以声誉背书换取长期资金。同时最多维持 2 份生效契约。'
     choices:
       - text: 签下赞助契约（声誉 -30，此后每日 +80–300 钱 × 14 天）
         outcomes:
@@ -953,13 +970,14 @@ events:
     cooldown_days: 4
     weight: 21
     requirements: null
-    description: "午夜时分收到匿名对战函，蒙面强手连番挑战。平局加赛突死；当日连胜可叠加额外奖励。"
+    description: '午夜时分收到匿名对战函，蒙面强手连番挑战。平局加赛突死；当日连胜可叠加额外奖励。'
     choices:
       - text: 深夜应战
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: random_elite, party_size: 3, quality_rule: false, tiebreak: sudden_death }
+            duel:
+              { opponent: random_elite, party_size: 3, quality_rule: false, tiebreak: sudden_death }
             rewards_win:
               money: 600
               reputation: 10
@@ -976,7 +994,7 @@ events:
     cooldown_days: 4
     weight: 19
     requirements: null
-    description: "旅途中偶遇一位天才少年，其天赋肉眼可见——但签约金同样惊人。"
+    description: '旅途中偶遇一位天才少年，其天赋肉眼可见——但签约金同样惊人。'
     choices:
       - text: 支付签约金抢人（花 8000 钱）
         cost_money: 8000
@@ -1011,13 +1029,14 @@ events:
     cooldown_days: 7
     weight: 55
     requirements: { min_reputation: 800 }
-    description: "隐退多年的金牌选手如幽灵般现身，指名要与你的学员过招。【考察出题质量】生效；平局比拼出题质量分。胜者得传说中的 tag 获取卡。"
+    description: '隐退多年的金牌选手如幽灵般现身，指名要与你的学员过招。【考察出题质量】生效；平局比拼出题质量分。胜者得传说中的 tag 获取卡。'
     choices:
       - text: 迎战金牌幽灵
         outcomes:
           - weight: 100
             type: duel
-            duel: { opponent: legendary_ghost, party_size: 3, quality_rule: true, tiebreak: by_quality }
+            duel:
+              { opponent: legendary_ghost, party_size: 3, quality_rule: true, tiebreak: by_quality }
             rewards_win: { items: [{ id: tag-card, qty: 1 }], reputation: 100 }
             rewards_lose: { reputation: 5, stat_gain: { mindset: -3 } }
 
@@ -1032,7 +1051,7 @@ events:
     cooldown_days: 7
     weight: 45
     requirements: null
-    description: "传闻中的图灵之遗在本周短暂显世，全服每周仅 3 人可得机缘：彩色天赋碎片，乃至完整的进阶材料。"
+    description: '传闻中的图灵之遗在本周短暂显世，全服每周仅 3 人可得机缘：彩色天赋碎片，乃至完整的进阶材料。'
     choices:
       - text: 触碰遗物
         outcomes:

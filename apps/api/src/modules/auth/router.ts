@@ -22,7 +22,9 @@ authRouter.post('/register', async (req, res, next) => {
     const s = await svc.register(parse(CredentialsSchema, req.body));
     res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken, req.secure));
     res.json({ ok: true, data: { accessToken: s.accessToken, me: s.me } });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 authRouter.post('/login', async (req, res, next) => {
@@ -30,7 +32,9 @@ authRouter.post('/login', async (req, res, next) => {
     const s = await svc.login(parse(CredentialsSchema, req.body));
     res.setHeader('Set-Cookie', svc.refreshCookie(s.refreshToken, req.secure));
     res.json({ ok: true, data: { accessToken: s.accessToken, me: s.me } });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 authRouter.post('/logout', requireAuth, async (req, res, next) => {
@@ -38,7 +42,9 @@ authRouter.post('/logout', requireAuth, async (req, res, next) => {
     await svc.bumpTokenVersionAndLogout(req.user!.id);
     res.setHeader('Set-Cookie', svc.clearRefreshCookie(req.secure));
     res.json({ ok: true, data: null });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 authRouter.put('/password', requireAuth, async (req, res, next) => {
@@ -47,7 +53,9 @@ authRouter.put('/password', requireAuth, async (req, res, next) => {
     await svc.changePassword(req.user!.id, oldPassword, newPassword);
     res.setHeader('Set-Cookie', svc.clearRefreshCookie(req.secure));
     res.json({ ok: true, data: null }); // tokenVersion+1 → 所有旧 token 失效，前端跳登录
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 authRouter.post('/deactivate', requireAuth, async (req, res, next) => {
@@ -59,13 +67,17 @@ authRouter.post('/deactivate', requireAuth, async (req, res, next) => {
     await svc.deactivate(req.user!.id);
     res.setHeader('Set-Cookie', svc.clearRefreshCookie(req.secure));
     res.json({ ok: true, data: null });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 authRouter.post('/refresh', async (req, res, next) => {
   try {
     const raw = (req.headers.cookie ?? '')
-      .split(';').map((c) => c.trim()).find((c) => c.startsWith('oinur_rt='))
+      .split(';')
+      .map((c) => c.trim())
+      .find((c) => c.startsWith('oinur_rt='))
       ?.slice('oinur_rt='.length);
     if (!raw) throw new ApiError('UNAUTHENTICATED');
     const claims = verifyRefresh(decodeURIComponent(raw));
@@ -78,6 +90,10 @@ authRouter.post('/refresh', async (req, res, next) => {
   } catch (e) {
     // TokenExpiredError 继承自 JsonWebTokenError，无需单列；
     // URIError 来自畸形 percent-encoding 的 Cookie（decodeURIComponent 抛出），同按未认证处理
-    next(e instanceof jwt.JsonWebTokenError || e instanceof URIError ? new ApiError('UNAUTHENTICATED') : e);
+    next(
+      e instanceof jwt.JsonWebTokenError || e instanceof URIError
+        ? new ApiError('UNAUTHENTICATED')
+        : e,
+    );
   }
 });

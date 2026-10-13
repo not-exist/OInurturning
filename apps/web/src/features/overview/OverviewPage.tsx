@@ -51,7 +51,13 @@ import {
   Panel,
   RollingNumber,
 } from '../../components/ui';
-import { GLYPH, Icon, eventCategoryIcon, DIMENSION_ICON, type LucideIcon } from '../../components/icons';
+import {
+  GLYPH,
+  Icon,
+  eventCategoryIcon,
+  DIMENSION_ICON,
+  type LucideIcon,
+} from '../../components/icons';
 import { QualityBadge, StudentHover } from '../students/StudentVisuals';
 
 /**
@@ -81,7 +87,10 @@ export function OverviewPage(): JSX.Element {
   const rep = ov.me.reputation;
   const nextTitle = nextReputationTitle(rep);
   const nextStage = ov.story.nextStage;
-  const chapterCls = nextStage !== null && isTier(nextStage.chapter) ? TIER_TEXT[nextStage.chapter] : 'text-fg-muted';
+  const chapterCls =
+    nextStage !== null && isTier(nextStage.chapter)
+      ? TIER_TEXT[nextStage.chapter]
+      : 'text-fg-muted';
   const feed = buildFeed(ov);
 
   function onClaim(): void {
@@ -184,17 +193,19 @@ export function OverviewPage(): JSX.Element {
                   >
                     {claim.isPending ? '领取中…' : '领取徽章'}
                   </Btn>
-                  <Chip>{CHECKLIST_BADGE_LABEL[ov.checklist.rewardBadge] ?? ov.checklist.rewardBadge}</Chip>
+                  <Chip>
+                    {CHECKLIST_BADGE_LABEL[ov.checklist.rewardBadge] ?? ov.checklist.rewardBadge}
+                  </Chip>
                   {!allDone && (
-                    <span className="text-xs text-fg-faint">
-                      完成全部 5 项任务后可领取
-                    </span>
+                    <span className="text-xs text-fg-faint">完成全部 5 项任务后可领取</span>
                   )}
                 </div>
               )}
               {claimMsg !== null && <p className="mt-2 text-sm text-good-400">{claimMsg}</p>}
               {claim.isError && (
-                <p className="mt-2 text-sm text-bad-400">领取失败：{apiErrorMessage(claim.error)}</p>
+                <p className="mt-2 text-sm text-bad-400">
+                  领取失败：{apiErrorMessage(claim.error)}
+                </p>
               )}
             </div>
           </Panel>
@@ -224,7 +235,10 @@ export function OverviewPage(): JSX.Element {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-3">
-                        <Link to={item.to} className="truncate text-sm text-fg transition-colors hover:text-cyber-300">
+                        <Link
+                          to={item.to}
+                          className="truncate text-sm text-fg transition-colors hover:text-cyber-300"
+                        >
                           {item.title}
                         </Link>
                         <span
@@ -234,7 +248,9 @@ export function OverviewPage(): JSX.Element {
                           {relTime(item.at)}
                         </span>
                       </div>
-                      <p className="mt-0.5 truncate font-mono text-[11px] text-fg-dim">{item.meta}</p>
+                      <p className="mt-0.5 truncate font-mono text-[11px] text-fg-dim">
+                        {item.meta}
+                      </p>
                     </div>
                   </li>
                 ))}
@@ -249,7 +265,10 @@ export function OverviewPage(): JSX.Element {
             eyebrow="名册"
             bodyClassName="p-0"
             actions={
-              <Link to="/students" className="text-xs text-fg-dim transition-colors hover:text-cyber-300">
+              <Link
+                to="/students"
+                className="text-xs text-fg-dim transition-colors hover:text-cyber-300"
+              >
                 全部学员
               </Link>
             }
@@ -291,7 +310,10 @@ export function OverviewPage(): JSX.Element {
             title="招募池"
             eyebrow="招募"
             actions={
-              <Link to="/academy" className="text-xs text-fg-dim transition-colors hover:text-cyber-300">
+              <Link
+                to="/academy"
+                className="text-xs text-fg-dim transition-colors hover:text-cyber-300"
+              >
                 去招募
               </Link>
             }
@@ -319,7 +341,10 @@ export function OverviewPage(): JSX.Element {
             title="剧情进度"
             eyebrow="剧情"
             actions={
-              <Link to="/story" className="text-xs text-fg-dim transition-colors hover:text-cyber-300">
+              <Link
+                to="/story"
+                className="text-xs text-fg-dim transition-colors hover:text-cyber-300"
+              >
                 剧情模式
               </Link>
             }
@@ -344,7 +369,9 @@ export function OverviewPage(): JSX.Element {
                 <span className="min-w-0">
                   <span className="eyebrow">下一关</span>
                   <span className="mt-0.5 block truncate text-sm text-fg">
-                    <span className={`mr-1.5 font-mono ${chapterCls}`}>{tierLabel(nextStage.chapter)}</span>
+                    <span className={`mr-1.5 font-mono ${chapterCls}`}>
+                      {tierLabel(nextStage.chapter)}
+                    </span>
                     {nextStage.name}
                   </span>
                 </span>
@@ -365,7 +392,9 @@ export function OverviewPage(): JSX.Element {
                   <div className="min-w-0">
                     <h3 className="text-sm font-medium text-fg">{a.title}</h3>
                     <p className="mt-1 text-xs text-fg-muted">{a.body}</p>
-                    <p className="mt-1 font-mono text-[11px] text-fg-faint">{fmtStamp(Date.parse(a.createdAt))}</p>
+                    <p className="mt-1 font-mono text-[11px] text-fg-faint">
+                      {fmtStamp(Date.parse(a.createdAt))}
+                    </p>
                   </div>
                 </article>
               ))
@@ -459,7 +488,11 @@ function PoolCountdown({ targetIso }: { targetIso: string }): JSX.Element {
   const hours = Math.floor(total / 3600);
   const mm = pad(Math.floor((total % 3600) / 60));
   const ss = pad(total % 60);
-  return <span className="font-mono text-fg">{hours > 0 ? `${pad(hours)}:${mm}:${ss}` : `${mm}:${ss}`}</span>;
+  return (
+    <span className="font-mono text-fg">
+      {hours > 0 ? `${pad(hours)}:${mm}:${ss}` : `${mm}:${ss}`}
+    </span>
+  );
 }
 
 interface FeedItem {

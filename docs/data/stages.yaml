@@ -22,14 +22,24 @@ updated: '2026-08-26'
 # 全局默认（每关继承，可被单关覆盖）
 # -----------------------------------------------------------------------------
 defaults:
-  engine_ref: docs/systems/contest.md        # 排名制模拟赛 §3 全流程
-  stamina_cost_by_chapter: { cspj: 1, csps: 1, noip: 1, province: 1, noi: 2, ctt: 2, cts: 2, ioi: 2 }   # 参赛体力：第1–4章1点、第5–8章2点（progression.md 口径）
-  pass_rank_max: 8                            # 通关线：固定前 8 名（与 NPC 池规模解耦；名次奖金同门槛）
-  roster_size: 4                              # 每关出战学员数；玩家队伍与每支 NPC 队伍人数必须相同。
-                                              # story 逐关读取 `stage.roster_size ?? defaults.roster_size`，单关可覆盖；
-                                              # 历练对决固定 3 人（events.yaml party_size），PVP 由赛事 config.rosterSize 决定。
-  first_clear_fixed_items:                    # 每关首通固定发放的道具（全章统一，progression.md §1.6）：
-    - { item: drumstick-bento, count: 1 }     #   鸡腿便当 ×1（+5 体力食物，items.yaml 定义）；NG+ 各层首通独立发放、不参与稀有度上移。
+  engine_ref: docs/systems/contest.md # 排名制模拟赛 §3 全流程
+  stamina_cost_by_chapter: {
+      cspj: 1,
+      csps: 1,
+      noip: 1,
+      province: 1,
+      noi: 2,
+      ctt: 2,
+      cts: 2,
+      ioi: 2,
+    } # 参赛体力：第1–4章1点、第5–8章2点（progression.md 口径）
+  pass_rank_max: 8 # 通关线：固定前 8 名（与 NPC 池规模解耦；名次奖金同门槛）
+  roster_size:
+    4 # 每关出战学员数；玩家队伍与每支 NPC 队伍人数必须相同。
+    # story 逐关读取 `stage.roster_size ?? defaults.roster_size`，单关可覆盖；
+    # 历练对决固定 3 人（events.yaml party_size），PVP 由赛事 config.rosterSize 决定。
+  first_clear_fixed_items: # 每关首通固定发放的道具（全章统一，progression.md §1.6）：
+    - { item: drumstick-bento, count: 1 } #   鸡腿便当 ×1（+5 体力食物，items.yaml 定义）；NG+ 各层首通独立发放、不参与稀有度上移。
   # 题目实例化规则：
   #   * problem_slots 各组按序抽取，同一场内模板不重复（池不足时允许复用）；
   #   * 带 chance 的组为概率附加题（超纲题），未触发则本场少一题；
@@ -56,7 +66,7 @@ stages:
       - { tier: cspj, count: 3 }
     npc_pool: { size: 10, mean_level: 8, spread: 5 }
     first_clear:
-      money: 500                              # 500 × 1.0
+      money: 500 # 500 × 1.0
       items: { count: 1, chance: 0.6, pool: [{ rarity: gray, weight: 1.0 }] }
       milestone: null
 
@@ -67,10 +77,10 @@ stages:
     duration_min: 240
     problem_slots:
       - { tier: cspj, count: 3 }
-      - { tier: csps, count: 1, chance: 0.2 }   # 少量超纲题
+      - { tier: csps, count: 1, chance: 0.2 } # 少量超纲题
     npc_pool: { size: 10, mean_level: 11, spread: 5 }
     first_clear:
-      money: 650                              # 500 × 1.3
+      money: 650 # 500 × 1.3
       items: { count: 1, chance: 0.6, pool: [{ rarity: gray, weight: 1.0 }] }
       milestone: null
 
@@ -84,7 +94,7 @@ stages:
       - { tier: csps, count: 1, chance: 0.35 }
     npc_pool: { size: 10, mean_level: 14, spread: 6 }
     first_clear:
-      money: 800                              # 500 × 1.6
+      money: 800 # 500 × 1.6
       items: { count: 1, chance: 0.6, pool: [{ rarity: gray, weight: 1.0 }] }
       milestone: null
 
@@ -98,13 +108,13 @@ stages:
       - { tier: csps, count: 1, chance: 0.5 }
     npc_pool: { size: 12, mean_level: 17, spread: 6 }
     first_clear:
-      money: 1100                             # 500 × 2.2
+      money: 1100 # 500 × 2.2
       items: { count: 1, chance: 0.6, pool: [{ rarity: gray, weight: 1.0 }] }
-      milestone: { items: [{ item: rename-card, count: 1 }] }   # U[CSP-J]=改名卡×1
+      milestone: { items: [{ item: rename-card, count: 1 }] } # U[CSP-J]=改名卡×1
 
-# =============================================================================
-# 第 2 章 CSP-S（4 关）  锚点 ≈ 25–40；M=1200；U=洗练券×1
-# =============================================================================
+  # =============================================================================
+  # 第 2 章 CSP-S（4 关）  锚点 ≈ 25–40；M=1200；U=洗练券×1
+  # =============================================================================
   - chapter: csps
     stage_index: 1
     name: 热身赛
@@ -114,7 +124,7 @@ stages:
       - { tier: csps, count: 3 }
     npc_pool: { size: 11, mean_level: 21, spread: 5 }
     first_clear:
-      money: 1200                             # 1200 × 1.0
+      money: 1200 # 1200 × 1.0
       items:
         count: 1
         chance: 0.6
@@ -131,7 +141,7 @@ stages:
       - { tier: noip, count: 1, chance: 0.2 }
     npc_pool: { size: 12, mean_level: 26, spread: 6 }
     first_clear:
-      money: 1560                             # 1200 × 1.3
+      money: 1560 # 1200 × 1.3
       items:
         count: 1
         chance: 0.6
@@ -148,7 +158,7 @@ stages:
       - { tier: noip, count: 1, chance: 0.35 }
     npc_pool: { size: 13, mean_level: 31, spread: 6 }
     first_clear:
-      money: 1920                             # 1200 × 1.6
+      money: 1920 # 1200 × 1.6
       items:
         count: 1
         chance: 0.6
@@ -165,17 +175,17 @@ stages:
       - { tier: noip, count: 1, chance: 0.5 }
     npc_pool: { size: 13, mean_level: 35, spread: 7 }
     first_clear:
-      money: 2640                             # 1200 × 2.2
+      money: 2640 # 1200 × 2.2
       items:
         count: 1
         chance: 0.6
         pool: [{ rarity: gray, weight: 0.7 }, { rarity: yellow, weight: 0.3 }]
-      milestone: { items: [{ item: reroll-ticket, count: 1 }] }   # U[CSP-S]=洗练券×1
+      milestone: { items: [{ item: reroll-ticket, count: 1 }] } # U[CSP-S]=洗练券×1
 
-# =============================================================================
-# 第 3 章 NOIP（5 关）  锚点 ≈ 40–60；M=3000；U=定心丸×2
-# 自本章起道具保底发放（chance 1.0）
-# =============================================================================
+  # =============================================================================
+  # 第 3 章 NOIP（5 关）  锚点 ≈ 40–60；M=3000；U=定心丸×2
+  # 自本章起道具保底发放（chance 1.0）
+  # =============================================================================
   - chapter: noip
     stage_index: 1
     name: 热身赛
@@ -185,7 +195,7 @@ stages:
       - { tier: noip, count: 3 }
     npc_pool: { size: 11, mean_level: 37, spread: 6 }
     first_clear:
-      money: 3000                             # 3000 × 1.0
+      money: 3000 # 3000 × 1.0
       items:
         count: 1
         chance: 1.0
@@ -202,7 +212,7 @@ stages:
       - { tier: province, count: 1, chance: 0.2 }
     npc_pool: { size: 12, mean_level: 42, spread: 6 }
     first_clear:
-      money: 3900                             # 3000 × 1.3
+      money: 3900 # 3000 × 1.3
       items:
         count: 1
         chance: 1.0
@@ -219,7 +229,7 @@ stages:
       - { tier: province, count: 1, chance: 0.3 }
     npc_pool: { size: 12, mean_level: 47, spread: 7 }
     first_clear:
-      money: 4800                             # 3000 × 1.6
+      money: 4800 # 3000 × 1.6
       items:
         count: 1
         chance: 1.0
@@ -230,13 +240,13 @@ stages:
     stage_index: 4
     name: 模拟赛Ⅲ
     recommended_level: 55
-    duration_min: 330                         # 4 题，题多但无超纲附加
+    duration_min: 330 # 4 题，题多但无超纲附加
     problem_slots:
-      - { tier: noip, count: 2, dims: [ds, dp] }   # 保证数据结构+DP 底盘
+      - { tier: noip, count: 2, dims: [ds, dp] } # 保证数据结构+DP 底盘
       - { tier: noip, count: 2 }
     npc_pool: { size: 12, mean_level: 51, spread: 7 }
     first_clear:
-      money: 6600                             # 3000 × 2.2
+      money: 6600 # 3000 × 2.2
       items:
         count: 1
         chance: 1.0
@@ -252,16 +262,16 @@ stages:
       - { tier: noip, count: 4 }
     npc_pool: { size: 12, mean_level: 55, spread: 7 }
     first_clear:
-      money: 8400                             # 3000 × 2.8
+      money: 8400 # 3000 × 2.8
       items:
         count: 1
         chance: 1.0
         pool: [{ rarity: yellow, weight: 0.6 }, { rarity: green, weight: 0.4 }]
-      milestone: { items: [{ item: calm-pill, count: 2 }] }   # U[NOIP]=定心丸×2
+      milestone: { items: [{ item: calm-pill, count: 2 }] } # U[NOIP]=定心丸×2
 
-# =============================================================================
-# 第 4 章 省选（5 关）  锚点 ≈ 60–75；M=8000；U=天赋进阶石×1
-# =============================================================================
+  # =============================================================================
+  # 第 4 章 省选（5 关）  锚点 ≈ 60–75；M=8000；U=天赋进阶石×1
+  # =============================================================================
   - chapter: province
     stage_index: 1
     name: 热身赛
@@ -271,7 +281,7 @@ stages:
       - { tier: province, count: 3 }
     npc_pool: { size: 10, mean_level: 57, spread: 5 }
     first_clear:
-      money: 8000                             # 8000 × 1.0
+      money: 8000 # 8000 × 1.0
       items:
         count: 1
         chance: 1.0
@@ -288,7 +298,7 @@ stages:
       - { tier: noi, count: 1, chance: 0.2 }
     npc_pool: { size: 10, mean_level: 61, spread: 6 }
     first_clear:
-      money: 10400                            # 8000 × 1.3
+      money: 10400 # 8000 × 1.3
       items:
         count: 1
         chance: 1.0
@@ -304,7 +314,7 @@ stages:
       - { tier: province, count: 4 }
     npc_pool: { size: 10, mean_level: 65, spread: 6 }
     first_clear:
-      money: 12800                            # 8000 × 1.6
+      money: 12800 # 8000 × 1.6
       items:
         count: 1
         chance: 1.0
@@ -321,7 +331,7 @@ stages:
       - { tier: noi, count: 1, chance: 0.3 }
     npc_pool: { size: 10, mean_level: 69, spread: 6 }
     first_clear:
-      money: 17600                            # 8000 × 2.2
+      money: 17600 # 8000 × 2.2
       items:
         count: 1
         chance: 1.0
@@ -337,16 +347,16 @@ stages:
       - { tier: province, count: 4 }
     npc_pool: { size: 12, mean_level: 72, spread: 7 }
     first_clear:
-      money: 22400                            # 8000 × 2.8
+      money: 22400 # 8000 × 2.8
       items:
         count: 1
         chance: 1.0
         pool: [{ rarity: green, weight: 0.6 }, { rarity: blue, weight: 0.4 }]
-      milestone: { items: [{ item: advance-stone, count: 1 }] }   # U[省选]=进阶石×1
+      milestone: { items: [{ item: advance-stone, count: 1 }] } # U[省选]=进阶石×1
 
-# =============================================================================
-# 第 5 章 NOI（5 关）  锚点 ≈ 75–88；M=20000；U=进阶石×2＋心流引擎×1
-# =============================================================================
+  # =============================================================================
+  # 第 5 章 NOI（5 关）  锚点 ≈ 75–88；M=20000；U=进阶石×2＋心流引擎×1
+  # =============================================================================
   - chapter: noi
     stage_index: 1
     name: 热身赛
@@ -356,7 +366,7 @@ stages:
       - { tier: noi, count: 3 }
     npc_pool: { size: 13, mean_level: 73, spread: 5 }
     first_clear:
-      money: 20000                            # 20000 × 1.0
+      money: 20000 # 20000 × 1.0
       items:
         count: 1
         chance: 1.0
@@ -373,7 +383,7 @@ stages:
       - { tier: ctt, count: 1, chance: 0.2 }
     npc_pool: { size: 14, mean_level: 77, spread: 6 }
     first_clear:
-      money: 26000                            # 20000 × 1.3
+      money: 26000 # 20000 × 1.3
       items:
         count: 1
         chance: 1.0
@@ -389,7 +399,7 @@ stages:
       - { tier: noi, count: 4 }
     npc_pool: { size: 14, mean_level: 80, spread: 6 }
     first_clear:
-      money: 32000                            # 20000 × 1.6
+      money: 32000 # 20000 × 1.6
       items:
         count: 1
         chance: 1.0
@@ -406,7 +416,7 @@ stages:
       - { tier: ctt, count: 1, chance: 0.3 }
     npc_pool: { size: 15, mean_level: 84, spread: 6 }
     first_clear:
-      money: 44000                            # 20000 × 2.2
+      money: 44000 # 20000 × 2.2
       items:
         count: 1
         chance: 1.0
@@ -422,19 +432,19 @@ stages:
       - { tier: noi, count: 4 }
     npc_pool: { size: 16, mean_level: 86, spread: 6 }
     first_clear:
-      money: 56000                            # 20000 × 2.8
+      money: 56000 # 20000 × 2.8
       items:
         count: 1
         chance: 1.0
         pool: [{ rarity: blue, weight: 1.0 }]
       milestone:
         items:
-          - { item: advance-stone, count: 2 }     # U[NOI]=进阶石×2
-          - { item: focus-engine, count: 1 }      #         ＋心流引擎×1
+          - { item: advance-stone, count: 2 } # U[NOI]=进阶石×2
+          - { item: focus-engine, count: 1 } #         ＋心流引擎×1
 
-# =============================================================================
-# 第 6 章 CTT（3 关）  锚点 ≈ 85–92；M=45000；U=进阶石×3
-# =============================================================================
+  # =============================================================================
+  # 第 6 章 CTT（3 关）  锚点 ≈ 85–92；M=45000；U=进阶石×3
+  # =============================================================================
   - chapter: ctt
     stage_index: 1
     name: 热身赛
@@ -444,7 +454,7 @@ stages:
       - { tier: ctt, count: 3 }
     npc_pool: { size: 11, mean_level: 84, spread: 4 }
     first_clear:
-      money: 45000                            # 45000 × 1.0
+      money: 45000 # 45000 × 1.0
       items:
         count: 2
         chance: 1.0
@@ -461,7 +471,7 @@ stages:
       - { tier: cts, count: 1, chance: 0.15 }
     npc_pool: { size: 11, mean_level: 88, spread: 4 }
     first_clear:
-      money: 58500                            # 45000 × 1.3
+      money: 58500 # 45000 × 1.3
       items:
         count: 2
         chance: 1.0
@@ -478,16 +488,16 @@ stages:
       - { tier: cts, count: 1, chance: 0.25 }
     npc_pool: { size: 11, mean_level: 90, spread: 5 }
     first_clear:
-      money: 72000                            # 45000 × 1.6
+      money: 72000 # 45000 × 1.6
       items:
         count: 2
         chance: 1.0
         pool: [{ rarity: blue, weight: 0.6 }, { rarity: purple, weight: 0.4 }]
-      milestone: { items: [{ item: advance-stone, count: 3 }] }   # U[CTT]=进阶石×3
+      milestone: { items: [{ item: advance-stone, count: 3 }] } # U[CTT]=进阶石×3
 
-# =============================================================================
-# 第 7 章 CTS（3 关）  锚点 ≈ 88–95；M=90000；U=紫级书自选券×1（新 id）
-# =============================================================================
+  # =============================================================================
+  # 第 7 章 CTS（3 关）  锚点 ≈ 88–95；M=90000；U=紫级书自选券×1（新 id）
+  # =============================================================================
   - chapter: cts
     stage_index: 1
     name: 热身赛
@@ -497,7 +507,7 @@ stages:
       - { tier: cts, count: 3 }
     npc_pool: { size: 10, mean_level: 88, spread: 4 }
     first_clear:
-      money: 90000                            # 90000 × 1.0
+      money: 90000 # 90000 × 1.0
       items:
         count: 2
         chance: 1.0
@@ -514,7 +524,7 @@ stages:
       - { tier: ioi, count: 1, chance: 0.15 }
     npc_pool: { size: 10, mean_level: 91, spread: 4 }
     first_clear:
-      money: 117000                           # 90000 × 1.3
+      money: 117000 # 90000 × 1.3
       items:
         count: 2
         chance: 1.0
@@ -531,16 +541,16 @@ stages:
       - { tier: ioi, count: 1, chance: 0.25 }
     npc_pool: { size: 12, mean_level: 93, spread: 5 }
     first_clear:
-      money: 144000                           # 90000 × 1.6
+      money: 144000 # 90000 × 1.6
       items:
         count: 2
         chance: 1.0
         pool: [{ rarity: purple, weight: 1.0 }]
-      milestone: { items: [{ item: purple-book-voucher, count: 1 }] }   # U[CTS]（id 与 items.yaml 统一）
+      milestone: { items: [{ item: purple-book-voucher, count: 1 }] } # U[CTS]（id 与 items.yaml 统一）
 
-# =============================================================================
-# 第 8 章 IOI（4 关）  锚点 ≥ 90；M=180000；U=传说礼盒
-# =============================================================================
+  # =============================================================================
+  # 第 8 章 IOI（4 关）  锚点 ≥ 90；M=180000；U=传说礼盒
+  # =============================================================================
   - chapter: ioi
     stage_index: 1
     name: 热身赛
@@ -550,7 +560,7 @@ stages:
       - { tier: ioi, count: 3 }
     npc_pool: { size: 9, mean_level: 90, spread: 4 }
     first_clear:
-      money: 180000                           # 180000 × 1.0
+      money: 180000 # 180000 × 1.0
       items:
         count: 2
         chance: 1.0
@@ -566,7 +576,7 @@ stages:
       - { tier: ioi, count: 3 }
     npc_pool: { size: 9, mean_level: 93, spread: 4 }
     first_clear:
-      money: 234000                           # 180000 × 1.3
+      money: 234000 # 180000 × 1.3
       items:
         count: 2
         chance: 1.0
@@ -582,7 +592,7 @@ stages:
       - { tier: ioi, count: 3 }
     npc_pool: { size: 11, mean_level: 95, spread: 4 }
     first_clear:
-      money: 288000                           # 180000 × 1.6
+      money: 288000 # 180000 × 1.6
       items:
         count: 2
         chance: 1.0
@@ -595,26 +605,26 @@ stages:
     recommended_level: 97
     duration_min: 550
     problem_slots:
-      - { tier: ioi, count: 1, dims: [math] }      # 保底抽出「传说压轴」
+      - { tier: ioi, count: 1, dims: [math] } # 保底抽出「传说压轴」
       - { tier: ioi, count: 3 }
-    npc_pool: { size: 11, mean_level: 97, spread: 3 }   # 顶点局：分布收窄，人人都是怪物
+    npc_pool: { size: 11, mean_level: 97, spread: 3 } # 顶点局：分布收窄，人人都是怪物
     first_clear:
-      money: 396000                           # 180000 × 2.2
+      money: 396000 # 180000 × 2.2
       items:
         count: 2
         chance: 1.0
         pool: [{ rarity: purple, weight: 1.0 }]
-      milestone: { items: [{ item: legend-box, count: 1 }] }   # U[IOI]=传说礼盒（内容见 items.yaml）
+      milestone: { items: [{ item: legend-box, count: 1 }] } # U[IOI]=传说礼盒（内容见 items.yaml）
 
 # =============================================================================
 # 一周目全通奖励（GAME-DESIGN §13.2 末尾）
 # =============================================================================
 full_clear:
   condition: 一周目（k=0）八章全部「正赛」通关
-  money: 500000            # 「大额结算金」（权威数值：economy.yaml → story.full_clear_gold）
+  money: 500000 # 「大额结算金」（权威数值：economy.yaml → story.full_clear_gold）
   items:
-    - { item: badge-legend, count: 1 }   # 传奇教练勋章（规范 id，账号永久声誉获取 +10%）
-  unlocks: ng_plus         # 解锁 NG+
+    - { item: badge-legend, count: 1 } # 传奇教练勋章（规范 id，账号永久声誉获取 +10%）
+  unlocks: ng_plus # 解锁 NG+
 
 # =============================================================================
 # NG+ 与重复通关参数（GAME-DESIGN §13.3；k 为 NG+ 层号，k≥1，一周目 k=0）
@@ -622,30 +632,30 @@ full_clear:
 # =============================================================================
 ng_plus:
   layer_param: k
-  demand_multiplier: "1 + 0.15*k"              # 题目 D/M/C 数值需求乘数
-  trait_chance_bonus: "0.10*k"                 # 特性出现概率加成
-  trait_pool_shift:                            # 特性等级池上移
-    weight_scale: "1 + 0.10*k"                 # 所有条目权重放大（隐式无特性权重不变）
+  demand_multiplier: '1 + 0.15*k' # 题目 D/M/C 数值需求乘数
+  trait_chance_bonus: '0.10*k' # 特性出现概率加成
+  trait_pool_shift: # 特性等级池上移
+    weight_scale: '1 + 0.10*k' # 所有条目权重放大（隐式无特性权重不变）
     high_severity_extra:
-      min_severity: blue                       # severity ≥ blue 的条目额外再乘
-      scale: "1 + 0.05*k"
-      cap: colorful                            # 彩封顶
-  first_clear_money_multiplier: "1 + 0.5*k"    # 首通钱奖励乘数（仅钱部分）
+      min_severity: blue # severity ≥ blue 的条目额外再乘
+      scale: '1 + 0.05*k'
+      cap: colorful # 彩封顶
+  first_clear_money_multiplier: '1 + 0.5*k' # 首通钱奖励乘数（仅钱部分）
   item_rarity_shift:
-    from_layer: 2                              # k≥2 起道具池稀有度上移一档
+    from_layer: 2 # k≥2 起道具池稀有度上移一档
     shift: 1
     cap: colorful
   milestone_rule: >
     NG+ 层沿用各章正赛里程碑，但其中进阶石类（advance-stone）与传说礼盒（legend-box）
     不重复发放——进阶石收益改由每层全通固定 +5 承担（不参与任何乘算）；
     其余里程碑道具照常发放、数量不变。
-  advance_stone_per_layer_clear: 5             # 每层全通固定 +5 颗进阶石
+  advance_stone_per_layer_clear: 5 # 每层全通固定 +5 颗进阶石
   layer_badge:
-    item_id_template: badge-ngplus-{k}         # 运行时生成 id 模板：每层全通专属徽章，如 badge-ngplus-1（与 progression.md 统一）
+    item_id_template: badge-ngplus-{k} # 运行时生成 id 模板：每层全通专属徽章，如 badge-ngplus-1（与 progression.md 统一）
     count: 1
-  repeat_clear_rank_bonus:                     # 非首通重复通关名次奖金：money = M[chapter] × 系数
-    champion: 0.3                              # 冠军
-    runner_up: 0.2                             # 亚军
-    third_to_eighth: 0.1                       # 第 3–8 名
+  repeat_clear_rank_bonus: # 非首通重复通关名次奖金：money = M[chapter] × 系数
+    champion: 0.3 # 冠军
+    runner_up: 0.2 # 亚军
+    third_to_eighth: 0.1 # 第 3–8 名
     others: 0
-  layer_cap: null                              # 层数无上限
+  layer_cap: null # 层数无上限

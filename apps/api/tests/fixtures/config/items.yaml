@@ -1,6 +1,6 @@
 # 测试 fixtures：最小合法 items 配置（结构对齐 docs/data/items.yaml，含顶层 meta）
 meta:
-  version: "0.1-test"
+  version: '0.1-test'
   rarity_order: [gray, yellow, green, blue, purple, colorful]
 
 items:
@@ -347,7 +347,7 @@ items:
     effect:
       desc: 使用后该学员在下一场比赛中精力上限临时 +20，仅当场有效。
       kind: contest_buff
-      buff: {energy_cap_temp: 20}
+      buff: { energy_cap_temp: 20 }
     price: 220
     sources: [商城]
     stack: 99
@@ -397,7 +397,7 @@ items:
     effect:
       desc: 使用后下一次历练的高稀有度事件权重整体上调一档（体力投入档不变），用后自动消耗。
       kind: adventure_buff
-      buff: {rarity_weight_shift: +1_tier}
+      buff: { rarity_weight_shift: +1_tier }
     price: 650
     sources: [商城]
     stack: 99

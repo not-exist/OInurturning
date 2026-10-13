@@ -75,10 +75,7 @@ export function FinishedPanel({
               </li>
             ))}
             {finish.growth.map((growth, index) => (
-              <li
-                key={`${growth.attr}-${index}`}
-                className="flex items-center gap-2 text-good-400"
-              >
+              <li key={`${growth.attr}-${index}`} className="flex items-center gap-2 text-good-400">
                 <Icon icon={Sparkles} className="size-3.5 shrink-0" />
                 实战成长 · {growthText(growth)}
               </li>

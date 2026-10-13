@@ -3,7 +3,12 @@ import { ArrowRight, Check, Sparkles } from 'lucide-react';
 import { clamp } from '@oinur/shared';
 import { Btn, Meter, Panel } from '../../components/ui';
 import { Icon } from '../../components/icons';
-import { useAdvanceTutorial, useCompleteTutorial, useTutorial, useTutorialVisitStepSync } from '../../lib/tutorial';
+import {
+  useAdvanceTutorial,
+  useCompleteTutorial,
+  useTutorial,
+  useTutorialVisitStepSync,
+} from '../../lib/tutorial';
 
 interface Rect {
   top: number;
@@ -82,9 +87,15 @@ function MaskPanels({ hole, blocking }: { hole: Hole; blocking: boolean }): JSX.
         <div aria-hidden className={cls} style={{ top: 0, left: 0, right: 0, height: hole.top }} />
       )}
       {hole.bottom < innerHeight && (
-        <div aria-hidden className={cls} style={{ top: hole.bottom, left: 0, right: 0, bottom: 0 }} />
+        <div
+          aria-hidden
+          className={cls}
+          style={{ top: hole.bottom, left: 0, right: 0, bottom: 0 }}
+        />
       )}
-      {hole.left > 0 && <div aria-hidden className={cls} style={{ ...middle, left: 0, width: hole.left }} />}
+      {hole.left > 0 && (
+        <div aria-hidden className={cls} style={{ ...middle, left: 0, width: hole.left }} />
+      )}
       {hole.right < innerWidth && (
         <div aria-hidden className={cls} style={{ ...middle, left: hole.right, right: 0 }} />
       )}
@@ -202,7 +213,8 @@ export function TutorialOverlay(): JSX.Element | null {
   const actionHint =
     cur.action === 'do_recruit'
       ? recruitHint(state.studentsOwned, state.studentsRequired)
-      : (ACTION_HINT[cur.action] ?? (actionPending ? '完成当前指引操作后自动进入下一步' : '按指引体验功能'));
+      : (ACTION_HINT[cur.action] ??
+        (actionPending ? '完成当前指引操作后自动进入下一步' : '按指引体验功能'));
 
   const handleNext = async () => {
     // 行为步（action !== 'none'）由服务端 autoAdvanceIfNeeded 推进，这里只处理纯展示步。
@@ -328,10 +340,26 @@ export function TutorialOverlay(): JSX.Element | null {
 
             {cur.reward && (
               <div className="flex flex-wrap gap-2 text-[11px]">
-                {cur.reward.money && <span className="border border-cyber-400/30 bg-cyber-400/10 px-2 py-0.5 text-cyber-300">+{cur.reward.money} 金币</span>}
-                {cur.reward.reputation && <span className="border border-arc-400/30 bg-arc-400/10 px-2 py-0.5 text-arc-300">+{cur.reward.reputation} 声誉</span>}
-                {cur.reward.item && <span className="border border-ink-500 bg-ink-800 px-2 py-0.5 text-fg-muted">{cur.reward.item} x{cur.reward.count ?? 1}</span>}
-                {cur.reward.badge && <span className="border border-warn-400/30 bg-warn-400/10 px-2 py-0.5 text-warn-400">{cur.reward.badge}</span>}
+                {cur.reward.money && (
+                  <span className="border border-cyber-400/30 bg-cyber-400/10 px-2 py-0.5 text-cyber-300">
+                    +{cur.reward.money} 金币
+                  </span>
+                )}
+                {cur.reward.reputation && (
+                  <span className="border border-arc-400/30 bg-arc-400/10 px-2 py-0.5 text-arc-300">
+                    +{cur.reward.reputation} 声誉
+                  </span>
+                )}
+                {cur.reward.item && (
+                  <span className="border border-ink-500 bg-ink-800 px-2 py-0.5 text-fg-muted">
+                    {cur.reward.item} x{cur.reward.count ?? 1}
+                  </span>
+                )}
+                {cur.reward.badge && (
+                  <span className="border border-warn-400/30 bg-warn-400/10 px-2 py-0.5 text-warn-400">
+                    {cur.reward.badge}
+                  </span>
+                )}
               </div>
             )}
 

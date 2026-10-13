@@ -2,7 +2,12 @@ import type { JSX } from 'react';
 import { Swords } from 'lucide-react';
 import type { BattleReplayEvent } from '@oinur/shared';
 import { Icon } from '../../../components/icons';
-import { contestSideLabel, dimensionLabel, roundReasonLabel, tiebreakLabel } from '../../../lib/labels';
+import {
+  contestSideLabel,
+  dimensionLabel,
+  roundReasonLabel,
+  tiebreakLabel,
+} from '../../../lib/labels';
 import { Metric, VerdictBadge } from '../shared/bits';
 import { formatMinutes, trailLabel } from '../shared/replay';
 
@@ -51,11 +56,7 @@ export function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): 
             </span>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
-            <Metric
-              label="判定"
-              value={<VerdictBadge verdict={event.verdict} />}
-              tone="text-fg"
-            />
+            <Metric label="判定" value={<VerdictBadge verdict={event.verdict} />} tone="text-fg" />
             <Metric label="提交时间" value={formatMinutes(event.submissionTimeMin)} />
             <Metric
               label="罚时"
@@ -63,7 +64,9 @@ export function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): 
               tone={event.penaltyMin > 0 ? 'text-warn-400' : 'text-fg-muted'}
             />
           </div>
-          {event.clockExhausted && <p className="text-xs text-bad-400">比赛时钟已耗尽，本局被迫收尾。</p>}
+          {event.clockExhausted && (
+            <p className="text-xs text-bad-400">比赛时钟已耗尽，本局被迫收尾。</p>
+          )}
         </div>
       );
 
@@ -142,9 +145,7 @@ export function LiveEvent({ event }: { event: BattleReplayEvent | undefined }): 
       return (
         <div className="animate-rise border border-warn-400/40 bg-warn-400/5 px-5 py-4">
           <p className="text-sm font-semibold text-warn-400">常规局战平，进入裁决</p>
-          <p className="mt-1.5 text-xs text-fg-muted">
-            裁决方式：{tiebreakLabel(event.decidedBy)}
-          </p>
+          <p className="mt-1.5 text-xs text-fg-muted">裁决方式：{tiebreakLabel(event.decidedBy)}</p>
           {event.trail.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {event.trail.map((token) => (

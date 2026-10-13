@@ -45,7 +45,11 @@ export function createRandomStream(baseSeed: number, label: string): RandomSourc
 export function standardNormal(rng: () => number): number {
   const firstRaw = rng();
   const secondRaw = rng();
-  const first = clamp(Number.isFinite(firstRaw) ? firstRaw : 0.5, Number.EPSILON, 1 - Number.EPSILON);
+  const first = clamp(
+    Number.isFinite(firstRaw) ? firstRaw : 0.5,
+    Number.EPSILON,
+    1 - Number.EPSILON,
+  );
   const second = clamp(Number.isFinite(secondRaw) ? secondRaw : 0.5, 0, 1 - Number.EPSILON);
   return Math.sqrt(-2 * Math.log(first)) * Math.cos(2 * Math.PI * second);
 }

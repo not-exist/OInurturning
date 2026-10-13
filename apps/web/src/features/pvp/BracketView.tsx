@@ -13,7 +13,11 @@ function recordPath(apiUrl: string): string {
  * 队名一律走中文：自己用账号名，其他选手用「选手 id」兜底。
  * PvpMatchView 没有 displayName，绝不把 homeUserId 裸数字当队名。
  */
-function teamLabel(userId: number | null, meId: number | undefined, meName: string | undefined): string {
+function teamLabel(
+  userId: number | null,
+  meId: number | undefined,
+  meName: string | undefined,
+): string {
   if (userId === null) return '轮空';
   if (meId !== undefined && userId === meId) return meName ?? '我的队伍';
   return `选手 ${userId}`;
@@ -60,7 +64,10 @@ function MatchCard({
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px]">
         <span className="text-fg-dim">{matchStatusLabel(match.status)}</span>
         {match.reportUrl !== null && (
-          <Link to={recordPath(match.reportUrl)} className="text-cyber-300 underline decoration-cyber-500/50">
+          <Link
+            to={recordPath(match.reportUrl)}
+            className="text-cyber-300 underline decoration-cyber-500/50"
+          >
             查看战报
           </Link>
         )}
@@ -79,7 +86,9 @@ export function BracketView({
   meId: number | undefined;
   meName: string | undefined;
 }): JSX.Element {
-  const rounds = [...new Set(matches.map((match) => match.round))].sort((left, right) => left - right);
+  const rounds = [...new Set(matches.map((match) => match.round))].sort(
+    (left, right) => left - right,
+  );
 
   return (
     <section>

@@ -62,9 +62,7 @@ export function buildFirstRound(
   return rounds;
 }
 
-export function buildNextRound(
-  winners: readonly (number | null)[],
-): FirstRoundSlot[] {
+export function buildNextRound(winners: readonly (number | null)[]): FirstRoundSlot[] {
   const matches: FirstRoundSlot[] = [];
   for (let index = 0; index < winners.length; index += 2) {
     const homeUserId = winners[index] ?? null;

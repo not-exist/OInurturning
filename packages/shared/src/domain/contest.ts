@@ -334,7 +334,8 @@ export const rankingInputSchema = z
         context.addIssue({
           code: 'custom',
           path: ['teams', teamIndex, 'userId'],
-          message: teamIndex === 0 ? 'Player team must have a userId' : 'NPC teams must not have a userId',
+          message:
+            teamIndex === 0 ? 'Player team must have a userId' : 'NPC teams must not have a userId',
         });
       }
       const memberStudentIds = new Set<number>();
@@ -406,12 +407,7 @@ function memberIdentityKey(member: ParticipantSnapshot): string {
 }
 
 function teamIdentityKey(team: ContestTeam): string {
-  return JSON.stringify([
-    team.teamId,
-    team.side,
-    team.userId,
-    team.members.map(memberIdentityKey),
-  ]);
+  return JSON.stringify([team.teamId, team.side, team.userId, team.members.map(memberIdentityKey)]);
 }
 
 export interface TeamAggregate {
@@ -419,10 +415,7 @@ export interface TeamAggregate {
   rankingPenaltyMin: number;
 }
 
-function isBetterTeamAttempt(
-  candidate: TeamAttemptScore,
-  incumbent: TeamAttemptScore,
-): boolean {
+function isBetterTeamAttempt(candidate: TeamAttemptScore, incumbent: TeamAttemptScore): boolean {
   if (candidate.scoreAwarded !== incumbent.scoreAwarded)
     return candidate.scoreAwarded > incumbent.scoreAwarded;
   if (candidate.minutesUsed !== incumbent.minutesUsed)
@@ -481,131 +474,141 @@ export const rankingReportSchema = reportHeaderSchema
     pass: z.boolean(),
   })
   .superRefine((report, context) => {
-  const instanceIds = new Set(report.questions.map((question) => question.instanceId));
-  if (instanceIds.size !== report.questions.length) {
-    context.addIssue({
-      code: 'custom',
-      path: ['questions'],
-      message: 'instanceId values must be unique',
-    });
-  }
+    const instanceIds = new Set(report.questions.map((question) => question.instanceId));
+    if (instanceIds.size !== report.questions.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['questions'],
+        message: 'instanceId values must be unique',
+      });
+    }
 
-  if (report.standings.length !== report.teams.length) {
-    context.addIssue({
-      code: 'custom',
-      path: ['standings'],
-      message: 'Must contain exactly one standing per team',
-    });
-  }
+    if (report.standings.length !== report.teams.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['standings'],
+        message: 'Must contain exactly one standing per team',
+      });
+    }
 
-  if (
-    report.teams.length !== report.inputSnapshot.teams.length ||
-    report.teams.some(
-      (team, index) => teamIdentityKey(team) !== teamIdentityKey(report.inputSnapshot.teams[index]!),
-    )
-  ) {
-    context.addIssue({
-      code: 'custom',
-      path: ['teams'],
-      message: 'Teams must match inputSnapshot.teams exactly',
-    });
-  }
+    if (
+      report.teams.length !== report.inputSnapshot.teams.length ||
+      report.teams.some(
+        (team, index) =>
+          teamIdentityKey(team) !== teamIdentityKey(report.inputSnapshot.teams[index]!),
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['teams'],
+        message: 'Teams must match inputSnapshot.teams exactly',
+      });
+    }
 
-  const flatMembers = report.teams.flatMap((team) => team.members);
-  if (flatMembers.length !== report.participants.length) {
-    context.addIssue({
-      code: 'custom',
-      path: ['participants'],
-      message: 'Must contain one timeline per team member',
-    });
-  } else {
-    report.participants.forEach((timeline, index) => {
-      if (memberIdentityKey(timeline.participant) !== memberIdentityKey(flatMembers[index]!)) {
+    const flatMembers = report.teams.flatMap((team) => team.members);
+    if (flatMembers.length !== report.participants.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['participants'],
+        message: 'Must contain one timeline per team member',
+      });
+    } else {
+      report.participants.forEach((timeline, index) => {
+        if (memberIdentityKey(timeline.participant) !== memberIdentityKey(flatMembers[index]!)) {
+          context.addIssue({
+            code: 'custom',
+            path: ['participants', index, 'participant'],
+            message: 'Order must follow teams.flatMap(members)',
+          });
+        }
+      });
+    }
+
+    let memberOffset = 0;
+    // 与引擎共用同一聚合实现（aggregateTeam）：伪造 standings 必须同时骗过引擎自身算术；行为偏差由 golden 字节 pin 兜底。
+    const expectedTeamOrder = report.teams
+      .map((team, teamIndex) => {
+        const timelines = report.participants.slice(
+          memberOffset,
+          memberOffset + team.members.length,
+        );
+        memberOffset += team.members.length;
+        return { teamIndex, ...aggregateTeam(timelines) };
+      })
+      .sort(
+        (left, right) =>
+          right.totalScore - left.totalScore ||
+          left.rankingPenaltyMin - right.rankingPenaltyMin ||
+          left.teamIndex - right.teamIndex,
+      );
+
+    const seenTeams = new Set<number>();
+    report.standings.forEach((standing, standingPosition) => {
+      const expected = expectedTeamOrder[standingPosition];
+      if (standing.teamIndex !== expected?.teamIndex) {
         context.addIssue({
           code: 'custom',
-          path: ['participants', index, 'participant'],
-          message: 'Order must follow teams.flatMap(members)',
+          path: ['standings', standingPosition, 'teamIndex'],
+          message: 'Must match score, accepted-time, and stable-index ordering',
+        });
+      }
+      if (standing.rank !== standingPosition + 1) {
+        context.addIssue({
+          code: 'custom',
+          path: ['standings', standingPosition, 'rank'],
+          message: 'Ranks must be contiguous and match standings order',
+        });
+      }
+      if (standing.teamIndex >= report.teams.length || seenTeams.has(standing.teamIndex)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['standings', standingPosition, 'teamIndex'],
+          message: 'Team indexes must be unique and in range',
+        });
+      }
+      seenTeams.add(standing.teamIndex);
+
+      if (standing.totalScore !== expected?.totalScore) {
+        context.addIssue({
+          code: 'custom',
+          path: ['standings', standingPosition, 'totalScore'],
+          message: 'Must equal the aggregated team score',
         });
       }
     });
-  }
 
-  let memberOffset = 0;
-  // 与引擎共用同一聚合实现（aggregateTeam）：伪造 standings 必须同时骗过引擎自身算术；行为偏差由 golden 字节 pin 兜底。
-  const expectedTeamOrder = report.teams
-    .map((team, teamIndex) => {
-      const timelines = report.participants.slice(memberOffset, memberOffset + team.members.length);
-      memberOffset += team.members.length;
-      return { teamIndex, ...aggregateTeam(timelines) };
-    })
-    .sort(
-      (left, right) =>
-        right.totalScore - left.totalScore ||
-        left.rankingPenaltyMin - right.rankingPenaltyMin ||
-        left.teamIndex - right.teamIndex,
-    );
+    report.participants.forEach((timeline, participantIndex) => {
+      const seenProblems = new Set<string>();
+      timeline.attempts.forEach((attempt, attemptPosition) => {
+        if (
+          !instanceIds.has(attempt.problemInstanceId) ||
+          seenProblems.has(attempt.problemInstanceId)
+        ) {
+          context.addIssue({
+            code: 'custom',
+            path: [
+              'participants',
+              participantIndex,
+              'attempts',
+              attemptPosition,
+              'problemInstanceId',
+            ],
+            message: 'Attempt problem instance IDs must be known and unique per participant',
+          });
+        }
+        seenProblems.add(attempt.problemInstanceId);
+      });
+    });
 
-  const seenTeams = new Set<number>();
-  report.standings.forEach((standing, standingPosition) => {
-    const expected = expectedTeamOrder[standingPosition];
-    if (standing.teamIndex !== expected?.teamIndex) {
+    const playerStanding = report.standings.find((standing) => standing.teamIndex === 0);
+    if (playerStanding === undefined || report.pass !== playerStanding.rank <= 8) {
       context.addIssue({
         code: 'custom',
-        path: ['standings', standingPosition, 'teamIndex'],
-        message: 'Must match score, accepted-time, and stable-index ordering',
-      });
-    }
-    if (standing.rank !== standingPosition + 1) {
-      context.addIssue({
-        code: 'custom',
-        path: ['standings', standingPosition, 'rank'],
-        message: 'Ranks must be contiguous and match standings order',
-      });
-    }
-    if (standing.teamIndex >= report.teams.length || seenTeams.has(standing.teamIndex)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['standings', standingPosition, 'teamIndex'],
-        message: 'Team indexes must be unique and in range',
-      });
-    }
-    seenTeams.add(standing.teamIndex);
-
-    if (standing.totalScore !== expected?.totalScore) {
-      context.addIssue({
-        code: 'custom',
-        path: ['standings', standingPosition, 'totalScore'],
-        message: 'Must equal the aggregated team score',
+        path: ['pass'],
+        message: 'Must match the player team rank pass line',
       });
     }
   });
-
-  report.participants.forEach((timeline, participantIndex) => {
-    const seenProblems = new Set<string>();
-    timeline.attempts.forEach((attempt, attemptPosition) => {
-      if (
-        !instanceIds.has(attempt.problemInstanceId) ||
-        seenProblems.has(attempt.problemInstanceId)
-      ) {
-        context.addIssue({
-          code: 'custom',
-          path: ['participants', participantIndex, 'attempts', attemptPosition, 'problemInstanceId'],
-          message: 'Attempt problem instance IDs must be known and unique per participant',
-        });
-      }
-      seenProblems.add(attempt.problemInstanceId);
-    });
-  });
-
-  const playerStanding = report.standings.find((standing) => standing.teamIndex === 0);
-  if (playerStanding === undefined || report.pass !== playerStanding.rank <= 8) {
-    context.addIssue({
-      code: 'custom',
-      path: ['pass'],
-      message: 'Must match the player team rank pass line',
-    });
-  }
-});
 export type RankingReport = z.infer<typeof rankingReportSchema>;
 
 export interface DuelRoundReport {
@@ -882,7 +885,8 @@ export const duelReportSchema = reportHeaderSchema
       const expectedAnswererSide = expectedSetterSide === 'HOME' ? 'AWAY' : 'HOME';
       const expectedSetterMember = group % memberCount;
       const expectedAnswererMember = (group + 1) % memberCount;
-      const answererMembers = report.inputSnapshot[expectedAnswererSide === 'HOME' ? 'home' : 'away'].members;
+      const answererMembers =
+        report.inputSnapshot[expectedAnswererSide === 'HOME' ? 'home' : 'away'].members;
       const expectedAnswerer = answererMembers[expectedAnswererMember];
 
       if (round.setterSide !== expectedSetterSide) {
@@ -913,7 +917,10 @@ export const duelReportSchema = reportHeaderSchema
           message: 'Answerer member must follow the 2N rotation',
         });
       }
-      if (expectedAnswerer === undefined || memberIdentityKey(round.answerer) !== memberIdentityKey(expectedAnswerer)) {
+      if (
+        expectedAnswerer === undefined ||
+        memberIdentityKey(round.answerer) !== memberIdentityKey(expectedAnswerer)
+      ) {
         context.addIssue({
           code: 'custom',
           path: ['rounds', index, 'answerer'],

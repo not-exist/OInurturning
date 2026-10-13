@@ -45,7 +45,9 @@ export function RewardBoard({
       <ul className="divide-y divide-ink-600/60 border-y border-ink-600/60">
         {grants.map((grant) => {
           const mine =
-            grant.claimable || grant.id === claimedGrantId || (meId !== undefined && grant.userId === meId);
+            grant.claimable ||
+            grant.id === claimedGrantId ||
+            (meId !== undefined && grant.userId === meId);
           return (
             <li
               key={grant.id}

@@ -44,7 +44,10 @@ const CHECKLIST_DEFS: { id: ChecklistStepId; label: string; hint: string }[] = [
 type StepCounts = Record<ChecklistStepId, boolean>;
 
 async function deriveSteps(
-  db: Pick<typeof prisma, 'trainingLog' | 'lectureLog' | 'adventureLog' | 'storyProgress' | 'student'>,
+  db: Pick<
+    typeof prisma,
+    'trainingLog' | 'lectureLog' | 'adventureLog' | 'storyProgress' | 'student'
+  >,
   userId: number,
 ): Promise<StepCounts> {
   const [train, lecture, adventure, story, active] = await Promise.all([
@@ -87,18 +90,27 @@ function freeIntervalHours(): number {
 
 export async function getOverview(userId: number): Promise<OverviewView> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  const [students, storyOverview, pool, training, lectures, adventures, contests, announcements, done] =
-    await Promise.all([
-      listStudents(userId),
-      getStoryOverview(userId, 0),
-      getPool(userId),
-      listTrainingLogs(userId, { limit: RECENT_LIMIT }),
-      listLectureLogs(userId, RECENT_LIMIT),
-      listAdventureLogs(userId, RECENT_LIMIT),
-      listRecentContestRecords(userId, RECENT_LIMIT),
-      listAnnouncements(3),
-      deriveSteps(prisma, userId),
-    ]);
+  const [
+    students,
+    storyOverview,
+    pool,
+    training,
+    lectures,
+    adventures,
+    contests,
+    announcements,
+    done,
+  ] = await Promise.all([
+    listStudents(userId),
+    getStoryOverview(userId, 0),
+    getPool(userId),
+    listTrainingLogs(userId, { limit: RECENT_LIMIT }),
+    listLectureLogs(userId, RECENT_LIMIT),
+    listAdventureLogs(userId, RECENT_LIMIT),
+    listRecentContestRecords(userId, RECENT_LIMIT),
+    listAnnouncements(3),
+    deriveSteps(prisma, userId),
+  ]);
 
   const stages = storyOverview.chapters.flatMap((chapter) =>
     chapter.stages.map((stage) => ({ ...stage, chapter: chapter.chapter })),
@@ -122,7 +134,9 @@ export async function getOverview(userId: number): Promise<OverviewView> {
     story: {
       clearedStages: stages.filter((stage) => stage.cleared).length,
       totalStages: stages.length,
-      nextStage: next ? { stageKey: next.stageKey, name: next.name ?? next.stageKey, chapter: next.chapter } : null,
+      nextStage: next
+        ? { stageKey: next.stageKey, name: next.name ?? next.stageKey, chapter: next.chapter }
+        : null,
     },
     pool: { count: pool.candidates.length, refreshPrice: pool.refreshPrice, freeRefreshAt },
     recent: { training: training.items, lectures, adventures, contests },

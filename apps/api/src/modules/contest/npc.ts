@@ -10,11 +10,7 @@ import { createRandomStream, deriveStreamSeed, standardNormal } from './engine/r
 import type { RandomSource } from './engine/models.js';
 
 export type DuelOpponentKind =
-  | 'random_common'
-  | 'random_skilled'
-  | 'random_elite'
-  | 'platform_reviewer'
-  | 'legendary_ghost';
+  'random_common' | 'random_skilled' | 'random_elite' | 'platform_reviewer' | 'legendary_ghost';
 
 function normal(random: RandomSource, mean: number, standardDeviation: number): number {
   return mean + standardDeviation * standardNormal(random);
@@ -57,7 +53,11 @@ function npcParticipant(
   };
 }
 
-export function generateNpcTeams(stage: StageConfig, rosterSize: number, seed: number): ContestTeam[] {
+export function generateNpcTeams(
+  stage: StageConfig,
+  rosterSize: number,
+  seed: number,
+): ContestTeam[] {
   const validatedSeed = rankingSeedSchema.parse(seed);
   return Array.from({ length: stage.npc_pool.size }, (_, teamIndex) => ({
     teamId: `npc:${teamIndex}`,
@@ -65,23 +65,19 @@ export function generateNpcTeams(stage: StageConfig, rosterSize: number, seed: n
     userId: null,
     members: Array.from({ length: rosterSize }, (_, memberIndex) => {
       const npcSeed = deriveStreamSeed(validatedSeed, `npc:${teamIndex}:${memberIndex}`);
-      return npcParticipant(
-        createRandomStream(npcSeed, 'misc'),
-        teamIndex,
-        memberIndex,
-        stage,
-      );
+      return npcParticipant(createRandomStream(npcSeed, 'misc'), teamIndex, memberIndex, stage);
     }),
   }));
 }
 
-const DUEL_OPPONENTS: Record<DuelOpponentKind, { level: number; spread: number; energy: number }> = {
-  random_common: { level: 8, spread: 3, energy: 55 },
-  random_skilled: { level: 24, spread: 5, energy: 65 },
-  random_elite: { level: 45, spread: 6, energy: 75 },
-  platform_reviewer: { level: 38, spread: 5, energy: 70 },
-  legendary_ghost: { level: 75, spread: 5, energy: 90 },
-};
+const DUEL_OPPONENTS: Record<DuelOpponentKind, { level: number; spread: number; energy: number }> =
+  {
+    random_common: { level: 8, spread: 3, energy: 55 },
+    random_skilled: { level: 24, spread: 5, energy: 65 },
+    random_elite: { level: 45, spread: 6, energy: 75 },
+    platform_reviewer: { level: 38, spread: 5, energy: 70 },
+    legendary_ghost: { level: 75, spread: 5, energy: 90 },
+  };
 
 /** 生成事件遭遇战的 AWAY 侧；所有数值由事件对手档位和 seed 定格。 */
 export function generateDuelOpponent(
@@ -91,7 +87,11 @@ export function generateDuelOpponent(
 ): ParticipantSnapshot {
   const params = DUEL_OPPONENTS[kind];
   const random = createRandomStream(seed, 'duel-opponent');
-  const level = clamp(Math.round(normal(random, params.level * powerMultiplier, params.spread)), 1, 100);
+  const level = clamp(
+    Math.round(normal(random, params.level * powerMultiplier, params.spread)),
+    1,
+    100,
+  );
   const dominant = Math.floor(random() * DIMENSIONS.length);
   const abilities = Object.fromEntries(
     DIMENSIONS.map((dimension, index) => [

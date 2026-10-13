@@ -7,7 +7,11 @@ import type { Express } from 'express';
 import { importConfigs } from '../src/config/loader.js';
 import { createApp } from '../src/index.js';
 import { prisma } from '../src/lib/prisma.js';
-import { chooseAdventure, drawAdventure, listAdventureLogs } from '../src/modules/adventure/service.js';
+import {
+  chooseAdventure,
+  drawAdventure,
+  listAdventureLogs,
+} from '../src/modules/adventure/service.js';
 import { resetUsers, unlockTutorial, unwrapErr, unwrapOk } from './helpers.js';
 
 /**
@@ -110,9 +114,23 @@ async function register(): Promise<{ token: string; userId: number }> {
 async function makeStudent(userId: number, stamina = 5): Promise<{ id: number }> {
   const student = await prisma.student.create({
     data: {
-      userId, name: '历练学员', qualityTier: 'COMMON',
-      ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10, code: 10, thinking: 10, setting: 10,
-      focusCap: 20, energyMax: 60, energy: 30, stamina, staminaRegen: 10,
+      userId,
+      name: '历练学员',
+      qualityTier: 'COMMON',
+      ds: 10,
+      dp: 10,
+      math: 10,
+      graph: 10,
+      greedy: 10,
+      str: 10,
+      code: 10,
+      thinking: 10,
+      setting: 10,
+      focusCap: 20,
+      energyMax: 60,
+      energy: 30,
+      stamina,
+      staminaRegen: 10,
     },
   });
   return { id: student.id };
@@ -132,11 +150,20 @@ describe('adventure gaps：抽卡与选项校验', () => {
     const roster = await makeRoster(user.userId);
     const spare = (await makeStudent(user.userId)).id;
     const auth = { Authorization: `Bearer ${user.token}` };
-    const badTier = await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 4 });
+    const badTier = await request(app)
+      .post('/api/adventures/draw')
+      .set(auth)
+      .send({ roster, tier: 4 });
     expect(badTier.status).toBe(400);
-    const zeroTier = await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 0 });
+    const zeroTier = await request(app)
+      .post('/api/adventures/draw')
+      .set(auth)
+      .send({ roster, tier: 0 });
     expect(zeroTier.status).toBe(400);
-    const pair = await request(app).post('/api/adventures/draw').set(auth).send({ roster: roster.slice(0, 2), tier: 1 });
+    const pair = await request(app)
+      .post('/api/adventures/draw')
+      .set(auth)
+      .send({ roster: roster.slice(0, 2), tier: 1 });
     expect(pair.status).toBe(400);
     const quartet = await request(app)
       .post('/api/adventures/draw')
@@ -144,8 +171,12 @@ describe('adventure gaps：抽卡与选项校验', () => {
       .send({ roster: [...roster, spare], tier: 1 });
     expect(quartet.status).toBe(400);
 
-    for (const member of roster) await prisma.student.update({ where: { id: member }, data: { stamina: 0 } });
-    const poor = await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 1 });
+    for (const member of roster)
+      await prisma.student.update({ where: { id: member }, data: { stamina: 0 } });
+    const poor = await request(app)
+      .post('/api/adventures/draw')
+      .set(auth)
+      .send({ roster, tier: 1 });
     expect(poor.status).toBe(409);
     expect(unwrapErr(poor).code).toBe('INSUFFICIENT_RESOURCE');
 
@@ -166,9 +197,15 @@ describe('adventure gaps：抽卡与选项校验', () => {
     const user = await register();
     const roster = await makeRoster(user.userId);
     const auth = { Authorization: `Bearer ${user.token}` };
-    const first = await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 1 });
+    const first = await request(app)
+      .post('/api/adventures/draw')
+      .set(auth)
+      .send({ roster, tier: 1 });
     expect(first.status).toBe(200);
-    const second = await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 1 });
+    const second = await request(app)
+      .post('/api/adventures/draw')
+      .set(auth)
+      .send({ roster, tier: 1 });
     expect(second.status).toBe(409);
     expect(unwrapErr(second).code).toBe('STATE_CONFLICT');
   });
@@ -178,7 +215,10 @@ describe('adventure gaps：抽卡与选项校验', () => {
     const other = await register();
     const roster = await makeRoster(user.userId);
     const drawn = unwrapOk<{ id: number }>(
-      await request(app).post('/api/adventures/draw').set('Authorization', `Bearer ${user.token}`).send({ roster, tier: 1 }),
+      await request(app)
+        .post('/api/adventures/draw')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ roster, tier: 1 }),
     );
     const badIndex = await request(app)
       .post(`/api/adventures/${drawn.id}/choice`)
@@ -202,16 +242,28 @@ describe('adventure gaps：选项门槛', () => {
     const drawn = unwrapOk<{ id: number }>(
       await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 1 }),
     );
-    const lacking = await request(app).post(`/api/adventures/${drawn.id}/choice`).set(auth).send({ optionIndex: 0 });
+    const lacking = await request(app)
+      .post(`/api/adventures/${drawn.id}/choice`)
+      .set(auth)
+      .send({ optionIndex: 0 });
     expect(lacking.status).toBe(409);
     expect(unwrapErr(lacking)).toMatchObject({ code: 'INSUFFICIENT_RESOURCE' });
 
-    await prisma.userItem.create({ data: { userId: user.userId, itemId: 'rename-card', quantity: 1 } });
-    const ok = await request(app).post(`/api/adventures/${drawn.id}/choice`).set(auth).send({ optionIndex: 0 });
+    await prisma.userItem.create({
+      data: { userId: user.userId, itemId: 'rename-card', quantity: 1 },
+    });
+    const ok = await request(app)
+      .post(`/api/adventures/${drawn.id}/choice`)
+      .set(auth)
+      .send({ optionIndex: 0 });
     expect(ok.status).toBe(200);
     expect(unwrapOk<{ completed: boolean }>(ok).completed).toBe(true);
     // requires_item 仅门槛不消耗
-    expect(await prisma.userItem.findUnique({ where: { userId_itemId: { userId: user.userId, itemId: 'rename-card' } } })).not.toBeNull();
+    expect(
+      await prisma.userItem.findUnique({
+        where: { userId_itemId: { userId: user.userId, itemId: 'rename-card' } },
+      }),
+    ).not.toBeNull();
   });
 
   it('cost_money 缺钱 → 409；足额 → 净收支到账', async () => {
@@ -223,11 +275,17 @@ describe('adventure gaps：选项门槛', () => {
     const drawn = unwrapOk<{ id: number }>(
       await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 1 }),
     );
-    const lacking = await request(app).post(`/api/adventures/${drawn.id}/choice`).set(auth).send({ optionIndex: 0 });
+    const lacking = await request(app)
+      .post(`/api/adventures/${drawn.id}/choice`)
+      .set(auth)
+      .send({ optionIndex: 0 });
     expect(lacking.status).toBe(409);
 
     await prisma.user.update({ where: { id: user.userId }, data: { money: 40 } });
-    const ok = await request(app).post(`/api/adventures/${drawn.id}/choice`).set(auth).send({ optionIndex: 0 });
+    const ok = await request(app)
+      .post(`/api/adventures/${drawn.id}/choice`)
+      .set(auth)
+      .send({ optionIndex: 0 });
     expect(ok.status).toBe(200);
     const me = unwrapOk<{ money: number }>(await request(app).get('/api/users/me').set(auth));
     expect(me.money).toBe(100); // 40 − 40 + 100
@@ -238,7 +296,10 @@ describe('adventure gaps：选项门槛', () => {
     const user = await register();
     const roster = await makeRoster(user.userId);
     const drawn = unwrapOk<{ id: number }>(
-      await request(app).post('/api/adventures/draw').set('Authorization', `Bearer ${user.token}`).send({ roster, tier: 1 }),
+      await request(app)
+        .post('/api/adventures/draw')
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ roster, tier: 1 }),
     );
     const res = await request(app)
       .post(`/api/adventures/${drawn.id}/choice`)
@@ -258,11 +319,18 @@ describe('adventure gaps：幂等与日志', () => {
     const drawn = unwrapOk<{ id: number }>(
       await request(app).post('/api/adventures/draw').set(auth).send({ roster, tier: 1 }),
     );
-    const first = await request(app).post(`/api/adventures/${drawn.id}/choice`).set(auth).send({ optionIndex: 0 });
+    const first = await request(app)
+      .post(`/api/adventures/${drawn.id}/choice`)
+      .set(auth)
+      .send({ optionIndex: 0 });
     expect(unwrapOk<{ completed: boolean }>(first).completed).toBe(true);
-    const moneyAfterFirst = (await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })).money;
+    const moneyAfterFirst = (await prisma.user.findUniqueOrThrow({ where: { id: user.userId } }))
+      .money;
     expect(moneyAfterFirst).toBe(10);
-    const second = await request(app).post(`/api/adventures/${drawn.id}/choice`).set(auth).send({ optionIndex: 0 });
+    const second = await request(app)
+      .post(`/api/adventures/${drawn.id}/choice`)
+      .set(auth)
+      .send({ optionIndex: 0 });
     expect(second.status).toBe(200);
     expect(unwrapOk<{ completed: boolean }>(second).completed).toBe(true);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })).money).toBe(10);
@@ -279,24 +347,51 @@ describe('adventure gaps：幂等与日志', () => {
     // drawAdventure 忽略注入的 now（createdAt 取库默认值），同毫秒建行会导致倒序歧义；
     // 此处直写 createdAt 保证确定性（listAdventureLogs 按 createdAt desc 排序）
     seq += 1;
-    const direct = await prisma.user.create({ data: { username: `advgap-direct-${Date.now().toString(36)}-${seq}` } });
+    const direct = await prisma.user.create({
+      data: { username: `advgap-direct-${Date.now().toString(36)}-${seq}` },
+    });
     const roster: number[] = [];
     for (let index = 0; index < 3; index += 1) {
       const row = await prisma.student.create({
         data: {
-          userId: direct.id, name: '直调学员', qualityTier: 'COMMON',
-          ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10, code: 10, thinking: 10, setting: 10,
-          focusCap: 20, energyMax: 60, energy: 60, stamina: 5, staminaRegen: 10,
+          userId: direct.id,
+          name: '直调学员',
+          qualityTier: 'COMMON',
+          ds: 10,
+          dp: 10,
+          math: 10,
+          graph: 10,
+          greedy: 10,
+          str: 10,
+          code: 10,
+          thinking: 10,
+          setting: 10,
+          focusCap: 20,
+          energyMax: 60,
+          energy: 60,
+          stamina: 5,
+          staminaRegen: 10,
           lastSettledAt: new Date('2026-09-02T11:00:00.000Z'),
         },
       });
       roster.push(row.id);
     }
     const first = await drawAdventure(direct.id, roster, 1, new Date('2026-09-02T12:00:00.000Z'));
-    await chooseAdventure(direct.id, first.id, { optionIndex: 0 }, new Date('2026-09-02T12:00:01.000Z'));
+    await chooseAdventure(
+      direct.id,
+      first.id,
+      { optionIndex: 0 },
+      new Date('2026-09-02T12:00:01.000Z'),
+    );
     const second = await drawAdventure(direct.id, roster, 1, new Date('2026-09-02T12:00:02.000Z'));
-    await prisma.adventureLog.update({ where: { id: first.id }, data: { createdAt: new Date('2026-09-02T12:00:00.000Z') } });
-    await prisma.adventureLog.update({ where: { id: second.id }, data: { createdAt: new Date('2026-09-02T12:00:02.000Z') } });
+    await prisma.adventureLog.update({
+      where: { id: first.id },
+      data: { createdAt: new Date('2026-09-02T12:00:00.000Z') },
+    });
+    await prisma.adventureLog.update({
+      where: { id: second.id },
+      data: { createdAt: new Date('2026-09-02T12:00:02.000Z') },
+    });
     const logs = await listAdventureLogs(direct.id, 10);
     expect(logs.map((l) => l.id)).toEqual([second.id, first.id]);
   });

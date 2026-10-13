@@ -1,12 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import {
-  registerUser,
-  loginViaUI,
-  fund,
-  apiCall,
-  unwrap,
-  type TestAccount,
-} from '../fixtures';
+import { registerUser, loginViaUI, fund, apiCall, unwrap, type TestAccount } from '../fixtures';
 
 /**
  * 讲课：达标直讲必成功 / 强接窗口成功或讲砸皆合法 / 低于强接下限拒单。
@@ -85,7 +78,12 @@ test.describe('讲课', () => {
     for (let round = 0; round < 8; round += 1) {
       let candidates = await poolOf(request, account.accessToken);
       if (candidates.length === 0) {
-        const refreshed = await apiCall(request, 'POST', '/api/academy/refresh', account.accessToken);
+        const refreshed = await apiCall(
+          request,
+          'POST',
+          '/api/academy/refresh',
+          account.accessToken,
+        );
         candidates = unwrap<{ candidates: Candidate[] }>(refreshed.body, '刷新招募池').candidates;
       }
       const id = await recruitTempId(request, account.accessToken, candidates[0]!.tempId);
@@ -131,7 +129,10 @@ test.describe('讲课', () => {
     await expect(logs).toContainText(/成功|讲砸/);
   });
 
-  test('讲课成长：思维要求随档位联动，成功场在记录上留下成长（issue #56）', async ({ page, request }) => {
+  test('讲课成长：思维要求随档位联动，成功场在记录上留下成长（issue #56）', async ({
+    page,
+    request,
+  }) => {
     const account = await registerUser(request, 'lec');
     await fund(account.username, { money: 50000 });
     const studentId = await recruitAtLeast(request, account, 15);

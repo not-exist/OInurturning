@@ -40,16 +40,10 @@ export function itemDisplayName(itemId: string, items: ItemView[] | undefined): 
 
 export function useItemName(): (itemId: string) => string {
   const inventory = useInventory();
-  return useCallback(
-    (itemId: string) => itemDisplayName(itemId, inventory.data),
-    [inventory.data],
-  );
+  return useCallback((itemId: string) => itemDisplayName(itemId, inventory.data), [inventory.data]);
 }
 
-export function rewardLineText(
-  reward: RewardLine,
-  itemName: (itemId: string) => string,
-): string {
+export function rewardLineText(reward: RewardLine, itemName: (itemId: string) => string): string {
   const label = REWARD_LINE_LABEL[reward.type] ?? '奖励';
   switch (reward.type) {
     case 'first_clear_money':

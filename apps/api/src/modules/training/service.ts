@@ -110,7 +110,10 @@ export async function listTrainingLogs(
     take: limit + 1,
   });
   const items = rows.slice(0, limit).map(toLogView);
-  return { items, nextCursor: rows.length > limit && items.length > 0 ? items[items.length - 1]!.id : null };
+  return {
+    items,
+    nextCursor: rows.length > limit && items.length > 0 ? items[items.length - 1]!.id : null,
+  };
 }
 
 /** 校验存在/归属/在册（事务前快失败）；事务内再复核 */
@@ -145,7 +148,11 @@ export async function directedTrain(
   now: Date = new Date(),
 ): Promise<TrainingResult> {
   await loadOwnedActive(userId, studentId);
-  const result = await runTraining({ kind: 'directed', userId, studentId, dim, bookItemId }, rng, now);
+  const result = await runTraining(
+    { kind: 'directed', userId, studentId, dim, bookItemId },
+    rng,
+    now,
+  );
   void autoAdvanceIfNeeded(userId, 'do_training');
   return result;
 }
@@ -164,28 +171,51 @@ export async function specializedTrain(
   return result;
 }
 
-async function resolveProblem(tx: Prisma.TransactionClient, input: TrainingInput): Promise<ProblemLibraryEntry> {
+async function resolveProblem(
+  tx: Prisma.TransactionClient,
+  input: TrainingInput,
+): Promise<ProblemLibraryEntry> {
   const p = await tx.problemLibraryEntry.findUnique({ where: { id: input.problemId! } });
   if (!p) throw new ApiError('NOT_FOUND', { resource: 'problem', id: input.problemId });
-  if (p.userId !== input.userId) throw new ApiError('FORBIDDEN', { resource: 'problem', id: input.problemId });
-  if (p.consumedAt) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'problem', id: input.problemId, reason: '已被消耗' });
+  if (p.userId !== input.userId)
+    throw new ApiError('FORBIDDEN', { resource: 'problem', id: input.problemId });
+  if (p.consumedAt)
+    throw new ApiError('INSUFFICIENT_RESOURCE', {
+      resource: 'problem',
+      id: input.problemId,
+      reason: '已被消耗',
+    });
   if (!(DIMENSIONS as readonly string[]).includes(p.dominantDim)) {
-    throw new ApiError('VALIDATION_FAILED', { resource: 'problem', id: input.problemId, dominantDim: p.dominantDim });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: 'problem',
+      id: input.problemId,
+      dominantDim: p.dominantDim,
+    });
   }
   return p;
 }
 
 /** 定向书归属校验：bookItemId 必须形如 book-<match subject>-<rarity> 且稀有度已知 */
-function bookFor(dim: DimensionKey, bookItemId: string | undefined): { itemId: string; mult: number } {
+function bookFor(
+  dim: DimensionKey,
+  bookItemId: string | undefined,
+): { itemId: string; mult: number } {
   const { bookSubject } = DIM_META[dim];
   const itemId = bookItemId ?? `book-${bookSubject}-gray`;
   const m = /^book-(.+)-(.+)$/.exec(itemId);
-  if (!m) throw new ApiError('VALIDATION_FAILED', { resource: 'book', itemId, reason: '非法书籍 id' });
+  if (!m)
+    throw new ApiError('VALIDATION_FAILED', { resource: 'book', itemId, reason: '非法书籍 id' });
   if (m[1] !== bookSubject) {
-    throw new ApiError('VALIDATION_FAILED', { resource: 'book', itemId, dim, reason: `书籍科目与目标维不符（需 book-${bookSubject}-*）` });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: 'book',
+      itemId,
+      dim,
+      reason: `书籍科目与目标维不符（需 book-${bookSubject}-*）`,
+    });
   }
   const mult = BOOK_MULT[m[2]];
-  if (mult === undefined) throw new ApiError('VALIDATION_FAILED', { resource: 'book', itemId, reason: '未知书籍稀有度' });
+  if (mult === undefined)
+    throw new ApiError('VALIDATION_FAILED', { resource: 'book', itemId, reason: '未知书籍稀有度' });
   return { itemId, mult };
 }
 
@@ -203,20 +233,27 @@ async function runTraining(
   if (input.problemId != null && kind === 'specialized') {
     const p = await prisma.problemLibraryEntry.findUnique({ where: { id: input.problemId } });
     if (!p) throw new ApiError('NOT_FOUND', { resource: 'problem', id: input.problemId });
-    if (p.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'problem', id: input.problemId });
+    if (p.userId !== userId)
+      throw new ApiError('FORBIDDEN', { resource: 'problem', id: input.problemId });
   }
 
   return prisma.$transaction(async (tx) => {
     // 1. 锁学员行（写事务内串行化并发训练）
     await lockStudent(tx, input.studentId);
-    const student = await tx.student.findUniqueOrThrow({ where: { id: input.studentId }, include: { talents: true } });
-    if (student.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: input.studentId });
-    if (student.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', { resource: 'student', id: input.studentId });
+    const student = await tx.student.findUniqueOrThrow({
+      where: { id: input.studentId },
+      include: { talents: true },
+    });
+    if (student.userId !== userId)
+      throw new ApiError('FORBIDDEN', { resource: 'student', id: input.studentId });
+    if (student.status !== 'ACTIVE')
+      throw new ApiError('NOT_FOUND', { resource: 'student', id: input.studentId });
 
     // 2. settle 投影（懒结算随现实时间恢复，锚点推进）
     const meta = aggregateMeta(student.talents.map((t) => t.talentId));
     const settled = settle(student, meta, now);
-    if (settled.stamina < 1) throw new ApiError('STATE_CONFLICT', { studentId: input.studentId, reason: '体力不足' });
+    if (settled.stamina < 1)
+      throw new ApiError('STATE_CONFLICT', { studentId: input.studentId, reason: '体力不足' });
 
     // 3. 费用（N=在册学员数）
     const ownedStudents = await tx.student.count({ where: { userId, status: 'ACTIVE' } });
@@ -228,7 +265,8 @@ async function runTraining(
       where: { id: userId, money: { gte: cost } },
       data: { money: { decrement: cost } },
     });
-    if (paid.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { need: cost, resource: 'money' });
+    if (paid.count === 0)
+      throw new ApiError('INSUFFICIENT_RESOURCE', { need: cost, resource: 'money' });
 
     // 5. 解析目标维与倍率
     let dim: DimensionKey;
@@ -244,7 +282,12 @@ async function runTraining(
       const pdim = problem.dominantDim as DimensionKey;
       dim = pdim;
       const mult = QUALITY_MULT[problem.rarity];
-      if (mult === undefined) throw new ApiError('VALIDATION_FAILED', { resource: 'problem', id: problem.id, rarity: problem.rarity });
+      if (mult === undefined)
+        throw new ApiError('VALIDATION_FAILED', {
+          resource: 'problem',
+          id: problem.id,
+          rarity: problem.rarity,
+        });
       qualityMult = mult;
     }
 
@@ -283,8 +326,11 @@ async function runTraining(
         where: { userId, itemId: book!.itemId, quantity: { gte: 1 } },
         data: { quantity: { decrement: 1 } },
       });
-      if (consumed.count === 0) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: book!.itemId, need: 1 });
-      await tx.userItem.deleteMany({ where: { userId, itemId: book!.itemId, quantity: { lte: 0 } } });
+      if (consumed.count === 0)
+        throw new ApiError('INSUFFICIENT_RESOURCE', { resource: book!.itemId, need: 1 });
+      await tx.userItem.deleteMany({
+        where: { userId, itemId: book!.itemId, quantity: { lte: 0 } },
+      });
     } else if (kind === 'specialized') {
       const used = await tx.problemLibraryEntry.updateMany({
         where: { id: input.problemId!, userId, consumedAt: null },
@@ -293,7 +339,11 @@ async function runTraining(
       if (used.count === 0) {
         const p = await tx.problemLibraryEntry.findUnique({ where: { id: input.problemId! } });
         if (!p) throw new ApiError('NOT_FOUND', { resource: 'problem', id: input.problemId });
-        throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'problem', id: input.problemId, reason: '已被消耗' });
+        throw new ApiError('INSUFFICIENT_RESOURCE', {
+          resource: 'problem',
+          id: input.problemId,
+          reason: '已被消耗',
+        });
       }
     }
 

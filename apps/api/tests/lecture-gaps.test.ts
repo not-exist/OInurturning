@@ -40,9 +40,22 @@ async function register(): Promise<{ token: string; userId: number }> {
 async function makeStudent(userId: number, v: number): Promise<{ id: number }> {
   const student = await prisma.student.create({
     data: {
-      userId, name: `讲师 V${v}`, qualityTier: 'COMMON',
-      ds: v, dp: v, math: v, graph: v, greedy: v, str: v, code: v, thinking: v, setting: v,
-      focusCap: 20, energyMax: 50, energy: 50, staminaRegen: 10,
+      userId,
+      name: `讲师 V${v}`,
+      qualityTier: 'COMMON',
+      ds: v,
+      dp: v,
+      math: v,
+      graph: v,
+      greedy: v,
+      str: v,
+      code: v,
+      thinking: v,
+      setting: v,
+      focusCap: 20,
+      energyMax: 50,
+      energy: 50,
+      staminaRegen: 10,
     },
   });
   return { id: student.id };
@@ -62,7 +75,10 @@ describe('lecture gaps', () => {
     const user = await register();
     const student = await makeStudent(user.userId, 50);
     const auth = { Authorization: `Bearer ${user.token}` };
-    const badTier = await request(app).post('/api/academy/lectures').set(auth).send({ studentId: student.id, tier: 'phd' });
+    const badTier = await request(app)
+      .post('/api/academy/lectures')
+      .set(auth)
+      .send({ studentId: student.id, tier: 'phd' });
     expect(badTier.status).toBe(400);
     const zero = await request(app).get('/api/academy/lectures?limit=0').set(auth);
     expect(zero.status).toBe(400);
@@ -79,7 +95,10 @@ describe('lecture gaps', () => {
       .set('Authorization', `Bearer ${user.token}`)
       .send({ studentId: student.id, tier: 'beginner' });
     expect(res.status).toBe(409);
-    expect(unwrapErr(res)).toMatchObject({ code: 'INSUFFICIENT_RESOURCE', details: { resource: 'stamina', need: 2 } });
+    expect(unwrapErr(res)).toMatchObject({
+      code: 'INSUFFICIENT_RESOURCE',
+      details: { resource: 'stamina', need: 2 },
+    });
   });
 
   it('弱学员（V=1）：全部五档 unavailable', async () => {
@@ -87,7 +106,9 @@ describe('lecture gaps', () => {
     await prisma.student.deleteMany({ where: { userId: user.userId } }); // 清开局包学员（GOOD V≈14 会点亮入门组）
     await makeStudent(user.userId, 1);
     const tiers = unwrapOk<Array<{ id: string; available: boolean }>>(
-      await request(app).get('/api/academy/lecture-tiers').set('Authorization', `Bearer ${user.token}`),
+      await request(app)
+        .get('/api/academy/lecture-tiers')
+        .set('Authorization', `Bearer ${user.token}`),
     );
     expect(tiers).toHaveLength(5);
     expect(tiers.every((t) => t.available === false)).toBe(true);
@@ -104,7 +125,12 @@ describe('lecture gaps', () => {
     expect(res.status).toBe(200);
     // base 60 × repMult(1) × overflow(1+1×0.2)=72；声誉 round(1×1.2)=1
     expect(unwrapOk<LectureResult>(res)).toMatchObject({
-      teachingValue: 20, forced: false, success: true, money: 72, reputation: 1, staminaAfter: 3,
+      teachingValue: 20,
+      forced: false,
+      success: true,
+      money: 72,
+      reputation: 1,
+      staminaAfter: 3,
     });
     const me = unwrapOk<{ money: number; reputation: number }>(
       await request(app).get('/api/users/me').set('Authorization', `Bearer ${user.token}`),

@@ -48,10 +48,7 @@ test.describe('完整玩家旅程', () => {
     await cards.nth(bestIdx).getByTestId('recruit-btn').click();
   }
 
-  test('注册→招募→训练→剧情→出题→讲课→历练→背包→改名→PVP→改密→注销', async ({
-    page,
-    request,
-  }) => {
+  test('注册→招募→训练→剧情→出题→讲课→历练→背包→改名→PVP→改密→注销', async ({ page, request }) => {
     // —— 1. 注册 ——
     const username = uniqueName('journey');
     await page.goto('/register');
@@ -123,9 +120,7 @@ test.describe('完整玩家旅程', () => {
     await page.goto('/backpack');
     const potion = page.locator('[data-testid="inventory-row"][data-itemid="stamina-potion"]');
     await potion.getByTestId('item-use').click();
-    await page
-      .locator(`[data-testid="item-picker-student"][data-student-id="${best.id}"]`)
-      .click();
+    await page.locator(`[data-testid="item-picker-student"][data-student-id="${best.id}"]`).click();
     await page.getByTestId('item-use-confirm').click();
     await expect(page.getByTestId('item-picker')).not.toBeVisible();
 

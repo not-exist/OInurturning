@@ -4,7 +4,15 @@ import type { StudentView } from '@oinur/shared';
 import { useStudents, useTalentDefs, type TalentDefView } from '../../lib/hooks';
 import { floor, round, signed } from '../../lib/labels';
 import { QUALITY_MATERIAL, RARITY_ICON } from '../../lib/rarity';
-import { ActionLink, ErrorNote, Empty, HoverCard, InlineLoader, Meter, Numeral } from '../../components/ui';
+import {
+  ActionLink,
+  ErrorNote,
+  Empty,
+  HoverCard,
+  InlineLoader,
+  Meter,
+  Numeral,
+} from '../../components/ui';
 import { Icon, talentIcon } from '../../components/icons';
 import { Users, TriangleAlert } from 'lucide-react';
 import {
@@ -46,7 +54,11 @@ export function StudentsPage(): JSX.Element {
       </header>
 
       {students.length === 0 ? (
-        <Empty icon={Users} title="名下还没有学员" action={<ActionLink to="/academy">前往高级学院招募</ActionLink>}>
+        <Empty
+          icon={Users}
+          title="名下还没有学员"
+          action={<ActionLink to="/academy">前往高级学院招募</ActionLink>}
+        >
           招募第一名学员，从 CSP-J 起步冲击 IOI。
         </Empty>
       ) : (
@@ -60,7 +72,13 @@ export function StudentsPage(): JSX.Element {
   );
 }
 
-function StudentCard({ s, defs }: { s: StudentView; defs: Map<string, TalentDefView> }): JSX.Element {
+function StudentCard({
+  s,
+  defs,
+}: {
+  s: StudentView;
+  defs: Map<string, TalentDefView>;
+}): JSX.Element {
   const baseline = mindsetBaseline(s.talents, defs);
   const mindset = round(s.mindset);
   return (
@@ -119,7 +137,9 @@ function StudentCard({ s, defs }: { s: StudentView; defs: Map<string, TalentDefV
           <span className="min-w-0 flex-1">
             <MindsetBar value={s.mindset} baseline={baseline} compact />
           </span>
-          <span className="w-7 shrink-0 text-right font-mono text-fg-muted">{signed(s.mindset)}</span>
+          <span className="w-7 shrink-0 text-right font-mono text-fg-muted">
+            {signed(s.mindset)}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-8 shrink-0">体力</span>

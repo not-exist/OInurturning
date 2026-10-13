@@ -28,7 +28,7 @@ async function createStudent(userId: number, stamina = 5): Promise<number> {
     data: {
       userId,
       name: '出题学员',
-            qualityTier: 'GOOD',
+      qualityTier: 'GOOD',
       ds: 40,
       dp: 40,
       math: 40,
@@ -71,7 +71,10 @@ describe('M3 problem library', () => {
     expect(result.quality).toBeLessThanOrEqual(48);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).money).toBe(80);
     expect((await prisma.student.findUniqueOrThrow({ where: { id: studentId } })).stamina).toBe(4);
-    expect((await prisma.problemLibraryEntry.findUniqueOrThrow({ where: { id: result.id } })).authorStudentId).toBe(studentId);
+    expect(
+      (await prisma.problemLibraryEntry.findUniqueOrThrow({ where: { id: result.id } }))
+        .authorStudentId,
+    ).toBe(studentId);
   });
 
   it('enforces two creations per student per server day even after deleting a problem', async () => {
@@ -94,16 +97,23 @@ describe('M3 problem library', () => {
     const otherStudent = await createStudent(other);
     const problem = await createProblem(owner, ownerStudent, 'STRING', NOW);
 
-    await expect(createProblem(other, ownerStudent, 'DS', NOW)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(createProblem(other, ownerStudent, 'DS', NOW)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
     await expect(deleteProblem(other, problem.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(createProblem(other, otherStudent, 'DS', NOW)).resolves.toMatchObject({ dominantDim: 'DS' });
+    await expect(createProblem(other, otherStudent, 'DS', NOW)).resolves.toMatchObject({
+      dominantDim: 'DS',
+    });
   });
 
   it('exposes problem-library create/list/delete HTTP routes', async () => {
     sequence += 1;
     const registration = await request(app)
       .post('/api/auth/register')
-      .send({ username: `problem-route-${sequence}-${Date.now().toString(36)}`, password: 'pw-123456' });
+      .send({
+        username: `problem-route-${sequence}-${Date.now().toString(36)}`,
+        password: 'pw-123456',
+      });
     const session = unwrapOk<{ accessToken: string; me: { id: number } }>(registration);
     await unlockTutorial(session.me.id);
     await prisma.user.update({ where: { id: session.me.id }, data: { money: 100 } });

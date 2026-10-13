@@ -137,9 +137,7 @@ export const stagesNgPlusSchema = z
       .strict(),
     milestone_rule: z.string().min(1),
     advance_stone_per_layer_clear: nonNegativeInt,
-    layer_badge: z
-      .object({ item_id_template: z.string().min(1), count: positiveInt })
-      .strict(),
+    layer_badge: z.object({ item_id_template: z.string().min(1), count: positiveInt }).strict(),
     repeat_clear_rank_bonus: z
       .object({
         champion: z.number().finite().nonnegative(),

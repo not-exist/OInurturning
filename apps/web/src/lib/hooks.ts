@@ -159,8 +159,7 @@ export function useOverview() {
 export function useClaimChecklist() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiFetch<ClaimResult>('/api/overview/checklist/claim', { method: 'POST' }),
+    mutationFn: () => apiFetch<ClaimResult>('/api/overview/checklist/claim', { method: 'POST' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['overview'] });
       qc.invalidateQueries({ queryKey: ['me'] });

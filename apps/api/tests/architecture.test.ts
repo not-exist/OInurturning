@@ -78,10 +78,13 @@ function stripComments(source: string): string {
 function listTsFiles(root: string): string[] {
   const out: string[] = [];
   const visit = (dir: string): void => {
-    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1));
+    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+      a.name < b.name ? -1 : 1,
+    );
     for (const entry of entries) {
       // generated（prisma client）不参与守卫：它是生成物，不是人写的源码
-      if (entry.name === 'node_modules' || entry.name === 'generated' || entry.name === 'fixtures') continue;
+      if (entry.name === 'node_modules' || entry.name === 'generated' || entry.name === 'fixtures')
+        continue;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) visit(full);
       else if (/\.tsx?$/.test(entry.name)) out.push(full);
@@ -140,7 +143,11 @@ function prismaModelLines(text: string, model: string): string[] {
 
 /** 值与顺序都一致的序列比较（undefined 视为未找到） */
 function sameSequence(actual: readonly string[] | undefined, expected: readonly string[]): boolean {
-  return actual !== undefined && actual.length === expected.length && expected.every((v, i) => actual[i] === v);
+  return (
+    actual !== undefined &&
+    actual.length === expected.length &&
+    expected.every((v, i) => actual[i] === v)
+  );
 }
 
 // --- 守卫本体 ---------------------------------------------------------------
@@ -156,7 +163,9 @@ describe('architecture guards (R6-T1)', () => {
         }))
         .filter((entry) => entry.hits > 0);
       expect(stray).toEqual([]);
-      const rowLockHits = (stripComments(fileContents.get(ROW_LOCK_FILE)!).match(/FOR UPDATE/g) ?? []).length;
+      const rowLockHits = (
+        stripComments(fileContents.get(ROW_LOCK_FILE)!).match(/FOR UPDATE/g) ?? []
+      ).length;
       expect(rowLockHits).toBe(6);
     });
 
@@ -176,7 +185,9 @@ describe('architecture guards (R6-T1)', () => {
         const definition = new RegExp('\\bfunction\\s+' + name + '\\b');
         return {
           name,
-          sites: allSourceFiles.filter((file) => definition.test(stripComments(fileContents.get(file)!))).map(rel),
+          sites: allSourceFiles
+            .filter((file) => definition.test(stripComments(fileContents.get(file)!)))
+            .map(rel),
         };
       }).filter((entry) => entry.sites.length !== 1);
       expect(dupes).toEqual([]);
@@ -198,7 +209,11 @@ describe('architecture guards (R6-T1)', () => {
       ];
       const mismatches = aligned
         .filter(([name, shared]) => !sameSequence(prismaEnums.get(name), shared))
-        .map(([name, shared]) => ({ enum: name, prisma: prismaEnums.get(name), shared: [...shared] }));
+        .map(([name, shared]) => ({
+          enum: name,
+          prisma: prismaEnums.get(name),
+          shared: [...shared],
+        }));
       expect(mismatches).toEqual([]);
     });
 
@@ -216,10 +231,10 @@ describe('architecture guards (R6-T1)', () => {
       // 反向（shared 侧单面加一个 schema 没有的值）会从它手里逃逸——任何字面量
       // 都是合法成员，extra 不报错。这里反过来要求 Exclude<union, 词表> 为空，
       // 让 shared 侧单面增值在 tsc 变红。两个方向合起来才钉住『相等』而非『包含』。
-      type ContestFormatClosed = Exclude<ContestFormat, 'RANKING' | 'DUEL'> extends never ? true : never;
-      type ContestRecordTypeClosed = Exclude<ContestRecordType, 'STORY' | 'PVP' | 'ADVENTURE'> extends never
-        ? true
-        : never;
+      type ContestFormatClosed =
+        Exclude<ContestFormat, 'RANKING' | 'DUEL'> extends never ? true : never;
+      type ContestRecordTypeClosed =
+        Exclude<ContestRecordType, 'STORY' | 'PVP' | 'ADVENTURE'> extends never ? true : never;
       const contestFormatClosed: ContestFormatClosed = true;
       const contestRecordTypeClosed: ContestRecordTypeClosed = true;
       expect(contestFormatClosed).toBe(true);
@@ -230,13 +245,17 @@ describe('architecture guards (R6-T1)', () => {
       // 刻意不对齐：Prisma TrainingKind（BASIC/DIRECTED/SPECIALIZED）与 shared 的
       // 小写 wire 名（basic/directed/specialized）是两个域，api 内由映射表双向翻译
       // （R4-T9 结论）。此用例只锁定 schema 侧词表本身，防无声明漂移。
-      expect(sameSequence(prismaEnums.get('TrainingKind'), ['BASIC', 'DIRECTED', 'SPECIALIZED'])).toBe(true);
+      expect(
+        sameSequence(prismaEnums.get('TrainingKind'), ['BASIC', 'DIRECTED', 'SPECIALIZED']),
+      ).toBe(true);
     });
   });
 
   describe('guard 4: ability columns and dimension config', () => {
     it('every ABILITY_COLUMNS value is a Student model column', () => {
-      const columns = new Set(prismaModelLines(schemaText, 'Student').map((line) => line.split(/\s+/)[0]!));
+      const columns = new Set(
+        prismaModelLines(schemaText, 'Student').map((line) => line.split(/\s+/)[0]!),
+      );
       const missing = ABILITY_COLUMNS.filter((column) => !columns.has(column));
       expect(missing).toEqual([]);
     });
@@ -273,7 +292,11 @@ describe('architecture guards (R6-T1)', () => {
     it('badges raw casts / Array.isArray(badges) stay inside lib/json.ts only', () => {
       const offenders = allSourceFiles
         .filter((file) => file !== JSON_LIB_FILE)
-        .filter((file) => /badges as string\[\]|Array\.isArray\(badges\)/.test(stripComments(fileContents.get(file)!)))
+        .filter((file) =>
+          /badges as string\[\]|Array\.isArray\(badges\)/.test(
+            stripComments(fileContents.get(file)!),
+          ),
+        )
         .map(rel);
       expect(offenders).toEqual([]);
     });
@@ -292,7 +315,8 @@ describe('architecture guards (R6-T1)', () => {
   describe('guard 8: CandidatePublicView binding', () => {
     // 类型见证：CandidatePublicView 必须仍是 CandidatePayload 掐掉 qualityTier/talents
     // 的子集（R5-T1 裁决）。shared 侧字段漂移会让 _Pv 变 never，tsc 直接红。
-    type _Pv = CandidatePublicView extends Omit<CandidatePayload, 'qualityTier' | 'talents'> ? true : never;
+    type _Pv =
+      CandidatePublicView extends Omit<CandidatePayload, 'qualityTier' | 'talents'> ? true : never;
     const _pv: _Pv = true;
 
     it('CandidatePublicView is bound to CandidatePayload minus qualityTier/talents', () => {
@@ -305,7 +329,9 @@ describe('architecture guards (R6-T1)', () => {
       // 只匹配 interface 声明；`export type X = ...View` 类别名 re-export 不算违规。
       const offenders = allSourceFiles
         .filter((file) => file.startsWith(webSrc))
-        .filter((file) => /export\s+interface\s+\w+View\b/.test(stripComments(fileContents.get(file)!)))
+        .filter((file) =>
+          /export\s+interface\s+\w+View\b/.test(stripComments(fileContents.get(file)!)),
+        )
         .map(rel);
       expect(offenders).toEqual([]);
     });

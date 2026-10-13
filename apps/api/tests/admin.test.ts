@@ -33,7 +33,10 @@ describe('M4.1 admin tools', () => {
     const headers = auth(user.token);
     const requests = [
       request(app).post('/api/admin/tournaments').set(headers).send({
-        name: '禁用赛事', size: 8, registerEndsAt: REGISTER_END, autoStartAt: AUTO_START,
+        name: '禁用赛事',
+        size: 8,
+        registerEndsAt: REGISTER_END,
+        autoStartAt: AUTO_START,
       }),
       request(app).get('/api/admin/tournaments').set(headers),
       request(app).patch('/api/admin/pvp-tournaments/1').set(headers).send({ prizes: {} }),
@@ -72,9 +75,13 @@ describe('M4.1 admin tools', () => {
       .send({ title: '报名开始', body: '秋季公开赛开放报名。' });
     expect(announcementResponse.status).toBe(200);
 
-    const tournaments = unwrapOk<{ id: number }[]>(await request(app).get('/api/admin/tournaments').set(headers));
+    const tournaments = unwrapOk<{ id: number }[]>(
+      await request(app).get('/api/admin/tournaments').set(headers),
+    );
     expect(tournaments.map((entry) => entry.id)).toContain(tournament.id);
-    const announcements = unwrapOk<{ title: string }[]>(await request(app).get('/api/admin/announcements').set(headers));
+    const announcements = unwrapOk<{ title: string }[]>(
+      await request(app).get('/api/admin/announcements').set(headers),
+    );
     expect(announcements[0]?.title).toBe('报名开始');
 
     const users = unwrapOk<{ username: string; passwordHash?: string }[]>(
@@ -87,7 +94,10 @@ describe('M4.1 admin tools', () => {
       await request(app).get('/api/admin/audits').set(headers),
     );
     const ownAudits = audits.filter((entry) => entry.adminNameSnapshot.startsWith('admin-test'));
-    expect(ownAudits.map((entry) => entry.action)).toEqual(['ANNOUNCEMENT_CREATE', 'TOURNAMENT_CREATE']);
+    expect(ownAudits.map((entry) => entry.action)).toEqual([
+      'ANNOUNCEMENT_CREATE',
+      'TOURNAMENT_CREATE',
+    ]);
     expect(ownAudits.every((entry) => entry.adminNameSnapshot.startsWith('admin-test'))).toBe(true);
   });
 
@@ -95,11 +105,17 @@ describe('M4.1 admin tools', () => {
     const admin = await createUser('ADMIN');
     const headers = auth(admin.token);
     const invalidSize = await request(app).post('/api/admin/tournaments').set(headers).send({
-      name: '非法赛事', size: 12, registerEndsAt: REGISTER_END, autoStartAt: AUTO_START,
+      name: '非法赛事',
+      size: 12,
+      registerEndsAt: REGISTER_END,
+      autoStartAt: AUTO_START,
     });
     expect(invalidSize.status).toBe(400);
     const invalidWindow = await request(app).post('/api/admin/tournaments').set(headers).send({
-      name: '非法时间', size: 8, registerEndsAt: AUTO_START, autoStartAt: REGISTER_END,
+      name: '非法时间',
+      size: 8,
+      registerEndsAt: AUTO_START,
+      autoStartAt: REGISTER_END,
     });
     expect(invalidWindow.status).toBe(400);
   });
@@ -107,18 +123,36 @@ describe('M4.1 admin tools', () => {
   it('updates prize pools before cutoff and freezes them after tournament start', async () => {
     const admin = await createUser('ADMIN');
     const headers = auth(admin.token);
-    const created = unwrapOk<{ id: number }>(await request(app).post('/api/admin/tournaments').set(headers).send({
-      name: '奖池赛事', size: 8, registerEndsAt: REGISTER_END, autoStartAt: AUTO_START,
-    }));
-    const updated = await request(app).patch(`/api/admin/pvp-tournaments/${created.id}`).set(headers).send({ prizes: { champion: { money: 2000 } } });
+    const created = unwrapOk<{ id: number }>(
+      await request(app).post('/api/admin/tournaments').set(headers).send({
+        name: '奖池赛事',
+        size: 8,
+        registerEndsAt: REGISTER_END,
+        autoStartAt: AUTO_START,
+      }),
+    );
+    const updated = await request(app)
+      .patch(`/api/admin/pvp-tournaments/${created.id}`)
+      .set(headers)
+      .send({ prizes: { champion: { money: 2000 } } });
     expect(updated.status).toBe(200);
     expect(updated.body.data.prizes).toEqual({ champion: { money: 2000 } });
-    expect(await prisma.adminAuditLog.count({ where: { action: 'TOURNAMENT_PRIZES_UPDATE', targetId: String(created.id) } })).toBe(1);
+    expect(
+      await prisma.adminAuditLog.count({
+        where: { action: 'TOURNAMENT_PRIZES_UPDATE', targetId: String(created.id) },
+      }),
+    ).toBe(1);
 
-    const unknownItem = await request(app).patch(`/api/admin/pvp-tournaments/${created.id}`).set(headers).send({ prizes: { champion: { items: [{ itemId: 'unknown-prize', count: 1 }] } } });
+    const unknownItem = await request(app)
+      .patch(`/api/admin/pvp-tournaments/${created.id}`)
+      .set(headers)
+      .send({ prizes: { champion: { items: [{ itemId: 'unknown-prize', count: 1 }] } } });
     expect(unknownItem.status).toBe(400);
     await prisma.pvpTournament.update({ where: { id: created.id }, data: { status: 'RUNNING' } });
-    const frozen = await request(app).patch(`/api/admin/pvp-tournaments/${created.id}`).set(headers).send({ prizes: {} });
+    const frozen = await request(app)
+      .patch(`/api/admin/pvp-tournaments/${created.id}`)
+      .set(headers)
+      .send({ prizes: {} });
     expect(frozen.status).toBe(409);
   });
 });

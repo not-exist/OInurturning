@@ -111,17 +111,17 @@ pnpm test
 
 ## 开发指南
 
-| 命令 | 说明 |
-|---|---|
-| `pnpm dev` | 并行启动 api（tsx watch）与 web（vite dev，代理 /api） |
-| `pnpm build` | 全仓构建（api tsup + web vite） |
-| `pnpm typecheck` | 全仓类型检查 |
-| `pnpm lint` | ESLint 检查 |
-| `pnpm format` | Prettier 格式化 |
-| `pnpm secret` | 生成强随机 JWT_SECRET（48 字节 base64） |
-| `pnpm admin:set` | 设置管理员账号（需 .env） |
-| `pnpm sim:economy` | 经济收支模拟（读 economy.yaml） |
-| `pnpm bal:regress` | 数值平衡回归检查 |
+| 命令               | 说明                                                   |
+| ------------------ | ------------------------------------------------------ |
+| `pnpm dev`         | 并行启动 api（tsx watch）与 web（vite dev，代理 /api） |
+| `pnpm build`       | 全仓构建（api tsup + web vite）                        |
+| `pnpm typecheck`   | 全仓类型检查                                           |
+| `pnpm lint`        | ESLint 检查                                            |
+| `pnpm format`      | Prettier 格式化                                        |
+| `pnpm secret`      | 生成强随机 JWT_SECRET（48 字节 base64）                |
+| `pnpm admin:set`   | 设置管理员账号（需 .env）                              |
+| `pnpm sim:economy` | 经济收支模拟（读 economy.yaml）                        |
+| `pnpm bal:regress` | 数值平衡回归检查                                       |
 
 环境变量清单、限流与日志配置见 `.env.example` 与 `docs/OPERATIONS.md`。
 

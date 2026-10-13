@@ -60,9 +60,7 @@ function members(
   count: number,
   options: ParticipantOptions = {},
 ): ParticipantSnapshot[] {
-  return Array.from({ length: count }, (_, memberIndex) =>
-    participant(side, memberIndex, options),
-  );
+  return Array.from({ length: count }, (_, memberIndex) => participant(side, memberIndex, options));
 }
 
 function question(instanceId: string, index: number, quality: number): QuestionSnapshot {
@@ -82,7 +80,10 @@ function question(instanceId: string, index: number, quality: number): QuestionS
   };
 }
 
-function questions(count: number, quality: (index: number) => number = (index) => (index % 2 === 0 ? 90 : 10)) {
+function questions(
+  count: number,
+  quality: (index: number) => number = (index) => (index % 2 === 0 ? 90 : 10),
+) {
   return Array.from({ length: count }, (_, index) =>
     question(`duel-${index}`, index, quality(index)),
   );
@@ -201,9 +202,7 @@ describe('duel simulation', () => {
     );
 
     expect(report.rounds).toHaveLength(8);
-    expect(report.rounds.map((round) => round.setterMemberIndex)).toEqual([
-      0, 0, 1, 1, 2, 2, 3, 3,
-    ]);
+    expect(report.rounds.map((round) => round.setterMemberIndex)).toEqual([0, 0, 1, 1, 2, 2, 3, 3]);
     expect(report.rounds.map((round) => round.answererMemberIndex)).toEqual([
       1, 1, 2, 2, 3, 3, 0, 0,
     ]);

@@ -27,12 +27,18 @@ export async function lockStudent(tx: Prisma.TransactionClient, studentId: numbe
  * 去重，顺序语义留在调用点）；空数组时 Prisma.join 直接抛 TypeError，不会生成 SQL，
  * 调用点的 roster 校验已使其不可达。
  */
-export async function lockStudentsByIds(tx: Prisma.TransactionClient, lockedIds: readonly number[]): Promise<void> {
+export async function lockStudentsByIds(
+  tx: Prisma.TransactionClient,
+  lockedIds: readonly number[],
+): Promise<void> {
   await tx.$queryRaw`SELECT id FROM Student WHERE id IN (${Prisma.join(lockedIds)}) FOR UPDATE`;
 }
 
 /** 锦标赛行：pvp 流程的加锁起点（Tournament → User → Student）。 */
-export async function lockPvpTournament(tx: Prisma.TransactionClient, tournamentId: number): Promise<void> {
+export async function lockPvpTournament(
+  tx: Prisma.TransactionClient,
+  tournamentId: number,
+): Promise<void> {
   await tx.$queryRaw`SELECT id FROM PvpTournament WHERE id = ${tournamentId} FOR UPDATE`;
 }
 
@@ -42,6 +48,9 @@ export async function lockRecruitPool(tx: Prisma.TransactionClient, userId: numb
 }
 
 /** 锁历练日志行（chooseAdventure：users 行之后加锁）。 */
-export async function lockAdventureLog(tx: Prisma.TransactionClient, adventureId: number): Promise<void> {
+export async function lockAdventureLog(
+  tx: Prisma.TransactionClient,
+  adventureId: number,
+): Promise<void> {
   await tx.$queryRaw`SELECT id FROM AdventureLog WHERE id = ${adventureId} FOR UPDATE`;
 }

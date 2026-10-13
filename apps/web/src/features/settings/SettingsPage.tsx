@@ -43,7 +43,8 @@ export function SettingsPage(): JSX.Element {
   });
 
   if (meQ.isPending) return <p className="text-fg-dim">读取账户信息…</p>;
-  if (meQ.isError || !meQ.data) return <ErrorNote onRetry={() => void meQ.refetch()}>账户信息读取失败。</ErrorNote>;
+  if (meQ.isError || !meQ.data)
+    return <ErrorNote onRetry={() => void meQ.refetch()}>账户信息读取失败。</ErrorNote>;
   const me = meQ.data;
 
   function onChange(e: FormEvent<HTMLFormElement>): void {
@@ -151,7 +152,12 @@ export function SettingsPage(): JSX.Element {
               />
             </label>
           </div>
-          <Btn data-testid="pwd-save" type="submit" variant="primary" disabled={changePwd.isPending}>
+          <Btn
+            data-testid="pwd-save"
+            type="submit"
+            variant="primary"
+            disabled={changePwd.isPending}
+          >
             保存并重新登录
           </Btn>
         </form>
@@ -185,7 +191,12 @@ export function SettingsPage(): JSX.Element {
             placeholder="输入密码确认注销"
             className="min-w-[12rem] flex-1 border border-ink-600 bg-ink-850/80 px-3 py-2 focus:border-bad-400/70"
           />
-          <Btn data-testid="deactivate-submit" type="submit" variant="danger" disabled={deactivate.isPending}>
+          <Btn
+            data-testid="deactivate-submit"
+            type="submit"
+            variant="danger"
+            disabled={deactivate.isPending}
+          >
             <Icon icon={Trash2} className="size-3.5" />
             注销账户
           </Btn>

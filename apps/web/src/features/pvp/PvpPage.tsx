@@ -151,11 +151,7 @@ export function PvpPage(): JSX.Element {
       />
 
       {tournaments.data.length === 0 ? (
-        <Empty
-          icon={Swords}
-          title="暂无开放赛事"
-          action={<ActionLink to="/">查看公告</ActionLink>}
-        >
+        <Empty icon={Swords} title="暂无开放赛事" action={<ActionLink to="/">查看公告</ActionLink>}>
           管理员发布锦标赛后会出现在这里。报名需持有报名券，可留意公告。
         </Empty>
       ) : (

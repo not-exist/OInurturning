@@ -40,7 +40,10 @@ async function register(username?: string): Promise<{ token: string; userId: num
   seq += 1;
   const res = await request(app)
     .post('/api/auth/register')
-    .send({ username: username ?? `pvpcov-${Date.now().toString(36)}-${seq}`, password: 'pw-12345678' });
+    .send({
+      username: username ?? `pvpcov-${Date.now().toString(36)}-${seq}`,
+      password: 'pw-12345678',
+    });
   expect(res.status).toBe(200);
   const session = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
   await unlockTutorial(session.me.id);
@@ -53,9 +56,22 @@ async function makePlayer(): Promise<Player> {
   for (let member = 0; member < 3; member += 1) {
     const student = await prisma.student.create({
       data: {
-        userId, name: `PVP 选手 ${seq}-${member}`, qualityTier: 'ELITE',
-        ds: 60, dp: 60, math: 60, graph: 60, greedy: 60, str: 60, code: 60, thinking: 60, setting: 60,
-        focusCap: 40, energyMax: 80, energy: 80, staminaRegen: 50,
+        userId,
+        name: `PVP 选手 ${seq}-${member}`,
+        qualityTier: 'ELITE',
+        ds: 60,
+        dp: 60,
+        math: 60,
+        graph: 60,
+        greedy: 60,
+        str: 60,
+        code: 60,
+        thinking: 60,
+        setting: 60,
+        focusCap: 40,
+        energyMax: 80,
+        energy: 80,
+        staminaRegen: 50,
       },
     });
     studentIds.push(student.id);
@@ -108,7 +124,11 @@ describe('pvp coverage：报名 HTTP', () => {
       .set('Authorization', `Bearer ${player.token}`)
       .send({ studentIds: player.studentIds, problemEntryIds: [] });
     expect(first.status).toBe(200);
-    const created = unwrapOk<{ id: number; replayed: boolean; roster: Array<{ studentId: number }> }>(first);
+    const created = unwrapOk<{
+      id: number;
+      replayed: boolean;
+      roster: Array<{ studentId: number }>;
+    }>(first);
     expect(created.replayed).toBe(false);
     expect(created.roster).toHaveLength(3);
     expect(created.roster[0]?.studentId).toBe(player.studentIds[0]);
@@ -127,21 +147,35 @@ describe('pvp coverage：报名 HTTP', () => {
     const player = await makePlayer();
     const auth = { Authorization: `Bearer ${player.token}` };
     // 每名队员至多携带一道：rosterSize=3 时第 4 道越界
-    const problems = await Promise.all([1, 2, 3, 4].map(() => prisma.problemLibraryEntry.create({
-      data: { userId: player.userId, authorStudentId: player.studentId, name: 'PVP 题', dominantDim: 'DS', rarity: 'green', quality: 60 },
-    })));
+    const problems = await Promise.all(
+      [1, 2, 3, 4].map(() =>
+        prisma.problemLibraryEntry.create({
+          data: {
+            userId: player.userId,
+            authorStudentId: player.studentId,
+            name: 'PVP 题',
+            dominantDim: 'DS',
+            rarity: 'green',
+            quality: 60,
+          },
+        }),
+      ),
+    );
     const tooMany = await request(app)
-      .post(`/api/pvp/tournaments/${tournament.id}/register`).set(auth)
+      .post(`/api/pvp/tournaments/${tournament.id}/register`)
+      .set(auth)
       .send({ studentIds: player.studentIds, problemEntryIds: problems.map((p) => p.id) });
     expect(tooMany.status).toBe(400);
     const dup = await request(app)
-      .post(`/api/pvp/tournaments/${tournament.id}/register`).set(auth)
+      .post(`/api/pvp/tournaments/${tournament.id}/register`)
+      .set(auth)
       .send({ studentIds: player.studentIds, problemEntryIds: [problems[0]!.id, problems[0]!.id] });
     expect(dup.status).toBe(400);
 
     const closed = await makeTournament({ registerEndsAt: PAST });
     const closedRes = await request(app)
-      .post(`/api/pvp/tournaments/${closed.id}/register`).set(auth)
+      .post(`/api/pvp/tournaments/${closed.id}/register`)
+      .set(auth)
       .send({ studentIds: player.studentIds, problemEntryIds: [] });
     expect(closedRes.status).toBe(409);
     expect(unwrapErr(closedRes).code).toBe('STATE_CONFLICT');
@@ -155,7 +189,8 @@ describe('pvp coverage：报名 HTTP', () => {
       expect(res.status).toBe(200);
     }
     const full = await request(app)
-      .post(`/api/pvp/tournaments/${tournament.id}/register`).set(auth)
+      .post(`/api/pvp/tournaments/${tournament.id}/register`)
+      .set(auth)
       .send({ studentIds: player.studentIds, problemEntryIds: [] });
     expect(full.status).toBe(409);
   });
@@ -174,12 +209,16 @@ describe('pvp coverage：奖励与认领 HTTP', () => {
 
     const champion = players[0]!;
     const list = unwrapOk<RewardGrant[]>(
-      await request(app).get(`/api/pvp/tournaments/${tournament.id}/rewards`).set('Authorization', `Bearer ${champion.token}`),
+      await request(app)
+        .get(`/api/pvp/tournaments/${tournament.id}/rewards`)
+        .set('Authorization', `Bearer ${champion.token}`),
     );
     expect(list).toHaveLength(8);
     const winner = list.find((g) => g.rank === 1)!;
     expect(winner.rewards).toContainEqual({ type: 'item', itemId: 'tag-card', count: 1 });
-    expect(list.filter((g) => g.rank > 1).every((g) => !g.rewards.some((r) => r.itemId === 'tag-card'))).toBe(true);
+    expect(
+      list.filter((g) => g.rank > 1).every((g) => !g.rewards.some((r) => r.itemId === 'tag-card')),
+    ).toBe(true);
 
     const winnerPlayer = players.find((p) => p.userId === winner.userId)!;
     const claim = await request(app)
@@ -208,7 +247,9 @@ describe('pvp coverage：奖励与认领 HTTP', () => {
 
   it('自定义奖池：钱/声誉/道具到账并写 ReputationLog', async () => {
     const tournament = await makeTournament({
-      prizes: { champion: { money: 500, reputation: 10, items: [{ itemId: 'milk-tea', count: 2 }] } },
+      prizes: {
+        champion: { money: 500, reputation: 10, items: [{ itemId: 'milk-tea', count: 2 }] },
+      },
     });
     const players: Player[] = [];
     for (let i = 0; i < 8; i += 1) {
@@ -219,7 +260,9 @@ describe('pvp coverage：奖励与认领 HTTP', () => {
     await finishTournament(tournament.id);
 
     const list = unwrapOk<RewardGrant[]>(
-      await request(app).get(`/api/pvp/tournaments/${tournament.id}/rewards`).set('Authorization', `Bearer ${players[0]!.token}`),
+      await request(app)
+        .get(`/api/pvp/tournaments/${tournament.id}/rewards`)
+        .set('Authorization', `Bearer ${players[0]!.token}`),
     );
     const winner = list.find((g) => g.rank === 1)!;
     expect(winner.rewards).toContainEqual({ type: 'money', amount: 500 });
@@ -235,9 +278,13 @@ describe('pvp coverage：奖励与认领 HTTP', () => {
     const after = await prisma.user.findUniqueOrThrow({ where: { id: winner.userId } });
     expect(after.money - before.money).toBe(500);
     expect(after.reputation - before.reputation).toBe(10);
-    const tea = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: winner.userId, itemId: 'milk-tea' } } });
+    const tea = await prisma.userItem.findUnique({
+      where: { userId_itemId: { userId: winner.userId, itemId: 'milk-tea' } },
+    });
     expect(tea?.quantity).toBe(4); // 开局包×2 + 奖品×2
-    const log = await prisma.reputationLog.findFirstOrThrow({ where: { userId: winner.userId, reason: { startsWith: `PVP_PRIZE:${tournament.id}:` } } });
+    const log = await prisma.reputationLog.findFirstOrThrow({
+      where: { userId: winner.userId, reason: { startsWith: `PVP_PRIZE:${tournament.id}:` } },
+    });
     expect(log.delta).toBe(10);
   });
 
@@ -274,7 +321,9 @@ describe('pvp coverage：战报共享与对阵 HTTP', () => {
     }
     await finishTournament(tournament.id);
 
-    const match = await prisma.pvpMatch.findFirstOrThrow({ where: { tournamentId: tournament.id, round: 1 } });
+    const match = await prisma.pvpMatch.findFirstOrThrow({
+      where: { tournamentId: tournament.id, round: 1 },
+    });
     expect(match.homeUserId).not.toBeNull();
     expect(match.awayUserId).not.toBeNull();
     expect(match.contestRecordId).not.toBeNull();
@@ -283,11 +332,15 @@ describe('pvp coverage：战报共享与对阵 HTTP', () => {
     const outsider = await makePlayer();
 
     for (const party of [home, away]) {
-      const res = await request(app).get(`/api/records/${match.contestRecordId}`).set('Authorization', `Bearer ${party.token}`);
+      const res = await request(app)
+        .get(`/api/records/${match.contestRecordId}`)
+        .set('Authorization', `Bearer ${party.token}`);
       expect(res.status).toBe(200);
       expect(unwrapOk<{ summary: { format: string } }>(res).summary.format).toBe('DUEL');
     }
-    const denied = await request(app).get(`/api/records/${match.contestRecordId}`).set('Authorization', `Bearer ${outsider.token}`);
+    const denied = await request(app)
+      .get(`/api/records/${match.contestRecordId}`)
+      .set('Authorization', `Bearer ${outsider.token}`);
     expect(denied.status).toBe(404);
   });
 
@@ -299,19 +352,29 @@ describe('pvp coverage：战报共享与对阵 HTTP', () => {
       players.push(player);
       await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
     }
-    const before = unwrapOk<{ status: string; registeredCount: number; myRegistration: number | null }>(
-      await request(app).get(`/api/pvp/tournaments/${tournament.id}`).set('Authorization', `Bearer ${players[0]!.token}`),
+    const before = unwrapOk<{
+      status: string;
+      registeredCount: number;
+      myRegistration: number | null;
+    }>(
+      await request(app)
+        .get(`/api/pvp/tournaments/${tournament.id}`)
+        .set('Authorization', `Bearer ${players[0]!.token}`),
     );
     expect(before).toMatchObject({ status: 'REGISTERING', registeredCount: 8 });
     expect(before.myRegistration).toEqual(expect.any(Number));
 
     await finishTournament(tournament.id);
     const after = unwrapOk<{ status: string }>(
-      await request(app).get(`/api/pvp/tournaments/${tournament.id}`).set('Authorization', `Bearer ${players[0]!.token}`),
+      await request(app)
+        .get(`/api/pvp/tournaments/${tournament.id}`)
+        .set('Authorization', `Bearer ${players[0]!.token}`),
     );
     expect(after.status).toBe('FINISHED');
     const bracket = unwrapOk<Array<{ status: string; winnerUserId: number | null }>>(
-      await request(app).get(`/api/pvp/tournaments/${tournament.id}/bracket`).set('Authorization', `Bearer ${players[0]!.token}`),
+      await request(app)
+        .get(`/api/pvp/tournaments/${tournament.id}/bracket`)
+        .set('Authorization', `Bearer ${players[0]!.token}`),
     );
     expect(bracket).toHaveLength(7);
     expect(bracket.every((m) => m.status === 'DONE' && m.winnerUserId !== null)).toBe(true);
@@ -325,16 +388,24 @@ describe('pvp coverage：admin 一键开赛真实路径', () => {
     const tournament = await makeTournament({ autoStartAt: PAST });
     const player = await makePlayer();
     await registerPvp(player.userId, tournament.id, player.studentIds, [], PAST);
-    expect(await prisma.userItem.findUnique({ where: { userId_itemId: { userId: player.userId, itemId: 'entry-ticket' } } })).toBeNull();
+    expect(
+      await prisma.userItem.findUnique({
+        where: { userId_itemId: { userId: player.userId, itemId: 'entry-ticket' } },
+      }),
+    ).toBeNull();
 
     const res = await request(app)
       .post(`/api/admin/pvp-tournaments/${tournament.id}/actions/start`)
       .set('Authorization', `Bearer ${admin.token}`);
     expect(res.status).toBe(200);
     expect(unwrapOk<{ status: string }>(res).status).toBe('CANCELLED');
-    const refunded = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: player.userId, itemId: 'entry-ticket' } } });
+    const refunded = await prisma.userItem.findUnique({
+      where: { userId_itemId: { userId: player.userId, itemId: 'entry-ticket' } },
+    });
     expect(refunded?.quantity).toBe(1);
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START', targetId: String(tournament.id) } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({
+      where: { action: 'PVP_TOURNAMENT_START', targetId: String(tournament.id) },
+    });
     expect(audit.payload as object).toMatchObject({ status: 'CANCELLED' });
   });
 
@@ -352,7 +423,9 @@ describe('pvp coverage：admin 一键开赛真实路径', () => {
     expect(res.status).toBe(200);
     expect(unwrapOk<{ status: string }>(res).status).toBe('FINISHED');
     expect(await prisma.pvpMatch.count({ where: { tournamentId: tournament.id } })).toBe(7);
-    const audit = await prisma.adminAuditLog.findFirstOrThrow({ where: { action: 'PVP_TOURNAMENT_START', targetId: String(tournament.id) } });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({
+      where: { action: 'PVP_TOURNAMENT_START', targetId: String(tournament.id) },
+    });
     expect(audit.adminId).toBe(admin.userId);
   });
 });
@@ -368,7 +441,9 @@ describe('pvp coverage：参赛者注销（物理删除）后的历史赛事健�
     }
     await finishTournament(tournament.id);
 
-    const grantsBefore = await prisma.pvpRewardGrant.findMany({ where: { tournamentId: tournament.id } });
+    const grantsBefore = await prisma.pvpRewardGrant.findMany({
+      where: { tournamentId: tournament.id },
+    });
     expect(grantsBefore).toHaveLength(8);
     const champion = grantsBefore.find((grant) => grant.rank === 1)!;
     const championPlayer = players.find((player) => player.userId === champion.userId)!;
@@ -398,7 +473,10 @@ describe('pvp coverage：参赛者注销（物理删除）后的历史赛事健�
     expect(unwrapOk<unknown[]>(bracket)).toHaveLength(7);
 
     // 已删冠军的奖励行不复活，其余 7 人名次与奖励不受影响
-    const grantsAfter = await prisma.pvpRewardGrant.findMany({ where: { tournamentId: tournament.id }, orderBy: { rank: 'asc' } });
+    const grantsAfter = await prisma.pvpRewardGrant.findMany({
+      where: { tournamentId: tournament.id },
+      orderBy: { rank: 'asc' },
+    });
     expect(grantsAfter).toHaveLength(7);
     expect(grantsAfter.some((grant) => grant.userId === champion.userId)).toBe(false);
     const rewards = await request(app)

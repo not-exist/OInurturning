@@ -7,7 +7,13 @@ import { ReplayControls } from '../shared/ReplayControls';
 import { ReplayStatus } from '../shared/bits';
 import { useIncrementalReplay } from '../shared/useIncrementalReplay';
 import { useReplayPlayback } from '../shared/useReplayPlayback';
-import { buildTimedEvents, finishEvent, matchupOf, questionMap, type ReplayViewProps } from '../shared/replay';
+import {
+  buildTimedEvents,
+  finishEvent,
+  matchupOf,
+  questionMap,
+  type ReplayViewProps,
+} from '../shared/replay';
 import {
   MemberPanel,
   applyMemberEvent,
@@ -83,7 +89,9 @@ export function RankingParallelReplay({
     applyEventToQuestionStatus,
   );
 
-  const members = [...memberStates.values()].sort((left, right) => left.memberIndex - right.memberIndex);
+  const members = [...memberStates.values()].sort(
+    (left, right) => left.memberIndex - right.memberIndex,
+  );
   const columns = clamp(members.length, 1, 4);
 
   return (

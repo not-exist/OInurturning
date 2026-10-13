@@ -57,7 +57,10 @@ const eventConsumeSchema = z
 const eventChoiceSchema = z
   .object({
     text: z.string().min(1),
-    requires_item: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    requires_item: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]*$/)
+      .optional(),
     consume: eventConsumeSchema.optional(),
     cost_money: z.number().int().nonnegative().optional(),
     outcomes: z.array(eventOutcomeSchema).min(1),

@@ -37,9 +37,22 @@ async function register(): Promise<{ token: string; userId: number }> {
 async function makeStudent(userId: number): Promise<{ id: number }> {
   const student = await prisma.student.create({
     data: {
-      userId, name: '补白学员', qualityTier: 'COMMON',
-      ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10, code: 10, thinking: 10, setting: 10,
-      focusCap: 20, energyMax: 50, energy: 50, staminaRegen: 10,
+      userId,
+      name: '补白学员',
+      qualityTier: 'COMMON',
+      ds: 10,
+      dp: 10,
+      math: 10,
+      graph: 10,
+      greedy: 10,
+      str: 10,
+      code: 10,
+      thinking: 10,
+      setting: 10,
+      focusCap: 20,
+      energyMax: 50,
+      energy: 50,
+      staminaRegen: 10,
     },
   });
   return { id: student.id };
@@ -73,10 +86,15 @@ describe('students gaps', () => {
     const user = await register();
     const student = await makeStudent(user.userId);
     const auth = { Authorization: `Bearer ${user.token}` };
-    await prisma.userItem.create({ data: { userId: user.userId, itemId: 'rename-card', quantity: 1 } });
+    await prisma.userItem.create({
+      data: { userId: user.userId, itemId: 'rename-card', quantity: 1 },
+    });
     const dismiss = await request(app).post(`/api/students/${student.id}/dismiss`).set(auth);
     expect(dismiss.status).toBe(200);
-    const rename = await request(app).post(`/api/students/${student.id}/rename`).set(auth).send({ name: '新名字' });
+    const rename = await request(app)
+      .post(`/api/students/${student.id}/rename`)
+      .set(auth)
+      .send({ name: '新名字' });
     expect(rename.status).toBe(404);
   });
 });

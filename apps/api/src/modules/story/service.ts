@@ -1,4 +1,8 @@
-import { Prisma, type Student, type StoryProgress as StoryProgressRow } from '../../generated/prisma/client.js';
+import {
+  Prisma,
+  type Student,
+  type StoryProgress as StoryProgressRow,
+} from '../../generated/prisma/client.js';
 import {
   ABILITY_COLUMN,
   CONFIG_RARITIES,

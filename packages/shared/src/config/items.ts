@@ -5,7 +5,14 @@ import { CONFIG_RARITIES } from './talents.js';
  * items.yaml 对应的 zod schema（docs/data/items.yaml 为唯一事实源）。
  * 顶层允许文件级 meta 区块（合成配方表等，集成裁定 #13）。
  */
-export const ITEM_CATEGORIES = ['nurture', 'book', 'functional', 'contest', 'quest', 'material'] as const;
+export const ITEM_CATEGORIES = [
+  'nurture',
+  'book',
+  'functional',
+  'contest',
+  'quest',
+  'material',
+] as const;
 export type ItemCategoryKey = (typeof ITEM_CATEGORIES)[number];
 
 /** effect.kind 使用语义枚举（items.yaml 头部清单 + 集成新增 + 数据实有值） */

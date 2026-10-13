@@ -1,0 +1,8 @@
+apps/api/src/generated/
+dist/
+coverage/
+pnpm-lock.yaml
+.superpowers/
+history.txt
+conversation-*.txt
+*.log

@@ -150,7 +150,9 @@ export function resolveAttempt(input: ResolveAttemptInput, rng: AttemptRng): Att
   const noiseSigma = Math.max(0, (0.15 + hooks.noiseSigmaAdd) * hooks.noiseSigmaMul);
   const submissionTime = Math.max(
     0,
-    rewriteMultiplier * Math.max(0, finite(input.estimatedTimeMin, 0)) * Math.exp(noiseSigma * standardNormal(rng.noise)) +
+    rewriteMultiplier *
+      Math.max(0, finite(input.estimatedTimeMin, 0)) *
+      Math.exp(noiseSigma * standardNormal(rng.noise)) +
       hooks.submitTimeAdd,
   );
 
@@ -167,7 +169,11 @@ export function resolveAttempt(input: ResolveAttemptInput, rng: AttemptRng): Att
     };
   }
 
-  const tleProbability = clamp(amplifyProbability(0.02 + hooks.tleProbAdd, hooks.probabilityAmplify), 0, 0.6);
+  const tleProbability = clamp(
+    amplifyProbability(0.02 + hooks.tleProbAdd, hooks.probabilityAmplify),
+    0,
+    0.6,
+  );
   const isTle = rng.judge() < tleProbability;
   let verdict: AttemptResolution['verdict'];
 
@@ -215,7 +221,8 @@ export function resolveAttempt(input: ResolveAttemptInput, rng: AttemptRng): Att
 }
 
 function baseAcProbability(input: SolveQuestionInput): number {
-  const dimensionMargin = input.participant.abilities[input.question.dimension] - input.question.demand;
+  const dimensionMargin =
+    input.participant.abilities[input.question.dimension] - input.question.demand;
   const thinkingMargin = input.participant.abilities.THINKING - input.question.thought;
   return sigmoid(0.15 * (8 + dimensionMargin + thinkingMargin));
 }
@@ -316,7 +323,10 @@ export function solveQuestion(input: SolveQuestionInput, rng: AttemptRng): Quest
     investedMin: timeSpent,
     mindset: mindsetBefore,
   });
-  const scoreAwarded = verdict === 'AC' ? Math.max(0, input.question.score) : partialScore(input, timeSpent, estimatedTime);
+  const scoreAwarded =
+    verdict === 'AC'
+      ? Math.max(0, input.question.score)
+      : partialScore(input, timeSpent, estimatedTime);
 
   return {
     problemInstanceId: input.question.instanceId,

@@ -66,7 +66,9 @@ export function RegistrationForm({
                 <label
                   key={problem.id}
                   className={`flex cursor-pointer items-center gap-2 border px-2.5 py-2 text-xs transition-colors ${
-                    checked ? 'border-cyber-500/60 bg-cyber-400/5' : 'border-ink-600/70 bg-ink-900/40'
+                    checked
+                      ? 'border-cyber-500/60 bg-cyber-400/5'
+                      : 'border-ink-600/70 bg-ink-900/40'
                   }`}
                 >
                   <input
@@ -147,7 +149,9 @@ export function RegistrationView({
             >
               <span className="truncate">{problem.name}</span>
               <span className="tnum opacity-80">Q {problem.quality}</span>
-              {problem.traitId !== null && <span className="opacity-80">{traitName(problem.traitId)}</span>}
+              {problem.traitId !== null && (
+                <span className="opacity-80">{traitName(problem.traitId)}</span>
+              )}
             </span>
           ))
         )}

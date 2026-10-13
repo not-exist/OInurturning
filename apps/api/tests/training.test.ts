@@ -25,7 +25,9 @@ let userSeq = 0;
 async function createAuthedUser(money = 0): Promise<{ userId: number; token: string }> {
   userSeq += 1;
   const username = `tr-${Date.now().toString(36)}-${userSeq}`;
-  const res = await request(app).post('/api/auth/register').send({ username, password: 'pw-123456' });
+  const res = await request(app)
+    .post('/api/auth/register')
+    .send({ username, password: 'pw-123456' });
   const { accessToken, me } = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
   await unlockTutorial(me.id);
   await prisma.user.update({ where: { id: me.id }, data: { money } });
@@ -37,15 +39,28 @@ function auth(token: string) {
 }
 
 /** 六维全部 = 10（使基础训练任意维 cur 相同，锚点可手算）；stamina 默认 5 */
-async function createStudent(userId: number, overrides: Record<string, unknown> = {}): Promise<number> {
+async function createStudent(
+  userId: number,
+  overrides: Record<string, unknown> = {},
+): Promise<number> {
   const s = await prisma.student.create({
     data: {
       userId,
       name: '训练学员',
-            qualityTier: 'COMMON',
-      ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10,
-      code: 10, thinking: 10, setting: 10,
-      focusCap: 45, energyMax: 60, energy: 30, staminaRegen: 50,
+      qualityTier: 'COMMON',
+      ds: 10,
+      dp: 10,
+      math: 10,
+      graph: 10,
+      greedy: 10,
+      str: 10,
+      code: 10,
+      thinking: 10,
+      setting: 10,
+      focusCap: 45,
+      energyMax: 60,
+      energy: 30,
+      staminaRegen: 50,
       lastSettledAt: new Date(),
       ...overrides,
     },
@@ -70,7 +85,10 @@ async function itemQuantity(userId: number, itemId: string): Promise<number> {
   return row?.quantity ?? 0;
 }
 
-async function giveProblem(userId: number, overrides: Record<string, unknown> = {}): Promise<number> {
+async function giveProblem(
+  userId: number,
+  overrides: Record<string, unknown> = {},
+): Promise<number> {
   const p = await prisma.problemLibraryEntry.create({
     data: {
       userId,
@@ -90,20 +108,48 @@ async function giveProblem(userId: number, overrides: Record<string, unknown> = 
 
 describe('gains 纯函数', () => {
   it('computeDelta：cur=10 base=1.6 全乘 1 → ≈1.296（student.md §4.3）', () => {
-    const delta = computeDelta({ base: TRAINING_BASE.basic, bookMult: 1, qualityMult: 1, meta: {}, dimMetaKey: 'training_ds', cur: 10 });
+    const delta = computeDelta({
+      base: TRAINING_BASE.basic,
+      bookMult: 1,
+      qualityMult: 1,
+      meta: {},
+      dimMetaKey: 'training_ds',
+      cur: 10,
+    });
     expect(delta).toBeCloseTo(1.296, 6); // 1.6 × 0.9^2
   });
 
   it('computeDelta：cur≥100 → 0', () => {
-    expect(computeDelta({ base: 1.6, bookMult: 1, qualityMult: 1, meta: {}, dimMetaKey: 'training_ds', cur: 100 })).toBe(0);
-    expect(computeDelta({ base: 1.6, bookMult: 1, qualityMult: 1, meta: {}, dimMetaKey: 'training_ds', cur: 105 })).toBe(0);
+    expect(
+      computeDelta({
+        base: 1.6,
+        bookMult: 1,
+        qualityMult: 1,
+        meta: {},
+        dimMetaKey: 'training_ds',
+        cur: 100,
+      }),
+    ).toBe(0);
+    expect(
+      computeDelta({
+        base: 1.6,
+        bookMult: 1,
+        qualityMult: 1,
+        meta: {},
+        dimMetaKey: 'training_ds',
+        cur: 105,
+      }),
+    ).toBe(0);
   });
 
   it('computeDelta：meta 乘算展开（training_all +15 与 training_ds +15 乘算 → ×1.3225）', () => {
     const delta = computeDelta({
-      base: 1.6, bookMult: 1, qualityMult: 1,
+      base: 1.6,
+      bookMult: 1,
+      qualityMult: 1,
       meta: { training_all: 15, training_ds: 15 },
-      dimMetaKey: 'training_ds', cur: 0,
+      dimMetaKey: 'training_ds',
+      cur: 0,
     });
     expect(delta).toBeCloseTo(1.6 * 1.15 * 1.15, 6);
   });
@@ -119,7 +165,14 @@ describe('gains 纯函数', () => {
     const seq = [0.01, 0.5, 0.01, 0.5, 0.5, 0.5];
     let i = 0;
     const rng = () => seq[i++];
-    const student = { code: 10, thinking: 10, setting: 10, mindset: 2, focusCap: 45, staminaRegen: 50 } as never;
+    const student = {
+      code: 10,
+      thinking: 10,
+      setting: 10,
+      mindset: 2,
+      focusCap: 45,
+      staminaRegen: 50,
+    } as never;
     const { patch, rareGains } = computeSecondaryGains({ type: 'basic', student, meta: {}, rng });
     // code：20% × 0.01 命中，阻尼 (1−0.1)^2 = 0.81 → +0.81
     expect(patch.code).toBeCloseTo(10.81, 6);
@@ -134,7 +187,19 @@ describe('gains 纯函数', () => {
     let i = 0;
     const rng = () => seq[i++];
     // training_code=100 → code 概率 0.2×2=0.4，0.01 命中
-    const { patch } = computeSecondaryGains({ type: 'basic', student: { code: 10, thinking: 10, setting: 1, mindset: 2, focusCap: 45, staminaRegen: 50 } as never, meta: { training_code: 100 }, rng });
+    const { patch } = computeSecondaryGains({
+      type: 'basic',
+      student: {
+        code: 10,
+        thinking: 10,
+        setting: 1,
+        mindset: 2,
+        focusCap: 45,
+        staminaRegen: 50,
+      } as never,
+      meta: { training_code: 100 },
+      rng,
+    });
     expect(patch.code).toBeCloseTo(10.81, 6);
   });
 });
@@ -150,7 +215,10 @@ describe('POST /api/training/basic', () => {
     const u = await createAuthedUser(1000);
     const id = await createStudent(u.userId);
 
-    const res = await request(app).post('/api/training/basic').set(auth(u.token)).send({ studentId: id });
+    const res = await request(app)
+      .post('/api/training/basic')
+      .set(auth(u.token))
+      .send({ studentId: id });
     expect(res.status).toBe(200);
     const r = unwrapOk<HttpResult>(res);
     expect(DIMENSIONS).toContain(r.dim);
@@ -168,7 +236,10 @@ describe('POST /api/training/basic', () => {
     const u = await createAuthedUser(1000);
     const id = await createStudent(u.userId, { stamina: 0 });
 
-    const res = await request(app).post('/api/training/basic').set(auth(u.token)).send({ studentId: id });
+    const res = await request(app)
+      .post('/api/training/basic')
+      .set(auth(u.token))
+      .send({ studentId: id });
     expect(res.status).toBe(409);
     expect(unwrapErr(res).code).toBe('STATE_CONFLICT');
     expect(await userMoney(u.userId)).toBe(1000); // 未扣
@@ -178,7 +249,10 @@ describe('POST /api/training/basic', () => {
     const u = await createAuthedUser(10);
     const id = await createStudent(u.userId);
 
-    const res = await request(app).post('/api/training/basic').set(auth(u.token)).send({ studentId: id });
+    const res = await request(app)
+      .post('/api/training/basic')
+      .set(auth(u.token))
+      .send({ studentId: id });
     expect(res.status).toBe(409);
     expect(unwrapErr(res).code).toBe('INSUFFICIENT_RESOURCE');
   });
@@ -188,7 +262,10 @@ describe('POST /api/training/basic', () => {
     for (let i = 0; i < 4; i++) await createStudent(u.userId); // 4 + 目标 1 + 开局包 2 = 7 在册
     const id = await createStudent(u.userId);
 
-    const res = await request(app).post('/api/training/basic').set(auth(u.token)).send({ studentId: id });
+    const res = await request(app)
+      .post('/api/training/basic')
+      .set(auth(u.token))
+      .send({ studentId: id });
     const r = unwrapOk<HttpResult>(res);
     expect(r.cost).toBe(89); // round(60×(1+0.08×6))=89
   });
@@ -218,7 +295,10 @@ describe('POST /api/training/directed', () => {
     const id = await createStudent(u.userId, { ds: 10 });
     await giveItem(u.userId, 'book-ds-green', 1);
 
-    const res = await request(app).post('/api/training/directed').set(auth(u.token)).send({ studentId: id, dim: 'DS', bookItemId: 'book-ds-green' });
+    const res = await request(app)
+      .post('/api/training/directed')
+      .set(auth(u.token))
+      .send({ studentId: id, dim: 'DS', bookItemId: 'book-ds-green' });
     expect(res.status).toBe(200);
     const r = unwrapOk<HttpResult>(res);
     expect(r.dim).toBe('DS');
@@ -234,7 +314,10 @@ describe('POST /api/training/directed', () => {
     const id = await createStudent(u.userId, { ds: 10 });
     const before = await studentRow(id);
 
-    const res = await request(app).post('/api/training/directed').set(auth(u.token)).send({ studentId: id, dim: 'DS' });
+    const res = await request(app)
+      .post('/api/training/directed')
+      .set(auth(u.token))
+      .send({ studentId: id, dim: 'DS' });
     expect(res.status).toBe(409);
     expect(unwrapErr(res).code).toBe('INSUFFICIENT_RESOURCE');
     expect((await studentRow(id)).ds).toBe(before.ds);
@@ -246,7 +329,10 @@ describe('POST /api/training/directed', () => {
     const id = await createStudent(u.userId, { dp: 10 });
     await giveItem(u.userId, 'book-ds-green', 1);
 
-    const res = await request(app).post('/api/training/directed').set(auth(u.token)).send({ studentId: id, dim: 'DP', bookItemId: 'book-ds-green' });
+    const res = await request(app)
+      .post('/api/training/directed')
+      .set(auth(u.token))
+      .send({ studentId: id, dim: 'DP', bookItemId: 'book-ds-green' });
     expect(res.status).toBe(400);
     expect(unwrapErr(res).code).toBe('VALIDATION_FAILED');
     expect(await itemQuantity(u.userId, 'book-ds-green')).toBe(1); // 不扣
@@ -258,7 +344,10 @@ describe('POST /api/training/directed', () => {
     const id = await createStudent(u.userId, { ds: 100 });
     await giveItem(u.userId, 'book-ds-green', 1);
 
-    const res = await request(app).post('/api/training/directed').set(auth(u.token)).send({ studentId: id, dim: 'DS', bookItemId: 'book-ds-green' });
+    const res = await request(app)
+      .post('/api/training/directed')
+      .set(auth(u.token))
+      .send({ studentId: id, dim: 'DS', bookItemId: 'book-ds-green' });
     const r = unwrapOk<HttpResult>(res);
     expect(r.delta).toBe(0);
     expect((await studentRow(id)).ds).toBe(100);
@@ -269,7 +358,10 @@ describe('POST /api/training/directed', () => {
   it('缺 dim → 400 VALIDATION_FAILED', async () => {
     const u = await createAuthedUser(5000);
     const id = await createStudent(u.userId);
-    const res = await request(app).post('/api/training/directed').set(auth(u.token)).send({ studentId: id });
+    const res = await request(app)
+      .post('/api/training/directed')
+      .set(auth(u.token))
+      .send({ studentId: id });
     expect(res.status).toBe(400);
     expect(unwrapErr(res).code).toBe('VALIDATION_FAILED');
   });
@@ -287,7 +379,10 @@ describe('POST /api/training/specialized', () => {
     const id = await createStudent(u.userId, { ds: 10 });
     const pid = await giveProblem(u.userId, { dominantDim: 'DS', rarity: 'green' });
 
-    const res = await request(app).post('/api/training/specialized').set(auth(u.token)).send({ studentId: id, problemId: pid });
+    const res = await request(app)
+      .post('/api/training/specialized')
+      .set(auth(u.token))
+      .send({ studentId: id, problemId: pid });
     expect(res.status).toBe(200);
     const r = unwrapOk<HttpResult>(res);
     expect(r.dim).toBe('DS');
@@ -304,7 +399,10 @@ describe('POST /api/training/specialized', () => {
     const id = await createStudent(u.userId, { ds: 10 });
     const pid = await giveProblem(u.userId, { consumedAt: new Date() });
 
-    const res = await request(app).post('/api/training/specialized').set(auth(u.token)).send({ studentId: id, problemId: pid });
+    const res = await request(app)
+      .post('/api/training/specialized')
+      .set(auth(u.token))
+      .send({ studentId: id, problemId: pid });
     expect(res.status).toBe(409);
     expect(unwrapErr(res).code).toBe('INSUFFICIENT_RESOURCE');
     expect(await userMoney(u.userId)).toBe(5000);
@@ -316,11 +414,17 @@ describe('POST /api/training/specialized', () => {
     const id = await createStudent(u1.userId, { ds: 10 });
     const pid = await giveProblem(u1.userId);
 
-    const forbidden = await request(app).post('/api/training/specialized').set(auth(u2.token)).send({ studentId: id, problemId: pid });
+    const forbidden = await request(app)
+      .post('/api/training/specialized')
+      .set(auth(u2.token))
+      .send({ studentId: id, problemId: pid });
     expect(forbidden.status).toBe(403);
     expect(unwrapErr(forbidden).code).toBe('FORBIDDEN');
 
-    const missing = await request(app).post('/api/training/specialized').set(auth(u1.token)).send({ studentId: id, problemId: 999999 });
+    const missing = await request(app)
+      .post('/api/training/specialized')
+      .set(auth(u1.token))
+      .send({ studentId: id, problemId: 999999 });
     expect(missing.status).toBe(404);
     expect(unwrapErr(missing).code).toBe('NOT_FOUND');
   });
@@ -338,12 +442,21 @@ describe('POST /api/training 归属与校验', () => {
     const u2 = await createAuthedUser(5000);
     const id = await createStudent(u1.userId);
 
-    const forbidden = await request(app).post('/api/training/basic').set(auth(u2.token)).send({ studentId: id });
+    const forbidden = await request(app)
+      .post('/api/training/basic')
+      .set(auth(u2.token))
+      .send({ studentId: id });
     expect(forbidden.status).toBe(403);
     expect(unwrapErr(forbidden).code).toBe('FORBIDDEN');
 
-    await prisma.student.update({ where: { id }, data: { status: 'DISMISSED', dismissedAt: new Date() } });
-    const dismissed = await request(app).post('/api/training/basic').set(auth(u1.token)).send({ studentId: id });
+    await prisma.student.update({
+      where: { id },
+      data: { status: 'DISMISSED', dismissedAt: new Date() },
+    });
+    const dismissed = await request(app)
+      .post('/api/training/basic')
+      .set(auth(u1.token))
+      .send({ studentId: id });
     expect(dismissed.status).toBe(404);
     expect(unwrapErr(dismissed).code).toBe('NOT_FOUND');
   });

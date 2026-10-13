@@ -47,22 +47,32 @@ export async function getTutorialState(userId: number): Promise<TutorialStateVie
   const progress = resolveProgress(user, steps);
   const cur = progress.current;
   // 只有 do_recruit 步才查在册人数：其余步不该为一个永远不渲染的字段付一次 COUNT
-  const roster = cur?.action === 'do_recruit' && (cur.requires_students ?? 0) > 0
-    ? {
-        studentsOwned: await prisma.student.count({ where: { userId, status: 'ACTIVE' } }),
-        studentsRequired: cur.requires_students as number,
-      }
-    : undefined;
+  const roster =
+    cur?.action === 'do_recruit' && (cur.requires_students ?? 0) > 0
+      ? {
+          studentsOwned: await prisma.student.count({ where: { userId, status: 'ACTIVE' } }),
+          studentsRequired: cur.requires_students as number,
+        }
+      : undefined;
   return stateView(progress.step, progress.completed, steps, roster);
 }
 
-async function grantReward(tx: Prisma.TransactionClient, userId: number, reward: NonNullable<TutorialStepDef['reward']>) {
+async function grantReward(
+  tx: Prisma.TransactionClient,
+  userId: number,
+  reward: NonNullable<TutorialStepDef['reward']>,
+) {
   if (reward.money && reward.money > 0) {
     await tx.user.update({ where: { id: userId }, data: { money: { increment: reward.money } } });
   }
   if (reward.reputation && reward.reputation > 0) {
-    await tx.user.update({ where: { id: userId }, data: { reputation: { increment: reward.reputation } } });
-    await tx.reputationLog.create({ data: { userId, delta: reward.reputation, reason: 'TUTORIAL' } });
+    await tx.user.update({
+      where: { id: userId },
+      data: { reputation: { increment: reward.reputation } },
+    });
+    await tx.reputationLog.create({
+      data: { userId, delta: reward.reputation, reason: 'TUTORIAL' },
+    });
   }
   if (reward.item && reward.count) {
     await tx.userItem.upsert({
@@ -137,7 +147,10 @@ export async function advanceTutorial(
 }
 
 /** 自动推进：若当前步骤的 action 匹配，则自动 advance 到下一步 */
-export async function autoAdvanceIfNeeded(userId: number, action: TutorialStepDef['action']): Promise<void> {
+export async function autoAdvanceIfNeeded(
+  userId: number,
+  action: TutorialStepDef['action'],
+): Promise<void> {
   if (action === 'none') return;
   try {
     const steps = getSteps();
@@ -152,7 +165,8 @@ export async function autoAdvanceIfNeeded(userId: number, action: TutorialStepDe
       const need = cur.requires_students ?? 0;
       if (need > 0) {
         const owned = await prisma.student.count({ where: { userId, status: 'ACTIVE' } });
-        if (owned >= need) await advanceTutorial(userId, step + 1, { reason: 'auto', action: 'do_recruit' });
+        if (owned >= need)
+          await advanceTutorial(userId, step + 1, { reason: 'auto', action: 'do_recruit' });
       }
       return;
     }

@@ -1,4 +1,9 @@
-import { Prisma, type PvpMatch, type PvpRewardGrant, type PvpTournament } from '../../generated/prisma/client.js';
+import {
+  Prisma,
+  type PvpMatch,
+  type PvpRewardGrant,
+  type PvpTournament,
+} from '../../generated/prisma/client.js';
 import { type PvpRewardGrantView, type PvpRewardLine } from '@oinur/shared';
 import { requireConfig } from '../../config/require-config.js';
 import { ApiError } from '../../lib/errors.js';
@@ -26,8 +31,18 @@ interface Standing {
 }
 
 const DEFAULT_PRIZES: PrizeConfig = {
-  champion: { items: [{ itemId: 'advance-stone', count: 2 }, { itemId: 'trophy-champion', count: 1 }] },
-  runnerUp: { items: [{ itemId: 'advance-stone', count: 1 }, { itemId: 'reroll-ticket', count: 1 }] },
+  champion: {
+    items: [
+      { itemId: 'advance-stone', count: 2 },
+      { itemId: 'trophy-champion', count: 1 },
+    ],
+  },
+  runnerUp: {
+    items: [
+      { itemId: 'advance-stone', count: 1 },
+      { itemId: 'reroll-ticket', count: 1 },
+    ],
+  },
   thirdToFourth: { items: [{ itemId: 'reroll-ticket', count: 1 }] },
   otherFirstRoundWinners: { items: [{ itemId: 'entry-ticket', count: 1 }] },
 };
@@ -49,7 +64,11 @@ function rawBucket(root: Record<string, unknown>, keys: readonly string[]): unkn
 
 function nonnegativeInteger(value: unknown, path: string): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
-    throw new ApiError('VALIDATION_FAILED', { field: 'prizes', path, reason: 'must be a non-negative integer' });
+    throw new ApiError('VALIDATION_FAILED', {
+      field: 'prizes',
+      path,
+      reason: 'must be a non-negative integer',
+    });
   }
   return value;
 }
@@ -62,39 +81,78 @@ function parseBucket(value: unknown, fallback: PrizeBucket, path: string): Prize
   const root = value;
   const itemsValue = root.items;
   if (itemsValue !== undefined && !Array.isArray(itemsValue)) {
-    throw new ApiError('VALIDATION_FAILED', { field: 'prizes', path: `${path}.items`, reason: 'must be an array' });
+    throw new ApiError('VALIDATION_FAILED', {
+      field: 'prizes',
+      path: `${path}.items`,
+      reason: 'must be an array',
+    });
   }
-  const items = (itemsValue ?? []).map((entry, index) => {
-    const item = record(entry);
-    if (typeof item.itemId !== 'string' || item.itemId.length === 0) {
-      throw new ApiError('VALIDATION_FAILED', { field: 'prizes', path: `${path}.items.${index}.itemId` });
-    }
-    return { itemId: item.itemId, count: nonnegativeInteger(item.count, `${path}.items.${index}.count`) || 0 };
-  }).filter((item) => item.count > 0);
+  const items = (itemsValue ?? [])
+    .map((entry, index) => {
+      const item = record(entry);
+      if (typeof item.itemId !== 'string' || item.itemId.length === 0) {
+        throw new ApiError('VALIDATION_FAILED', {
+          field: 'prizes',
+          path: `${path}.items.${index}.itemId`,
+        });
+      }
+      return {
+        itemId: item.itemId,
+        count: nonnegativeInteger(item.count, `${path}.items.${index}.count`) || 0,
+      };
+    })
+    .filter((item) => item.count > 0);
   const result: PrizeBucket = { items };
   if (root.money !== undefined) result.money = nonnegativeInteger(root.money, `${path}.money`);
-  if (root.reputation !== undefined) result.reputation = nonnegativeInteger(root.reputation, `${path}.reputation`);
+  if (root.reputation !== undefined)
+    result.reputation = nonnegativeInteger(root.reputation, `${path}.reputation`);
   return result;
 }
 
 function normalizePrizes(prizes: unknown, withDefaults = true): PrizeConfig {
-  if (!isRecord(prizes)) throw new ApiError('VALIDATION_FAILED', { field: 'prizes', reason: 'must be an object' });
+  if (!isRecord(prizes))
+    throw new ApiError('VALIDATION_FAILED', { field: 'prizes', reason: 'must be an object' });
   const root = record(prizes);
-  const fallback = (bucket: PrizeBucket): PrizeBucket => withDefaults ? bucket : { items: [] };
+  const fallback = (bucket: PrizeBucket): PrizeBucket => (withDefaults ? bucket : { items: [] });
   return {
-    champion: parseBucket(rawBucket(root, ['champion']), fallback(DEFAULT_PRIZES.champion), 'champion'),
-    runnerUp: parseBucket(rawBucket(root, ['runner_up', 'runnerUp']), fallback(DEFAULT_PRIZES.runnerUp), 'runner_up'),
-    thirdToFourth: parseBucket(rawBucket(root, ['third_to_fourth', 'third_to_eighth', 'thirdToFourth']), fallback(DEFAULT_PRIZES.thirdToFourth), 'third_to_fourth'),
-    otherFirstRoundWinners: parseBucket(rawBucket(root, ['other_first_round_winners', 'otherFirstRoundWinners', 'other']), fallback(DEFAULT_PRIZES.otherFirstRoundWinners), 'other_first_round_winners'),
+    champion: parseBucket(
+      rawBucket(root, ['champion']),
+      fallback(DEFAULT_PRIZES.champion),
+      'champion',
+    ),
+    runnerUp: parseBucket(
+      rawBucket(root, ['runner_up', 'runnerUp']),
+      fallback(DEFAULT_PRIZES.runnerUp),
+      'runner_up',
+    ),
+    thirdToFourth: parseBucket(
+      rawBucket(root, ['third_to_fourth', 'third_to_eighth', 'thirdToFourth']),
+      fallback(DEFAULT_PRIZES.thirdToFourth),
+      'third_to_fourth',
+    ),
+    otherFirstRoundWinners: parseBucket(
+      rawBucket(root, ['other_first_round_winners', 'otherFirstRoundWinners', 'other']),
+      fallback(DEFAULT_PRIZES.otherFirstRoundWinners),
+      'other_first_round_winners',
+    ),
   };
 }
 
 function validateItems(config: PrizeConfig): void {
   const items = requireConfig('pvp').items;
-  for (const bucket of [config.champion, config.runnerUp, config.thirdToFourth, config.otherFirstRoundWinners]) {
+  for (const bucket of [
+    config.champion,
+    config.runnerUp,
+    config.thirdToFourth,
+    config.otherFirstRoundWinners,
+  ]) {
     for (const item of bucket.items) {
       if (items[item.itemId] === undefined) {
-        throw new ApiError('VALIDATION_FAILED', { field: 'prizes', itemId: item.itemId, reason: 'unknown item' });
+        throw new ApiError('VALIDATION_FAILED', {
+          field: 'prizes',
+          itemId: item.itemId,
+          reason: 'unknown item',
+        });
       }
     }
   }
@@ -106,10 +164,16 @@ export function validatePvpPrizes(prizes: unknown): void {
 
 function rewardLines(bucket: PrizeBucket, champion: boolean): PvpRewardLine[] {
   const lines: PvpRewardLine[] = [];
-  if (bucket.money !== undefined && bucket.money > 0) lines.push({ type: 'money', amount: bucket.money });
-  if (bucket.reputation !== undefined && bucket.reputation > 0) lines.push({ type: 'reputation', amount: bucket.reputation });
+  if (bucket.money !== undefined && bucket.money > 0)
+    lines.push({ type: 'money', amount: bucket.money });
+  if (bucket.reputation !== undefined && bucket.reputation > 0)
+    lines.push({ type: 'reputation', amount: bucket.reputation });
   if (champion) lines.push({ type: 'item', itemId: 'tag-card', count: 1 });
-  lines.push(...bucket.items.filter((item) => item.itemId !== 'tag-card').map((item) => ({ type: 'item' as const, ...item })));
+  lines.push(
+    ...bucket.items
+      .filter((item) => item.itemId !== 'tag-card')
+      .map((item) => ({ type: 'item' as const, ...item })),
+  );
   return lines;
 }
 
@@ -121,7 +185,11 @@ function loser(match: PvpMatch): number | null {
 }
 
 function standings(matches: readonly PvpMatch[], participantIds: readonly number[]): Standing[] {
-  const firstRoundWinners = new Set(matches.filter((match) => match.round === 1 && match.winnerUserId !== null).map((match) => match.winnerUserId!));
+  const firstRoundWinners = new Set(
+    matches
+      .filter((match) => match.round === 1 && match.winnerUserId !== null)
+      .map((match) => match.winnerUserId!),
+  );
   const decided = matches.filter((match) => match.status === 'DONE' && match.winnerUserId !== null);
   const finalRound = decided.reduce((max, match) => Math.max(max, match.round), 0);
   const final = decided.find((match) => match.round === finalRound);
@@ -132,30 +200,62 @@ function standings(matches: readonly PvpMatch[], participantIds: readonly number
   add(final?.winnerUserId ?? null);
   add(final === undefined ? null : loser(final));
   if (finalRound > 1) {
-    for (const match of matches.filter((candidate) => candidate.round === finalRound - 1 && candidate.status === 'DONE').sort((left, right) => left.slot - right.slot)) add(loser(match));
+    for (const match of matches
+      .filter((candidate) => candidate.round === finalRound - 1 && candidate.status === 'DONE')
+      .sort((left, right) => left.slot - right.slot))
+      add(loser(match));
   }
   for (const userId of participantIds) add(userId);
-  return ordered.map((userId, index) => ({ userId, rank: index + 1, firstRoundWinner: firstRoundWinners.has(userId) }));
+  return ordered.map((userId, index) => ({
+    userId,
+    rank: index + 1,
+    firstRoundWinner: firstRoundWinners.has(userId),
+  }));
 }
 
 function storedRewards(value: unknown): PvpRewardLine[] {
-  if (!Array.isArray(value)) throw new ApiError('STATE_CONFLICT', { resource: 'pvp-reward', reason: 'invalid reward payload' });
+  if (!Array.isArray(value))
+    throw new ApiError('STATE_CONFLICT', {
+      resource: 'pvp-reward',
+      reason: 'invalid reward payload',
+    });
   return value as PvpRewardLine[];
 }
 
 function grantView(row: PvpRewardGrant, viewerUserId: number): PvpRewardGrantView {
   const rewards = storedRewards(row.rewards);
-  return { id: row.id, tournamentId: row.tournamentId, userId: row.userId, rank: row.rank, rewards, claimedAt: row.claimedAt?.toISOString() ?? null, claimable: row.userId === viewerUserId && row.claimedAt === null && rewards.length > 0 };
+  return {
+    id: row.id,
+    tournamentId: row.tournamentId,
+    userId: row.userId,
+    rank: row.rank,
+    rewards,
+    claimedAt: row.claimedAt?.toISOString() ?? null,
+    claimable: row.userId === viewerUserId && row.claimedAt === null && rewards.length > 0,
+  };
 }
 
-export async function ensurePvpRewardGrants(tx: Prisma.TransactionClient, tournament: PvpTournament): Promise<void> {
+export async function ensurePvpRewardGrants(
+  tx: Prisma.TransactionClient,
+  tournament: PvpTournament,
+): Promise<void> {
   const [matches, registrations] = await Promise.all([
-    tx.pvpMatch.findMany({ where: { tournamentId: tournament.id }, orderBy: [{ round: 'asc' }, { slot: 'asc' }] }),
-    tx.pvpRegistration.findMany({ where: { tournamentId: tournament.id }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], select: { userId: true } }),
+    tx.pvpMatch.findMany({
+      where: { tournamentId: tournament.id },
+      orderBy: [{ round: 'asc' }, { slot: 'asc' }],
+    }),
+    tx.pvpRegistration.findMany({
+      where: { tournamentId: tournament.id },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { userId: true },
+    }),
   ]);
   const config = normalizePrizes(tournament.prizes);
   validateItems(config);
-  const computed = standings(matches, registrations.map((registration) => registration.userId));
+  const computed = standings(
+    matches,
+    registrations.map((registration) => registration.userId),
+  );
   // PvpMatch.homeUserId/awayUserId/winnerUserId 是无外键的裸 Int，参赛者注销（物理删除）后
   // 这些 id 仍残留在历史对阵行里；直接拿去写 PvpRewardGrant 会撞 users 外键（P2003）并让
   // GET /api/pvp/tournaments/:id 这条读路径对所有剩余选手 500。故先过滤掉已不存在的账号，
@@ -167,48 +267,81 @@ export async function ensurePvpRewardGrants(tx: Prisma.TransactionClient, tourna
   const aliveIds = new Set(alive.map((row) => row.id));
   for (const standing of computed) {
     if (!aliveIds.has(standing.userId)) continue;
-    const bucket = standing.rank === 1
-      ? config.champion
-      : standing.rank === 2
-        ? config.runnerUp
-        : standing.rank <= 4
-          ? config.thirdToFourth
-          : standing.firstRoundWinner
-            ? config.otherFirstRoundWinners
-            : { items: [] };
+    const bucket =
+      standing.rank === 1
+        ? config.champion
+        : standing.rank === 2
+          ? config.runnerUp
+          : standing.rank <= 4
+            ? config.thirdToFourth
+            : standing.firstRoundWinner
+              ? config.otherFirstRoundWinners
+              : { items: [] };
     const rewards = rewardLines(bucket, standing.rank === 1);
     await tx.pvpRewardGrant.upsert({
       where: { tournamentId_userId: { tournamentId: tournament.id, userId: standing.userId } },
-      create: { tournamentId: tournament.id, userId: standing.userId, rank: standing.rank, rewards: jsonWrite(rewards) },
+      create: {
+        tournamentId: tournament.id,
+        userId: standing.userId,
+        rank: standing.rank,
+        rewards: jsonWrite(rewards),
+      },
       update: { rank: standing.rank, rewards: jsonWrite(rewards) },
     });
   }
 }
 
-export async function listPvpRewardGrants(viewerUserId: number, tournamentId: number): Promise<PvpRewardGrantView[]> {
-  const rows = await prisma.pvpRewardGrant.findMany({ where: { tournamentId }, orderBy: { rank: 'asc' } });
+export async function listPvpRewardGrants(
+  viewerUserId: number,
+  tournamentId: number,
+): Promise<PvpRewardGrantView[]> {
+  const rows = await prisma.pvpRewardGrant.findMany({
+    where: { tournamentId },
+    orderBy: { rank: 'asc' },
+  });
   return rows.map((row) => grantView(row, viewerUserId));
 }
 
-export async function claimPvpReward(userId: number, tournamentId: number): Promise<PvpRewardGrantView> {
+export async function claimPvpReward(
+  userId: number,
+  tournamentId: number,
+): Promise<PvpRewardGrantView> {
   return prisma.$transaction(async (tx) => {
     await lockPvpTournament(tx, tournamentId);
     await lockUser(tx, userId);
-    const grant = await tx.pvpRewardGrant.findUnique({ where: { tournamentId_userId: { tournamentId, userId } } });
-    if (grant === null) throw new ApiError('NOT_FOUND', { resource: 'pvp-reward', id: tournamentId });
+    const grant = await tx.pvpRewardGrant.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId } },
+    });
+    if (grant === null)
+      throw new ApiError('NOT_FOUND', { resource: 'pvp-reward', id: tournamentId });
     if (grant.claimedAt !== null) return grantView(grant, userId);
     const rewards = storedRewards(grant.rewards);
     for (const reward of rewards) {
       if (reward.type === 'money') {
-        await tx.user.update({ where: { id: userId }, data: { money: { increment: reward.amount } } });
+        await tx.user.update({
+          where: { id: userId },
+          data: { money: { increment: reward.amount } },
+        });
       } else if (reward.type === 'reputation') {
-        await tx.user.update({ where: { id: userId }, data: { reputation: { increment: reward.amount } } });
-        await tx.reputationLog.create({ data: { userId, delta: reward.amount, reason: `PVP_PRIZE:${tournamentId}:${grant.id}` } });
+        await tx.user.update({
+          where: { id: userId },
+          data: { reputation: { increment: reward.amount } },
+        });
+        await tx.reputationLog.create({
+          data: { userId, delta: reward.amount, reason: `PVP_PRIZE:${tournamentId}:${grant.id}` },
+        });
       } else {
-        await tx.userItem.upsert({ where: { userId_itemId: { userId, itemId: reward.itemId } }, create: { userId, itemId: reward.itemId, quantity: reward.count }, update: { quantity: { increment: reward.count } } });
+        await tx.userItem.upsert({
+          where: { userId_itemId: { userId, itemId: reward.itemId } },
+          create: { userId, itemId: reward.itemId, quantity: reward.count },
+          update: { quantity: { increment: reward.count } },
+        });
       }
     }
-    const claimed = await tx.pvpRewardGrant.update({ where: { id: grant.id }, data: { claimedAt: new Date() } });
+    const claimed = await tx.pvpRewardGrant.update({
+      where: { id: grant.id },
+      data: { claimedAt: new Date() },
+    });
     return grantView(claimed, userId);
   });
 }

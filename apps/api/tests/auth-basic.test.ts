@@ -35,7 +35,9 @@ describe('POST /api/auth/register', () => {
     ['超长密码', 'x'.repeat(73)],
     ['空用户名', ''],
   ])('非法输入 %s → VALIDATION_FAILED', async (_n, bad) => {
-    const res = await request(app).post('/api/auth/register').send({ username: bad, password: bad });
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ username: bad, password: bad });
     expect([400, 409]).toContain(res.status);
     expect(unwrapErr(res).code).toBe('VALIDATION_FAILED');
   });
@@ -51,8 +53,12 @@ describe('POST /api/auth/login', () => {
 
   it('密码错误 → 401 INVALID_CREDENTIALS（与用户不存在同码）', async () => {
     await request(app).post('/api/auth/register').send(U);
-    const wrongPw = await request(app).post('/api/auth/login').send({ ...U, password: 'wrong-pass-1' });
-    const noUser = await request(app).post('/api/auth/login').send({ username: 'ghost', password: 'wrong-pass-1' });
+    const wrongPw = await request(app)
+      .post('/api/auth/login')
+      .send({ ...U, password: 'wrong-pass-1' });
+    const noUser = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'ghost', password: 'wrong-pass-1' });
     expect(wrongPw.status).toBe(401);
     expect(noUser.status).toBe(401);
     expect(unwrapErr(wrongPw).code).toBe('INVALID_CREDENTIALS');

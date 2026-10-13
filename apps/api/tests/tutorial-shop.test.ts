@@ -23,7 +23,9 @@ function loadYaml(file: string): unknown {
   return readYaml(full);
 }
 
-const tutorialSteps: TutorialStepDef[] = tutorialConfigSchema.parse(loadYaml('tutorial.yaml')).steps;
+const tutorialSteps: TutorialStepDef[] = tutorialConfigSchema.parse(
+  loadYaml('tutorial.yaml'),
+).steps;
 
 describe('tutorial config（docs/data/tutorial.yaml 真身）', () => {
   it('可被 zod 解析、步骤 id 唯一、末步全解锁', () => {
@@ -133,7 +135,9 @@ describe('tutorial routing：段边界与前缀匹配', () => {
       // isApiAllowed(其它键, p) === true 当且仅当 p 已被其它键或 always-allowed 覆盖
       const others = keys.filter((k) => k !== key);
       const fullyShadowed = prefixes.every((p) => isApiAllowed(others, p));
-      expect(usedByStep || !fullyShadowed, `${key} 是死配置：无人 unlock 且前缀被完全覆盖`).toBe(true);
+      expect(usedByStep || !fullyShadowed, `${key} 是死配置：无人 unlock 且前缀被完全覆盖`).toBe(
+        true,
+      );
     }
   });
 

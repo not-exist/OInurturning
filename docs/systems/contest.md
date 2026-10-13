@@ -11,12 +11,12 @@
 
 ### 0.1 属性键（与总纲一致）
 
-| 组 | 键 |
-|---|---|
-| 六维 | `ds` / `dp` / `math` / `graph` / `greedy` / `string` |
-| 能力 | `code`（代码能力）/ `thinking`（思维能力）/ `setting`（出题能力） |
+| 组   | 键                                                                                                                   |
+| ---- | -------------------------------------------------------------------------------------------------------------------- |
+| 六维 | `ds` / `dp` / `math` / `graph` / `greedy` / `string`                                                                 |
+| 能力 | `code`（代码能力）/ `thinking`（思维能力）/ `setting`（出题能力）                                                    |
 | 状态 | `mindset`（心态，动态值，范围 **[-10, +10]**，机制权威 student.md §5）/ `focus_cap` / `energy_max` / `stamina_regen` |
-| 资源 | `money` / `reputation` / `stamina` / `energy` / `focus` |
+| 资源 | `money` / `reputation` / `stamina` / `energy` / `focus`                                                              |
 
 ### 0.2 数学工具
 
@@ -57,6 +57,7 @@ serverNonce = contest_records 表自增序号（防同参数重放得到相同�
 **选择：解析式直接计算（事件驱动、逐题结算），不做分钟 tick。**
 
 理由：
+
 1. 总纲 §8.1 明示「即时结算，逐题模拟」，解析式与之天然对应；
 2. 分钟 tick 需要 数百次/场 的 RNG 决策与状态分支，平衡调参困难、战报冗长不可读；
 3. 解析式把随机性集中在少数关键掷点（噪声、判定、特性），种子回放短小可审计；
@@ -67,41 +68,49 @@ serverNonce = contest_records 表自增序号（防同参数重放得到相同�
 ### 3.2 输入数据结构
 
 ```ts
-interface ParticipantSnapshot {       // 参赛队员快照（结算前冻结）
+interface ParticipantSnapshot {
+  // 参赛队员快照（结算前冻结）
   studentId: string;
-  ds: number; dp: number; math: number; graph: number; greedy: number; string: number;
-  code: number; thinking: number;
-  mindset: number;                    // [-10,+10]
-  focusCap: number;                   // 专注上限
-  energy: number;                     // 入赛精力（≤ energy_max）
-  traits: TraitInstance[];            // 天赋不在本引擎内生效，仅存档用
+  ds: number;
+  dp: number;
+  math: number;
+  graph: number;
+  greedy: number;
+  string: number;
+  code: number;
+  thinking: number;
+  mindset: number; // [-10,+10]
+  focusCap: number; // 专注上限
+  energy: number; // 入赛精力（≤ energy_max）
+  traits: TraitInstance[]; // 天赋不在本引擎内生效，仅存档用
 }
 
 interface ContestTeam {
   teamId: string;
-  side: 'HOME' | 'NPC';               // teams[0] 为玩家 HOME 队，其余为 NPC 队
+  side: 'HOME' | 'NPC'; // teams[0] 为玩家 HOME 队，其余为 NPC 队
   userId: number | null;
-  members: ParticipantSnapshot[];     // 3~4 名；同场所有队伍人数相同
+  members: ParticipantSnapshot[]; // 3~4 名；同场所有队伍人数相同
 }
 
-interface ProblemInstance {          // 由 problems.yaml 模板实例化（含 NG+ 变换、特性掷点结果）
-  instanceId: string;                 // `${template.id}@${stageRef}#${n}`
+interface ProblemInstance {
+  // 由 problems.yaml 模板实例化（含 NG+ 变换、特性掷点结果）
+  instanceId: string; // `${template.id}@${stageRef}#${n}`
   templateId: string;
-  tier: Tier;                         // cspj|csps|noip|province|noi|ctt|cts|ioi
-  dim: 'ds'|'dp'|'math'|'graph'|'greedy'|'string';
-  reqD: number;                       // 六维需求 D（NG+ 后值）
-  reqM: number;                       // 思维量 M
-  reqC: number;                       // 代码量 C
+  tier: Tier; // cspj|csps|noip|province|noi|ctt|cts|ioi
+  dim: 'ds' | 'dp' | 'math' | 'graph' | 'greedy' | 'string';
+  reqD: number; // 六维需求 D（NG+ 后值）
+  reqM: number; // 思维量 M
+  reqC: number; // 代码量 C
   score: number;
-  timeLimitMin: number;               // 单题参考用时基准（人类解题耗时，非 OJ 运行时限）
+  timeLimitMin: number; // 单题参考用时基准（人类解题耗时，非 OJ 运行时限）
   partialScores: boolean;
-  traits: ProblemTraitInstance[];     // 已附着的特性（id + 快照 hooks）
+  traits: ProblemTraitInstance[]; // 已附着的特性（id + 快照 hooks）
 }
 
 interface RankedContestInput {
   kind: 'story';
   stageRef: { chapter: ChapterId; stageIndex: number; ngPlusLayer: number };
-  teams: ContestTeam[];               // [0] 玩家 HOME 队；[1..] NPC 队
+  teams: ContestTeam[]; // [0] 玩家 HOME 队；[1..] NPC 队
   problems: ProblemInstance[];
   durationMin: number;
   npcPoolParam?: { size: number; meanLevel: number; spread: number }; // size=NPC 队伍数
@@ -133,11 +142,11 @@ tEst   = timeLimitMin × Kdim × Kthink × Kcode ÷ S(focus)     // S 为专注�
 tEst   = clamp(tEst, 0.35×timeLimitMin, 2.5×timeLimitMin)，且 ≥ 5
 ```
 
-| 常数 | 值 | 含义 |
-|---|---|---|
-| A_dim / B_dim | 1.6 / 0.22 | 六维差满幅 ±80% 用时；每 1 点缺口移动 σ 输入 0.22 |
+| 常数              | 值         | 含义                                                     |
+| ----------------- | ---------- | -------------------------------------------------------- |
+| A_dim / B_dim     | 1.6 / 0.22 | 六维差满幅 ±80% 用时；每 1 点缺口移动 σ 输入 0.22        |
 | A_think / B_think | 1.2 / 0.25 | 思维差幅度 ±60%；特性 `construct-poison` 将 B_think ×1.5 |
-| A_code / B_code | 0.7 / 0.30 | 代码差对用时的幅度 ±35% |
+| A_code / B_code   | 0.7 / 0.30 | 代码差对用时的幅度 ±35%                                  |
 
 **验算样例**（程序员单元测试可直接使用）：学员 `dim=50, thinking=48, code=52`，题 `D=55, M=45, C=50, TL=90`，focus=0：
 
@@ -168,12 +177,12 @@ focus = clamp(focus + Δfocus, 0, focusCap)
 若 mindset ≤ −6（焦虑反噬）：做题过程中专注额外每分钟 −1（下限 0）
 ```
 
-| 常数 | 值 | 含义 |
-|---|---|---|
-| 专注增速 | 0.06/min × mf | 一场投入 ~300min、心态 50（mf=1.5）≈ 全程 +27 专注 |
-| mf 斜率 | 0.01/点 | 心态 100 → 双倍获取；心态 −30 → 0.70 |
-| 焦虑反噬 | 做题期间每分钟额外 −1 | 仅 mindset ≤ −6 时触发（student.md §5.3） |
-| S 半饱和点 | 20 | 专注收益边际递减 |
+| 常数       | 值                    | 含义                                               |
+| ---------- | --------------------- | -------------------------------------------------- |
+| 专注增速   | 0.06/min × mf         | 一场投入 ~300min、心态 50（mf=1.5）≈ 全程 +27 专注 |
+| mf 斜率    | 0.01/点               | 心态 100 → 双倍获取；心态 −30 → 0.70               |
+| 焦虑反噬   | 做题期间每分钟额外 −1 | 仅 mindset ≤ −6 时触发（student.md §5.3）          |
+| S 半饱和点 | 20                    | 专注收益边际递减                                   |
 
 ### 3.5 精力模型（代码缺口 → 精力消耗）
 
@@ -240,29 +249,29 @@ fail():   // WA 与判题 TLE 共用失败处理，仅 flavor 与个别 hook 不
   if invested ≥ remainingClock → UNFINISHED
 ```
 
-| 常数 | 值 | 含义 |
-|---|---|---|
-| 噪声 σn | 0.15 | 用时乘性噪声；`tight-clock` 等特性 ×1.3 或 +0.10 |
-| 重写系数 | 0.6 | 失败后重写基准 = 0.6×tEst |
-| 学习效应 | +0.08/次失败 | AC 概率随尝试次数回升 |
-| WA 罚时 | 20min | 特性可加重（`mod-longlong-curse` +5 等） |
-| WA 心态 | −4 | 特性可加重（`precision-hell` 额外 −2） |
-| 判题 TLE 概率基数 | 0.02/次提交 | 无特性时几乎不触发 |
-| AC 心态 | +2/题 | 上限 100 |
+| 常数              | 值           | 含义                                             |
+| ----------------- | ------------ | ------------------------------------------------ |
+| 噪声 σn           | 0.15         | 用时乘性噪声；`tight-clock` 等特性 ×1.3 或 +0.10 |
+| 重写系数          | 0.6          | 失败后重写基准 = 0.6×tEst                        |
+| 学习效应          | +0.08/次失败 | AC 概率随尝试次数回升                            |
+| WA 罚时           | 20min        | 特性可加重（`mod-longlong-curse` +5 等）         |
+| WA 心态           | −4           | 特性可加重（`precision-hell` 额外 −2）           |
+| 判题 TLE 概率基数 | 0.02/次提交  | 无特性时几乎不触发                               |
+| AC 心态           | +2/题        | 上限 100                                         |
 
 > **备注：判题 TLE 为什么是概率制。** `time_limit_min` 是「人类参考解题用时」（成长与经济锚点），而 OJ 判题时限是程序运行秒数，二者不同量纲，不可混用。故判题 TLE 建模为「提交被判超时的概率」，主要由卡常类特性抬高；无特性时 2% 基数制造偶发翻车。**UNFINISHED**（比赛时钟耗尽未过题）承担传统意义上的"TLE 弃题"语义，二者在战报中分别呈现。
 
 #### 3.6.3 心态变化汇总
 
-| 事件 | Δmindset |
-|---|---|
-| 单次 WA / 判题 TLE | −4（+特性修正） |
-| 单题 AC | +2 |
-| SKIP_ENERGY（弃题） | −3 |
-| 赛后名次百分位 ≤10% | +3 |
-| 赛后名次百分位 ≤50% | +1 |
-| 赛后名次百分位 >75% | −3 |
-| 其余 | 0 |
+| 事件                | Δmindset        |
+| ------------------- | --------------- |
+| 单次 WA / 判题 TLE  | −4（+特性修正） |
+| 单题 AC             | +2              |
+| SKIP_ENERGY（弃题） | −3              |
+| 赛后名次百分位 ≤10% | +3              |
+| 赛后名次百分位 ≤50% | +1              |
+| 赛后名次百分位 >75% | −3              |
+| 其余                | 0               |
 
 全程累计后 clamp 到 [−10, +10] 并**持久化到学员**。定心丸等道具可在赛前抬心态。
 
@@ -362,44 +371,45 @@ function updateFocus(focus, r, mindset, cap): number {
 
 特性定义于 `problems.yaml`（severity 阶梯 red<yellow<blue<purple<black<colorful）。引擎识别以下 hook 键：
 
-| hook | 类型 | 生效点 |
-|---|---|---|
-| `time_k_mul` | float | 乘在 tEst 上 |
-| `ac_prob_add` | float | 加进 PacEff |
-| `tle_prob_add` | float | 加进 PTLE |
-| `wa_penalty_add` | int | 每次失败的罚时增量 |
-| `submit_time_add` | int | 每次提交的固定耗时增量 |
-| `energy_cost_add` | int | Eneed 增量 |
-| `energy_per_submit_add` | int | 每次提交的额外精力 |
-| `noise_sigma_add` / `noise_sigma_mul` | float | 用时噪声 |
-| `mindset_fail_add` | int | 失败时额外心态惩罚 |
-| `partial_override` | none/trap/keep | 覆盖部分分规则 |
-| `think_weight_mul` | float | B_think 有效值放大（构造题思维瓶颈） |
-| `condition` | null/first_problem/anti_ak | hook 的条件包装 |
+| hook                                  | 类型                       | 生效点                               |
+| ------------------------------------- | -------------------------- | ------------------------------------ |
+| `time_k_mul`                          | float                      | 乘在 tEst 上                         |
+| `ac_prob_add`                         | float                      | 加进 PacEff                          |
+| `tle_prob_add`                        | float                      | 加进 PTLE                            |
+| `wa_penalty_add`                      | int                        | 每次失败的罚时增量                   |
+| `submit_time_add`                     | int                        | 每次提交的固定耗时增量               |
+| `energy_cost_add`                     | int                        | Eneed 增量                           |
+| `energy_per_submit_add`               | int                        | 每次提交的额外精力                   |
+| `noise_sigma_add` / `noise_sigma_mul` | float                      | 用时噪声                             |
+| `mindset_fail_add`                    | int                        | 失败时额外心态惩罚                   |
+| `partial_override`                    | none/trap/keep             | 覆盖部分分规则                       |
+| `think_weight_mul`                    | float                      | B_think 有效值放大（构造题思维瓶颈） |
+| `condition`                           | null/first_problem/anti_ak | hook 的条件包装                      |
 
 条件语义：
+
 - `first_problem`：仅对该队员**本场尝试的第一题**生效；
 - `anti_ak`：仅当该题是该队员**最后一块拼图**（其余题均已 AC）时生效——玩家队与 NPC 队同受影响，用于拉开满分线。
 
 映射实例（完整表以 problems.yaml 为准）：
 
-| trait id | severity | 主要 hooks |
-|---|---|---|
-| wide-data 大数据范围 | red | partial_override:none, tle_prob_add:+0.05 |
-| mod-longlong-curse 取模忘开longlong诅咒 | red | wa_penalty_add:+5, ac_prob_add:−0.03 |
-| strict-spj SPJ严格判题 | yellow | partial_override:none, noise_sigma_add:+0.05 |
-| off-by-one-boundary 差一边界陷阱 | yellow | ac_prob_add:−0.04, wa_penalty_add:+2 |
-| interactive 强制在线交互·入门 | yellow | submit_time_add:+10, energy_cost_add:+2 |
-| card-constant 卡常 | blue | tle_prob_add:+0.20 |
-| greedy-counterexample 玄学贪心反例 | blue | ac_prob_add:−0.08 |
-| partial-trap 部分分陷阱 | blue | partial_override:trap |
-| construct-poison 毒瘤构造 | purple | think_weight_mul:1.5, ac_prob_add:−0.05 |
-| anti-ak-shield 防AK护盾 | purple | condition:anti_ak → ac_prob_add:−0.15, tle_prob_add:+0.10 |
-| force-online 强制在线·完全版 | purple | submit_time_add:+8, energy_per_submit_add:+1, partial_override:none |
-| precision-hell 精度地狱 | black | ac_prob_add:−0.12, wa_penalty_add:+5, mindset_fail_add:−2 |
-| tight-clock 极限时钟 | black | tle_prob_add:+0.30, noise_sigma_mul:1.3 |
-| miracle-easy 灵光乍现 | colorful | condition:first_problem → time_k_mul:0.75, ac_prob_add:+0.25 |
-| chaos-domain 概率世界 | colorful | prob_amplify:0.5（P←P+0.5(P−0.5)，作用于一切判定概率）, noise_sigma_add:+0.10 |
+| trait id                                | severity | 主要 hooks                                                                    |
+| --------------------------------------- | -------- | ----------------------------------------------------------------------------- |
+| wide-data 大数据范围                    | red      | partial_override:none, tle_prob_add:+0.05                                     |
+| mod-longlong-curse 取模忘开longlong诅咒 | red      | wa_penalty_add:+5, ac_prob_add:−0.03                                          |
+| strict-spj SPJ严格判题                  | yellow   | partial_override:none, noise_sigma_add:+0.05                                  |
+| off-by-one-boundary 差一边界陷阱        | yellow   | ac_prob_add:−0.04, wa_penalty_add:+2                                          |
+| interactive 强制在线交互·入门           | yellow   | submit_time_add:+10, energy_cost_add:+2                                       |
+| card-constant 卡常                      | blue     | tle_prob_add:+0.20                                                            |
+| greedy-counterexample 玄学贪心反例      | blue     | ac_prob_add:−0.08                                                             |
+| partial-trap 部分分陷阱                 | blue     | partial_override:trap                                                         |
+| construct-poison 毒瘤构造               | purple   | think_weight_mul:1.5, ac_prob_add:−0.05                                       |
+| anti-ak-shield 防AK护盾                 | purple   | condition:anti_ak → ac_prob_add:−0.15, tle_prob_add:+0.10                     |
+| force-online 强制在线·完全版            | purple   | submit_time_add:+8, energy_per_submit_add:+1, partial_override:none           |
+| precision-hell 精度地狱                 | black    | ac_prob_add:−0.12, wa_penalty_add:+5, mindset_fail_add:−2                     |
+| tight-clock 极限时钟                    | black    | tle_prob_add:+0.30, noise_sigma_mul:1.3                                       |
+| miracle-easy 灵光乍现                   | colorful | condition:first_problem → time_k_mul:0.75, ac_prob_add:+0.25                  |
+| chaos-domain 概率世界                   | colorful | prob_amplify:0.5（P←P+0.5(P−0.5)，作用于一切判定概率）, noise_sigma_add:+0.10 |
 
 ### 3.10 NPC 队伍池生成
 
@@ -449,14 +459,14 @@ for teamIndex in 1..npcPoolParam.size:
 
 ### 3.12 微量实战成长（不可刷）
 
-| 项 | 概率（每场） | 说明 |
-|---|---|---|
-| 已解出题的主导六维 | 每解出一题独立掷 `0.15 × fade(cur)` | +1 |
-| thinking | `0.10 × fade(cur)`（全场一次） | +1 |
-| code | `0.10 × fade(cur)`（全场一次） | +1 |
-| focus_cap | 0.005 | +1（极低概率，呼应总纲 §9） |
-| stamina_regen | 0.005 | +1（极低概率） |
-| setting / mindset | — | 比赛不产出（出题能力走出题玩法） |
+| 项                 | 概率（每场）                        | 说明                             |
+| ------------------ | ----------------------------------- | -------------------------------- |
+| 已解出题的主导六维 | 每解出一题独立掷 `0.15 × fade(cur)` | +1                               |
+| thinking           | `0.10 × fade(cur)`（全场一次）      | +1                               |
+| code               | `0.10 × fade(cur)`（全场一次）      | +1                               |
+| focus_cap          | 0.005                               | +1（极低概率，呼应总纲 §9）      |
+| stamina_regen      | 0.005                               | +1（极低概率）                   |
+| setting / mindset  | —                                   | 比赛不产出（出题能力走出题玩法） |
 
 反刷论证：fade=(1−cur/100)^2，cur=80 时六维单题期望 ≈ 0.15×0.04=0.006 点。参赛体力按章 1–2 点（第 1–4 章 1 点、第 5–8 章 2 点，progression.md 口径），高练度下场均成长 <0.1 点；对照定向训练（大幅提升一维），比赛永远只是「顺带」，训练仍是主循环。
 
@@ -477,20 +487,20 @@ reqD/M/C ← round(req × (1 + 0.15k))
 ```ts
 interface ContestReport {
   id: string;
-  engineVersion: string;              // 引擎版本（影响可回放性时必须升级）
-  rngVersion: string;                 // 'mulberry32-v1'
-  seed: string;                       // hex 种子
+  engineVersion: string; // 引擎版本（影响可回放性时必须升级）
+  rngVersion: string; // 'mulberry32-v1'
+  seed: string; // hex 种子
   kind: 'story' | 'custom';
   stageRef?: { chapter: ChapterId; stageIndex: number; ngPlusLayer: number };
-  inputSnapshot: RankedContestInput;  // 含 teams、题目、NPC 队伍参数
+  inputSnapshot: RankedContestInput; // 含 teams、题目、NPC 队伍参数
   questions: ProblemInstance[];
-  teams: ContestTeam[];               // 参与排名的队伍快照，teams[0] 为玩家队
+  teams: ContestTeam[]; // 参与排名的队伍快照，teams[0] 为玩家队
   participants: ParticipantTimeline[]; // 按 teams.flatMap(team => team.members) 排列
-  standings: RankingStanding[];       // 每支队伍一行，含 teamIndex/总分/rank
-  pass: boolean;                      // 等价于玩家队 standings.rank <= 8
-  rewards: RewardLine[];              // 按 §3.11 发放顺序排列
+  standings: RankingStanding[]; // 每支队伍一行，含 teamIndex/总分/rank
+  pass: boolean; // 等价于玩家队 standings.rank <= 8
+  rewards: RewardLine[]; // 按 §3.11 发放顺序排列
   growth: GrowthDelta[];
-  createdAt: string;                  // ISO8601
+  createdAt: string; // ISO8601
 }
 
 interface ParticipantTimeline {
@@ -503,18 +513,19 @@ interface ParticipantTimeline {
 interface AttemptRecord {
   problemInstanceId: string;
   verdict: 'AC' | 'UNFINISHED' | 'SKIP_ENERGY';
-  submissions: number;                // 含 WA 与判题 TLE 的提交次数
-  timeSpentMin: number;               // 含罚时
-  penaltyMin: number;                 // 其中 20min 罚时合计
+  submissions: number; // 含 WA 与判题 TLE 的提交次数
+  timeSpentMin: number; // 含罚时
+  penaltyMin: number; // 其中 20min 罚时合计
   energyCost: number;
   scoreAwarded: number;
-  focusBefore: number; focusAfter: number;
+  focusBefore: number;
+  focusAfter: number;
   mindsetDelta: number;
-  notes: string[];                    // 特性触发、弃题原因等 flavor
+  notes: string[]; // 特性触发、弃题原因等 flavor
 }
 
 interface RankingStanding {
-  teamIndex: number;                 // 0 = 玩家 HOME 队
+  teamIndex: number; // 0 = 玩家 HOME 队
   totalScore: number;
   rank: number;
 }
@@ -526,9 +537,19 @@ type RewardLine =
   | { type: 'rank_bonus_money'; rank: number; amount: number };
 
 interface GrowthDelta {
-  attr: 'ds'|'dp'|'math'|'graph'|'greedy'|'string'|'thinking'|'code'|'focus_cap'|'stamina_regen';
+  attr:
+    | 'ds'
+    | 'dp'
+    | 'math'
+    | 'graph'
+    | 'greedy'
+    | 'string'
+    | 'thinking'
+    | 'code'
+    | 'focus_cap'
+    | 'stamina_regen';
   delta: 1;
-  sourceProblem?: string;             // instanceId（六维成长来源题）
+  sourceProblem?: string; // instanceId（六维成长来源题）
 }
 ```
 
@@ -542,8 +563,8 @@ interface GrowthDelta {
 
 对第 `r` 局（1-based）令 `k = floor((r−1)/2)`，rotation 为：
 
-| 局别 | 出题方 | 答题方 |
-|---|---|---|
+| 局别            | 出题方          | 答题方              |
+| --------------- | --------------- | ------------------- |
 | 奇数局 `r=2k+1` | `HOME[k mod N]` | `AWAY[(k+1) mod N]` |
 | 偶数局 `r=2k+2` | `AWAY[k mod N]` | `HOME[(k+1) mod N]` |
 
@@ -597,13 +618,13 @@ b = [red:40, yellow:30, blue:18, purple:8, black:3, colorful:1]   归一化后 r
 
 **复用方式**：答题端整体调用 §3.3–§3.6 的 `resolveProblem()`，不做第二套公式。差异仅以下五点（以参数注入）：
 
-| # | 差异 | 实现 |
-|---|---|---|
-| 1 | 无专注积累 | `focus` 固定 0（S≡1.0），`updateFocus` 短路 |
-| 2 | 时钟换成局限时 | `T_round = timeLimitMin × 1.25`（生成式见 §4.3），超时即 UNFINISHED=未解出 |
-| 3 | 能力归属 | 三缺口用的六维/thinking/code 取**答题队员**；Eneed 从该队员 energy 中扣 |
-| 4 | 心态归属 | 判定的心态变化记在答题者身上；出题者心态不受该局影响 |
-| 5 | 开局能量不足 | 答题者 `energy < Eneed` → 直接判负该局（记 forfeit_energy，对方得分），不出伪流程 |
+| #   | 差异           | 实现                                                                              |
+| --- | -------------- | --------------------------------------------------------------------------------- |
+| 1   | 无专注积累     | `focus` 固定 0（S≡1.0），`updateFocus` 短路                                       |
+| 2   | 时钟换成局限时 | `T_round = timeLimitMin × 1.25`（生成式见 §4.3），超时即 UNFINISHED=未解出        |
+| 3   | 能力归属       | 三缺口用的六维/thinking/code 取**答题队员**；Eneed 从该队员 energy 中扣           |
+| 4   | 心态归属       | 判定的心态变化记在答题者身上；出题者心态不受该局影响                              |
+| 5   | 开局能量不足   | 答题者 `energy < Eneed` → 直接判负该局（记 forfeit_energy，对方得分），不出伪流程 |
 
 其余（WA 罚时 20min、学习效应 +0.08、判题 TLE、特性 hooks、噪声）全部原样生效——这保证「练度差距 → 表现差距」在全游戏只有一套刻度。
 
@@ -648,50 +669,54 @@ type TiebreakMode = 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';
 ```ts
 interface DuelReport {
   id: string;
-  engineVersion: string; rngVersion: string; seed: string;
-  kind: 'pvp' | 'encounter';                  // PVP 淘汰赛 / 历练遭遇战
-  encounterEventId?: string;                  // kind=encounter 时的 events.yaml 事件 id
-  inputSnapshot: DuelInput;                   // home/away 两侧均为 { members }
-  qualityRuleOn: boolean;                     // 【考察出题质量】是否启用
+  engineVersion: string;
+  rngVersion: string;
+  seed: string;
+  kind: 'pvp' | 'encounter'; // PVP 淘汰赛 / 历练遭遇战
+  encounterEventId?: string; // kind=encounter 时的 events.yaml 事件 id
+  inputSnapshot: DuelInput; // home/away 两侧均为 { members }
+  qualityRuleOn: boolean; // 【考察出题质量】是否启用
   tiebreak?: TiebreakMode;
-  rounds: DuelRoundRecord[];                  // 2N 普通局 + 可能的加赛局，按时间序
+  rounds: DuelRoundRecord[]; // 2N 普通局 + 可能的加赛局，按时间序
   scores: { home: number; away: number };
   scoreAfterEachRound: { home: number; away: number }[];
   winnerSide: 'HOME' | 'AWAY' | 'DRAW';
   decidedBy?: 'REGULAR' | 'SUDDEN_DEATH' | 'ENERGY' | 'QUALITY' | 'FRIENDLY';
-  tiebreakTrail?: string[];                   // 终审链逐步记录（§4.6）
-  rewards: RewardLine[];                      // 复用 ContestReport 的 RewardLine
+  tiebreakTrail?: string[]; // 终审链逐步记录（§4.6）
+  rewards: RewardLine[]; // 复用 ContestReport 的 RewardLine
   createdAt: string;
 }
 
 interface DuelInput {
   home: DuelSide;
   away: DuelSide;
-  questions: ProblemInstance[];               // 前 2N 题覆盖普通局；加赛题必须 GENERATED
+  questions: ProblemInstance[]; // 前 2N 题覆盖普通局；加赛题必须 GENERATED
   qualityRuleOn: boolean;
   tiebreak?: TiebreakMode;
 }
 
 interface DuelSide {
-  members: ParticipantSnapshot[];             // N = 3~4，双方人数必须相同
+  members: ParticipantSnapshot[]; // N = 3~4，双方人数必须相同
 }
 
 interface DuelRoundRecord {
-  roundNo: number;                            // 1-based；加赛沿 rotation 续编
+  roundNo: number; // 1-based；加赛沿 rotation 续编
   setterSide: 'HOME' | 'AWAY';
   answererSide: 'HOME' | 'AWAY';
-  setterMemberIndex: number;                  // §4.1 rotation
-  answererMemberIndex: number;                // §4.1 rotation
+  setterMemberIndex: number; // §4.1 rotation
+  answererMemberIndex: number; // §4.1 rotation
   problem: ProblemInstance;
   problemSource: 'GENERATED' | 'PREMADE';
   roundLimitMin: number;
   solved: boolean;
-  forfeitEnergy: boolean;                     // 答题方开局精力不足直接判负
-  submissions: number; timeSpentMin: number; penaltyMin: number;
-  energyCost: number;                         // 答题成员支出
-  answererMindsetDelta: number;               // 仅该成员变化
+  forfeitEnergy: boolean; // 答题方开局精力不足直接判负
+  submissions: number;
+  timeSpentMin: number;
+  penaltyMin: number;
+  energyCost: number; // 答题成员支出
+  answererMindsetDelta: number; // 仅该成员变化
   scoreAwardedTo: 'HOME' | 'AWAY';
-  scoreAwarded: number;                       // 1 或（qualityRuleOn 且未解出时）2
+  scoreAwarded: number; // 1 或（qualityRuleOn 且未解出时）2
   notes: string[];
 }
 ```
@@ -700,27 +725,27 @@ interface DuelRoundRecord {
 
 ## 5. 常数速查表（实现对照用）
 
-| 常数 | 值 |
-|---|---|
-| K_dim / K_think / K_code | centered(1.6, 0.22) / centered(1.2, 0.25) / centered(0.7, 0.30) |
-| tEst clamp | [0.35×TL, 2.5×TL]，≥5min |
-| 用时噪声 σn | 0.15（lognormal）；重写基准 0.6×tEst |
-| Pac | σ(0.15 × (8 + dimGap + thinkGap))；失败 +0.08/次；clamp [0.02, 0.97] |
-| PTLE | 0.02 + Σadd，cap 0.6 |
-| WA 罚时 / 心态 / 精力 | +20min / −4 / +4（判题 TLE 精力 +2） |
-| AC 心态 | +2 |
-| Ebase / Emult | 3 + 0.10×reqC / centered(1.4, 0.28, gapCode) |
-| 专注 | Δ=round(0.06×invested×mf)；S(f)=1+0.5f/(f+20)；衰减 ×0.7−1（mindset≤0） |
-| mf | clamp(1+0.01×mindset, 0.2, 2.0) |
-| mindset 范围 | [-10, +10]（权威：student.md §5） |
-| 排名 | 队伍总分 desc → 队伍罚时 asc → teamIndex asc；玩家队 rank ≤ 8 通过 |
-| 名次奖金 | 按玩家队名次：冠军 0.3 / 亚军 0.2 / 3–8 名 0.1 × M[chapter] |
-| 剧情体力 | 第1–4章每名队员 −1；第5–8章每名队员 −2 |
-| NPC | `npc_pool.size`=队伍数；每队 roster_size 名成员；level~N(mean,spread)；dominant +5；mindset~N(50,10)；focus_cap~N(20+0.15L,5) |
-| 出题端 | D=q±3 / M=0.92q / C=0.85q；quality=0.5q+0.3V_dom+0.2thinking；P_trait=0.10+0.0035q |
-| 严重度权重 | W_s = b_s×(1+0.006q)^s，b=[40,30,18,8,3,1] |
-| 局时限 | T_round = TL_generated × 1.25（clamp 45–160 由生成式保证） |
-| 预制题 | ≤N 道/队（每名成员至多一道），quality ≥40，准备阶段锁，赛后 used_for_duel |
+| 常数                     | 值                                                                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| K_dim / K_think / K_code | centered(1.6, 0.22) / centered(1.2, 0.25) / centered(0.7, 0.30)                                                               |
+| tEst clamp               | [0.35×TL, 2.5×TL]，≥5min                                                                                                      |
+| 用时噪声 σn              | 0.15（lognormal）；重写基准 0.6×tEst                                                                                          |
+| Pac                      | σ(0.15 × (8 + dimGap + thinkGap))；失败 +0.08/次；clamp [0.02, 0.97]                                                          |
+| PTLE                     | 0.02 + Σadd，cap 0.6                                                                                                          |
+| WA 罚时 / 心态 / 精力    | +20min / −4 / +4（判题 TLE 精力 +2）                                                                                          |
+| AC 心态                  | +2                                                                                                                            |
+| Ebase / Emult            | 3 + 0.10×reqC / centered(1.4, 0.28, gapCode)                                                                                  |
+| 专注                     | Δ=round(0.06×invested×mf)；S(f)=1+0.5f/(f+20)；衰减 ×0.7−1（mindset≤0）                                                       |
+| mf                       | clamp(1+0.01×mindset, 0.2, 2.0)                                                                                               |
+| mindset 范围             | [-10, +10]（权威：student.md §5）                                                                                             |
+| 排名                     | 队伍总分 desc → 队伍罚时 asc → teamIndex asc；玩家队 rank ≤ 8 通过                                                            |
+| 名次奖金                 | 按玩家队名次：冠军 0.3 / 亚军 0.2 / 3–8 名 0.1 × M[chapter]                                                                   |
+| 剧情体力                 | 第1–4章每名队员 −1；第5–8章每名队员 −2                                                                                        |
+| NPC                      | `npc_pool.size`=队伍数；每队 roster_size 名成员；level~N(mean,spread)；dominant +5；mindset~N(50,10)；focus_cap~N(20+0.15L,5) |
+| 出题端                   | D=q±3 / M=0.92q / C=0.85q；quality=0.5q+0.3V_dom+0.2thinking；P_trait=0.10+0.0035q                                            |
+| 严重度权重               | W_s = b_s×(1+0.006q)^s，b=[40,30,18,8,3,1]                                                                                    |
+| 局时限                   | T_round = TL_generated × 1.25（clamp 45–160 由生成式保证）                                                                    |
+| 预制题                   | ≤N 道/队（每名成员至多一道），quality ≥40，准备阶段锁，赛后 used_for_duel                                                     |
 
 ## 6. 与 GAME-DESIGN.md 的差异备注（待总纲确认）
 

@@ -16,7 +16,9 @@ let userSeq = 0;
 async function createAuthedUser(money = 0): Promise<{ userId: number; token: string }> {
   userSeq += 1;
   const username = `it-${Date.now().toString(36)}-${userSeq}`;
-  const res = await request(app).post('/api/auth/register').send({ username, password: 'pw-123456' });
+  const res = await request(app)
+    .post('/api/auth/register')
+    .send({ username, password: 'pw-123456' });
   const { accessToken, me } = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
   await unlockTutorial(me.id);
   await prisma.user.update({ where: { id: me.id }, data: { money } });
@@ -27,15 +29,28 @@ function auth(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
 
-async function createStudent(userId: number, overrides: Record<string, unknown> = {}): Promise<number> {
+async function createStudent(
+  userId: number,
+  overrides: Record<string, unknown> = {},
+): Promise<number> {
   const s = await prisma.student.create({
     data: {
       userId,
       name: '道具学员',
-            qualityTier: 'COMMON',
-      ds: 10, dp: 12, math: 14, graph: 16, greedy: 18, str: 20,
-      code: 22, thinking: 24, setting: 5,
-      focusCap: 45, energyMax: 60, energy: 30, staminaRegen: 50,
+      qualityTier: 'COMMON',
+      ds: 10,
+      dp: 12,
+      math: 14,
+      graph: 16,
+      greedy: 18,
+      str: 20,
+      code: 22,
+      thinking: 24,
+      setting: 5,
+      focusCap: 45,
+      energyMax: 60,
+      energy: 30,
+      staminaRegen: 50,
       stamina: 0,
       lastSettledAt: new Date(),
       ...overrides,
@@ -138,7 +153,9 @@ describe('POST /api/items/use 正例', () => {
     const id = await createStudent(u.userId, { stamina: 1 });
     await giveItem(u.userId, 'stamina-potion', 2);
 
-    const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'stamina-potion', studentId: id }));
+    const view = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'stamina-potion', studentId: id }),
+    );
     expect(view.stamina).toBeCloseTo(4, 3); // 1+3=4
 
     // 第 2 瓶 → 每日限 1 → VALIDATION_FAILED（且不扣第 2 瓶）
@@ -153,7 +170,9 @@ describe('POST /api/items/use 正例', () => {
     const id = await createStudent(u.userId, { stamina: 2 });
     await giveItem(u.userId, 'drumstick-bento', 2);
 
-    const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'drumstick-bento', studentId: id }));
+    const view = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'drumstick-bento', studentId: id }),
+    );
     expect(view.stamina).toBeCloseTo(5, 3); // 2+5 → clamp 5（回满）
 
     // 同日第 2 份仍可用（供给仅剧情首通限量，无每日限额）；已满则 clamp 保持 5、照常扣道具
@@ -196,7 +215,9 @@ describe('POST /api/items/use 正例', () => {
     const res = await use(u.token, { itemId: 'vigor-drink', studentId: id });
     expect(res.status).toBe(400);
     expect(unwrapErr(res).code).toBe('VALIDATION_FAILED');
-    expect((unwrapErr(res).details as { reason?: string } | undefined)?.reason).toBe('该道具暂不可用');
+    expect((unwrapErr(res).details as { reason?: string } | undefined)?.reason).toBe(
+      '该道具暂不可用',
+    );
     expect(await itemQuantity(u.userId, 'vigor-drink')).toBe(1); // 不扣
   });
 
@@ -233,7 +254,9 @@ describe('POST /api/items/use 正例', () => {
     const id = await createStudent(u.userId, { thinking: 20 });
     await giveItem(u.userId, 'book-thinking-green', 1);
 
-    const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'book-thinking-green', studentId: id }));
+    const view = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'book-thinking-green', studentId: id }),
+    );
     expect(view.thinking).toBe(27); // 20 + 7 (book_effect=0)
   });
 
@@ -251,12 +274,18 @@ describe('POST /api/items/use 正例', () => {
     for (const [itemId] of tiers) await giveItem(u.userId, itemId, 1);
 
     // 逐一使用直到周限 10 触发
-    const first = unwrapOk<StudentView>(await use(u.token, { itemId: 'book-thinking-gray', studentId: id }));
+    const first = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'book-thinking-gray', studentId: id }),
+    );
     expect(first.thinking).toBeCloseTo(12, 6); // 10+2
-    const second = unwrapOk<StudentView>(await use(u.token, { itemId: 'book-thinking-yellow', studentId: id }));
+    const second = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'book-thinking-yellow', studentId: id }),
+    );
     expect(second.thinking).toBeCloseTo(16, 6); // +4
     // 累计 6 / 10，绿书 7 点 → 本周仅余 4 点，应用后计 10，溢出部分被截断
-    const third = unwrapOk<StudentView>(await use(u.token, { itemId: 'book-thinking-green', studentId: id }));
+    const third = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'book-thinking-green', studentId: id }),
+    );
     expect(third.thinking).toBeCloseTo(20, 6); // +4（截断到周限 10）
     // 再使用蓝书 → 周限已满，VALIDATION_FAILED
     const fourth = await use(u.token, { itemId: 'book-thinking-blue', studentId: id });
@@ -270,9 +299,13 @@ describe('POST /api/items/use 正例', () => {
     await giveItem(u.userId, 'book-coding-green', 1);
     await giveItem(u.userId, 'book-setting-green', 1);
 
-    const v1 = unwrapOk<StudentView>(await use(u.token, { itemId: 'book-coding-green', studentId: id }));
+    const v1 = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'book-coding-green', studentId: id }),
+    );
     expect(v1.code).toBeCloseTo(29, 6); // 22+7
-    const v2 = unwrapOk<StudentView>(await use(u.token, { itemId: 'book-setting-green', studentId: id }));
+    const v2 = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'book-setting-green', studentId: id }),
+    );
     expect(v2.setting).toBeCloseTo(12, 6); // 5+7
   });
 });
@@ -329,7 +362,9 @@ describe('POST /api/items/use 限制类反例', () => {
     const view = unwrapOk<StudentView>(await use(u.token, { itemId: 'calm-pill', studentId: id }));
     expect(view.mindset).toBe(7); // 2+5
     expect(
-      await prisma.userItem.findUnique({ where: { userId_itemId: { userId: u.userId, itemId: 'calm-pill' } } }),
+      await prisma.userItem.findUnique({
+        where: { userId_itemId: { userId: u.userId, itemId: 'calm-pill' } },
+      }),
     ).toBeNull(); // 扣到 0 删行
 
     // 不再持有
@@ -342,7 +377,10 @@ describe('POST /api/items/use 限制类反例', () => {
     const u = await createAuthedUser();
     await prisma.userItem.deleteMany({ where: { userId: u.userId } }); // 清开局包库存（自带奶茶×2）
     // 用晚于 04:00 的时刻构造，从而 dayKey 稳定；本轮使用后直接断言计数与键
-    const id = await createStudent(u.userId, { mindset: 0, counters: { milkTea: 2, milkTeaKey: '1900-01-01' } });
+    const id = await createStudent(u.userId, {
+      mindset: 0,
+      counters: { milkTea: 2, milkTeaKey: '1900-01-01' },
+    });
     await giveItem(u.userId, 'milk-tea', 1);
 
     // 陈旧 milkTeaKey 已跨日界 → 视为当日 0 杯，可正常使用
@@ -359,10 +397,15 @@ describe('POST /api/items/use 限制类反例', () => {
       counters: { bookWeek: { thinking: 10 }, bookWeekKey: '1900-W01' },
     });
     await giveItem(u.userId, 'book-thinking-green', 1);
-    const before = unwrapOk<StudentView>(await use(u.token, { itemId: 'book-thinking-green', studentId: id }));
+    const before = unwrapOk<StudentView>(
+      await use(u.token, { itemId: 'book-thinking-green', studentId: id }),
+    );
     expect(before.thinking).toBeCloseTo(17, 6); // 10+7
     const row = await studentRow(id);
-    expect((row.counters as { bookWeek: Record<string, number> }).bookWeek.thinking).toBeCloseTo(7, 6);
+    expect((row.counters as { bookWeek: Record<string, number> }).bookWeek.thinking).toBeCloseTo(
+      7,
+      6,
+    );
   });
 });
 
@@ -388,8 +431,14 @@ describe('POST /api/items/use 不可用与校验', () => {
     const u = await createAuthedUser();
     const id = await createStudent(u.userId);
     const unavailable = [
-      'advance-stone', 'reroll-ticket', 'reroll-shard', 'direction-charm',
-      'legend-box', 'tag-card', 'badge-legend', 'vigor-drink',
+      'advance-stone',
+      'reroll-ticket',
+      'reroll-shard',
+      'direction-charm',
+      'legend-box',
+      'tag-card',
+      'badge-legend',
+      'vigor-drink',
     ];
     for (const itemId of unavailable) await giveItem(u.userId, itemId, 1);
 
@@ -397,7 +446,9 @@ describe('POST /api/items/use 不可用与校验', () => {
       const res = await use(u.token, { itemId, studentId: id });
       expect(res.status).toBe(400);
       expect(unwrapErr(res).code).toBe('VALIDATION_FAILED');
-      expect((unwrapErr(res).details as { reason?: string } | undefined)?.reason).toBe('该道具暂不可用');
+      expect((unwrapErr(res).details as { reason?: string } | undefined)?.reason).toBe(
+        '该道具暂不可用',
+      );
       await expect(studentRow(id)).resolves.toBeTruthy();
     }
   });

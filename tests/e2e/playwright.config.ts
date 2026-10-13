@@ -13,8 +13,7 @@ const API_PORT = Number(process.env.E2E_API_PORT ?? 3000);
 const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 5173);
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL ?? 'mysql://oinur:oinur@127.0.0.1:3306/oinur_e2e';
-const E2E_JWT_SECRET =
-  process.env.E2E_JWT_SECRET ?? 'e2e-jwt-secret-0123456789abcdef-change-me';
+const E2E_JWT_SECRET = process.env.E2E_JWT_SECRET ?? 'e2e-jwt-secret-0123456789abcdef-change-me';
 
 export default defineConfig({
   testDir: './specs',
@@ -24,9 +23,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   timeout: 180_000,
   expect: { timeout: 15_000 },
-  reporter: process.env.CI
-    ? [['list'], ['github'], ['html', { open: 'never' }]]
-    : [['list']],
+  reporter: process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: `http://127.0.0.1:${WEB_PORT}`,
     trace: 'retain-on-failure',

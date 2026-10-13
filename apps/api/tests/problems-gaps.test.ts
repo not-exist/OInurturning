@@ -38,10 +38,22 @@ async function register(money = 100000): Promise<{ token: string; userId: number
 async function makeStudent(userId: number, ability: number): Promise<{ id: number }> {
   const student = await prisma.student.create({
     data: {
-      userId, name: `出题人 ${ability}`, qualityTier: 'COMMON',
-      ds: ability, dp: ability, math: ability, graph: ability, greedy: ability, str: ability,
-      code: ability, thinking: ability, setting: ability,
-      focusCap: 20, energyMax: 50, energy: 50, staminaRegen: 10,
+      userId,
+      name: `出题人 ${ability}`,
+      qualityTier: 'COMMON',
+      ds: ability,
+      dp: ability,
+      math: ability,
+      graph: ability,
+      greedy: ability,
+      str: ability,
+      code: ability,
+      thinking: ability,
+      setting: ability,
+      focusCap: 20,
+      energyMax: 50,
+      energy: 50,
+      staminaRegen: 10,
     },
   });
   return { id: student.id };
@@ -61,7 +73,10 @@ describe('problems gaps', () => {
     const user = await register();
     const auth = { Authorization: `Bearer ${user.token}` };
     const strong = await makeStudent(user.userId, 100);
-    const strongRes = await request(app).post('/api/problem-library').set(auth).send({ studentId: strong.id, dimension: 'DS' });
+    const strongRes = await request(app)
+      .post('/api/problem-library')
+      .set(auth)
+      .send({ studentId: strong.id, dimension: 'DS' });
     expect(strongRes.status).toBe(200);
     const hq = unwrapOk<CreateProblemResult>(strongRes);
     // round(0.55×100+0.25×100+0.2×100+噪声[-8,9)) → [92,100]
@@ -100,7 +115,9 @@ describe('problems gaps', () => {
     expect(res.status).toBe(200);
     // round(20×(1+0.15×2)) = 26（library.ts 硬编码公式）
     expect(unwrapOk<CreateProblemResult>(res).cost).toBe(26);
-    expect(before - (await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })).money).toBe(26);
+    expect(
+      before - (await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })).money,
+    ).toBe(26);
   });
 
   it('容量 120：121 → STATE_CONFLICT', async () => {
@@ -129,13 +146,24 @@ describe('problems gaps', () => {
     const author = await makeStudent(user.userId, 50);
     const auth = { Authorization: `Bearer ${user.token}` };
     const consumed = await prisma.problemLibraryEntry.create({
-      data: { userId: user.userId, authorStudentId: author.id, name: '已耗题', dominantDim: 'DS', rarity: 'gray', quality: 10, consumedAt: new Date() },
+      data: {
+        userId: user.userId,
+        authorStudentId: author.id,
+        name: '已耗题',
+        dominantDim: 'DS',
+        rarity: 'gray',
+        quality: 10,
+        consumedAt: new Date(),
+      },
     });
     const del = await request(app).delete(`/api/problem-library/${consumed.id}`).set(auth);
     expect(del.status).toBe(409);
     expect(unwrapErr(del).code).toBe('STATE_CONFLICT');
 
-    const badDim = await request(app).post('/api/problem-library').set(auth).send({ studentId: author.id, dimension: 'XX' });
+    const badDim = await request(app)
+      .post('/api/problem-library')
+      .set(auth)
+      .send({ studentId: author.id, dimension: 'XX' });
     expect(badDim.status).toBe(400);
 
     const broke = await register(0);
@@ -148,7 +176,10 @@ describe('problems gaps', () => {
     expect(unwrapErr(noMoney).code).toBe('INSUFFICIENT_RESOURCE');
 
     await prisma.student.update({ where: { id: author.id }, data: { stamina: 0 } });
-    const noStamina = await request(app).post('/api/problem-library').set(auth).send({ studentId: author.id, dimension: 'DS' });
+    const noStamina = await request(app)
+      .post('/api/problem-library')
+      .set(auth)
+      .send({ studentId: author.id, dimension: 'DS' });
     expect(noStamina.status).toBe(409);
   });
 

@@ -114,10 +114,7 @@ describe('讲课成长：达标成功', () => {
     // rng 0.99 ≥ 0.55 → 主成长落 thinking
     const thinkingSide = run({ rng: rngOf(0.99, 0.9), student: { setting: 20, thinking: 45 } });
     expect(thinkingSide.gains.map((entry) => entry.stat)).toEqual(['thinking']);
-    expect(amountOf(thinkingSide.gains, 'thinking')).toBeCloseTo(
-      0.75 * (1 - 45 / 100) ** 2,
-      10,
-    );
+    expect(amountOf(thinkingSide.gains, 'thinking')).toBeCloseTo(0.75 * (1 - 45 / 100) ** 2, 10);
   });
 
   it('附带成长：另一项按 secondary_share 打折，rng 顺序固定为「落点 → 附带」', () => {
@@ -175,7 +172,10 @@ describe('讲课成长：思维不足', () => {
       { stat: 'thinking', amount: expect.closeTo(-0.8, 10) },
       { stat: 'setting', amount: expect.closeTo(-0.5, 10) },
     ]);
-    expect(result.patch).toEqual({ thinking: expect.closeTo(39.2, 10), setting: expect.closeTo(19.5, 10) });
+    expect(result.patch).toEqual({
+      thinking: expect.closeTo(39.2, 10),
+      setting: expect.closeTo(19.5, 10),
+    });
   });
 
   it('回落 clamp 下限 0，不会把属性打成负数', () => {
@@ -191,7 +191,12 @@ describe('讲课成长：思维不足', () => {
   });
 
   it('强接但勉强过关 → 仍成长，量低于达标场（deficit 匹配 × forced_success_mult）', () => {
-    const survived = run({ student: deficitStudent, forced: true, success: true, rng: rngOf(0, 0.9) });
+    const survived = run({
+      student: deficitStudent,
+      forced: true,
+      success: true,
+      rng: rngOf(0, 0.9),
+    });
     expect(amountOf(survived.gains, 'setting')).toBeCloseTo(0.75 * 0.75 * 0.6 * 0.64, 10);
     expect(amountOf(survived.gains, 'setting')).toBeLessThan(0.48);
     expect(survived.patch.thinking).toBeUndefined();
@@ -210,7 +215,12 @@ describe('讲课成长：思维不足', () => {
   });
 
   it('思维不足但达标直讲（非强接）→ 无失败分支，照常成长', () => {
-    const result = run({ student: deficitStudent, forced: false, success: true, rng: rngOf(0, 0.9) });
+    const result = run({
+      student: deficitStudent,
+      forced: false,
+      success: true,
+      rng: rngOf(0, 0.9),
+    });
     expect(amountOf(result.gains, 'setting')).toBeCloseTo(0.75 * 0.75 * 0.64, 10);
   });
 });
@@ -219,7 +229,13 @@ describe('讲课成长：档位思维要求', () => {
   it('thinking_req 缺省回退到该档门槛', () => {
     expect(thinkingReqOf({ id: 'x', threshold: 33, base_money: 1, base_reputation: 1 })).toBe(33);
     expect(
-      thinkingReqOf({ id: 'x', threshold: 33, base_money: 1, base_reputation: 1, thinking_req: 30 }),
+      thinkingReqOf({
+        id: 'x',
+        threshold: 33,
+        base_money: 1,
+        base_reputation: 1,
+        thinking_req: 30,
+      }),
     ).toBe(30);
   });
 

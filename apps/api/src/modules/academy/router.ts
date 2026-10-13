@@ -23,33 +23,43 @@ academyRouter.get('/pool', requireAuth, async (req, res, next) => {
     // visit_academy 只在本端点推进：overview 内部也调 getPool()，挂 service 上会被总览页代劳
     void autoAdvanceIfNeeded(req.user!.id, 'visit_academy');
     res.json({ ok: true, data });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 academyRouter.post('/refresh', requireAuth, async (req, res, next) => {
   try {
     res.json({ ok: true, data: await svc.refreshPool(req.user!.id) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 academyRouter.post('/recruit', requireAuth, async (req, res, next) => {
   try {
     const parsed = RecruitBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await svc.recruit(req.user!.id, parsed.data.tempId) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 academyRouter.get('/lecture-tiers', requireAuth, async (req, res, next) => {
   try {
     res.json({ ok: true, data: await lecture.getLectureTiers(req.user!.id) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 academyRouter.post('/lectures', requireAuth, async (req, res, next) => {
   try {
     const parsed = LectureBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({
       ok: true,
       data: await lecture.teachLecture(
@@ -59,7 +69,9 @@ academyRouter.post('/lectures', requireAuth, async (req, res, next) => {
         parsed.data.force,
       ),
     });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 academyRouter.get('/lectures', requireAuth, async (req, res, next) => {
@@ -69,5 +81,7 @@ academyRouter.get('/lectures', requireAuth, async (req, res, next) => {
       throw new ApiError('VALIDATION_FAILED', { field: 'limit' });
     }
     res.json({ ok: true, data: await lecture.listLectureLogs(req.user!.id, limit) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });

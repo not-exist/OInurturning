@@ -31,31 +31,54 @@ const LogsQuerySchema = z.object({
 trainingRouter.get('/logs', requireAuth, async (req, res, next) => {
   try {
     const parsed = LogsQuerySchema.safeParse(req.query);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await svc.listTrainingLogs(req.user!.id, parsed.data) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 trainingRouter.post('/basic', requireAuth, async (req, res, next) => {
   try {
     const parsed = StudentIdSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     res.json({ ok: true, data: await svc.basicTrain(req.user!.id, parsed.data.studentId) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 trainingRouter.post('/directed', requireAuth, async (req, res, next) => {
   try {
     const parsed = DirectedBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
-    res.json({ ok: true, data: await svc.directedTrain(req.user!.id, parsed.data.studentId, parsed.data.dim, parsed.data.bookItemId) });
-  } catch (e) { next(e); }
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    res.json({
+      ok: true,
+      data: await svc.directedTrain(
+        req.user!.id,
+        parsed.data.studentId,
+        parsed.data.dim,
+        parsed.data.bookItemId,
+      ),
+    });
+  } catch (e) {
+    next(e);
+  }
 });
 
 trainingRouter.post('/specialized', requireAuth, async (req, res, next) => {
   try {
     const parsed = SpecializedBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
-    res.json({ ok: true, data: await svc.specializedTrain(req.user!.id, parsed.data.studentId, parsed.data.problemId) });
-  } catch (e) { next(e); }
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    res.json({
+      ok: true,
+      data: await svc.specializedTrain(req.user!.id, parsed.data.studentId, parsed.data.problemId),
+    });
+  } catch (e) {
+    next(e);
+  }
 });

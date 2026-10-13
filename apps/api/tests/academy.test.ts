@@ -53,16 +53,24 @@ function makeTalent(id: string, rarity: ConfigRarity): TalentDef {
 function fullBuckets(): TalentBuckets {
   const rarities: ConfigRarity[] = ['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'];
   const talents = Object.fromEntries(
-    rarities.flatMap((r) => [1, 2, 3].map((i) => {
-      const t = makeTalent(`${r}-t${i}`, r);
-      return [t.id, t];
-    })),
+    rarities.flatMap((r) =>
+      [1, 2, 3].map((i) => {
+        const t = makeTalent(`${r}-t${i}`, r);
+        return [t.id, t];
+      }),
+    ),
   );
   return bucketTalents(talents);
 }
 
 function genCtx(overrides: Partial<GenerateContext> = {}): GenerateContext {
-  return { reputation: 0, ownedStudents: 0, buckets: fullBuckets(), recruitment: RECRUITMENT, ...overrides };
+  return {
+    reputation: 0,
+    ownedStudents: 0,
+    buckets: fullBuckets(),
+    recruitment: RECRUITMENT,
+    ...overrides,
+  };
 }
 
 describe('recruit-gen：品质权重（student.md §3.2）', () => {
@@ -137,7 +145,14 @@ describe('recruit-gen：候选生成（§3.3–3.6）', () => {
         GENIUS: { dim: 32, d: 8, mult: 5.0 },
       }[c.qualityTier];
       const e = repAdjustedE(tierTable.dim, 6000);
-      for (const v of [c.attrs.ds, c.attrs.dp, c.attrs.math, c.attrs.graph, c.attrs.greedy, c.attrs.str]) {
+      for (const v of [
+        c.attrs.ds,
+        c.attrs.dp,
+        c.attrs.math,
+        c.attrs.graph,
+        c.attrs.greedy,
+        c.attrs.str,
+      ]) {
         expect(v).toBeGreaterThanOrEqual(Math.max(1, e - tierTable.d));
         expect(v).toBeLessThanOrEqual(Math.min(100, e + tierTable.d));
       }
@@ -147,11 +162,15 @@ describe('recruit-gen：候选生成（§3.3–3.6）', () => {
 
   it('genius 第 1 槽保证绿及以上（§3.4 保底）', () => {
     const buckets = fullBuckets();
-    const rank = new Map(['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'].map((r, i) => [r, i]));
+    const rank = new Map(
+      ['gray', 'yellow', 'green', 'blue', 'purple', 'colorful'].map((r, i) => [r, i]),
+    );
     for (let seed = 0; seed < 300; seed++) {
       const ids = rollTalentIds(mulberry32(seed), 'genius', buckets);
       expect(ids.length).toBeGreaterThanOrEqual(1);
-      const first = Object.values(buckets.byRarity).flat().find((t) => t.id === ids[0])!;
+      const first = Object.values(buckets.byRarity)
+        .flat()
+        .find((t) => t.id === ids[0])!;
       expect(rank.get(first.rarity)!).toBeGreaterThanOrEqual(rank.get('green')!);
       expect(new Set(ids).size).toBe(ids.length); // 去重
     }
@@ -181,7 +200,9 @@ let userSeq = 0;
 async function createAuthedUser(money: number, reputation = 0): Promise<AuthedUser> {
   userSeq += 1;
   const username = `ac-${Date.now().toString(36)}-${userSeq}`;
-  const res = await request(app).post('/api/auth/register').send({ username, password: 'pw-123456' });
+  const res = await request(app)
+    .post('/api/auth/register')
+    .send({ username, password: 'pw-123456' });
   const { accessToken, me } = unwrapOk<{ accessToken: string; me: { id: number } }>(res);
   await unlockTutorial(me.id);
   await prisma.user.update({ where: { id: me.id }, data: { money, reputation } });
@@ -314,13 +335,21 @@ describe('POST /api/academy/recruit', () => {
     const u = await createAuthedUser(10_000);
     const pool = await getPool(u.token);
     const target = pool.candidates[0]!;
-    const targetStored = (await storedCandidates(u.userId)).find((c) => c.tempId === target.tempId)!;
+    const targetStored = (await storedCandidates(u.userId)).find(
+      (c) => c.tempId === target.tempId,
+    )!;
 
     const res = await request(app)
       .post('/api/academy/recruit')
       .set(auth(u.token))
       .send({ tempId: target.tempId });
-    const view = unwrapOk<{ id: number; name: string; qualityTier: string; talents: string[]; mindset: number }>(res);
+    const view = unwrapOk<{
+      id: number;
+      name: string;
+      qualityTier: string;
+      talents: string[];
+      mindset: number;
+    }>(res);
     expect(view.name).toBe(target.name);
     expect(view.qualityTier).toBe(targetStored.qualityTier);
     expect(view.mindset).toBe(2);
@@ -355,7 +384,9 @@ describe('POST /api/academy/recruit', () => {
     const before = (await prisma.user.findUniqueOrThrow({ where: { id: u.userId } })).money;
 
     const second = pool.candidates[1]!;
-    const secondStored = (await storedCandidates(u.userId)).find((c) => c.tempId === second.tempId)!;
+    const secondStored = (await storedCandidates(u.userId)).find(
+      (c) => c.tempId === second.tempId,
+    )!;
     const mult = { COMMON: 1.0, GOOD: 1.5, ELITE: 2.5, GENIUS: 5.0 }[secondStored.qualityTier];
     const expected = Math.round(738 * mult); // round(300×1.35³)=738
     const res = await request(app)

@@ -141,7 +141,11 @@ function StageNode({
         <span className="flex flex-wrap items-center gap-2">
           <span
             className={`font-mono text-[11px] ${
-              state === 'open' ? 'text-cyber-400' : state === 'cleared' ? 'text-good-400/80' : 'text-fg-faint'
+              state === 'open'
+                ? 'text-cyber-400'
+                : state === 'cleared'
+                  ? 'text-good-400/80'
+                  : 'text-fg-faint'
             }`}
           >
             {String(ordinal).padStart(2, '0')}
@@ -150,28 +154,30 @@ function StageNode({
             width="w-80"
             content={
               <span className="block space-y-1.5">
-                <span className="block text-xs font-semibold text-fg">
-                  {name}
-                </span>
+                <span className="block text-xs font-semibold text-fg">{name}</span>
                 <HoverRow k="关卡编号">{stageNumberLabel(stage.stageKey, ordinal)}</HoverRow>
                 <HoverRow k="推荐等级">{stage.recommendedLevel ?? '—'}</HoverRow>
                 <HoverRow k="比赛时长">{stage.durationMin ?? '—'} 分钟</HoverRow>
                 <HoverRow k="体力消耗">×{cost}</HoverRow>
                 <HoverRow k="出战人数">{rosterSize} 人</HoverRow>
-                <HoverRow k="首通奖励">{stage.firstClearAt === null ? '待领取' : '已领取'}</HoverRow>
+                <HoverRow k="首通奖励">
+                  {stage.firstClearAt === null ? '待领取' : '已领取'}
+                </HoverRow>
                 <HoverRow k="最佳名次">{stage.bestRank ?? '—'}</HoverRow>
                 <HoverRow k="通关次数">{stage.clearCount}</HoverRow>
                 <span className="block pt-1 text-[11px] text-fg-dim">
-                  {stage.unlocked
-                    ? '通关后在名次达标时解锁下一关。'
-                    : '尚未解锁：先通关上一关。'}
+                  {stage.unlocked ? '通关后在名次达标时解锁下一关。' : '尚未解锁：先通关上一关。'}
                 </span>
               </span>
             }
           >
             <span
               className={`cursor-help font-medium ${
-                state === 'open' ? 'text-fg' : state === 'cleared' ? 'text-fg-muted' : 'text-fg-faint'
+                state === 'open'
+                  ? 'text-fg'
+                  : state === 'cleared'
+                    ? 'text-fg-muted'
+                    : 'text-fg-faint'
               }`}
             >
               {name}
@@ -195,7 +201,9 @@ function StageNode({
       </span>
 
       <span className="flex items-center gap-2">
-        <span className={`tnum text-[11px] ${state === 'locked' ? 'text-fg-faint' : 'text-warn-400'}`}>
+        <span
+          className={`tnum text-[11px] ${state === 'locked' ? 'text-fg-faint' : 'text-warn-400'}`}
+        >
           体力 ×{cost}
         </span>
         <Btn
@@ -252,7 +260,10 @@ function ChapterMap({
               <Icon icon={Lock} className="size-3.5 shrink-0 text-fg-faint" />
             ) : (
               // 本页唯一 idle 动效：只标当前章
-              <span aria-hidden className="size-1.5 shrink-0 animate-pulse-dot rounded-full bg-cyber-400" />
+              <span
+                aria-hidden
+                className="size-1.5 shrink-0 animate-pulse-dot rounded-full bg-cyber-400"
+              />
             )}
             <span className={`font-display text-sm ${locked ? 'text-fg-faint' : tier}`}>
               {tierLabel(chapter.chapter)}
@@ -332,7 +343,8 @@ export function StoryPage(): JSX.Element {
   );
   // 当前章 = 首个「已可达且未清完」的章；八章全清时落在最后一章
   const found = chapters.findIndex(
-    (chapter) => chapter.stages[0]?.unlocked === true && chapter.stages.some((stage) => !stage.cleared),
+    (chapter) =>
+      chapter.stages[0]?.unlocked === true && chapter.stages.some((stage) => !stage.cleared),
   );
   const focusIndex = found === -1 ? chapters.length - 1 : found;
   const expandedKey = openChapterKey ?? chapters[focusIndex]?.chapter ?? null;

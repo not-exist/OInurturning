@@ -51,7 +51,12 @@ export function ProblemLibraryPage(): JSX.Element {
   const [dimension, setDimension] = useState<DimensionKey>('DS');
 
   if (students.isPending || library.isPending) return <InlineLoader>读取题库数据…</InlineLoader>;
-  if (students.isError || library.isError || students.data === undefined || library.data === undefined) {
+  if (
+    students.isError ||
+    library.isError ||
+    students.data === undefined ||
+    library.data === undefined
+  ) {
     return (
       <ErrorNote
         onRetry={() => {
@@ -87,7 +92,9 @@ export function ProblemLibraryPage(): JSX.Element {
       <Panel
         eyebrow="工作台"
         title="创作一道新题"
-        actions={<span className="text-xs text-fg-dim">消耗 1 体力与出题费（费用随在营学员数上浮）</span>}
+        actions={
+          <span className="text-xs text-fg-dim">消耗 1 体力与出题费（费用随在营学员数上浮）</span>
+        }
       >
         {roster.length === 0 ? (
           <Empty
@@ -227,7 +234,10 @@ function ProblemRow({
           norm === 'RAINBOW' ? 'animate-rainbow-halo' : ''
         }`}
       >
-        <Icon icon={DIMENSION_ICON[problem.dominantDim]} className={`size-4 ${RARITY_ICON[norm]}`} />
+        <Icon
+          icon={DIMENSION_ICON[problem.dominantDim]}
+          className={`size-4 ${RARITY_ICON[norm]}`}
+        />
       </span>
 
       <div className="min-w-0 flex-1">
@@ -237,8 +247,12 @@ function ProblemRow({
               {formatProblemName(problem)}
             </span>
           </HoverCard>
-          <span className={`border px-1.5 py-0.5 text-[11px] ${rarityChip(norm)}`}>{rarityLabel(norm)}</span>
-          <span className={`border px-1.5 py-0.5 text-[11px] ${rarityChip(band.rarity)}`}>{band.label}</span>
+          <span className={`border px-1.5 py-0.5 text-[11px] ${rarityChip(norm)}`}>
+            {rarityLabel(norm)}
+          </span>
+          <span className={`border px-1.5 py-0.5 text-[11px] ${rarityChip(band.rarity)}`}>
+            {band.label}
+          </span>
           {trait !== null && <SeverityTag info={trait} />}
           {problem.traitId !== null && trait === null && <Chip>特殊特性</Chip>}
         </div>
@@ -252,7 +266,13 @@ function ProblemRow({
         </p>
       </div>
 
-      <Btn data-testid="problem-delete" size="sm" variant="danger" disabled={deleting} onClick={onDelete}>
+      <Btn
+        data-testid="problem-delete"
+        size="sm"
+        variant="danger"
+        disabled={deleting}
+        onClick={onDelete}
+      >
         <Icon icon={Trash2} className="size-3.5" />
         删除
       </Btn>
@@ -300,7 +320,9 @@ function ProblemDetail({ problem }: { problem: ProblemView }): JSX.Element {
         </span>
         <span className="flex items-baseline justify-between gap-3">
           <span className="text-fg-dim">当前状态</span>
-          <span className="text-fg">{problem.consumedAt === null ? '可训练 / 可携带' : '已消耗'}</span>
+          <span className="text-fg">
+            {problem.consumedAt === null ? '可训练 / 可携带' : '已消耗'}
+          </span>
         </span>
       </span>
 

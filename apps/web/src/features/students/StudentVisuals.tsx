@@ -97,12 +97,20 @@ export function MindsetBar({
         <span
           aria-hidden
           className={`absolute inset-y-0 ${v >= 0 ? 'bg-cyber-400/80' : 'bg-bad-400/80'}`}
-          style={v >= 0 ? { left: '50%', width: `${pos - 50}%` } : { left: `${pos}%`, width: `${50 - pos}%` }}
+          style={
+            v >= 0
+              ? { left: '50%', width: `${pos - 50}%` }
+              : { left: `${pos}%`, width: `${50 - pos}%` }
+          }
         />
         {/* 0 警戒线 */}
         <span aria-hidden className="absolute inset-y-0 left-1/2 w-px bg-fg-faint" />
         {/* 个人归位锚点 B */}
-        <span aria-hidden className="absolute -inset-y-1 w-0.5 bg-arc-400" style={{ left: `${mindsetX(baseline)}%` }} />
+        <span
+          aria-hidden
+          className="absolute -inset-y-1 w-0.5 bg-arc-400"
+          style={{ left: `${mindsetX(baseline)}%` }}
+        />
         {/* −6 焦虑反噬阈值 */}
         <span
           aria-hidden
@@ -144,14 +152,27 @@ export function staminaIntervalMin(regen: number): number {
   return Math.round((45 * 50) / Math.max(1, regen));
 }
 
-export function StaminaCells({ stamina, className = '' }: { stamina: number; className?: string }): JSX.Element {
+export function StaminaCells({
+  stamina,
+  className = '',
+}: {
+  stamina: number;
+  className?: string;
+}): JSX.Element {
   const value = clamp(stamina, 0, 5);
   return (
-    <span className={`inline-flex items-center gap-1 ${className}`} aria-label={`体力 ${floor(value)}/5`}>
+    <span
+      className={`inline-flex items-center gap-1 ${className}`}
+      aria-label={`体力 ${floor(value)}/5`}
+    >
       {[0, 1, 2, 3, 4].map((i) => {
         const fill = clamp(value - i, 0, 1);
         return (
-          <span key={i} aria-hidden className="relative block h-2 w-4 border border-ink-500/80 bg-ink-850">
+          <span
+            key={i}
+            aria-hidden
+            className="relative block h-2 w-4 border border-ink-500/80 bg-ink-850"
+          >
             <span
               className="absolute inset-y-0 left-0 bg-warn-400/80 transition-[width] duration-500"
               style={{ width: `${fill * 100}%` }}
@@ -193,7 +214,11 @@ function radarXY(index: number, ratio: number): [number, number] {
 }
 
 function radarRing(ratio: number): string {
-  return SIX_DIMS.map((_, i) => radarXY(i, ratio).map((n) => n.toFixed(1)).join(',')).join(' ');
+  return SIX_DIMS.map((_, i) =>
+    radarXY(i, ratio)
+      .map((n) => n.toFixed(1))
+      .join(','),
+  ).join(' ');
 }
 
 function radarLabel(s: StudentView): string {
@@ -222,16 +247,34 @@ export function RadarChart({
       aria-label={`六维雷达：${radarLabel(s)}`}
       className={`shrink-0 ${className}`}
     >
-      <polygon points={radarRing(1)} className="fill-cyber-400/[0.04] stroke-ink-500" strokeWidth={0.6} />
+      <polygon
+        points={radarRing(1)}
+        className="fill-cyber-400/[0.04] stroke-ink-500"
+        strokeWidth={0.6}
+      />
       <polygon points={radarRing(0.5)} className="fill-none stroke-ink-600" strokeWidth={0.4} />
       {SIX_DIMS.map((dim, i) => {
         const [x, y] = radarXY(i, 1);
         return (
-          <line key={dim.key} x1={50} y1={50} x2={x} y2={y} className="stroke-ink-600" strokeWidth={0.4} />
+          <line
+            key={dim.key}
+            x1={50}
+            y1={50}
+            x2={x}
+            y2={y}
+            className="stroke-ink-600"
+            strokeWidth={0.4}
+          />
         );
       })}
       <polygon
-        points={ratios.map((r, i) => radarXY(i, r).map((n) => n.toFixed(1)).join(',')).join(' ')}
+        points={ratios
+          .map((r, i) =>
+            radarXY(i, r)
+              .map((n) => n.toFixed(1))
+              .join(','),
+          )
+          .join(' ')}
         className="fill-cyber-400/15 stroke-cyber-400"
         strokeWidth={1}
         strokeLinejoin="round"
@@ -264,7 +307,13 @@ export function RadarChart({
 // 品质档（材质层级，不复用稀有度色相）
 // ---------------------------------------------------------------------------
 
-export function QualityBadge({ tier, className = '' }: { tier: QualityTier; className?: string }): JSX.Element {
+export function QualityBadge({
+  tier,
+  className = '',
+}: {
+  tier: QualityTier;
+  className?: string;
+}): JSX.Element {
   return (
     <span
       className={`inline-flex items-center border px-1.5 py-0.5 text-[11px] text-fg-muted ${QUALITY_MATERIAL[tier]} ${className}`}
@@ -368,7 +417,9 @@ export function StudentHover({
           <span>心态</span>
           <span className="flex w-24 items-center gap-1.5">
             <MindsetBar value={s.mindset} baseline={baseline} compact />
-            <span className="w-6 shrink-0 text-right font-mono text-fg-muted">{signed(round(s.mindset))}</span>
+            <span className="w-6 shrink-0 text-right font-mono text-fg-muted">
+              {signed(round(s.mindset))}
+            </span>
           </span>
         </div>
       </div>
@@ -382,7 +433,9 @@ export function StudentHover({
                   icon={talentIcon(def?.family ?? null, def?.kind ?? 'positive')}
                   className={`size-3.5 ${def ? RARITY_ICON[def.rarity] : 'text-fg-dim'}`}
                 />
-                <span className={def ? 'text-fg-muted' : 'text-fg-faint'}>{def?.name ?? '未知天赋'}</span>
+                <span className={def ? 'text-fg-muted' : 'text-fg-faint'}>
+                  {def?.name ?? '未知天赋'}
+                </span>
                 {def !== undefined && (
                   <span className="ml-auto font-mono text-[10px] text-fg-faint">
                     {rarityLabel(def.rarity)}
@@ -401,7 +454,13 @@ export function StudentHover({
 // 六维迷你条（列表卡）
 // ---------------------------------------------------------------------------
 
-export function DimBars({ s, className = '' }: { s: StudentView; className?: string }): JSX.Element {
+export function DimBars({
+  s,
+  className = '',
+}: {
+  s: StudentView;
+  className?: string;
+}): JSX.Element {
   const scale = statScale(SIX_DIMS.map((d) => s[d.field]));
   return (
     <div className={`grid grid-cols-2 gap-x-3 gap-y-1.5 ${className}`}>
@@ -411,7 +470,12 @@ export function DimBars({ s, className = '' }: { s: StudentView; className?: str
             <span className="truncate text-fg-faint">{DIMENSION_LABEL[dim.key]}</span>
             <span className="font-mono text-fg-muted">{floor(s[dim.field])}</span>
           </div>
-          <Meter value={s[dim.field]} max={scale} className="bg-cyber-400/70" trackClassName="bg-ink-700/80" />
+          <Meter
+            value={s[dim.field]}
+            max={scale}
+            className="bg-cyber-400/70"
+            trackClassName="bg-ink-700/80"
+          />
         </div>
       ))}
     </div>

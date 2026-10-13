@@ -53,7 +53,7 @@ async function createStudent(userId: number, strong = false): Promise<number> {
     data: {
       userId,
       name: '对决学员',
-            qualityTier: 'ELITE',
+      qualityTier: 'ELITE',
       ds: strong ? 100 : 35,
       dp: strong ? 100 : 35,
       math: strong ? 100 : 35,
@@ -132,7 +132,10 @@ describe('M3 duel adventure integration', () => {
     expect(stored.contestRecordId).toBeTruthy();
     expect(record.type).toBe('ADVENTURE');
     expect(record.format).toBe('DUEL');
-    expect(record.report).toMatchObject({ format: 'DUEL', inputSnapshot: { qualityRuleOn: false } });
+    expect(record.report).toMatchObject({
+      format: 'DUEL',
+      inputSnapshot: { qualityRuleOn: false },
+    });
     expect(result.adventure.results[0]).toMatchObject({
       outcomeType: 'duel',
       contestRecordId: record.id,
@@ -150,14 +153,20 @@ describe('M3 duel adventure integration', () => {
     expect(report.inputSnapshot.home.members.every((member) => member.side === 'HOME')).toBe(true);
     expect(report.inputSnapshot.away.members).toHaveLength(3);
     expect(report.inputSnapshot.away.members.every((member) => member.side === 'AWAY')).toBe(true);
-    expect(new Set(report.rounds.filter((round) => round.answererSide === 'HOME').map((round) => round.answererMemberIndex))).toEqual(
-      new Set([0, 1, 2]),
-    );
+    expect(
+      new Set(
+        report.rounds
+          .filter((round) => round.answererSide === 'HOME')
+          .map((round) => round.answererMemberIndex),
+      ),
+    ).toEqual(new Set([0, 1, 2]));
     // 每名参战学员只扣自己答题那一局的精力
-    const expected = roster.map((_, index) =>
-      100 - report.rounds
-        .filter((round) => round.answererSide === 'HOME' && round.answererMemberIndex === index)
-        .reduce((total, round) => total + round.energyCost, 0),
+    const expected = roster.map(
+      (_, index) =>
+        100 -
+        report.rounds
+          .filter((round) => round.answererSide === 'HOME' && round.answererMemberIndex === index)
+          .reduce((total, round) => total + round.energyCost, 0),
     );
     expect(await energyOf(roster[0]!)).toBe(expected[0]);
     expect(await energyOf(roster[1]!)).toBe(expected[1]);
@@ -166,7 +175,9 @@ describe('M3 duel adventure integration', () => {
   });
 
   it('marks a three-person duel choice available', async () => {
-    const user = await prisma.user.create({ data: { username: `duel-avail-${Date.now().toString(36)}` } });
+    const user = await prisma.user.create({
+      data: { username: `duel-avail-${Date.now().toString(36)}` },
+    });
     const roster = await createRoster(user.id);
 
     await importConfigs({ configDir: writeConfigDir(duelEventYaml(3)) });
@@ -266,8 +277,16 @@ describe('M3 duel adventure integration', () => {
         },
       });
       const result = await chooseAdventure(user.id, current.id, { optionIndex: 0 }, NOW);
-      const rewards = (result.adventure.results[0] as { rewards?: { type?: string; amount?: number; streak?: number }[] }).rewards ?? [];
-      foundBonus = rewards.some((reward) => reward.type === 'win_streak_bonus' && reward.amount === 500 && reward.streak === 2);
+      const rewards =
+        (
+          result.adventure.results[0] as {
+            rewards?: { type?: string; amount?: number; streak?: number }[];
+          }
+        ).rewards ?? [];
+      foundBonus = rewards.some(
+        (reward) =>
+          reward.type === 'win_streak_bonus' && reward.amount === 500 && reward.streak === 2,
+      );
     }
     expect(foundBonus).toBe(true);
   });

@@ -1,5 +1,10 @@
 import { useState, type JSX } from 'react';
-import { clamp, type BattleReplayEvent, type FrozenSolveHooks, type QuestionSnapshot } from '@oinur/shared';
+import {
+  clamp,
+  type BattleReplayEvent,
+  type FrozenSolveHooks,
+  type QuestionSnapshot,
+} from '@oinur/shared';
 import { Metric } from '../shared/bits';
 import { Modal } from '../../../components/ui';
 import { dimensionLabel, tierLabel, traitInfo } from '../../../lib/labels';
@@ -44,7 +49,9 @@ export function applyEventToQuestionStatus(
 
 function QuestionStatusChip({ status }: { status: QuestionStatus | undefined }): JSX.Element {
   if (status === undefined || !status.started) {
-    return <span className="border border-ink-600 px-1.5 py-0.5 text-[10px] text-fg-faint">未开题</span>;
+    return (
+      <span className="border border-ink-600 px-1.5 py-0.5 text-[10px] text-fg-faint">未开题</span>
+    );
   }
   if (status.passedBy !== null) {
     return (
@@ -60,7 +67,9 @@ function QuestionStatusChip({ status }: { status: QuestionStatus | undefined }):
       </span>
     );
   }
-  return <span className="border border-ink-600 px-1.5 py-0.5 text-[10px] text-fg-dim">暂时卡住</span>;
+  return (
+    <span className="border border-ink-600 px-1.5 py-0.5 text-[10px] text-fg-dim">暂时卡住</span>
+  );
 }
 
 /** 特性严重度刻度（罗马数字 Ⅰ–Ⅵ + 名称；red 是最轻且最高频的一档，不做灾难告警） */
@@ -94,7 +103,8 @@ const HOOK_LABEL = {
 } satisfies Record<keyof FrozenSolveHooks, string>;
 
 function hookValueText(key: string, value: string | number | boolean): string {
-  if (key === 'condition') return value === 'first_problem' ? '队伍第一题' : '防 AK（仅剩一题未过）';
+  if (key === 'condition')
+    return value === 'first_problem' ? '队伍第一题' : '防 AK（仅剩一题未过）';
   if (key === 'partial_override') {
     if (value === 'none') return '无部分分';
     if (value === 'trap') return '部分分陷阱';
@@ -163,13 +173,8 @@ function QuestionDetailModal({
             value={question.partialScores ? '可得部分分' : '全有或全无'}
             tone={question.partialScores ? 'text-fg' : 'text-warn-400'}
           />
-          <Metric
-            label="来源"
-            value={question.source === 'PREMADE' ? '题库预制' : '临场生成'}
-          />
-          {question.quality !== undefined && (
-            <Metric label="题目质量" value={question.quality} />
-          )}
+          <Metric label="来源" value={question.source === 'PREMADE' ? '题库预制' : '临场生成'} />
+          {question.quality !== undefined && <Metric label="题目质量" value={question.quality} />}
         </div>
       ) : question.traits.length === 0 ? (
         <p className="text-sm text-fg-dim">本题没有附着特性。</p>
@@ -205,7 +210,10 @@ function QuestionDetailModal({
                     className="mt-2 grid gap-x-4 gap-y-1 border-t border-ink-600/50 pt-2 sm:grid-cols-2"
                   >
                     {Object.entries(hook as FrozenSolveHooks).map(([key, value]) => (
-                      <div key={key} className="flex items-baseline justify-between gap-2 text-[11px]">
+                      <div
+                        key={key}
+                        className="flex items-baseline justify-between gap-2 text-[11px]"
+                      >
                         <dt className="text-fg-dim">
                           {(HOOK_LABEL as Record<string, string>)[key] ?? '附加效果'}
                         </dt>
@@ -265,7 +273,11 @@ function QuestionCard({
       {question.traits.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {question.traits.map((trait, index) => (
-            <TraitChip key={`${trait.traitId}-${index}`} traitId={trait.traitId} severity={trait.severity} />
+            <TraitChip
+              key={`${trait.traitId}-${index}`}
+              traitId={trait.traitId}
+              severity={trait.severity}
+            />
           ))}
         </div>
       )}

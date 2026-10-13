@@ -43,7 +43,9 @@ export default async function setup(): Promise<void> {
       // 快速路径：检查库是否存在，存在则跳过重建
       const rows = await admin.query(`SHOW DATABASES LIKE '${database}'`);
       if (rows.length > 0) {
-        console.log(`[global-setup] VITEST_REUSE_DB=1 → 复用已存在库 ${database}，跳过重建 (${Date.now() - started}ms)`);
+        console.log(
+          `[global-setup] VITEST_REUSE_DB=1 → 复用已存在库 ${database}，跳过重建 (${Date.now() - started}ms)`,
+        );
         return;
       }
       console.log(`[global-setup] VITEST_REUSE_DB=1 但库 ${database} 不存在，执行完整重建`);
@@ -51,7 +53,9 @@ export default async function setup(): Promise<void> {
 
     console.log(`[global-setup] 重建测试库 ${database}...`);
     await admin.query(`DROP DATABASE IF EXISTS \`${database}\``);
-    await admin.query(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    await admin.query(
+      `CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+    );
     await admin.query(`USE \`${database}\``);
 
     // 禁用外键检查以加速 DDL 批量执行

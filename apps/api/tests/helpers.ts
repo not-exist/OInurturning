@@ -21,11 +21,16 @@ export function unwrap<T>(res: request.Response): ApiEnvelope<T> {
 
 export function unwrapOk<T>(res: request.Response): T {
   const body = res.body as ApiEnvelope<T>;
-  if (!body.ok) throw new Error(`expected ok envelope, got error: ${body.error.code} ${body.error.message}`);
+  if (!body.ok)
+    throw new Error(`expected ok envelope, got error: ${body.error.code} ${body.error.message}`);
   return body.data;
 }
 
-export function unwrapErr(res: request.Response): { code: string; message: string; details?: unknown } {
+export function unwrapErr(res: request.Response): {
+  code: string;
+  message: string;
+  details?: unknown;
+} {
   const body = res.body as ApiEnvelope<unknown>;
   if (body.ok) throw new Error('expected error envelope, got ok');
   return body.error;
@@ -94,12 +99,22 @@ export async function resetUsersFast(): Promise<void> {
  * 适用于非 auth 流程的集成测试
  * `tutorialCompleted` 默认 true：业务用例不关心引导锁，需要测锁定行为时显式传 false
  */
-export async function createTestUserDirect(opts: { username: string; passwordHash?: string; money?: number; reputation?: number; role?: Role; tutorialCompleted?: boolean } = { username: `test-${Date.now()}` }) {
+export async function createTestUserDirect(
+  opts: {
+    username: string;
+    passwordHash?: string;
+    money?: number;
+    reputation?: number;
+    role?: Role;
+    tutorialCompleted?: boolean;
+  } = { username: `test-${Date.now()}` },
+) {
   const tutorialCompleted = opts.tutorialCompleted ?? true;
   const user = await prisma.user.create({
     data: {
       username: opts.username,
-      passwordHash: opts.passwordHash || '$2b$12$testhashfortestonly0000000000000000000000000000000000',
+      passwordHash:
+        opts.passwordHash || '$2b$12$testhashfortestonly0000000000000000000000000000000000',
       money: opts.money ?? 0,
       reputation: opts.reputation ?? 0,
       role: opts.role ?? 'USER',
@@ -117,7 +132,10 @@ export async function createTestUserDirect(opts: { username: string; passwordHas
  * 因此 HTTP 注册的测试账号需要显式解锁，而不是放宽服务端守卫。
  */
 export async function unlockTutorial(userId: number): Promise<void> {
-  await prisma.user.update({ where: { id: userId }, data: { tutorialStep: 999, tutorialCompleted: true } });
+  await prisma.user.update({
+    where: { id: userId },
+    data: { tutorialStep: 999, tutorialCompleted: true },
+  });
 }
 
 /**

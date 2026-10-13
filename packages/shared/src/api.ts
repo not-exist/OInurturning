@@ -15,14 +15,22 @@ export const ERROR_CODES = [
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
-export interface ApiOk<T> { ok: true; data: T }
+export interface ApiOk<T> {
+  ok: true;
+  data: T;
+}
 export interface ApiErr {
   ok: false;
   error: { code: ErrorCode; message: string; details?: unknown };
 }
 export type ApiEnvelope<T> = ApiOk<T> | ApiErr;
 
-export interface Page<T> { items: T[]; page: number; pageSize: number; total: number }
+export interface Page<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
 
 export interface MeView {
   id: number;

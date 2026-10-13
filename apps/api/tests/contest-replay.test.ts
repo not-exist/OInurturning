@@ -129,7 +129,9 @@ describe('battle replay', () => {
     for (const entry of teams[0]!.members) expect(start.homeName).toContain(entry.displayName);
 
     // 每名队员都有自己的答题时间线（不能只播队长）
-    const answered = new Set(eventsOf(replay, 'QUESTION_START').map((event) => event.participantName));
+    const answered = new Set(
+      eventsOf(replay, 'QUESTION_START').map((event) => event.participantName),
+    );
     expect(answered).toEqual(new Set(['HOME-0', 'HOME-1', 'HOME-2']));
 
     // memberIndex 在 QUESTION_START / SUBMISSION / QUESTION_RESULT 上均存在
@@ -212,7 +214,9 @@ describe('battle replay', () => {
     });
 
     // 每名成员恰好出题一次、答题一次（防「只实现 3 人」或下标漂移）
-    expect(new Set(starts.map((event) => `${event.setterSide}:${event.setterName}`)).size).toBe(2 * size);
+    expect(new Set(starts.map((event) => `${event.setterSide}:${event.setterName}`)).size).toBe(
+      2 * size,
+    );
     expect(new Set(starts.map((event) => event.participantName)).size).toBe(2 * size);
   });
 });

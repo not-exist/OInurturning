@@ -43,10 +43,18 @@ describe('infra coverage', () => {
     expect(res.status).toBe(200);
     const session = unwrapOk<{ me: { id: number } }>(res);
     const expired = jwt.sign(
-      { uid: session.me.id, role: 'USER', tv: 0, typ: 'access', exp: Math.floor(Date.now() / 1000) - 60 },
+      {
+        uid: session.me.id,
+        role: 'USER',
+        tv: 0,
+        typ: 'access',
+        exp: Math.floor(Date.now() / 1000) - 60,
+      },
       env.JWT_SECRET,
     );
-    const denied = await request(app).get('/api/users/me').set('Authorization', `Bearer ${expired}`);
+    const denied = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${expired}`);
     expect(denied.status).toBe(401);
     expect(unwrapErr(denied).code).toBe('TOKEN_EXPIRED');
   });

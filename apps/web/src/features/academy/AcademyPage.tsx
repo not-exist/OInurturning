@@ -121,7 +121,10 @@ function AcademyBody({ pool }: { pool: PoolView }): JSX.Element {
               title="立即重建候选池：费用随今日刷新次数上浮，日界 04:00 归零"
               onClick={() => refresh.mutate(undefined, { onError: (e) => setMsg(errText(e)) })}
             >
-              <Icon icon={RefreshCw} className={`size-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
+              <Icon
+                icon={RefreshCw}
+                className={`size-3.5 ${refresh.isPending ? 'animate-spin' : ''}`}
+              />
               {refresh.isPending ? '重掷中…' : '立即刷新'}
             </Btn>
           </div>
@@ -242,7 +245,9 @@ function CandidateCard({
             </span>
           }
         >
-          <span className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[11px] ${tone.badge}`}>
+          <span
+            className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[11px] ${tone.badge}`}
+          >
             <span aria-hidden className={`size-1.5 rounded-full ${tone.dot}`} />
             {c.hint}
           </span>

@@ -24,7 +24,8 @@ const choiceSchema = z.union([
 
 function parseId(raw: string | string[]): number {
   const value = typeof raw === 'string' ? Number(raw) : NaN;
-  if (!Number.isInteger(value) || value <= 0) throw new ApiError('NOT_FOUND', { resource: 'adventure' });
+  if (!Number.isInteger(value) || value <= 0)
+    throw new ApiError('NOT_FOUND', { resource: 'adventure' });
   return value;
 }
 
@@ -33,7 +34,8 @@ export const adventureRouter = Router();
 adventureRouter.post('/draw', requireAuth, async (req, res, next) => {
   try {
     const parsed = drawSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     const data = await service.drawAdventure(req.user!.id, parsed.data.roster, parsed.data.tier);
     res.json({ ok: true, data });
   } catch (error) {
@@ -44,7 +46,8 @@ adventureRouter.post('/draw', requireAuth, async (req, res, next) => {
 adventureRouter.post('/:id/choice', requireAuth, async (req, res, next) => {
   try {
     const parsed = choiceSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
     const data = await service.chooseAdventure(req.user!.id, parseId(req.params.id), parsed.data);
     res.json({ ok: true, data });
   } catch (error) {

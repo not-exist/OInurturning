@@ -13,7 +13,7 @@ async function createStudent(userId: number, index = 0): Promise<number> {
     data: {
       userId,
       name: `Reward Student ${index}`,
-            qualityTier: 'ELITE',
+      qualityTier: 'ELITE',
       ds: 100,
       dp: 100,
       math: 100,
@@ -78,9 +78,11 @@ describe('story rewards and retries', () => {
     expect(second.firstClear).toBe(false);
     expect(second.record.rewards.some((r) => r.type === 'first_clear_item')).toBe(false); // 复刷不再发固定/抽选道具
     expect(
-      (await prisma.userItem.findUniqueOrThrow({
-        where: { userId_itemId: { userId: user.id, itemId: 'drumstick-bento' } },
-      })).quantity,
+      (
+        await prisma.userItem.findUniqueOrThrow({
+          where: { userId_itemId: { userId: user.id, itemId: 'drumstick-bento' } },
+        })
+      ).quantity,
     ).toBe(1); // 固定道具不随复刷累加
     for (const studentId of roster) {
       const afterSecond = await prisma.student.findUniqueOrThrow({ where: { id: studentId } });

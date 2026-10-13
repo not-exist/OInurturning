@@ -2,14 +2,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
-import {
-  normalizeProblemTemplate,
-  problemConfigSchema,
-  stagesConfigSchema,
-} from '@oinur/shared';
+import { normalizeProblemTemplate, problemConfigSchema, stagesConfigSchema } from '@oinur/shared';
 
-const dataPath = (file: string) =>
-  path.resolve(import.meta.dirname, '../../../docs/data', file);
+const dataPath = (file: string) => path.resolve(import.meta.dirname, '../../../docs/data', file);
 
 const problems = parseYaml(readFileSync(dataPath('problems.yaml'), 'utf8')) as unknown;
 const stages = parseYaml(readFileSync(dataPath('stages.yaml'), 'utf8')) as unknown;
@@ -58,7 +53,10 @@ describe('M2 configuration schemas', () => {
     const result = problemConfigSchema.safeParse(config);
 
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.issues.some((issue) => issue.path.join('.') === 'templates.0.score')).toBe(true);
+    if (!result.success)
+      expect(
+        result.error.issues.some((issue) => issue.path.join('.') === 'templates.0.score'),
+      ).toBe(true);
   });
 
   it('rejects invalid trait references at the trait_pool path', () => {
@@ -70,19 +68,31 @@ describe('M2 configuration schemas', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((issue) => issue.path.join('.') === 'templates.0.trait_pool.0.trait')).toBe(true);
+      expect(
+        result.error.issues.some(
+          (issue) => issue.path.join('.') === 'templates.0.trait_pool.0.trait',
+        ),
+      ).toBe(true);
     }
   });
 
   it('rejects malformed stage rewards with a precise path', () => {
     const config = structuredClone(stages) as Record<string, unknown>;
-    const firstClear = (config.stages as Array<Record<string, unknown>>)[0]!.first_clear as Record<string, unknown>;
+    const firstClear = (config.stages as Array<Record<string, unknown>>)[0]!.first_clear as Record<
+      string,
+      unknown
+    >;
     firstClear.items = { count: 1, chance: 1.5, pool: [{ rarity: 'gray', weight: 1 }] };
 
     const result = stagesConfigSchema.safeParse(config);
 
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.issues.some((issue) => issue.path.join('.') === 'stages.0.first_clear.items.chance')).toBe(true);
+    if (!result.success)
+      expect(
+        result.error.issues.some(
+          (issue) => issue.path.join('.') === 'stages.0.first_clear.items.chance',
+        ),
+      ).toBe(true);
   });
 
   it('rejects stage defaults missing first_clear_fixed_items', () => {
@@ -92,6 +102,11 @@ describe('M2 configuration schemas', () => {
     const result = stagesConfigSchema.safeParse(config);
 
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.issues.some((issue) => issue.path.join('.') === 'defaults.first_clear_fixed_items')).toBe(true);
+    if (!result.success)
+      expect(
+        result.error.issues.some(
+          (issue) => issue.path.join('.') === 'defaults.first_clear_fixed_items',
+        ),
+      ).toBe(true);
   });
 });

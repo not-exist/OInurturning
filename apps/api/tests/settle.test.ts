@@ -1,16 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Student } from '../src/generated/prisma/client.js';
-import {
-  SERVER_DAY_OFFSET_HOUR,
-  crossedDayBoundaries,
-  dayKey,
-  weekKey,
-} from '../src/lib/clock.js';
-import {
-  persistSettlement,
-  settle,
-  settleStudent,
-} from '../src/modules/students/settle.js';
+import { SERVER_DAY_OFFSET_HOUR, crossedDayBoundaries, dayKey, weekKey } from '../src/lib/clock.js';
+import { persistSettlement, settle, settleStudent } from '../src/modules/students/settle.js';
 import { importConfigs } from '../src/config/loader.js';
 import { prisma } from '../src/lib/prisma.js';
 import { resetUsers } from './helpers.js';
@@ -43,28 +34,24 @@ describe('clock', () => {
 
   it('crossedDayBoundaries：统计 (from, to] 间跨过的 04:00 日界数', () => {
     // 同日不跨界
-    expect(
-      crossedDayBoundaries(new Date(2026, 7, 30, 12, 0), new Date(2026, 7, 30, 18, 0)),
-    ).toBe(0);
+    expect(crossedDayBoundaries(new Date(2026, 7, 30, 12, 0), new Date(2026, 7, 30, 18, 0))).toBe(
+      0,
+    );
     // 跨越一个 04:00
-    expect(
-      crossedDayBoundaries(new Date(2026, 7, 30, 3, 59), new Date(2026, 7, 30, 4, 0)),
-    ).toBe(1);
+    expect(crossedDayBoundaries(new Date(2026, 7, 30, 3, 59), new Date(2026, 7, 30, 4, 0))).toBe(1);
     // 48 小时整跨 2 个日界
-    expect(
-      crossedDayBoundaries(new Date(2026, 7, 28, 12, 0), new Date(2026, 7, 30, 12, 0)),
-    ).toBe(2);
+    expect(crossedDayBoundaries(new Date(2026, 7, 28, 12, 0), new Date(2026, 7, 30, 12, 0))).toBe(
+      2,
+    );
     // 04:00 后到次日 04:00 前不跨界
-    expect(
-      crossedDayBoundaries(new Date(2026, 7, 30, 4, 0), new Date(2026, 7, 31, 3, 59)),
-    ).toBe(0);
+    expect(crossedDayBoundaries(new Date(2026, 7, 30, 4, 0), new Date(2026, 7, 31, 3, 59))).toBe(0);
     // to ≤ from 恒为 0
-    expect(
-      crossedDayBoundaries(new Date(2026, 7, 30, 12, 0), new Date(2026, 7, 30, 12, 0)),
-    ).toBe(0);
-    expect(
-      crossedDayBoundaries(new Date(2026, 7, 30, 18, 0), new Date(2026, 7, 30, 12, 0)),
-    ).toBe(0);
+    expect(crossedDayBoundaries(new Date(2026, 7, 30, 12, 0), new Date(2026, 7, 30, 12, 0))).toBe(
+      0,
+    );
+    expect(crossedDayBoundaries(new Date(2026, 7, 30, 18, 0), new Date(2026, 7, 30, 12, 0))).toBe(
+      0,
+    );
   });
 });
 
@@ -79,7 +66,7 @@ function makeStudent(overrides: Partial<Student> = {}): Student {
     id: seq,
     userId: 1,
     name: '测试学员',
-        qualityTier: 'COMMON',
+    qualityTier: 'COMMON',
     status: 'ACTIVE',
     ds: 10,
     dp: 10,
@@ -212,15 +199,25 @@ describe('settle：锚点与边界', () => {
 
 async function createStudentRow(overrides: Record<string, unknown> = {}): Promise<Student> {
   const user = await prisma.user.create({
-    data: { username: `st-${Date.now().toString(36)}${Math.floor(Math.random() * 1e6)}`, passwordHash: 'x' },
+    data: {
+      username: `st-${Date.now().toString(36)}${Math.floor(Math.random() * 1e6)}`,
+      passwordHash: 'x',
+    },
   });
   return prisma.student.create({
     data: {
       userId: user.id,
       name: '结算学员',
-            qualityTier: 'COMMON',
-      ds: 10, dp: 10, math: 10, graph: 10, greedy: 10, str: 10,
-      code: 10, thinking: 10, setting: 5,
+      qualityTier: 'COMMON',
+      ds: 10,
+      dp: 10,
+      math: 10,
+      graph: 10,
+      greedy: 10,
+      str: 10,
+      code: 10,
+      thinking: 10,
+      setting: 5,
       focusCap: 45,
       energyMax: 60,
       energy: 0,

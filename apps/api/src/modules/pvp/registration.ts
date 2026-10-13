@@ -17,14 +17,17 @@ import { lockPvpTournament, lockStudentsByIds, lockUser } from '../../lib/row-lo
 export const DEFAULT_PVP_ROSTER_SIZE: PvpRosterSize = TEAM_SIZE_MIN;
 
 export function pvpRosterSize(config: unknown): PvpRosterSize {
-  if (typeof config !== 'object' || config === null || Array.isArray(config)) return DEFAULT_PVP_ROSTER_SIZE;
+  if (typeof config !== 'object' || config === null || Array.isArray(config))
+    return DEFAULT_PVP_ROSTER_SIZE;
   const value = (config as Record<string, unknown>).rosterSize;
   if (value === undefined) return DEFAULT_PVP_ROSTER_SIZE;
   if (value === TEAM_SIZE_MIN || value === TEAM_SIZE_MAX) return value;
   throw new ApiError('STATE_CONFLICT', { resource: 'tournament', reason: 'invalid rosterSize' });
 }
 
-function tournamentView(row: PvpTournament & { registrations: { id: number }[] }): PvpTournamentView {
+function tournamentView(
+  row: PvpTournament & { registrations: { id: number }[] },
+): PvpTournamentView {
   return {
     id: row.id,
     name: row.name,
@@ -37,7 +40,11 @@ function tournamentView(row: PvpTournament & { registrations: { id: number }[] }
   };
 }
 
-function registrationView(row: PvpRegistration, replayed: boolean, rosterSize: PvpRosterSize): PvpRegistrationView {
+function registrationView(
+  row: PvpRegistration,
+  replayed: boolean,
+  rosterSize: PvpRosterSize,
+): PvpRegistrationView {
   return {
     id: row.id,
     tournamentId: row.tournamentId,
@@ -79,14 +86,18 @@ export async function registerPvp(
   now: Date = new Date(),
 ): Promise<PvpRegistrationView> {
   if (new Set(problemEntryIds).size !== problemEntryIds.length) {
-    throw new ApiError('VALIDATION_FAILED', { field: 'problemEntryIds', reason: 'duplicate problems' });
+    throw new ApiError('VALIDATION_FAILED', {
+      field: 'problemEntryIds',
+      reason: 'duplicate problems',
+    });
   }
   return prisma.$transaction(async (tx) => {
     // PVP lock ordering is Tournament -> User -> Student, matching scheduler/refund paths.
     await lockPvpTournament(tx, tournamentId);
     await lockUser(tx, userId);
     const tournament = await tx.pvpTournament.findUnique({ where: { id: tournamentId } });
-    if (tournament === null) throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
+    if (tournament === null)
+      throw new ApiError('NOT_FOUND', { resource: 'tournament', id: tournamentId });
     const rosterSize = pvpRosterSize(tournament.config);
     if (
       !Array.isArray(studentIds) ||
@@ -111,11 +122,19 @@ export async function registerPvp(
     });
     if (existing !== null) return registrationView(existing, true, rosterSize);
     if (tournament.status !== 'REGISTERING' || now >= tournament.registerEndsAt) {
-      throw new ApiError('STATE_CONFLICT', { resource: 'tournament', id: tournamentId, reason: 'registration closed' });
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'tournament',
+        id: tournamentId,
+        reason: 'registration closed',
+      });
     }
     const registrations = await tx.pvpRegistration.count({ where: { tournamentId } });
     if (registrations >= tournament.size) {
-      throw new ApiError('STATE_CONFLICT', { resource: 'tournament', id: tournamentId, reason: 'tournament is full' });
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'tournament',
+        id: tournamentId,
+        reason: 'tournament is full',
+      });
     }
     // 整支队伍一次性上锁：按 id 升序，避免并发报名互相等锁。
     const lockedIds = [...new Set(studentIds)].sort((left, right) => left - right);
@@ -129,29 +148,42 @@ export async function registerPvp(
       const student = rowById.get(studentId);
       if (student === undefined || student.status !== 'ACTIVE')
         throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
-      if (student.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
+      if (student.userId !== userId)
+        throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
       return participantSnapshot(student);
     });
-    const problems = problemEntryIds.length === 0
-      ? []
-      : await tx.problemLibraryEntry.findMany({ where: { id: { in: [...problemEntryIds] } } });
+    const problems =
+      problemEntryIds.length === 0
+        ? []
+        : await tx.problemLibraryEntry.findMany({ where: { id: { in: [...problemEntryIds] } } });
     if (problems.length !== problemEntryIds.length) {
-      const foreign = await tx.problemLibraryEntry.findFirst({ where: { id: { in: [...problemEntryIds] }, userId: { not: userId } } });
-      if (foreign !== null) throw new ApiError('FORBIDDEN', { resource: 'problem', id: foreign.id });
+      const foreign = await tx.problemLibraryEntry.findFirst({
+        where: { id: { in: [...problemEntryIds] }, userId: { not: userId } },
+      });
+      if (foreign !== null)
+        throw new ApiError('FORBIDDEN', { resource: 'problem', id: foreign.id });
       throw new ApiError('NOT_FOUND', { resource: 'problem' });
     }
     for (const problem of problems) {
-      if (problem.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'problem', id: problem.id });
+      if (problem.userId !== userId)
+        throw new ApiError('FORBIDDEN', { resource: 'problem', id: problem.id });
       if (problem.consumedAt !== null || problem.quality < 40) {
-        throw new ApiError('STATE_CONFLICT', { resource: 'problem', id: problem.id, reason: 'problem is not eligible for PVP' });
+        throw new ApiError('STATE_CONFLICT', {
+          resource: 'problem',
+          id: problem.id,
+          reason: 'problem is not eligible for PVP',
+        });
       }
     }
     const ticket = await tx.userItem.updateMany({
       where: { userId, itemId: 'entry-ticket', quantity: { gte: 1 } },
       data: { quantity: { decrement: 1 } },
     });
-    if (ticket.count !== 1) throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'entry-ticket', need: 1 });
-    await tx.userItem.deleteMany({ where: { userId, itemId: 'entry-ticket', quantity: { lte: 0 } } });
+    if (ticket.count !== 1)
+      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'entry-ticket', need: 1 });
+    await tx.userItem.deleteMany({
+      where: { userId, itemId: 'entry-ticket', quantity: { lte: 0 } },
+    });
     const problemsById = new Map(problems.map((problem) => [problem.id, problem]));
     const snapshots: PvpProblemSnapshot[] = problemEntryIds.map((problemId) => {
       const problem = problemsById.get(problemId)!;

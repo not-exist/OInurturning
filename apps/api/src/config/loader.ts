@@ -227,72 +227,94 @@ async function reconcileTables(
   const { talents, items, problems, stages, events, economy, sourceHash } = batch;
   const ops: Prisma.PrismaPromise<unknown>[] = [];
   for (const t of talents) {
-    ops.push(tx.configTalent.upsert({
-      where: { id: t.id },
-      create: { id: t.id, sourceHash, payload: t as Prisma.InputJsonValue },
-      update: { sourceHash, payload: t as Prisma.InputJsonValue, deprecated: false },
-    }));
+    ops.push(
+      tx.configTalent.upsert({
+        where: { id: t.id },
+        create: { id: t.id, sourceHash, payload: t as Prisma.InputJsonValue },
+        update: { sourceHash, payload: t as Prisma.InputJsonValue, deprecated: false },
+      }),
+    );
   }
   for (const it of items) {
-    ops.push(tx.configItem.upsert({
-      where: { id: it.id },
-      create: { id: it.id, sourceHash, payload: it as Prisma.InputJsonValue },
-      update: { sourceHash, payload: it as Prisma.InputJsonValue, deprecated: false },
-    }));
+    ops.push(
+      tx.configItem.upsert({
+        where: { id: it.id },
+        create: { id: it.id, sourceHash, payload: it as Prisma.InputJsonValue },
+        update: { sourceHash, payload: it as Prisma.InputJsonValue, deprecated: false },
+      }),
+    );
   }
   for (const problem of problems.templates) {
-    ops.push(tx.configProblem.upsert({
-      where: { id: problem.id },
-      create: { id: problem.id, sourceHash, payload: problem as Prisma.InputJsonValue },
-      update: { sourceHash, payload: problem as Prisma.InputJsonValue, deprecated: false },
-    }));
+    ops.push(
+      tx.configProblem.upsert({
+        where: { id: problem.id },
+        create: { id: problem.id, sourceHash, payload: problem as Prisma.InputJsonValue },
+        update: { sourceHash, payload: problem as Prisma.InputJsonValue, deprecated: false },
+      }),
+    );
   }
   for (const stage of stages.stages) {
     const id = `${stage.chapter}:${stage.stage_index}`;
-    ops.push(tx.configStage.upsert({
-      where: { id },
-      create: { id, sourceHash, payload: stage as Prisma.InputJsonValue },
-      update: { sourceHash, payload: stage as Prisma.InputJsonValue, deprecated: false },
-    }));
+    ops.push(
+      tx.configStage.upsert({
+        where: { id },
+        create: { id, sourceHash, payload: stage as Prisma.InputJsonValue },
+        update: { sourceHash, payload: stage as Prisma.InputJsonValue, deprecated: false },
+      }),
+    );
   }
   for (const event of events.events) {
-    ops.push(tx.configEvent.upsert({
-      where: { id: event.id },
-      create: { id: event.id, sourceHash, payload: event as Prisma.InputJsonValue },
-      update: { sourceHash, payload: event as Prisma.InputJsonValue, deprecated: false },
-    }));
+    ops.push(
+      tx.configEvent.upsert({
+        where: { id: event.id },
+        create: { id: event.id, sourceHash, payload: event as Prisma.InputJsonValue },
+        update: { sourceHash, payload: event as Prisma.InputJsonValue, deprecated: false },
+      }),
+    );
   }
-  ops.push(tx.configEconomy.upsert({
-    where: { id: 'active' },
-    create: { id: 'active', sourceHash, payload: economy as Prisma.InputJsonValue },
-    update: { sourceHash, payload: economy as Prisma.InputJsonValue, deprecated: false },
-  }));
-  ops.push(tx.configTalent.updateMany({
-    where: { deprecated: false, id: { notIn: talents.map((t) => t.id) } },
-    data: { deprecated: true, sourceHash },
-  }));
-  ops.push(tx.configItem.updateMany({
-    where: { deprecated: false, id: { notIn: items.map((i) => i.id) } },
-    data: { deprecated: true, sourceHash },
-  }));
-  ops.push(tx.configProblem.updateMany({
-    where: { deprecated: false, id: { notIn: problems.templates.map((problem) => problem.id) } },
-    data: { deprecated: true, sourceHash },
-  }));
-  ops.push(tx.configStage.updateMany({
-    where: {
-      deprecated: false,
-      id: { notIn: stages.stages.map((stage) => `${stage.chapter}:${stage.stage_index}`) },
-    },
-    data: { deprecated: true, sourceHash },
-  }));
-  ops.push(tx.configEvent.updateMany({
-    where: {
-      deprecated: false,
-      id: { notIn: events.events.map((event) => event.id) },
-    },
-    data: { deprecated: true, sourceHash },
-  }));
+  ops.push(
+    tx.configEconomy.upsert({
+      where: { id: 'active' },
+      create: { id: 'active', sourceHash, payload: economy as Prisma.InputJsonValue },
+      update: { sourceHash, payload: economy as Prisma.InputJsonValue, deprecated: false },
+    }),
+  );
+  ops.push(
+    tx.configTalent.updateMany({
+      where: { deprecated: false, id: { notIn: talents.map((t) => t.id) } },
+      data: { deprecated: true, sourceHash },
+    }),
+  );
+  ops.push(
+    tx.configItem.updateMany({
+      where: { deprecated: false, id: { notIn: items.map((i) => i.id) } },
+      data: { deprecated: true, sourceHash },
+    }),
+  );
+  ops.push(
+    tx.configProblem.updateMany({
+      where: { deprecated: false, id: { notIn: problems.templates.map((problem) => problem.id) } },
+      data: { deprecated: true, sourceHash },
+    }),
+  );
+  ops.push(
+    tx.configStage.updateMany({
+      where: {
+        deprecated: false,
+        id: { notIn: stages.stages.map((stage) => `${stage.chapter}:${stage.stage_index}`) },
+      },
+      data: { deprecated: true, sourceHash },
+    }),
+  );
+  ops.push(
+    tx.configEvent.updateMany({
+      where: {
+        deprecated: false,
+        id: { notIn: events.events.map((event) => event.id) },
+      },
+      data: { deprecated: true, sourceHash },
+    }),
+  );
   await tx.$transaction(ops);
 }
 
@@ -448,7 +470,10 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
         }),
       { timeout: 20_000 },
     );
-    CONFIG = await loadBundleFromDb(sourceHash, problems!, stages!, { tutorial: tutorial!, shop: shop! });
+    CONFIG = await loadBundleFromDb(sourceHash, problems!, stages!, {
+      tutorial: tutorial!,
+      shop: shop!,
+    });
     logger.info({ sourceHash, dir }, '[config] 同 hash 已导入，调和 DB 后幂等跳过');
     return CONFIG;
   }
@@ -486,7 +511,10 @@ export async function importConfigs(opts: ImportConfigsOptions = {}): Promise<Co
     { timeout: 20_000 },
   );
 
-  CONFIG = await loadBundleFromDb(sourceHash, problems!, stages!, { tutorial: tutorial!, shop: shop! });
+  CONFIG = await loadBundleFromDb(sourceHash, problems!, stages!, {
+    tutorial: tutorial!,
+    shop: shop!,
+  });
   logger.info(
     {
       sourceHash,

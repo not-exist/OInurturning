@@ -126,16 +126,18 @@ function reportQuality(reputation: number): void {
       console.log(`  ${r.padEnd(10)} ${((v / geniusN) * 100).toFixed(2)}%`);
     }
     const belowGreen = entries.filter(([r]) => (RARITY_RANK.get(r) ?? 0) < 2);
-    console.log(belowGreen.length === 0 ? '  保底校验：OK（无绿以下）' : `  保底校验：失败 ${JSON.stringify(belowGreen)}`);
+    console.log(
+      belowGreen.length === 0
+        ? '  保底校验：OK（无绿以下）'
+        : `  保底校验：失败 ${JSON.stringify(belowGreen)}`,
+    );
   }
 }
 
-console.log(`recruit-stats: samples=${SAMPLES} seed=${SEED} talents=${talents.length} 条（六档齐全校验：${
-  CONFIG_RARITIES.every(
-    (r) => buckets.byRarity[r].length > 0,
-  )
-    ? 'OK'
-    : '缺档！'
-}）`);
+console.log(
+  `recruit-stats: samples=${SAMPLES} seed=${SEED} talents=${talents.length} 条（六档齐全校验：${
+    CONFIG_RARITIES.every((r) => buckets.byRarity[r].length > 0) ? 'OK' : '缺档！'
+  }）`,
+);
 reportQuality(0);
 reportQuality(8000);

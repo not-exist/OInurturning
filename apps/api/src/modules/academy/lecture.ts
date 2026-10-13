@@ -96,7 +96,16 @@ export async function getLectureTiers(userId: number): Promise<LectureTierView[]
   const tiers = lectureConfig().audience_tiers;
   const students = await prisma.student.findMany({
     where: { userId, status: 'ACTIVE' },
-    select: { ds: true, dp: true, math: true, graph: true, greedy: true, str: true, code: true, thinking: true },
+    select: {
+      ds: true,
+      dp: true,
+      math: true,
+      graph: true,
+      greedy: true,
+      str: true,
+      code: true,
+      thinking: true,
+    },
   });
   return tiers.map((tier) => ({
     id: tier.id as LectureTierId,
@@ -120,53 +129,85 @@ export async function teachLecture(
     await lockUser(tx, userId);
     const logs = await dailyLogs(tx, userId, now);
     if (logs.length >= DAILY_LECTURE_LIMIT) {
-      throw new ApiError('STATE_CONFLICT', { resource: 'lecture', reason: 'daily lecture limit reached' });
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'lecture',
+        reason: 'daily lecture limit reached',
+      });
     }
     if (logs.filter((log) => log.studentId === studentId).length >= DAILY_STUDENT_LECTURE_LIMIT) {
-      throw new ApiError('STATE_CONFLICT', { resource: 'lecture', reason: 'student daily lecture limit reached' });
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'lecture',
+        reason: 'student daily lecture limit reached',
+      });
     }
 
     await lockStudent(tx, studentId);
-    const current = await tx.student.findUnique({ where: { id: studentId }, include: { talents: true } });
+    const current = await tx.student.findUnique({
+      where: { id: studentId },
+      include: { talents: true },
+    });
     if (current === null || current.status !== 'ACTIVE') {
       throw new ApiError('NOT_FOUND', { resource: 'student', id: studentId });
     }
-    if (current.userId !== userId) throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
+    if (current.userId !== userId)
+      throw new ApiError('FORBIDDEN', { resource: 'student', id: studentId });
     const meta = aggregateMeta(current.talents.map((talent) => talent.talentId));
     const settled = settle(current, meta, now);
     if (settled.stamina < LECTURE_STAMINA_COST) {
-      throw new ApiError('INSUFFICIENT_RESOURCE', { resource: 'stamina', need: LECTURE_STAMINA_COST });
+      throw new ApiError('INSUFFICIENT_RESOURCE', {
+        resource: 'stamina',
+        need: LECTURE_STAMINA_COST,
+      });
     }
     const teachingValue = computeV(settled);
     const underThreshold = teachingValue < tierData.threshold;
     if (teachingValue < tierData.threshold - 8) {
-      throw new ApiError('STATE_CONFLICT', { resource: 'lecture', reason: 'teaching value below forced-taking floor' });
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'lecture',
+        reason: 'teaching value below forced-taking floor',
+      });
     }
     if (underThreshold && !force) {
-      throw new ApiError('STATE_CONFLICT', { resource: 'lecture', reason: 'force flag required below threshold' });
+      throw new ApiError('STATE_CONFLICT', {
+        resource: 'lecture',
+        reason: 'force flag required below threshold',
+      });
     }
 
-    const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { reputation: true } });
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { reputation: true },
+    });
     const forced = underThreshold;
     const forcedSuccess =
-      !forced || createRandomStream(deriveSeed(userId, studentId, tierId, dayKey(now), logs.length), 'lecture-risk')() >= 0.4;
+      !forced ||
+      createRandomStream(
+        deriveSeed(userId, studentId, tierId, dayKey(now), logs.length),
+        'lecture-risk',
+      )() >= 0.4;
     const success = forcedSuccess;
-    const payMultiplier = repMultiplier(user.reputation) * overflowMultiplier(teachingValue, tierData.threshold);
+    const payMultiplier =
+      repMultiplier(user.reputation) * overflowMultiplier(teachingValue, tierData.threshold);
     const lectureIncome = meta.lecture_income ?? 0;
     const incomeMultiplier = 1 + lectureIncome / 100;
-    const money =
-      !success
-        ? 0
-        : Math.round(tierData.base_money * payMultiplier * incomeMultiplier * (forced ? 0.6 : 1));
-    const reputationTarget =
-      !forced
-        ? Math.round(
-            tierData.base_reputation *
-              (1 + Math.min(lectureConfig().overflow_bonus.overflow_cap_pct, Math.floor(Math.max(0, teachingValue - tierData.threshold) / lectureConfig().overflow_bonus.overflow_step) * lectureConfig().overflow_bonus.overflow_pct)),
-          )
-        : success
-          ? -ordinal
-          : -2 * ordinal;
+    const money = !success
+      ? 0
+      : Math.round(tierData.base_money * payMultiplier * incomeMultiplier * (forced ? 0.6 : 1));
+    const reputationTarget = !forced
+      ? Math.round(
+          tierData.base_reputation *
+            (1 +
+              Math.min(
+                lectureConfig().overflow_bonus.overflow_cap_pct,
+                Math.floor(
+                  Math.max(0, teachingValue - tierData.threshold) /
+                    lectureConfig().overflow_bonus.overflow_step,
+                ) * lectureConfig().overflow_bonus.overflow_pct,
+              )),
+        )
+      : success
+        ? -ordinal
+        : -2 * ordinal;
     const nextMindset = !forced || success ? settled.mindset : clamp(settled.mindset - 2, -10, 10);
     // 讲课成长（issue #56）：与讲砸判定同一 base seed、不同 label 的独立随机流 → 同 seed 必复现。
     // 成长只写 setting/thinking 两列，与体力/精力/心态同事务落库，任一失败整体回滚。
@@ -198,12 +239,17 @@ export async function teachLecture(
     if (money !== 0 || nextReputation !== user.reputation) {
       await tx.user.update({
         where: { id: userId },
-        data: { ...(money === 0 ? {} : { money: { increment: money } }), reputation: nextReputation },
+        data: {
+          ...(money === 0 ? {} : { money: { increment: money } }),
+          reputation: nextReputation,
+        },
       });
     }
     const reputationDelta = nextReputation - user.reputation;
     if (reputationDelta !== 0) {
-      await tx.reputationLog.create({ data: { userId, delta: reputationDelta, reason: 'LECTURE' } });
+      await tx.reputationLog.create({
+        data: { userId, delta: reputationDelta, reason: 'LECTURE' },
+      });
     }
     const row = await tx.lectureLog.create({
       data: {

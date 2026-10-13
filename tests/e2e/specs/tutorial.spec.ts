@@ -41,7 +41,10 @@ test.describe('新手引导', () => {
     studentsOwned?: number;
   }
 
-  async function tutorialState(request: APIRequestContext, token: string): Promise<TutorialStateView> {
+  async function tutorialState(
+    request: APIRequestContext,
+    token: string,
+  ): Promise<TutorialStateView> {
     const res = await apiCall(request, 'GET', '/api/tutorial', token);
     return unwrap<TutorialStateView>(res.body, '读取引导状态');
   }
@@ -78,18 +81,29 @@ test.describe('新手引导', () => {
   ): Promise<void> {
     if (await waitForStep(request, token, id, timeout)) return;
     const state = await tutorialState(request, token);
-    expect(state.current?.id ?? 'completed', `引导应推进到「${id}」（实际 ${JSON.stringify(state)}）`).toBe(id);
+    expect(
+      state.current?.id ?? 'completed',
+      `引导应推进到「${id}」（实际 ${JSON.stringify(state)}）`,
+    ).toBe(id);
   }
 
   /** 负向断言：留出在途请求的落地时间后，引导必须仍停在该步 */
-  async function expectStepStays(request: APIRequestContext, token: string, id: string): Promise<void> {
+  async function expectStepStays(
+    request: APIRequestContext,
+    token: string,
+    id: string,
+  ): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 500));
     const state = await tutorialState(request, token);
     expect(state.current?.id ?? 'completed', `洞外点击不应推进引导（应停在「${id}」）`).toBe(id);
   }
 
   /** 锁定探针：引导未完成时受限端点一律 403 且 details.resource === 'tutorial' */
-  async function expectLocked(request: APIRequestContext, token: string, path: string): Promise<void> {
+  async function expectLocked(
+    request: APIRequestContext,
+    token: string,
+    path: string,
+  ): Promise<void> {
     const res = await apiCall(request, 'GET', path, token);
     expect(res.status, `GET ${path} 应被引导锁挡下（403，不是 404）`).toBe(403);
     const body = res.body as { error?: { code?: string; details?: { resource?: string } } };
@@ -193,7 +207,10 @@ test.describe('新手引导', () => {
     //    点非聚光位的候选卡也必须能点中，正是这一例外的不变量（若被误拦，这里的
     //    hit-target 检查会一直失败直到超时）。挑最便宜的两名各招募一次，避开品质随机价差。
     const poolRes = await apiCall(request, 'GET', '/api/academy/pool', token);
-    const pool = unwrap<{ candidates: { tempId: string; price: number }[] }>(poolRes.body, '取候选池');
+    const pool = unwrap<{ candidates: { tempId: string; price: number }[] }>(
+      poolRes.body,
+      '取候选池',
+    );
     const cheapest = [...pool.candidates]
       .sort((a, b) => a.price - b.price)
       .slice(0, 2)
@@ -235,7 +252,9 @@ test.describe('新手引导', () => {
     //     主讲即页面默认选中的第一名学员——与 lecture-force 步判定强接的是同一人。
     await page.getByTestId('lecture-teach').click();
     // 讲砸也推进（服务端 do_lecture 在写日志后无条件 autoAdvance），但拒单不会：据此断言未拒单
-    await expect(page.getByTestId('lecture-logs').or(page.getByTestId('lecture-error'))).toBeVisible();
+    await expect(
+      page.getByTestId('lecture-logs').or(page.getByTestId('lecture-error')),
+    ).toBeVisible();
     await expect(page.getByTestId('lecture-error'), '讲课被拒单会导致本步无法推进').toHaveCount(0);
     await expect(page.getByTestId('lecture-logs').getByRole('listitem')).toHaveCount(1);
     await expectStep(request, token, 'story-enter');
@@ -309,7 +328,10 @@ test.describe('新手引导', () => {
       await expectStep(request, token, 'training-pick');
 
       // training-pick：第一张学员卡必须被滚进视口并聚光；洞外点击无效
-      await expect(page.getByTestId('tutorial-spotlight'), '选学员步应高亮第一张学员卡').toBeVisible();
+      await expect(
+        page.getByTestId('tutorial-spotlight'),
+        '选学员步应高亮第一张学员卡',
+      ).toBeVisible();
       const student = await page.locator("[data-tutorial='training-student']").boundingBox();
       expect(student, '学员卡锚点应已挂载').not.toBeNull();
       expect(student!.y, '学员卡应被滚进视口').toBeGreaterThanOrEqual(0);
@@ -323,7 +345,10 @@ test.describe('新手引导', () => {
       await expectStep(request, token, 'training');
 
       // training：聚光切到「开始基础训练」，引导卡仍留在视口内；洞外点击无效，洞内可点并完成训练
-      await expect(page.getByTestId('tutorial-spotlight'), '训练步应高亮「开始基础训练」').toBeVisible();
+      await expect(
+        page.getByTestId('tutorial-spotlight'),
+        '训练步应高亮「开始基础训练」',
+      ).toBeVisible();
       const run = await page.locator("[data-tutorial='training-basic']").boundingBox();
       expect(run, '训练按钮锚点应已挂载').not.toBeNull();
       expect(run!.y, '训练按钮应被滚进视口').toBeGreaterThanOrEqual(0);

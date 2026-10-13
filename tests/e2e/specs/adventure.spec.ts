@@ -37,10 +37,7 @@ test.describe('历练', () => {
     await expect(logs.getByRole('listitem')).toHaveCount(1);
   });
 
-  test('情报激活后 preview，可回避：记一条"已回避"', async ({
-    page,
-    request,
-  }) => {
+  test('情报激活后 preview，可回避：记一条"已回避"', async ({ page, request }) => {
     const account = await registerUser(request, 'adv');
     await fund(account.username, {
       money: 200000,
@@ -64,10 +61,7 @@ test.describe('历练', () => {
     await expect(logs).toContainText('已回避');
   });
 
-  test('情报激活后 preview，接受→分支结算→记录+1', async ({
-    page,
-    request,
-  }) => {
+  test('情报激活后 preview，接受→分支结算→记录+1', async ({ page, request }) => {
     const account = await registerUser(request, 'adv');
     await fund(account.username, {
       money: 200000,

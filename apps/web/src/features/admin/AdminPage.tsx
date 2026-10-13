@@ -84,7 +84,10 @@ export function AdminPage(): JSX.Element {
       <Section title="公告" icon={Megaphone}>
         <ul data-testid="admin-announcements" className="border border-ink-600 bg-ink-850/40">
           {announcements.data.map((announcement) => (
-            <li key={announcement.id} className="border-b border-ink-600/60 px-3 py-3 text-sm last:border-b-0">
+            <li
+              key={announcement.id}
+              className="border-b border-ink-600/60 px-3 py-3 text-sm last:border-b-0"
+            >
               <p className="font-medium">{announcement.title}</p>
               <p className="mt-1 text-fg-muted whitespace-pre-wrap">{announcement.body}</p>
               <p className="mt-1 font-mono text-[11px] text-fg-faint">
@@ -222,7 +225,12 @@ function TournamentForm(): JSX.Element {
           />
         </label>
         {prizeError && <p className="text-sm text-bad-400">奖池必须是有效 JSON 对象。</p>}
-        <Btn data-testid="admin-t-submit" type="submit" variant="primary" disabled={create.isPending}>
+        <Btn
+          data-testid="admin-t-submit"
+          type="submit"
+          variant="primary"
+          disabled={create.isPending}
+        >
           {create.isPending ? '创建中…' : '创建赛事'}
         </Btn>
         {create.isError && <p className="text-sm text-bad-400">赛事创建失败，请检查时间窗口。</p>}
@@ -268,7 +276,12 @@ function AnnouncementForm(): JSX.Element {
           value={body}
           onChange={(event) => setBody(event.target.value)}
         />
-        <Btn data-testid="admin-a-submit" type="submit" variant="primary" disabled={create.isPending}>
+        <Btn
+          data-testid="admin-a-submit"
+          type="submit"
+          variant="primary"
+          disabled={create.isPending}
+        >
           {create.isPending ? '发布中…' : '发布公告'}
         </Btn>
         {create.isError && <p className="text-sm text-bad-400">公告发布失败。</p>}
@@ -302,8 +315,7 @@ function TableShell({
 }
 
 function TournamentTable({ items }: { items: TournamentView[] }): JSX.Element {
-  if (items.length === 0)
-    return <Empty icon={Trophy} title="暂无赛事" />;
+  if (items.length === 0) return <Empty icon={Trophy} title="暂无赛事" />;
   return (
     <TableShell
       testId="admin-tournaments"
@@ -380,7 +392,9 @@ function UserTable({ users }: { users: UserAdminView[] }): JSX.Element {
           );
         })}
       </TableShell>
-      {setBan.isError && <p className="mt-2 text-sm text-bad-400">封禁/解封操作失败，请刷新后重试。</p>}
+      {setBan.isError && (
+        <p className="mt-2 text-sm text-bad-400">封禁/解封操作失败，请刷新后重试。</p>
+      )}
     </div>
   );
 }

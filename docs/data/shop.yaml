@@ -54,5 +54,5 @@ weekly_limits:
   rename-card: 5
 
 refresh:
-  daily_at: "04:00"
-  weekly_at: "Mon 04:00"
+  daily_at: '04:00'
+  weekly_at: 'Mon 04:00'

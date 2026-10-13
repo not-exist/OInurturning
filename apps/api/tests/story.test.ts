@@ -26,7 +26,7 @@ async function createStudent(userId: number, index = 0): Promise<number> {
     data: {
       userId,
       name: `Story Student ${index}`,
-            qualityTier: 'ELITE',
+      qualityTier: 'ELITE',
       ds: 80,
       dp: 80,
       math: 80,
@@ -158,9 +158,9 @@ describe('story stage API', () => {
     expect(duplicated.status).toBe(400);
     expect(unwrapErr(duplicated).details).toMatchObject({ field: 'roster' });
     // 被拒请求不扣任何人的体力
-    expect(
-      await prisma.student.count({ where: { id: { in: roster }, stamina: 5 } }),
-    ).toBe(ROSTER_SIZE);
+    expect(await prisma.student.count({ where: { id: { in: roster }, stamina: 5 } })).toBe(
+      ROSTER_SIZE,
+    );
   });
 
   it('队伍全员各自结算：体力/精力/心态按各自的 timeline 回写四个学员', async () => {
@@ -195,9 +195,7 @@ describe('story stage API', () => {
     report.participants.slice(0, ROSTER_SIZE).forEach((timeline, index) => {
       const student = rows.find((row) => row.id === roster[index])!;
       expect(student.stamina).toBe(4);
-      expect(student.energy).toBe(
-        timeline.attempts.at(-1)?.resolution.energyAfter ?? undefined,
-      );
+      expect(student.energy).toBe(timeline.attempts.at(-1)?.resolution.energyAfter ?? undefined);
       expect(student.mindset).toBe(timeline.finalMindset);
     });
     // 四人的 timeline 必须两两不同（起点精力不同），否则上面的逐人比对是空转

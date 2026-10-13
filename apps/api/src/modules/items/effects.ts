@@ -36,31 +36,51 @@ const bookField = z.object({ attribute: z.string().min(1), amount: z.number().fi
 /** 从 effect（部分）抽取有限数值子键；字段缺失/类型错 → VALIDATION_FAILED（F-4） */
 function numericField(eff: unknown, field: string, itemId: string): number {
   if (typeof eff !== 'object' || eff === null) {
-    throw new ApiError('VALIDATION_FAILED', { resource: itemId, field, reason: `${field} 缺失或非数值` });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: itemId,
+      field,
+      reason: `${field} 缺失或非数值`,
+    });
   }
   const r = amountField.safeParse(eff);
   if (r.success) return r.data.amount;
-  throw new ApiError('VALIDATION_FAILED', { resource: itemId, field, reason: `${field} 缺失或非数值` });
+  throw new ApiError('VALIDATION_FAILED', {
+    resource: itemId,
+    field,
+    reason: `${field} 缺失或非数值`,
+  });
 }
 
 /** 从 effect 抽取 amount + mentality_change（咖啡）；缺失/类型错 → VALIDATION_FAILED（F-4） */
 function coffeeField(eff: unknown, itemId: string): { amount: number; mentalityChange: number } {
   if (typeof eff !== 'object' || eff === null) {
-    throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: 'amount/mentality_change 缺失或非数值' });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: itemId,
+      reason: 'amount/mentality_change 缺失或非数值',
+    });
   }
   const r = staminaMindsetField.safeParse(eff);
   if (r.success) return { amount: r.data.amount, mentalityChange: r.data.mentality_change };
-  throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: 'amount/mentality_change 缺失或非数值' });
+  throw new ApiError('VALIDATION_FAILED', {
+    resource: itemId,
+    reason: 'amount/mentality_change 缺失或非数值',
+  });
 }
 
 /** 从 effect（部分）抽取直用书字段（attribute + amount）；缺失/类型错 → VALIDATION_FAILED（F-4） */
 function bookFields(eff: unknown, itemId: string): { attribute: string; amount: number } {
   if (typeof eff !== 'object' || eff === null) {
-    throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '属性/增益字段缺失或非数值' });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: itemId,
+      reason: '属性/增益字段缺失或非数值',
+    });
   }
   const r = bookField.safeParse(eff);
   if (r.success) return r.data;
-  throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '属性/增益字段缺失或非数值' });
+  throw new ApiError('VALIDATION_FAILED', {
+    resource: itemId,
+    reason: '属性/增益字段缺失或非数值',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +125,9 @@ function num(c: Counters, key: string): number {
 
 function recordOf(c: Counters, key: string): Record<string, number> {
   const v = c[key];
-  return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, number>) : {};
+  return v !== null && typeof v === 'object' && !Array.isArray(v)
+    ? (v as Record<string, number>)
+    : {};
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +156,10 @@ export function applyItemEffect(input: EffectApplyInput): EffectApplyResult {
 
   // 改名卡走改名端点消耗，不经 use
   if (itemId === 'rename-card') {
-    throw new ApiError('VALIDATION_FAILED', { resource: itemId, reason: '改名卡需通过改名接口使用' });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: itemId,
+      reason: '改名卡需通过改名接口使用',
+    });
   }
 
   // 可用性唯一真源：@oinur/shared USABLE_ITEM_IDS（81 件中 21 件，与前端共用）。
@@ -278,11 +303,21 @@ function focusEngine(amount: number, s: Student): EffectApplyResult {
  * 同学员同属性每周 ≤ 10 点（counters.bookWeek <周键, 属性>；ISO 周界由 weekKey 比对重置），受属性上限 100 约束。
  * book_effect 从天赋 meta 聚合（percent 加算后除以 100）。
  */
-function directBook(itemId: string, eff: unknown, s: Student, meta: MetaAggregate, now: Date): EffectApplyResult {
+function directBook(
+  itemId: string,
+  eff: unknown,
+  s: Student,
+  meta: MetaAggregate,
+  now: Date,
+): EffectApplyResult {
   const { attribute, amount } = bookFields(eff, itemId);
   const column = BOOK_ATTR_COLUMNS[attribute];
   if (!column) {
-    throw new ApiError('VALIDATION_FAILED', { resource: itemId, attribute, reason: '该科目书籍本期不可用' });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: itemId,
+      attribute,
+      reason: '该科目书籍本期不可用',
+    });
   }
 
   const c = countersOf(s);
@@ -307,7 +342,11 @@ function directBook(itemId: string, eff: unknown, s: Student, meta: MetaAggregat
   const applied = clamp(cur + Math.min(rawGain, weeklyHeadroom), 0, 100);
   const actual = applied - cur;
   if (actual <= 0) {
-    throw new ApiError('VALIDATION_FAILED', { resource: itemId, attribute, reason: '该属性已达上限 100' });
+    throw new ApiError('VALIDATION_FAILED', {
+      resource: itemId,
+      attribute,
+      reason: '该属性已达上限 100',
+    });
   }
 
   const nextBookWeek = { ...bookWeek, [attribute]: weeklyUsed + actual };

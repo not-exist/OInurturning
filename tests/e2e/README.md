@@ -3,23 +3,23 @@
 浏览器级端到端：真 API（`NODE_ENV=test`，`docs/data` 真配置）+ 真前端（vite dev），
 共用一个 e2e 库 `oinur_e2e`，**串行**执行（历练有服务端周限流、PVP 需多账号编排）。
 
-| 文件 | 覆盖 |
-|---|---|
-| `specs/smoke.spec.ts` | 新用户遍历全部页面无崩溃 |
-| `specs/auth.spec.ts` | 注册/登录/登出/未登录拦截 |
-| `specs/academy.spec.ts` | 候选池/招募/刷新/金币不足 |
-| `specs/students.spec.ts` | 列表/档案/改名/开除 |
-| `specs/training.spec.ts` | 基础/定向/专项训练 |
-| `specs/items.spec.ts` | 背包使用/不可用态/改名卡跳转 |
-| `specs/lecture.spec.ts` | 讲课达标/强接/拒单 |
-| `specs/problems.spec.ts` | 出题/删除/资源不足 |
-| `specs/adventure.spec.ts` | 抽取→preview→分支→回避 |
-| `specs/story.spec.ts` | 进关→战报→返回/锁定关 |
-| `specs/pvp.spec.ts` | 锦标赛 8 人全周期+领奖 |
-| `specs/records.spec.ts` | 并行回放控制/战报直达/非法 id/PVP 对决战报 |
-| `specs/admin.spec.ts` | 建赛/公告/查用户/审计 |
-| `specs/settings.spec.ts` | 账户信息/改密/注销 |
-| `specs/full-journey.spec.ts` | **完整玩家旅程**（旗舰） |
+| 文件                         | 覆盖                                       |
+| ---------------------------- | ------------------------------------------ |
+| `specs/smoke.spec.ts`        | 新用户遍历全部页面无崩溃                   |
+| `specs/auth.spec.ts`         | 注册/登录/登出/未登录拦截                  |
+| `specs/academy.spec.ts`      | 候选池/招募/刷新/金币不足                  |
+| `specs/students.spec.ts`     | 列表/档案/改名/开除                        |
+| `specs/training.spec.ts`     | 基础/定向/专项训练                         |
+| `specs/items.spec.ts`        | 背包使用/不可用态/改名卡跳转               |
+| `specs/lecture.spec.ts`      | 讲课达标/强接/拒单                         |
+| `specs/problems.spec.ts`     | 出题/删除/资源不足                         |
+| `specs/adventure.spec.ts`    | 抽取→preview→分支→回避                     |
+| `specs/story.spec.ts`        | 进关→战报→返回/锁定关                      |
+| `specs/pvp.spec.ts`          | 锦标赛 8 人全周期+领奖                     |
+| `specs/records.spec.ts`      | 并行回放控制/战报直达/非法 id/PVP 对决战报 |
+| `specs/admin.spec.ts`        | 建赛/公告/查用户/审计                      |
+| `specs/settings.spec.ts`     | 账户信息/改密/注销                         |
+| `specs/full-journey.spec.ts` | **完整玩家旅程**（旗舰）                   |
 
 API 级全链路旅程（supertest）在 `apps/api/tests/journey-full.e2e.test.ts`，跑在同一个 e2e Action 里。
 

@@ -61,8 +61,16 @@ interface LimitRule {
 }
 
 const ITEM_LIMIT: Partial<Record<string, LimitRule>> = {
-  'milk-tea': { max: ITEM_USE_LIMITS.milkTeaDaily, unit: '杯', day: { count: 'milkTea', key: 'milkTeaKey' } },
-  coffee: { max: ITEM_USE_LIMITS.coffeeDaily, unit: '杯', day: { count: 'coffeeDaily', key: 'coffeeDailyKey' } },
+  'milk-tea': {
+    max: ITEM_USE_LIMITS.milkTeaDaily,
+    unit: '杯',
+    day: { count: 'milkTea', key: 'milkTeaKey' },
+  },
+  coffee: {
+    max: ITEM_USE_LIMITS.coffeeDaily,
+    unit: '杯',
+    day: { count: 'coffeeDaily', key: 'coffeeDailyKey' },
+  },
   'stamina-potion': {
     max: ITEM_USE_LIMITS.staminaPotionDaily,
     unit: '瓶',
@@ -100,7 +108,9 @@ export function InventoryPage(): JSX.Element {
   if (inv.isPending) return <InlineLoader>读取背包…</InlineLoader>;
   if (inv.isError || inv.data === undefined) {
     return (
-      <ErrorNote onRetry={() => void inv.refetch()}>背包读取失败：{apiErrorMessage(inv.error)}</ErrorNote>
+      <ErrorNote onRetry={() => void inv.refetch()}>
+        背包读取失败：{apiErrorMessage(inv.error)}
+      </ErrorNote>
     );
   }
 
@@ -113,7 +123,11 @@ export function InventoryPage(): JSX.Element {
   })).filter((g) => g.items.length > 0);
 
   return (
-    <div data-testid="inventory-page" data-tutorial="backpack-page" className="mx-auto max-w-5xl space-y-4">
+    <div
+      data-testid="inventory-page"
+      data-tutorial="backpack-page"
+      className="mx-auto max-w-5xl space-y-4"
+    >
       <PageHeader
         eyebrow="补给与道具"
         title="背包"
@@ -167,8 +181,15 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
   const reason = ITEM_UNAVAILABLE_REASON[item.itemId] ?? '暂不可用';
 
   return (
-    <li data-testid="inventory-row" data-itemid={item.itemId} className="panel flex items-start gap-3 p-3">
-      <HoverCard className="shrink-0" content={<ItemDetail item={item} subject={subject} rule={rule} />}>
+    <li
+      data-testid="inventory-row"
+      data-itemid={item.itemId}
+      className="panel flex items-start gap-3 p-3"
+    >
+      <HoverCard
+        className="shrink-0"
+        content={<ItemDetail item={item} subject={subject} rule={rule} />}
+      >
         <span
           className={`grid size-11 place-items-center border ${RARITY_BORDER[norm]} ${RARITY_FILL[norm]} ${RARITY_GLOW[norm]} ${
             norm === 'RAINBOW' ? 'animate-rainbow-halo' : ''
@@ -185,8 +206,12 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-sm font-semibold text-fg">{item.name}</span>
-          <span className={`border px-1.5 py-0.5 text-[11px] ${rarityChip(norm)}`}>{rarityLabel(norm)}</span>
-          <span className={`numeral text-sm ${availability === 'locked' ? 'text-fg-dim' : 'text-fg'}`}>
+          <span className={`border px-1.5 py-0.5 text-[11px] ${rarityChip(norm)}`}>
+            {rarityLabel(norm)}
+          </span>
+          <span
+            className={`numeral text-sm ${availability === 'locked' ? 'text-fg-dim' : 'text-fg'}`}
+          >
             ×{item.quantity}
           </span>
           <Chip>{itemCategoryLabel(item.category)}</Chip>
@@ -197,8 +222,12 @@ function InventoryRow({ item, onUse }: { item: ItemView; onUse: () => void }): J
             </Chip>
           )}
         </div>
-        {item.effectDesc !== null && <p className="mt-1 text-xs text-fg-muted">{item.effectDesc}</p>}
-        {item.description !== '' && <p className="mt-0.5 text-xs text-fg-dim">{item.description}</p>}
+        {item.effectDesc !== null && (
+          <p className="mt-1 text-xs text-fg-muted">{item.effectDesc}</p>
+        )}
+        {item.description !== '' && (
+          <p className="mt-0.5 text-xs text-fg-dim">{item.description}</p>
+        )}
       </div>
 
       <div className="shrink-0 self-center">
@@ -250,9 +279,15 @@ function ItemDetail({
         {itemCategoryLabel(item.category)}
         {item.price !== null ? ` · 售价 ${item.price} 金` : ''}
       </span>
-      {item.effectDesc !== null && <span className="block text-xs text-fg-muted">{item.effectDesc}</span>}
-      {item.description !== '' && <span className="block text-[11px] text-fg-dim">{item.description}</span>}
-      {rule !== undefined && <span className="block text-[11px] text-warn-400">{ruleHint(rule)}</span>}
+      {item.effectDesc !== null && (
+        <span className="block text-xs text-fg-muted">{item.effectDesc}</span>
+      )}
+      {item.description !== '' && (
+        <span className="block text-[11px] text-fg-dim">{item.description}</span>
+      )}
+      {rule !== undefined && (
+        <span className="block text-[11px] text-warn-400">{ruleHint(rule)}</span>
+      )}
       {subject !== null && (
         <span className="block text-[11px] text-warn-400">
           {`单学员单属性每周最多获得 ${ITEM_USE_LIMITS.bookWeekCap} 点 ${DIRECT_BOOK_SUBJECT_LABEL[subject]} 增益，超出部分不计。`}
@@ -289,7 +324,8 @@ function StudentPicker({
   const subject = bookSubject(item.itemId);
   const used = rule !== undefined && chosen !== null ? usedOf(rule, chosen.counters, keys.day) : 0;
   const blocked = rule !== undefined && chosen !== null ? limitBlock(rule, used, item.name) : null;
-  const book = subject !== null && chosen !== null ? bookOutcome(item, subject, chosen, keys.week) : null;
+  const book =
+    subject !== null && chosen !== null ? bookOutcome(item, subject, chosen, keys.week) : null;
 
   return (
     <Modal
@@ -346,7 +382,9 @@ function StudentPicker({
         )}
 
         {chosen !== null && blocked !== null && (
-          <p className="border border-warn-400/40 bg-warn-400/10 px-3 py-2 text-xs text-warn-400">{blocked}</p>
+          <p className="border border-warn-400/40 bg-warn-400/10 px-3 py-2 text-xs text-warn-400">
+            {blocked}
+          </p>
         )}
 
         {chosen !== null && subject !== null && book !== null && (
@@ -403,7 +441,9 @@ function StudentPicker({
 }
 
 function ruleHint(rule: LimitRule): string {
-  return rule.day === null ? `每人限用 ${rule.max} ${rule.unit}` : `每日限用 ${rule.max} ${rule.unit}`;
+  return rule.day === null
+    ? `每人限用 ${rule.max} ${rule.unit}`
+    : `每日限用 ${rule.max} ${rule.unit}`;
 }
 
 /** 服务端写回的计数器即「此刻」的事实：以它的周期键作为本次会话的当前日/周键 */

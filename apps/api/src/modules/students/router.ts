@@ -22,25 +22,37 @@ studentsRouter.get('/', requireAuth, async (req, res, next) => {
     // visit_students 只在本端点推进：overview 内部也调 listStudents()，挂 service 上会被总览页代劳
     void autoAdvanceIfNeeded(req.user!.id, 'visit_students');
     res.json({ ok: true, data });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 studentsRouter.get('/:id', requireAuth, async (req, res, next) => {
   try {
     res.json({ ok: true, data: await svc.getStudent(req.user!.id, parseId(req.params.id!)) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 studentsRouter.post('/:id/rename', requireAuth, async (req, res, next) => {
   try {
     const parsed = RenameBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
-    res.json({ ok: true, data: await svc.renameStudent(req.user!.id, parseId(req.params.id!), parsed.data.name) });
-  } catch (e) { next(e); }
+    if (!parsed.success)
+      throw new ApiError('VALIDATION_FAILED', z.flattenError(parsed.error).fieldErrors);
+    res.json({
+      ok: true,
+      data: await svc.renameStudent(req.user!.id, parseId(req.params.id!), parsed.data.name),
+    });
+  } catch (e) {
+    next(e);
+  }
 });
 
 studentsRouter.post('/:id/dismiss', requireAuth, async (req, res, next) => {
   try {
     res.json({ ok: true, data: await svc.dismissStudent(req.user!.id, parseId(req.params.id!)) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });

@@ -46,8 +46,16 @@ export function LoginPage(): JSX.Element {
       title="回到指挥中心"
       bullets={[
         { icon: Users, title: '招募与培养', desc: '从气质判断潜力，靠训练与历练把学员送上赛场。' },
-        { icon: Swords, title: '组队参赛', desc: '排名赛并行作战，出题对决 2N 局，胜负由引擎权威结算。' },
-        { icon: Compass, title: '挂机也在进步', desc: '现实时间驱动：体力自动回充，离线也在积累。' },
+        {
+          icon: Swords,
+          title: '组队参赛',
+          desc: '排名赛并行作战，出题对决 2N 局，胜负由引擎权威结算。',
+        },
+        {
+          icon: Compass,
+          title: '挂机也在进步',
+          desc: '现实时间驱动：体力自动回充，离线也在积累。',
+        },
       ]}
       statusLines={['引擎就绪 · 服务端权威结算', '赛季：8 章 / 33 关 / 8 档赛事']}
       footer={
@@ -89,7 +97,13 @@ export function LoginPage(): JSX.Element {
           disabled={busy}
           className="w-full py-2"
         >
-          {busy ? <InlineLoader>登录中…</InlineLoader> : <>登录 <Icon icon={ArrowRight} className="size-4" /></>}
+          {busy ? (
+            <InlineLoader>登录中…</InlineLoader>
+          ) : (
+            <>
+              登录 <Icon icon={ArrowRight} className="size-4" />
+            </>
+          )}
         </Btn>
       </form>
     </AuthFrame>

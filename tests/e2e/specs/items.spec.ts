@@ -44,16 +44,18 @@ test.describe('背包', () => {
     await page.waitForURL('/students');
   });
 
-  test('名下无学员时使用道具：选择器提示先招募且确认禁用', async ({
-    page,
-    request,
-  }) => {
+  test('名下无学员时使用道具：选择器提示先招募且确认禁用', async ({ page, request }) => {
     const account = await registerUser(request, 'item');
     await fund(account.username, { money: 0, items: { 'milk-tea': 1 } });
     // 开局包自带 2 学员：先经 API 全部开除，还原“名下无学员”前置
     const list = await apiCall(request, 'GET', '/api/students', account.accessToken);
     for (const s of unwrap<{ id: number }[]>(list.body, '学员列表')) {
-      const dismissed = await apiCall(request, 'POST', `/api/students/${s.id}/dismiss`, account.accessToken);
+      const dismissed = await apiCall(
+        request,
+        'POST',
+        `/api/students/${s.id}/dismiss`,
+        account.accessToken,
+      );
       unwrap(dismissed.body, `开除学员 ${s.id}`);
     }
     await loginViaUI(page, account.username, account.password);

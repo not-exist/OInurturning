@@ -30,7 +30,9 @@ afterAll(async () => {
   await importConfigs({ configDir: FIXTURES });
 });
 
-async function register(prefix: string): Promise<{ token: string; userId: number; username: string }> {
+async function register(
+  prefix: string,
+): Promise<{ token: string; userId: number; username: string }> {
   seq += 1;
   const username = `${prefix}-${Date.now().toString(36)}-${seq}`;
   const res = await request(app)
@@ -116,7 +118,11 @@ describe('journey full (api)', () => {
     expect(pool.candidates).toHaveLength(5);
     const students: StudentView[] = [];
     // 单抽 V<7 概率约 19%（common 占 55% 且 V 上限约 11），12 轮全失败 ≈ 2e-9，可忽略
-    for (let round = 0; round < 12 && !(students.some((s) => s.v >= 7) && students.length >= 2); round += 1) {
+    for (
+      let round = 0;
+      round < 12 && !(students.some((s) => s.v >= 7) && students.length >= 2);
+      round += 1
+    ) {
       if (round > 0) {
         const refreshed = await request(app).post('/api/academy/refresh').set(auth);
         expect(refreshed.status).toBe(200);
@@ -188,9 +194,7 @@ describe('journey full (api)', () => {
         .send({ studentId: best.id, dimension: 'DS' }),
     );
     expect(problem.quality).toBeGreaterThanOrEqual(0);
-    const library = unwrapOk<unknown[]>(
-      await request(app).get('/api/problem-library').set(auth),
-    );
+    const library = unwrapOk<unknown[]>(await request(app).get('/api/problem-library').set(auth));
     expect(library).toHaveLength(1);
 
     // —— 专项训练：耗题 ——
@@ -305,14 +309,17 @@ describe('journey full (api)', () => {
     await prisma.user.update({ where: { id: admin.userId }, data: { role: 'ADMIN' } });
     const adminAuth = { Authorization: `Bearer ${admin.token}` };
     const tournament = unwrapOk<{ id: number }>(
-      await request(app).post('/api/admin/tournaments').set(adminAuth).send({
-        name: `journey-cup-${Date.now().toString(36)}`,
-        size: 8,
-        registerEndsAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
-        autoStartAt: new Date(Date.now() + 48 * 3600_000).toISOString(),
-        prizes: { champion: { money: 1000 } },
-        config: {},
-      }),
+      await request(app)
+        .post('/api/admin/tournaments')
+        .set(adminAuth)
+        .send({
+          name: `journey-cup-${Date.now().toString(36)}`,
+          size: 8,
+          registerEndsAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+          autoStartAt: new Date(Date.now() + 48 * 3600_000).toISOString(),
+          prizes: { champion: { money: 1000 } },
+          config: {},
+        }),
     );
     // PVP 报名固定 3 人队伍（config.rosterSize 缺省 3）
     const pvpRoster = [
@@ -354,7 +361,10 @@ describe('journey full (api)', () => {
     }
     await prisma.pvpTournament.update({
       where: { id: tournament.id },
-      data: { registerEndsAt: new Date(Date.now() - 60000), autoStartAt: new Date(Date.now() - 60000) },
+      data: {
+        registerEndsAt: new Date(Date.now() - 60000),
+        autoStartAt: new Date(Date.now() - 60000),
+      },
     });
     const started = await request(app)
       .post(`/api/admin/pvp-tournaments/${tournament.id}/actions/start`)
@@ -371,14 +381,16 @@ describe('journey full (api)', () => {
     expect(champion).toBeDefined();
     const championAccount = contenders.find((c) => c.userId === champion!.userId);
     expect(championAccount).toBeDefined();
-    const moneyBefore = (await prisma.user.findUniqueOrThrow({ where: { id: champion!.userId } })).money;
+    const moneyBefore = (await prisma.user.findUniqueOrThrow({ where: { id: champion!.userId } }))
+      .money;
     const claimed = unwrapOk<RewardGrant>(
       await request(app)
         .post(`/api/pvp/tournaments/${tournament.id}/rewards/claim`)
         .set({ Authorization: `Bearer ${championAccount!.token}` }),
     );
     expect(claimed.claimedAt).not.toBeNull();
-    const moneyAfter = (await prisma.user.findUniqueOrThrow({ where: { id: champion!.userId } })).money;
+    const moneyAfter = (await prisma.user.findUniqueOrThrow({ where: { id: champion!.userId } }))
+      .money;
     expect(moneyAfter - moneyBefore).toBe(1000);
     console.log('JSTAGE:pvp');
 
