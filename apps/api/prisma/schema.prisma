@@ -1,0 +1,537 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ContestType {
+  STORY
+  PVP
+  ADVENTURE
+}
+
+enum ContestFormat {
+  RANKING
+  DUEL
+}
+
+enum AdventureStatus {
+  PENDING
+  RESOLVED
+}
+
+enum TournamentStatus {
+  REGISTERING
+  RUNNING
+  FINISHED
+  CANCELLED
+}
+
+enum MatchStatus {
+  PENDING
+  DONE
+  BYE
+}
+
+model User {
+  id                  Int       @id @default(autoincrement())
+  username            String    @unique @db.VarChar(32)
+  passwordHash        String?
+  role                Role      @default(USER)
+  money               Int       @default(0)
+  reputation          Int       @default(0)
+  badges              Json      @default("[]")
+  tokenVersion        Int       @default(0)
+  bannedAt            DateTime?
+  onboardedAt         DateTime? // 开局包发放标记：注册事务/回填脚本发放后落库，重复发放幂等键
+  lastLoginAt         DateTime?
+  lastSettledAt       DateTime  @default(now())
+  adventureIntelReady Boolean   @default(false)
+  tutorialStep        Int       @default(0)
+  tutorialCompleted   Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  students           Student[]
+  items              UserItem[]
+  problemEntries     ProblemLibraryEntry[]
+  reputationLogs     ReputationLog[]
+  recruitPool        RecruitPool?
+  contestRecords     ContestRecord[]
+  adventureLogs      AdventureLog[]
+  storyProgress      StoryProgress[]
+  lectureLogs        LectureLog[]
+  createdTournaments PvpTournament[]       @relation("TournamentCreator")
+  adminAuditLogs     AdminAuditLog[]       @relation("AdminAuditActor")
+  announcements      AdminAnnouncement[]
+  pvpRegistrations   PvpRegistration[]
+  pvpRewardGrants    PvpRewardGrant[]
+  trainingLogs       TrainingLog[]
+  shopPurchaseLogs   ShopPurchaseLog[]
+
+  @@map("users")
+}
+
+model ContestRecord {
+  id             String        @id @default(cuid()) @db.VarChar(64)
+  userId         Int
+  type           ContestType
+  format         ContestFormat
+  stageKey       String?       @db.VarChar(64)
+  ngLevel        Int?
+  idempotencyKey String        @db.VarChar(128)
+  inputSnapshot  Json
+  report         Json
+  summary        Json
+  rewards        Json
+  snapshotHash   String        @db.VarChar(64)
+  createdAt      DateTime      @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adventureLogs AdventureLog[]
+  pvpMatches    PvpMatch[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, type, createdAt])
+}
+
+model StoryProgress {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  ngLevel      Int
+  stageKey     String    @db.VarChar(64)
+  firstClearAt DateTime?
+  bestRank     Int?
+  clearCount   Int       @default(0)
+  rewards      Json      @default("[]")
+  growth       Json      @default("[]")
+  lastRecordId String?   @db.VarChar(64)
+  lastSummary  Json?
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ngLevel, stageKey])
+  @@index([userId, ngLevel])
+}
+
+model AdventureLog {
+  id              Int             @id @default(autoincrement())
+  userId          Int
+  studentId       Int?
+  studentIds      Json            @default("[]")
+  eventId         String          @db.VarChar(64)
+  contestRecordId String?         @db.VarChar(64)
+  tier            Int
+  seed            Int
+  status          AdventureStatus @default(PENDING)
+  choices         Json            @default("[]")
+  results         Json            @default("[]")
+  createdAt       DateTime        @default(now())
+  resolvedAt      DateTime?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actorStudent  Student?       @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  contestRecord ContestRecord? @relation(fields: [contestRecordId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([userId, eventId])
+  @@index([contestRecordId])
+}
+
+model AdventureWeeklyUsage {
+  eventId String @db.VarChar(64)
+  weekKey String @db.VarChar(10)
+  count   Int    @default(0)
+
+  @@id([eventId, weekKey])
+}
+
+model LectureLog {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  studentId       Int
+  tier            String   @db.VarChar(32)
+  teachingValue   Int
+  threshold       Int
+  // 讲课成长（issue #56）审计三件套：本场比对的思维要求、思维是否不足、逐场成长增量。
+  thinkingReq     Int      @default(0)
+  thinkingDeficit Boolean  @default(false)
+  forced          Boolean
+  success         Boolean
+  money           Int
+  reputation      Int
+  /**
+   * LectureGrowthEntry[]（stat=setting|thinking，amount 为浮点增量；负值=讲砸回落）
+   */
+  gains           Json     @default("[]")
+  staminaCost     Int
+  createdAt       DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, studentId, createdAt])
+}
+
+enum TrainingKind {
+  BASIC
+  DIRECTED
+  SPECIALIZED
+}
+
+// 训练记录：每次训练在同一事务内落一行，与学员/道具/金钱变更同成功同回滚。
+// 学员被开除后记录保留（studentId 置空，studentName 快照可读）；problemId 为快照（无 FK，
+// 题库行可删）；rareGains 为 RareGain[]（stat/amount）。读路径：GET /api/training/logs
+// （studentId/kind 过滤 + id 游标分页）与总览 recent.training。
+model TrainingLog {
+  id           Int          @id @default(autoincrement())
+  userId       Int
+  studentId    Int?
+  studentName  String       @db.VarChar(24)
+  kind         TrainingKind
+  dim          String       @db.VarChar(8)
+  delta        Float
+  rareGains    Json         @default("[]")
+  cost         Int
+  staminaAfter Float
+  bookItemId   String?      @db.VarChar(64)
+  problemId    Int?
+  createdAt    DateTime     @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, studentId, createdAt])
+}
+
+model PvpTournament {
+  id             Int              @id @default(autoincrement())
+  name           String           @db.VarChar(64)
+  status         TournamentStatus @default(REGISTERING)
+  size           Int
+  registerEndsAt DateTime
+  autoStartAt    DateTime
+  prizes         Json             @default("{}")
+  config         Json             @default("{}")
+  createdBy      Int?
+  createdAt      DateTime         @default(now())
+
+  creator       User?             @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  registrations PvpRegistration[]
+  matches       PvpMatch[]
+  rewardGrants  PvpRewardGrant[]
+
+  @@index([status, autoStartAt])
+}
+
+model PvpRegistration {
+  id               Int      @id @default(autoincrement())
+  tournamentId     Int
+  userId           Int
+  roster           Json
+  problemEntryIds  Json     @default("[]")
+  problemSnapshots Json     @default("[]")
+  createdAt        DateTime @default(now())
+
+  tournament PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, createdAt])
+}
+
+model PvpMatch {
+  id              Int         @id @default(autoincrement())
+  tournamentId    Int
+  round           Int
+  slot            Int
+  homeUserId      Int?
+  awayUserId      Int?
+  homeScore       Int?
+  awayScore       Int?
+  winnerUserId    Int?
+  status          MatchStatus @default(PENDING)
+  contestRecordId String?     @unique @db.VarChar(64)
+  playedAt        DateTime?
+
+  tournament    PvpTournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  contestRecord ContestRecord? @relation(fields: [contestRecordId], references: [id], onDelete: SetNull)
+
+  @@unique([tournamentId, round, slot])
+  @@index([tournamentId, round])
+}
+
+model PvpRewardGrant {
+  id           Int       @id @default(autoincrement())
+  tournamentId Int
+  userId       Int
+  rank         Int
+  rewards      Json      @default("[]")
+  claimedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  tournament PvpTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, rank])
+}
+
+// 公告为全站内容，不属于任一玩家的个人数据：作者注销（物理删除）时置空 authorId 而非级联删除，
+// 避免管理员自行注销连带清空历史公告。前端只渲染 title/body，authorId 为空不影响展示。
+model AdminAnnouncement {
+  id        Int      @id @default(autoincrement())
+  authorId  Int?
+  title     String   @db.VarChar(128)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id                Int      @id @default(autoincrement())
+  adminId           Int?
+  adminNameSnapshot String   @db.VarChar(32)
+  action            String   @db.VarChar(64)
+  targetType        String?  @db.VarChar(32)
+  targetId          String?  @db.VarChar(64)
+  payload           Json?
+  createdAt         DateTime @default(now())
+
+  admin User? @relation("AdminAuditActor", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+}
+
+// ───────────────────────── 配置域（yaml 导入目标，TECH-DESIGN §3） ─────────────────────────
+// 公共字段约定：id=语义化稳定 id；sourceHash=导入批次指纹；payload=zod 校验后的完整定义；
+// deprecated=本批 yaml 中消失的历史条目（软弃用，绝不物理删除——玩法数据外键仍需有效）。
+// 后续里程碑的 StudentTalent/UserItem 等表将以外键指向 ConfigTalent/ConfigItem。
+
+model ConfigTalent {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+
+  studentTalents StudentTalent[]
+}
+
+model ConfigItem {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+
+  holdings UserItem[]
+}
+
+model ConfigProblem {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigEvent {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigStage {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigEconomy {
+  id         String   @id @db.VarChar(64)
+  sourceHash String   @db.VarChar(64)
+  payload    Json
+  deprecated Boolean  @default(false)
+  importedAt DateTime @updatedAt
+}
+
+model ConfigImport {
+  id         Int      @id @default(autoincrement())
+  sourceHash String   @db.VarChar(64)
+  manifest   Json
+  ok         Boolean
+  errorCount Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ───────────────────────── 学员域（M1-R4：字段对齐领域键，student.md 权威） ─────────────────────────
+
+enum QualityTier {
+  COMMON
+  GOOD
+  ELITE
+  GENIUS
+}
+
+enum StudentStatus {
+  ACTIVE
+  DISMISSED
+}
+
+enum AcquiredVia {
+  RECRUIT
+  EVENT
+  UPGRADE // 进阶石升阶
+  REROLL // 洗练券洗出
+  ADMIN
+}
+
+model Student {
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  name          String        @db.VarChar(24)
+  qualityTier   QualityTier
+  status        StudentStatus @default(ACTIVE)
+  // 九维能力（1–100，浮点累积、展示 floor）
+  ds            Float
+  dp            Float
+  math          Float
+  graph         Float
+  greedy        Float
+  str           Float
+  code          Float
+  thinking      Float
+  setting       Float
+  // 辅助属性与资源
+  mindset       Float         @default(2) // −10…+10
+  focusCap      Int
+  energyMax     Int
+  energy        Float
+  stamina       Float         @default(5) // 上限恒定 5（economy）
+  staminaRegen  Int // 1–100 刻度
+  counters      Json          @default("{}") // 稀疏计数器：reroll/vigorUsed/focusEngineUsed/milkTea/bookWeek
+  lastSettledAt DateTime      @default(now())
+  recruitedAt   DateTime      @default(now())
+  dismissedAt   DateTime?
+  updatedAt     DateTime      @updatedAt
+
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  talents          StudentTalent[]
+  adventures       AdventureLog[]
+  lectureLogs      LectureLog[]
+  authoredProblems ProblemLibraryEntry[] @relation("ProblemAuthor")
+  trainingLogs     TrainingLog[]
+
+  @@index([userId, status])
+}
+
+model StudentTalent {
+  id           Int         @id @default(autoincrement())
+  studentId    Int
+  talentId     String      @db.VarChar(64) // → ConfigTalent.id
+  acquiredVia  AcquiredVia
+  fromTalentId String?     @db.VarChar(64) // 升阶/洗练前的天赋 id，溯源用
+  createdAt    DateTime    @default(now())
+
+  student Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  talent  ConfigTalent @relation(fields: [talentId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, talentId]) // 同一天赋不可重复持有（家族升阶=替换行）
+  @@index([talentId])
+}
+
+// ───────────────────────── 招募域（M1-R1/R2/R3：5 人候选池，24h 懒刷新，04:00 日界） ─────────────────────────
+
+model RecruitPool {
+  userId         Int      @id
+  candidates     Json // 5 个 CandidatePayload（生成规则：student.md §3.2–3.6）
+  generatedAt    DateTime
+  refreshesToday Int      @default(0) // 当日手动刷新次数（k 从 0 计）
+  refreshDayKey  String   @db.VarChar(10) // clock.dayKey，04:00 界，跨日重置计数
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────── 物品域 ─────────────────────────
+
+model UserItem {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  itemId   String @db.VarChar(64) // → ConfigItem.id
+  quantity Int // >0 才保留行；扣到 0 即删除行
+
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item ConfigItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, itemId])
+  @@index([itemId])
+}
+
+model ProblemLibraryEntry {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  authorStudentId Int? // 开除作者后置空（student.md §9）
+  name            String    @db.VarChar(64)
+  dominantDim     String    @db.VarChar(8) // DS/DP/MATH/GRAPH/GREEDY/STRING
+  rarity          String    @db.VarChar(8) // 六档
+  quality         Int // Q 分 0–100
+  traitId         String?   @db.VarChar(64)
+  consumedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authorStudent Student? @relation("ProblemAuthor", fields: [authorStudentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, consumedAt])
+}
+
+model ReputationLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  delta     Int // 正负皆可
+  reason    String   @db.VarChar(64) // LECTURE / CONTEST_RANK / DISMISS / EVENT:<id> / PVP_PRIZE …
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model ShopPurchaseLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  itemId    String   @db.VarChar(64)
+  quantity  Int
+  dayKey    String   @db.VarChar(10)
+  weekKey   String   @db.VarChar(10)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dayKey])
+  @@index([userId, weekKey])
+  @@index([userId, itemId, dayKey])
+  @@index([userId, itemId, weekKey])
+}

@@ -1,0 +1,580 @@
+# =============================================================================
+# OInurturning 题目模板库与题目特性表（problems.yaml）
+# 依据：docs/GAME-DESIGN.md §5 / §6.2 / §8 / §11；引擎 hooks 定义见 docs/systems/contest.md §3.9
+# 本文件同时是策划文档与运行时数据源：API 启动时校验并导入 MySQL 配置表 problems / problem_traits。
+# =============================================================================
+
+version: 1
+updated: '2026-08-26'
+
+# -----------------------------------------------------------------------------
+# 全局约定
+# -----------------------------------------------------------------------------
+conventions:
+  requirement_band_reference: GAME-DESIGN §6.2 成长曲线锚点（各层 requirements 取自对应难度带）
+  time_limit_semantics: 单题参考用时基准（人类解题耗时，分钟）；不是 OJ 运行时限（判题 TLE 走概率制）
+  # 特性池抽取规则：在 trait_pool 各条目权重之外，隐式加入一条「无特性」权重，
+  # 使低权特性池不至于高频出特性。
+  implicit_no_trait_weight: 30
+  # NG+ 层（k≥1）由引擎在实例化阶段施加，不在本表改数据：
+  #   需求 ×(1+0.15k)；条目权重 ×(1+0.10k)；severity>=blue 条目再 ×(1+0.05k)（彩封顶）。
+  # 六维无 adhoc/构造分类：构造、交互、adhoc 类题统一归入 greedy 维。
+  adhoc_dim_mapping: greedy
+
+# -----------------------------------------------------------------------------
+# 特性严重度阶梯（题目专用独立阶梯，允许 red/black 共存，与道具稀有度序列无关）
+#   red < yellow < blue < purple < black < colorful
+# -----------------------------------------------------------------------------
+severity_ladder: [red, yellow, blue, purple, black, colorful]
+
+# =============================================================================
+# 特性表（15 条）
+# hooks 键的引擎语义见 docs/systems/contest.md §3.9 映射表
+# =============================================================================
+traits:
+  - id: wide-data
+    name: 大数据范围
+    severity: red
+    family: null
+    effect: >
+      数据规模刻意放大到暴力复杂度不可承受：暴力骗分路线被堵死（无部分分），
+      并小幅抬高判题超时概率。新手最常见的第一课。
+    hooks:
+      partial_override: none
+      tle_prob_add: 0.05
+
+  - id: mod-longlong-curse
+    name: 取模忘开longlong诅咒
+    severity: red
+    family: null
+    effect: >
+      答案对大质数取模且中间量爆 int：一次 AC 概率小幅下降，
+      WA 后罚时加重（多花 5 分钟定位溢出）。
+    hooks:
+      ac_prob_add: -0.03
+      wa_penalty_add: 5
+
+  - id: strict-spj
+    name: SPJ严格判题
+    severity: yellow
+    family: null
+    effect: >
+      特殊判题器逐字段核对输出格式：不存在部分分，且输出噪声容差更小
+      （用时噪声略增）。
+    hooks:
+      partial_override: none
+      noise_sigma_add: 0.05
+
+  - id: off-by-one-boundary
+    name: 差一边界陷阱
+    severity: yellow
+    family: null
+    effect: >
+      数据点精准卡在边界 ±1 上：AC 概率小幅下降，WA 后罚时略增。
+    hooks:
+      ac_prob_add: -0.04
+      wa_penalty_add: 2
+
+  - id: interactive
+    name: 强制在线交互·入门
+    severity: yellow
+    family: null
+    family_note: force-online 的弱化形态（同族上级见 force-online）
+    effect: >
+      交互题每轮问答必须即时响应：每次失败提交额外等待一轮交互（罚时 +10min），
+      基础精力开销略增。无部分分不设——但保留模板自身 partial_scores 决定权。
+    hooks:
+      submit_time_add: 10
+      energy_cost_add: 2
+
+  - id: card-constant
+    name: 卡常
+    severity: blue
+    family: null
+    effect: >
+      正解复杂度正确但常数巨大：判题超时概率大幅上升（+0.20/次提交），
+      逼选手反复卡常重交。
+    hooks:
+      tle_prob_add: 0.20
+
+  - id: greedy-counterexample
+    name: 玄学贪心反例
+    severity: blue
+    family: null
+    effect: >
+      表面贪心存在精心构造的反例集合：直觉做法大概率踩坑，
+      AC 概率显著下降。
+    hooks:
+      ac_prob_add: -0.08
+
+  - id: partial-trap
+    name: 部分分陷阱
+    severity: blue
+    family: null
+    effect: >
+      看似可以暴力拿部分分，实际测试点全部针对暴力设计：
+      未 AC 的已尝试题目得分归零（覆盖引擎默认 30% 部分分规则）。
+    hooks:
+      partial_override: trap
+
+  - id: construct-poison
+    name: 毒瘤构造
+    severity: purple
+    family: null
+    effect: >
+      构造类思维瓶颈放大：思维缺口对耗时的影响系数 ×1.5，
+      且 AC 概率额外下降。高阶玩家的分水岭题型。
+    hooks:
+      think_weight_mul: 1.5
+      ac_prob_add: -0.05
+
+  - id: anti-ak-shield
+    name: 防AK护盾
+    severity: purple
+    family: null
+    condition: anti_ak          # 仅当该题是选手最后一块拼图时生效（NPC 同受影响）
+    effect: >
+      当选手已 AC 场上其余所有题时，本题判定突然变难：
+      AC 概率 −0.15、判题超时 +0.10。用于拉开满分线、制造翻盘叙事。
+    hooks:
+      ac_prob_add: -0.15
+      tle_prob_add: 0.10
+
+  - id: force-online
+    name: 强制在线·完全版
+    severity: purple
+    family: interactive         # 家族上级
+    effect: >
+      完全强制在线：每次提交都要重新读入全部历史输入（+8min/次提交），
+      每次提交额外耗 1 点精力，且无部分分。
+    hooks:
+      submit_time_add: 8
+      energy_per_submit_add: 1
+      partial_override: none
+
+  - id: precision-hell
+    name: 精度地狱
+    severity: black
+    family: null
+    effect: >
+      实数运算精度坑遍布：AC 概率大幅下降，WA 罚时加重，
+      失败时心态打击额外加深（−2）。
+    hooks:
+      ac_prob_add: -0.12
+      wa_penalty_add: 5
+      mindset_fail_add: -2
+
+  - id: tight-clock
+    name: 极限时钟
+    severity: black
+    family: null
+    effect: >
+      判题时限压到极限：判题超时概率 +0.30，且用时噪声 ×1.3
+      （发挥波动被放大，强手更稳、弱手更崩）。
+    hooks:
+      tle_prob_add: 0.30
+      noise_sigma_mul: 1.3
+
+  - id: miracle-easy
+    name: 灵光乍现
+    severity: colorful
+    family: null
+    condition: first_problem    # 仅对该选手本场尝试的第一题生效
+    effect: >
+      传说级正面特性：签到神题让人手感火热——首题用时 ×0.75、
+      AC 概率 +0.25。全场节奏的发动机。
+    hooks:
+      time_k_mul: 0.75
+      ac_prob_add: 0.25
+
+  - id: chaos-domain
+    name: 概率世界
+    severity: colorful
+    family: null
+    effect: >
+      传说级双刃特性：所有判定概率的绝对值被放大 P←P+0.5(P−0.5)
+      （强者更强、弱者更弱），用时噪声 +0.10。命运的天平被推向强者。
+    hooks:
+      prob_amplify: 0.5
+      noise_sigma_add: 0.10
+
+# =============================================================================
+# 题目模板库（34 条；8 个难度层，每层 ≥3）
+# requirements 对齐 GAME-DESIGN §6.2 各章通关锚点带：
+#   cspj≈10–20 / csps≈25–40 / noip≈40–60 / province≈60–75
+#   noi≈75–88 / ctt≈85–92 / cts≈88–95 / ioi≥90
+# score 统一 100；time_limit_min 为单题参考用时基准（分钟）。
+# =============================================================================
+templates:
+
+  # ------------------------------------------------------------------ CSP-J --
+  - id: cspj-simulation
+    tier: cspj
+    title: "循环模拟小统计"
+    dim: ds
+    requirements: { d: 12, m: 10, c: 9 }
+    score: 100
+    time_limit_min: 45
+    trait_pool: []
+    partial_scores: true
+
+  - id: cspj-greedy-queue
+    tier: cspj
+    title: "排队接水"
+    dim: greedy
+    requirements: { d: 12, m: 11, c: 8 }
+    score: 100
+    time_limit_min: 40
+    trait_pool: []
+    partial_scores: true
+
+  - id: cspj-dp-knapsack-01
+    tier: cspj
+    title: "01背包变形"
+    dim: dp
+    requirements: { d: 14, m: 12, c: 10 }
+    score: 100
+    time_limit_min: 55
+    trait_pool:
+      - { trait: mod-longlong-curse, weight: 5 }
+    partial_scores: true
+
+  - id: cspj-math-gcd-count
+    tier: cspj
+    title: "最大公约数计数"
+    dim: math
+    requirements: { d: 15, m: 13, c: 9 }
+    score: 100
+    time_limit_min: 45
+    trait_pool:
+      - { trait: wide-data, weight: 3 }
+    partial_scores: true
+
+  # ----------------------------------------------------------------- CSP-S --
+  - id: csps-graph-shortest
+    tier: csps
+    title: "最短路变形"
+    dim: graph
+    requirements: { d: 28, m: 26, c: 24 }
+    score: 100
+    time_limit_min: 55
+    trait_pool: []
+    partial_scores: true
+
+  - id: csps-dp-interval
+    tier: csps
+    title: "区间DP入门"
+    dim: dp
+    requirements: { d: 30, m: 30, c: 26 }
+    score: 100
+    time_limit_min: 65
+    trait_pool:
+      - { trait: partial-trap, weight: 4 }
+    partial_scores: true
+
+  - id: csps-ds-monotonic-stack
+    tier: csps
+    title: "单调栈应用"
+    dim: ds
+    requirements: { d: 27, m: 25, c: 23 }
+    score: 100
+    time_limit_min: 55
+    trait_pool: []
+    partial_scores: true
+
+  - id: csps-string-hash
+    tier: csps
+    title: "字符串哈希匹配"
+    dim: string
+    requirements: { d: 29, m: 27, c: 25 }
+    score: 100
+    time_limit_min: 60
+    trait_pool:
+      - { trait: mod-longlong-curse, weight: 6 }
+    partial_scores: true
+
+  # ------------------------------------------------------------------ NOIP --
+  - id: noip-ds-segment-tree
+    tier: noip
+    title: "线段树维护最值"
+    dim: ds
+    requirements: { d: 46, m: 44, c: 40 }
+    score: 100
+    time_limit_min: 70
+    trait_pool:
+      - { trait: wide-data, weight: 5 }
+    partial_scores: true
+
+  - id: noip-dp-tree
+    tier: noip
+    title: "树形DP"
+    dim: dp
+    requirements: { d: 50, m: 48, c: 42 }
+    score: 100
+    time_limit_min: 75
+    trait_pool: []
+    partial_scores: true
+
+  - id: noip-graph-mst
+    tier: noip
+    title: "最小生成树变式"
+    dim: graph
+    requirements: { d: 44, m: 42, c: 38 }
+    score: 100
+    time_limit_min: 65
+    trait_pool: []
+    partial_scores: true
+
+  - id: noip-greedy-exchange
+    tier: noip
+    title: "贪心交换论证"
+    dim: greedy
+    requirements: { d: 47, m: 50, c: 36 }
+    score: 100
+    time_limit_min: 70
+    trait_pool:
+      - { trait: greedy-counterexample, weight: 6 }
+    partial_scores: true
+
+  - id: noip-math-combinatorics
+    tier: noip
+    title: "组合计数"
+    dim: math
+    requirements: { d: 52, m: 53, c: 38 }
+    score: 100
+    time_limit_min: 75
+    trait_pool:
+      - { trait: mod-longlong-curse, weight: 8 }
+    partial_scores: true
+
+  # ------------------------------------------------------------------ 省选 --
+  - id: prov-ds-bitset-opt
+    tier: province
+    title: "bitset优化"
+    dim: ds
+    requirements: { d: 62, m: 64, c: 58 }
+    score: 100
+    time_limit_min: 85
+    trait_pool: []
+    partial_scores: true
+
+  - id: prov-dp-digit
+    tier: province
+    title: "数位DP与状压"
+    dim: dp
+    requirements: { d: 66, m: 65, c: 56 }
+    score: 100
+    time_limit_min: 90
+    trait_pool:
+      - { trait: partial-trap, weight: 5 }
+    partial_scores: true
+
+  - id: prov-graph-flow
+    tier: province
+    title: "网络流建模"
+    dim: graph
+    requirements: { d: 70, m: 68, c: 62 }
+    score: 100
+    time_limit_min: 95
+    trait_pool:
+      - { trait: card-constant, weight: 5 }
+    partial_scores: true
+
+  - id: prov-math-lagrange
+    tier: province
+    title: "拉格朗日插值"
+    dim: math
+    requirements: { d: 64, m: 70, c: 50 }
+    score: 100
+    time_limit_min: 85
+    trait_pool: []
+    partial_scores: true
+
+  - id: prov-string-sam
+    tier: province
+    title: "后缀自动机入门"
+    dim: string
+    requirements: { d: 68, m: 66, c: 64 }
+    score: 100
+    time_limit_min: 90
+    trait_pool:
+      - { trait: wide-data, weight: 6 }
+    partial_scores: true
+
+  # ------------------------------------------------------------------- NOI --
+  - id: noi-ds-link-cut
+    tier: noi
+    title: "LCT动态树"
+    dim: ds
+    requirements: { d: 80, m: 78, c: 74 }
+    score: 100
+    time_limit_min: 95
+    trait_pool:
+      - { trait: card-constant, weight: 6 }
+    partial_scores: true
+
+  - id: noi-dp-slope
+    tier: noi
+    title: "斜率优化与决策单调性"
+    dim: dp
+    requirements: { d: 82, m: 84, c: 70 }
+    score: 100
+    time_limit_min: 100
+    trait_pool: []
+    partial_scores: true
+
+  - id: noi-graph-flow-bounds
+    tier: noi
+    title: "上下界网络流"
+    dim: graph
+    requirements: { d: 78, m: 82, c: 72 }
+    score: 100
+    time_limit_min: 95
+    trait_pool: []
+    partial_scores: true
+
+  - id: noi-math-poly-mod
+    tier: noi
+    title: "多项式取模"
+    dim: math
+    requirements: { d: 84, m: 86, c: 68 }
+    score: 100
+    time_limit_min: 105
+    trait_pool:
+      - { trait: tight-clock, weight: 4 }
+    partial_scores: true
+
+  - id: noi-construct-adhoc
+    tier: noi
+    title: "构造证明题"
+    dim: greedy                # 构造/adhoc 归入 greedy（见 conventions）
+    requirements: { d: 76, m: 88, c: 66 }
+    score: 100
+    time_limit_min: 95
+    trait_pool:
+      - { trait: construct-poison, weight: 7 }
+    partial_scores: false      # 构造题答案唯一，无部分分
+
+  # ------------------------------------------------------------------- CTT --
+  - id: ctt-ds-ett
+    tier: ctt
+    title: "ETT与均摊复杂度分析"
+    dim: ds
+    requirements: { d: 88, m: 87, c: 82 }
+    score: 100
+    time_limit_min: 100
+    trait_pool:
+      - { trait: card-constant, weight: 6 }
+    partial_scores: true
+
+  - id: ctt-math-genfunc
+    tier: ctt
+    title: "生成函数高级变换"
+    dim: math
+    requirements: { d: 90, m: 91, c: 78 }
+    score: 100
+    time_limit_min: 110
+    trait_pool:
+      - { trait: tight-clock, weight: 5 }
+    partial_scores: true
+
+  - id: ctt-string-lyndon
+    tier: ctt
+    title: "Lyndon分解应用"
+    dim: string
+    requirements: { d: 87, m: 89, c: 84 }
+    score: 100
+    time_limit_min: 100
+    trait_pool: []
+    partial_scores: true
+
+  - id: ctt-dp-wqs
+    tier: ctt
+    title: "凸优化wqs二分"
+    dim: dp
+    requirements: { d: 89, m: 90, c: 80 }
+    score: 100
+    time_limit_min: 105
+    trait_pool:
+      - { trait: construct-poison, weight: 4 }
+    partial_scores: true
+
+  # ------------------------------------------------------------------- CTS --
+  - id: cts-ds-top-tree
+    tier: cts
+    title: "TopTree"
+    dim: ds
+    requirements: { d: 92, m: 91, c: 88 }
+    score: 100
+    time_limit_min: 105
+    trait_pool:
+      - { trait: card-constant, weight: 7 }
+    partial_scores: true
+
+  - id: cts-math-algebra
+    tier: cts
+    title: "多项式复合与代数变换"
+    dim: math
+    requirements: { d: 93, m: 94, c: 86 }
+    score: 100
+    time_limit_min: 115
+    trait_pool:
+      - { trait: tight-clock, weight: 6 }
+    partial_scores: true
+
+  - id: cts-interact-construct
+    tier: cts
+    title: "交互式构造挑战"
+    dim: greedy                # 交互/构造归入 greedy（见 conventions）
+    requirements: { d: 91, m: 93, c: 90 }
+    score: 100
+    time_limit_min: 110
+    trait_pool:
+      - { trait: force-online, weight: 6 }
+      - { trait: construct-poison, weight: 5 }
+    partial_scores: false
+
+  # ------------------------------------------------------------------- IOI --
+  - id: ioi-ds-ktt
+    tier: ioi
+    title: "KTT线段树"
+    dim: ds
+    requirements: { d: 95, m: 94, c: 92 }
+    score: 100
+    time_limit_min: 115
+    trait_pool:
+      - { trait: tight-clock, weight: 6 }
+    partial_scores: true
+
+  - id: ioi-dp-decision
+    tier: ioi
+    title: "决策单调性终极形态"
+    dim: dp
+    requirements: { d: 96, m: 96, c: 90 }
+    score: 100
+    time_limit_min: 120
+    trait_pool: []
+    partial_scores: true
+
+  - id: ioi-graph-theory
+    tier: ioi
+    title: "图论综合：流、匹配与对偶"
+    dim: graph
+    requirements: { d: 94, m: 95, c: 91 }
+    score: 100
+    time_limit_min: 115
+    trait_pool:
+      - { trait: anti-ak-shield, weight: 4 }
+    partial_scores: true
+
+  - id: ioi-finale-legend
+    tier: ioi
+    title: "传说压轴"
+    dim: math
+    requirements: { d: 97, m: 97, c: 93 }
+    score: 100
+    time_limit_min: 125
+    trait_pool:
+      - { trait: anti-ak-shield, weight: 5 }
+      - { trait: chaos-domain, weight: 2 }
+    partial_scores: true

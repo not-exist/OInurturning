@@ -1,0 +1,355 @@
+import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
+import path from 'node:path';
+import type { APIRequestContext, Page } from '@playwright/test';
+
+const execFileAsync = promisify(execFile);
+
+export const API_URL =
+  process.env.E2E_API_URL ?? `http://127.0.0.1:${process.env.E2E_API_PORT ?? 3000}`;
+export const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL ?? 'mysql://oinur:oinur@127.0.0.1:3306/oinur_e2e';
+export const E2E_JWT_SECRET =
+  process.env.E2E_JWT_SECRET ?? 'e2e-jwt-secret-0123456789abcdef-change-me';
+
+export const DEFAULT_PASSWORD = 'E2ePlayer1234!';
+
+/** 每个 spec 独立命名空间：避免不同文件间的用户名/赛事名冲突。 */
+let counter = 0;
+export function uniqueName(prefix: string): string {
+  counter += 1;
+  return `${prefix}-${Date.now().toString(36)}-${counter}`;
+}
+
+export interface TestAccount {
+  username: string;
+  password: string;
+  accessToken: string;
+  userId: number;
+}
+
+/**
+ * 经 API 注册，且**不跳过**新手引导（快；UI 注册流程由 auth.spec.ts 覆盖）。用户名须 ≥3 字符。
+ *
+ * 引导自身的用例（tutorial.spec.ts）必须用这个：注册后 completed 恒为 false，
+ * 才能断言「未完成时受限 API 一律 403」与「逐步走完十步」。
+ */
+export async function registerUserRaw(
+  request: APIRequestContext,
+  prefix = 'e2e',
+  password: string = DEFAULT_PASSWORD,
+): Promise<TestAccount> {
+  const username = uniqueName(prefix);
+  const res = await request.post(`${API_URL}/api/auth/register`, {
+    data: { username, password },
+  });
+  if (!res.ok()) throw new Error(`注册 ${username} 失败：${res.status()} ${await res.text()}`);
+  const body = (await res.json()) as {
+    ok: boolean;
+    data: { accessToken: string; me: { id: number; username: string } };
+  };
+  return {
+    username,
+    password,
+    accessToken: body.data.accessToken,
+    userId: body.data.me.id,
+  };
+}
+
+/**
+ * 注册并**跳过**新手引导（registerUserRaw + POST /api/tutorial/skip）。
+ * 非引导用例一律用它：否则账号被引导锁住，受限 API 全数 403。
+ * 引导用例不得用它 —— skip 会把 completed 直接置 true。
+ */
+export async function registerUser(
+  request: APIRequestContext,
+  prefix = 'e2e',
+  password: string = DEFAULT_PASSWORD,
+): Promise<TestAccount> {
+  const account = await registerUserRaw(request, prefix, password);
+  // 跳过新手引导，避免旧 e2e 用例被锁定。失败必须显式抛错：
+  // 静默吞掉会让账号保持被锁，后续用例以 403/点击被拦的形式红在别处，难以归因。
+  const res = await request.post(`${API_URL}/api/tutorial/skip`, {
+    headers: { Authorization: `Bearer ${account.accessToken}` },
+  });
+  if (!res.ok()) throw new Error(`skip 引导失败：${res.status()} ${await res.text()}`);
+  return account;
+}
+
+/**
+ * UI 注册（`/register` 表单）后的账号仍停在引导第 1 步：侧栏被锁、引导遮罩会拦点击。
+ * 不测引导本身的 UI 用例在注册后调用它，再用 `page.reload()` 让 SPA 拉到新状态。
+ * （走 API 登录拿 token，与 global-setup 的 admin 提权同思路。）
+ */
+export async function finishTutorial(
+  request: APIRequestContext,
+  username: string,
+  password: string,
+): Promise<void> {
+  const token = await loginUser(request, username, password);
+  const res = await apiCall(request, 'POST', '/api/tutorial/skip', token);
+  if (res.status !== 200) throw new Error(`skip 引导失败：${res.status} ${JSON.stringify(res.body)}`);
+}
+
+export async function loginUser(
+  request: APIRequestContext,
+  username: string,
+  password: string,
+): Promise<string> {
+  const res = await request.post(`${API_URL}/api/auth/login`, {
+    data: { username, password },
+  });
+  if (!res.ok()) throw new Error(`登录 ${username} 失败：${res.status()} ${await res.text()}`);
+  const body = (await res.json()) as { ok: boolean; data: { accessToken: string } };
+  return body.data.accessToken;
+}
+
+/** 带 Authorization 头的 API 调用（JSON 信封 ok 断言由调用方处理）。 */
+export async function apiCall(
+  request: APIRequestContext,
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  path: string,
+  token?: string,
+  data?: unknown,
+): Promise<{ status: number; body: unknown }> {
+  const res = await request.fetch(`${API_URL}${path}`, {
+    method,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(data !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    data,
+  });
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = await res.text();
+  }
+  return { status: res.status(), body };
+}
+
+/** 经 UI 登录（覆盖真实登录链路；断言 Salt 后落在 / 首页）。 */
+export async function loginViaUI(
+  page: Page,
+  username: string,
+  password: string,
+): Promise<void> {
+  await page.goto('/login');
+  await page.getByTestId('login-username').fill(username);
+  await page.getByTestId('login-password').fill(password);
+  await page.getByTestId('login-submit').click();
+  await page.waitForURL('/');
+}
+
+export interface FundOptions {
+  money?: number;
+  reputation?: number;
+  items?: Record<string, number>;
+}
+
+/**
+ * 注资（DB 直写，见 apps/api/src/scripts/e2e-seed.ts 文件头注释的背景说明）。
+ * 要求从仓库根运行（CI：pnpm e2e；本地同）。
+ */
+export async function fund(username: string, opts: FundOptions): Promise<void> {
+  const args = ['-C', 'apps/api', 'e2e:seed', 'fund', username];
+  if (opts.money !== undefined) args.push('--money', String(opts.money));
+  if (opts.reputation !== undefined) args.push('--reputation', String(opts.reputation));
+  for (const [itemId, qty] of Object.entries(opts.items ?? {})) {
+    args.push('--item', `${itemId}=${qty}`);
+  }
+  await execFileAsync('pnpm', args, {
+    cwd: process.cwd(),
+    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: E2E_DATABASE_URL, JWT_SECRET: E2E_JWT_SECRET },
+  });
+}
+
+/** 回拨赛事时间窗（串行：spec 内按需调用）。 */
+export async function backdateTournament(tournamentId: number): Promise<void> {
+  await execFileAsync('pnpm', ['-C', 'apps/api', 'e2e:seed', 'backdate-tournament', String(tournamentId)], {
+    cwd: process.cwd(),
+    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: E2E_DATABASE_URL, JWT_SECRET: E2E_JWT_SECRET },
+  });
+}
+
+export interface AdminAccount {
+  username: string;
+  password: string;
+}
+
+/** 读取 globalSetup 写入的管理员账号。 */
+export async function readAdminAccount(): Promise<AdminAccount> {
+  const raw = await readFile(path.resolve(process.cwd(), 'tests/e2e/.auth/admin.json'), 'utf8');
+  return JSON.parse(raw) as AdminAccount;
+}
+
+/** 以管理员身份拿 token（走登录接口，顺带校验管理员链路）。 */
+export async function adminToken(request: APIRequestContext): Promise<string> {
+  const admin = await readAdminAccount();
+  return loginUser(request, admin.username, admin.password);
+}
+
+/**
+ * 历练"万能钥匙"道具篮：覆盖 events.yaml 全部 requires_item 取值
+ * （direction-charm / firewall / milk-tea / spare-cable），外加历练/培养常用品。
+ * 配合高额 money（覆盖 cost_money ≤ 8000），保证任何随机事件都有可选分支。
+ */
+export const ADVENTURE_KEYCHAIN: Record<string, number> = {
+  'direction-charm': 2,
+  firewall: 2,
+  'milk-tea': 3,
+  'spare-cable': 2,
+};
+
+/** 旅程/专项 spec 的标准玩家启动包。 */
+export const STARTER_KIT: Record<string, number> = {
+  ...ADVENTURE_KEYCHAIN,
+  'entry-ticket': 2,
+  'rename-card': 1,
+  'stamina-potion': 2,
+  'calm-pill': 2,
+  coffee: 1,
+  'book-ds-green': 2,
+  'book-ds-gray': 2,
+};
+
+/** 从学员卡片文本解析 V 值（卡片展示 "V = 12" / "V 12" 字样）。 */
+export function parseV(cardText: string): number | null {
+  const match = /V\s*=?\s*(\d+)/.exec(cardText);
+  return match ? Number(match[1]) : null;
+}
+
+export interface Envelope<T> {
+  ok: boolean;
+  data: T;
+  error?: { code?: string; message?: string };
+}
+
+export function unwrap<T>(body: unknown, what: string): T {
+  const env = body as Envelope<T>;
+  if (!env || env.ok !== true) {
+    throw new Error(`${what} 失败：${JSON.stringify(body)}`);
+  }
+  return env.data;
+}
+
+/**
+ * 从候选卡片文本估算 V（展示值为 floor 后的整数，估算与真值至多差 1，
+ * 只用于"选全场最高 V"这类排序场景，不做门槛判定）。
+ */
+export function candidateVProxy(cardText: string): number {
+  const num = (label: string): number => {
+    // innerText 对 flex 两栏不加分隔符（"数据12"），故空白可选；
+    // 候选名来自固定名池，经核对不含属性词，不会误匹配
+    const match = new RegExp(`${label}\\s*(\\d+)`).exec(cardText);
+    return match ? Number(match[1]) : 0;
+  };
+  const dims = ['数据', '动态', '数学', '图论', '贪心', '字符串'].map(num);
+  const dimAvg = Math.floor(dims.reduce((a, b) => a + b, 0) / 6);
+  return Math.floor((num('代码') + num('思维') + dimAvg) / 3);
+}
+
+/**
+ * 依次点击启用的历练分支，结算失败则换下一个；返回是否结算成功。
+ * （分支随机：keychain+高额资金保证总有可用分支，energy 不足等个案靠换分支兜底。）
+ */
+/**
+ * 结算触发对决时页面会切入战斗回放视图（隐藏历练记录区）：
+ * 跳过回放并点「返回」回到历练页。未触发对决则直接返回。
+ */
+async function dismissBattleReplayIfShown(page: Page): Promise<void> {
+  const skip = page.getByTestId('replay-skip');
+  const shown = await skip
+    .waitFor({ state: 'visible', timeout: 4000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return;
+  await skip.click();
+  const back = page.getByTestId('replay-back');
+  await back.waitFor({ state: 'visible', timeout: 15000 });
+  await back.click();
+}
+
+export async function resolveAdventureChoice(page: Page): Promise<boolean> {
+  const selector = '[data-testid^="adventure-choice-"]';
+  const count = await page.locator(selector).count();
+  for (let i = 0; i < count; i += 1) {
+    const choice = page.locator(selector).nth(i);
+    if (await choice.isDisabled()) continue;
+    await choice.click();
+    try {
+      await page.waitForSelector(selector, { state: 'detached', timeout: 8000 });
+      await dismissBattleReplayIfShown(page);
+      return true;
+    } catch {
+      // 选项仍在：若出现结算报错则试下一个分支，否则再等一轮
+      if (await page.getByTestId('adventure-choose-error').isVisible()) continue;
+      try {
+        await page.waitForSelector(selector, { state: 'detached', timeout: 8000 });
+        await dismissBattleReplayIfShown(page);
+        return true;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return false;
+}
+
+/** 在多选阵容里按页面顺序勾选前 count 名学员（勾选前需保证学员数 ≥ count）。 */
+export async function pickRoster(page: Page, prefix: string, count: number): Promise<void> {
+  const boxes = page.locator(`[data-testid^="${prefix}-checkbox-"]`);
+  for (let i = 0; i < count; i += 1) {
+    await boxes.nth(i).check();
+  }
+}
+
+/** 取当前账号前 count 名学员 id（组队报名等纯 API 场景）。 */
+export async function rosterIds(
+  request: APIRequestContext,
+  token: string,
+  count: number,
+): Promise<number[]> {
+  const list = await apiCall(request, 'GET', '/api/students', token);
+  const students = unwrap<{ id: number }[]>(list.body, '学员列表');
+  if (students.length < count) {
+    throw new Error(`学员不足：需要 ${count} 名，实有 ${students.length} 名`);
+  }
+  return students.slice(0, count).map((student) => student.id);
+}
+
+/** 经 API 招募一名学员（返回 studentId；调用方须已注资）。 */
+export async function recruitStudent(
+  request: APIRequestContext,
+  token: string,
+  candidateIndex = 0,
+): Promise<number> {
+  const pool = await apiCall(request, 'GET', '/api/academy/pool', token);
+  const view = unwrap<{ candidates: { tempId: string }[] }>(pool.body, '取招募池');
+  const candidate = view.candidates[candidateIndex];
+  if (!candidate) throw new Error(`招募池第 ${candidateIndex} 位无候选人`);
+  const reg = await apiCall(request, 'POST', '/api/academy/recruit', token, {
+    tempId: candidate.tempId,
+  });
+  return unwrap<{ id: number }>(reg.body, '招募').id;
+}
+
+/** 锦标赛默认阵容人数（赛事 config 未指定 rosterSize 时为 3）。 */
+export const DEFAULT_TOURNAMENT_ROSTER_SIZE = 3;
+
+/**
+ * 锦标赛选手装配（API 全包）：建号→注资（报名券×1）→开局 2 人 + 招募 1 人 = 3 人阵容。
+ * PVP 编排类 spec（pvp/records）共用，保持多账号 setup 口径一致。
+ */
+export async function setupTournamentPlayer(
+  request: APIRequestContext,
+  prefix = 'pvp',
+): Promise<TestAccount & { studentIds: number[] }> {
+  const account = await registerUser(request, prefix);
+  await fund(account.username, { money: 50000, items: { 'entry-ticket': 1 } });
+  await recruitStudent(request, account.accessToken);
+  const studentIds = await rosterIds(request, account.accessToken, DEFAULT_TOURNAMENT_ROSTER_SIZE);
+  return { ...account, studentIds };
+}

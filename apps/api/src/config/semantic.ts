@@ -1,0 +1,561 @@
+import {
+  CONFIG_RARITIES,
+  ECONOMY_QUALITY_TIERS,
+  TUTORIAL_ROUTE_KEYS,
+  lectureConfigSchema,
+  onboardingConfigSchema,
+  type ConfigRarity,
+  type EconomyConfig,
+  type EventsConfig,
+  type ItemDef,
+  type ProblemConfig,
+  type StagesConfig,
+  type TalentDef,
+  type TutorialConfig,
+  type ShopConfig,
+} from '@oinur/shared';
+
+export interface SemanticIssue {
+  file: 'talents' | 'items' | 'economy' | 'problems' | 'stages' | 'events' | 'tutorial' | 'shop';
+  path: string;
+  message: string;
+}
+
+const RARITY_RANK = new Map<ConfigRarity, number>(CONFIG_RARITIES.map((r, i) => [r, i]));
+
+/**
+ * 语义交叉校验（zod 结构校验通过之后执行）：
+ * 收集全部错误一次返回，绝不逐个试错（TECH-DESIGN §4.2）。
+ */
+export function runSemanticChecks(input: {
+  talents: TalentDef[];
+  items: ItemDef[];
+  economy: EconomyConfig;
+  problems?: ProblemConfig;
+  stages?: StagesConfig;
+  events?: EventsConfig;
+  tutorial?: TutorialConfig;
+  shop?: ShopConfig;
+}): SemanticIssue[] {
+  const issues: SemanticIssue[] = [];
+  checkTalents(input.talents, issues);
+  checkItems(input.items, issues);
+  checkEconomy(input.economy, issues);
+  checkOnboarding(input.economy, input.items, issues);
+  checkSimulation(input.economy, input.items, input.stages, issues);
+  if (input.problems !== undefined) checkProblems(input.problems, issues);
+  if (input.stages !== undefined) checkStages(input.stages, input.problems, input.items, issues);
+  if (input.events !== undefined) checkEvents(input.events, input.items, issues);
+  if (input.tutorial !== undefined) checkTutorial(input.tutorial, input.items, issues);
+  if (input.shop !== undefined) checkShop(input.shop, input.items, issues);
+  return issues;
+}
+
+function checkTutorial(tutorial: TutorialConfig, items: ItemDef[], issues: SemanticIssue[]): void {
+  const itemIds = new Set(items.map((item) => item.id));
+  const routeKeys = new Set<string>(TUTORIAL_ROUTE_KEYS);
+  const seen = new Set<string>();
+  tutorial.steps.forEach((step, idx) => {
+    if (seen.has(step.id)) {
+      issues.push({ file: 'tutorial', path: `steps.${idx}.id`, message: `引导步骤 id 重复：${step.id}` });
+    }
+    seen.add(step.id);
+    if (step.unlock.length === 0) {
+      issues.push({ file: 'tutorial', path: `steps.${idx}.unlock`, message: 'unlock 不能为空' });
+    }
+    for (const key of step.unlock) {
+      if (key !== 'all' && !routeKeys.has(key)) {
+        issues.push({ file: 'tutorial', path: `steps.${idx}.unlock`, message: `未知解锁键：${key}` });
+      }
+    }
+    // do_recruit 是条件式步：没有门槛就退化成「必须招募一次」，老号会被递增招募价卡死
+    if (step.action === 'do_recruit' && (step.requires_students ?? 0) < 1) {
+      issues.push({
+        file: 'tutorial',
+        path: `steps.${idx}.requires_students`,
+        message: 'do_recruit 步必须声明 requires_students 且 ≥1',
+      });
+    }
+    if (step.reward?.item) {
+      if (!itemIds.has(step.reward.item)) {
+        issues.push({ file: 'tutorial', path: `steps.${idx}.reward.item`, message: `奖励道具不存在：${step.reward.item}` });
+      }
+      if (!step.reward.count || step.reward.count <= 0) {
+        issues.push({ file: 'tutorial', path: `steps.${idx}.reward.count`, message: '奖励道具数量必须为正' });
+      }
+    }
+  });
+  // unlock 必须单调不减：一旦某步"收回"前面已解锁的功能，依赖该端点的页面就会在未完成引导时
+  // 403 打不开（实例：历练页用 GET /api/items 取情报条，adventure 步曾漏掉 backpack → 历练步无法完成）。
+  for (let idx = 1; idx < tutorial.steps.length; idx += 1) {
+    const prev = tutorial.steps[idx - 1]!;
+    const cur = tutorial.steps[idx]!;
+    if (cur.unlock.includes('all')) continue;
+    if (prev.unlock.includes('all')) {
+      issues.push({
+        file: 'tutorial',
+        path: `steps.${idx}.unlock`,
+        message: `unlock 必须单调不减：上一步已解锁 all，本步却回退为 ${cur.unlock.join('、')}`,
+      });
+      continue;
+    }
+    const missing = prev.unlock.filter((key) => !cur.unlock.includes(key));
+    if (missing.length > 0) {
+      issues.push({
+        file: 'tutorial',
+        path: `steps.${idx}.unlock`,
+        message: `unlock 必须单调不减：相比上一步缺少 ${missing.join('、')}`,
+      });
+    }
+  }
+  if (tutorial.steps.length < 3) {
+    issues.push({ file: 'tutorial', path: 'steps', message: '引导步骤至少 3 步' });
+  }
+  const last = tutorial.steps[tutorial.steps.length - 1];
+  if (last && !last.unlock.includes('all')) {
+    issues.push({ file: 'tutorial', path: `steps.${tutorial.steps.length - 1}.unlock`, message: '最后一步必须解锁 all' });
+  }
+}
+
+function checkShop(shop: ShopConfig, items: ItemDef[], issues: SemanticIssue[]): void {
+  const itemIds = new Set(items.map((i) => i.id));
+  const itemById = new Map(items.map((i) => [i.id, i]));
+  // daily_limits / weekly_limits 中的 itemId 必须存在且 price != null（可售）
+  const checkLimits = (limits: Record<string, number> | undefined, kind: string) => {
+    if (!limits) return;
+    for (const [itemId, limit] of Object.entries(limits)) {
+      if (itemId.startsWith('book-')) {
+        // 允许按前缀匹配，如 book-purple 代表所有紫书
+        const isPrefix = itemId === 'book-gray' || itemId === 'book-yellow' || itemId === 'book-green' || itemId === 'book-blue' || itemId === 'book-purple';
+        if (!isPrefix && !itemIds.has(itemId)) {
+          issues.push({ file: 'shop', path: `${kind}.${itemId}`, message: `限购道具不存在：${itemId}` });
+        }
+        continue;
+      }
+      if (!itemIds.has(itemId)) {
+        issues.push({ file: 'shop', path: `${kind}.${itemId}`, message: `限购道具不存在：${itemId}` });
+        continue;
+      }
+      const def = itemById.get(itemId);
+      if (def && def.price === null) {
+        issues.push({ file: 'shop', path: `${kind}.${itemId}`, message: `限购道具不可售（price null）：${itemId}` });
+      }
+      if (limit <= 0) {
+        issues.push({ file: 'shop', path: `${kind}.${itemId}`, message: `限购数量必须为正：${itemId}` });
+      }
+    }
+  };
+  checkLimits(shop.daily_limits, 'daily_limits');
+  checkLimits(shop.weekly_limits, 'weekly_limits');
+
+  // functional_gates 中的 itemId 必须存在
+  if (shop.functional_gates) {
+    for (const itemId of Object.keys(shop.functional_gates)) {
+      if (!itemIds.has(itemId)) {
+        issues.push({ file: 'shop', path: `functional_gates.${itemId}`, message: `声誉门槛道具不存在：${itemId}` });
+      }
+    }
+  }
+
+  // reputation_gates 必须包含五档
+  const requiredRarities = ['gray', 'yellow', 'green', 'blue', 'purple'] as const;
+  for (const r of requiredRarities) {
+    if ((shop.reputation_gates as Record<string, unknown>)[r] === undefined) {
+      issues.push({ file: 'shop', path: `reputation_gates.${r}`, message: `声誉门槛缺失：${r}` });
+    }
+  }
+}
+
+function checkEvents(events: EventsConfig, items: ItemDef[], issues: SemanticIssue[]): void {
+  const itemIds = new Set(items.map((item) => item.id));
+  const seenIds = new Set<string>();
+  const seenCodes = new Set<string>();
+  const groupWeights = new Map<string, number>();
+
+  for (const event of events.events) {
+    if (seenIds.has(event.id)) {
+      issues.push({ file: 'events', path: `events.${event.id}`, message: `事件 id 重复：${event.id}` });
+    }
+    seenIds.add(event.id);
+    if (seenCodes.has(event.code)) {
+      issues.push({ file: 'events', path: `events.${event.code}`, message: `事件 code 重复：${event.code}` });
+    }
+    seenCodes.add(event.code);
+
+    if (!event.repeatable && event.once_per_student === undefined && event.server_weekly_limit === undefined) {
+      issues.push({
+        file: 'events',
+        path: `events.${event.id}.repeatable`,
+        message: '不可重复事件必须声明 once_per_student 或 server_weekly_limit',
+      });
+    }
+    if (event.once_per_student === true && event.repeatable) {
+      issues.push({
+        file: 'events',
+        path: `events.${event.id}.once_per_student`,
+        message: 'once_per_student 事件不能是 repeatable',
+      });
+    }
+
+    const group = `${event.stamina_cost}:${event.rarity}`;
+    groupWeights.set(group, (groupWeights.get(group) ?? 0) + event.weight);
+    visitEventReferences(event, `events.${event.id}`, itemIds, issues);
+  }
+
+  for (const [group, total] of groupWeights) {
+    if (Math.abs(total - 100) > 1e-9) {
+      issues.push({
+        file: 'events',
+        path: `events[${group}]`,
+        message: `同体力档/稀有度的事件权重必须合计 100，实际为 ${total}`,
+      });
+    }
+  }
+}
+
+function visitEventReferences(
+  value: unknown,
+  path: string,
+  itemIds: ReadonlySet<string>,
+  issues: SemanticIssue[],
+): void {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => visitEventReferences(entry, `${path}.${index}`, itemIds, issues));
+    return;
+  }
+  if (value === null || typeof value !== 'object') return;
+
+  for (const [key, entry] of Object.entries(value)) {
+    const entryPath = `${path}.${key}`;
+    if (key === 'requires_item' && typeof entry === 'string' && !itemIds.has(entry)) {
+      issues.push({ file: 'events', path: entryPath, message: `事件道具引用不存在：${entry}` });
+    }
+    if (key === 'consume' && entry !== null && typeof entry === 'object') {
+      const itemId = 'item' in entry ? (entry as { item?: unknown }).item : undefined;
+      if (typeof itemId === 'string' && !itemIds.has(itemId)) {
+        issues.push({ file: 'events', path: `${entryPath}.item`, message: `事件道具引用不存在：${itemId}` });
+      }
+    }
+    if (key === 'items' && Array.isArray(entry)) {
+      entry.forEach((reward, index) => {
+        if (reward !== null && typeof reward === 'object' && 'id' in reward) {
+          const itemId = (reward as { id?: unknown }).id;
+          if (typeof itemId === 'string' && !itemIds.has(itemId) && itemId !== 'dim-book') {
+            issues.push({
+              file: 'events',
+              path: `${entryPath}.${index}.id`,
+              message: `事件道具引用不存在：${itemId}`,
+            });
+          }
+        }
+      });
+    }
+    visitEventReferences(entry, entryPath, itemIds, issues);
+  }
+}
+
+function checkProblems(problems: ProblemConfig, issues: SemanticIssue[]): void {
+  const seenTemplates = new Set<string>();
+  for (const template of problems.templates) {
+    if (seenTemplates.has(template.id)) {
+      issues.push({
+        file: 'problems',
+        path: `templates.${template.id}`,
+        message: `题目模板 id 重复：${template.id}`,
+      });
+    }
+    seenTemplates.add(template.id);
+  }
+}
+
+function checkStages(
+  stages: StagesConfig,
+  problems: ProblemConfig | undefined,
+  items: ItemDef[],
+  issues: SemanticIssue[],
+): void {
+  const itemIds = new Set(items.map((item) => item.id));
+  const templateTiers = new Set(problems?.templates.map((template) => template.tier));
+  const stageKeys = new Set<string>();
+
+  stages.stages.forEach((stage, stageIndex) => {
+    const stageKey = `${stage.chapter}:${stage.stage_index}`;
+    if (stageKeys.has(stageKey)) {
+      issues.push({
+        file: 'stages',
+        path: `stages.${stageIndex}`,
+        message: `关卡 key 重复：${stageKey}`,
+      });
+    }
+    stageKeys.add(stageKey);
+
+    stage.problem_slots.forEach((slot, slotIndex) => {
+      if (problems !== undefined && !templateTiers.has(slot.tier)) {
+        issues.push({
+          file: 'stages',
+          path: `stages.${stageIndex}.problem_slots.${slotIndex}.tier`,
+          message: `题目 tier 无可用模板：${slot.tier}`,
+        });
+      }
+    });
+
+    const milestoneItems = stage.first_clear.milestone?.items ?? [];
+    milestoneItems.forEach((reward, rewardIndex) => {
+      if (!itemIds.has(reward.item)) {
+        issues.push({
+          file: 'stages',
+          path: `stages.${stageIndex}.first_clear.milestone.items.${rewardIndex}.item`,
+          message: `奖励道具引用不存在：${reward.item}`,
+        });
+      }
+    });
+  });
+
+  stages.defaults.first_clear_fixed_items.forEach((reward, rewardIndex) => {
+    if (!itemIds.has(reward.item)) {
+      issues.push({
+        file: 'stages',
+        path: `defaults.first_clear_fixed_items.${rewardIndex}.item`,
+        message: `首通固定道具引用不存在：${reward.item}`,
+      });
+    }
+  });
+
+  stages.full_clear.items.forEach((reward, rewardIndex) => {
+    if (!itemIds.has(reward.item)) {
+      issues.push({
+        file: 'stages',
+        path: `full_clear.items.${rewardIndex}.item`,
+        message: `全通奖励道具引用不存在：${reward.item}`,
+      });
+    }
+  });
+}
+
+function checkTalents(talents: TalentDef[], issues: SemanticIssue[]): void {
+  const byId = new Map<string, TalentDef>();
+  for (const t of talents) {
+    if (byId.has(t.id)) {
+      issues.push({ file: 'talents', path: `talents.${t.id}`, message: `天赋 id 重复：${t.id}` });
+    }
+    byId.set(t.id, t);
+  }
+
+  // 引用存在性 + 稀有度单调升
+  for (const t of talents) {
+    if (t.upgrade_to === null) continue;
+    const target = byId.get(t.upgrade_to);
+    const path = `talents.${t.id}.upgrade_to`;
+    if (!target) {
+      issues.push({ file: 'talents', path, message: `upgrade_to 引用不存在：${t.upgrade_to}` });
+      continue;
+    }
+    if ((RARITY_RANK.get(target.rarity) ?? 0) <= (RARITY_RANK.get(t.rarity) ?? 0)) {
+      issues.push({
+        file: 'talents',
+        path,
+        message: `升阶稀有度未单调升：${t.id}(${t.rarity}) → ${target.id}(${target.rarity})`,
+      });
+    }
+  }
+
+  // 无合并：任一天赋至多作为一个 upgrade_to 的目标
+  const inbound = new Map<string, string[]>();
+  for (const t of talents) {
+    if (t.upgrade_to === null) continue;
+    const list = inbound.get(t.upgrade_to) ?? [];
+    list.push(t.id);
+    inbound.set(t.upgrade_to, list);
+  }
+  for (const [target, sources] of inbound) {
+    if (sources.length > 1) {
+      issues.push({
+        file: 'talents',
+        path: `talents.${target}`,
+        message: `升阶链合并：${sources.join('、')} 同时指向 ${target}（链条不得分叉或合并）`,
+      });
+    }
+  }
+
+  // 无环：沿 upgrade_to 链走访，重访即成环
+  const reported = new Set<string>();
+  for (const t of talents) {
+    const seen = new Set<string>();
+    let cur: TalentDef | undefined = t;
+    while (cur?.upgrade_to != null) {
+      if (seen.has(cur.id)) break; // 本链已确认有环，交由下一轮定位
+      seen.add(cur.id);
+      const next: TalentDef | undefined = byId.get(cur.upgrade_to);
+      if (next && seen.has(next.id)) {
+        const key = [...seen, next.id].sort().join('|');
+        if (!reported.has(key)) {
+          reported.add(key);
+          issues.push({
+            file: 'talents',
+            path: `talents.${next.id}.upgrade_to`,
+            message: `升阶链成环（cycle）：${[...seen, next.id].join(' → ')}`,
+          });
+        }
+        break;
+      }
+      cur = next;
+    }
+  }
+}
+
+function checkItems(items: ItemDef[], issues: SemanticIssue[]): void {
+  const seen = new Set<string>();
+  for (const it of items) {
+    if (seen.has(it.id)) {
+      issues.push({ file: 'items', path: `items.${it.id}`, message: `道具 id 重复：${it.id}` });
+    }
+    seen.add(it.id);
+    // category/rarity/effect.kind 合法性由 zod schema 保证，无需重复检查
+  }
+}
+
+function checkEconomy(economy: EconomyConfig, issues: SemanticIssue[]): void {
+  for (const tier of ECONOMY_QUALITY_TIERS) {
+    const v = economy.recruitment.quality_mult[tier];
+    if (v < 1) {
+      issues.push({
+        file: 'economy',
+        path: `recruitment.quality_mult.${tier}`,
+        message: `quality_mult 四档须齐全且 ≥1，实得 ${v}`,
+      });
+    }
+  }
+  const lecture = economy.lecture;
+  if (lecture !== undefined) {
+    const parsed = lectureConfigSchema.safeParse(lecture);
+    if (!parsed.success) return;
+    const completeLecture = parsed.data;
+    const ids = new Set<string>();
+    let previousThreshold = -1;
+    let previousThinkingReq = -1;
+    completeLecture.audience_tiers.forEach((tier, index) => {
+      if (ids.has(tier.id)) {
+        issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.id`, message: `讲课档位 id 重复：${tier.id}` });
+      }
+      ids.add(tier.id);
+      if (tier.threshold <= previousThreshold) {
+        issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.threshold`, message: '讲课门槛必须严格递增' });
+      }
+      previousThreshold = tier.threshold;
+      // 讲课成长（issue #56）：思维要求 R 必须随档位递增，且落在强接窗 [threshold−8, threshold] 内——
+      // 高于门槛会让「达标学员」恒定思维不足，低于窗口会让强接学员永不付出代价。
+      const thinkingReq = tier.thinking_req ?? tier.threshold;
+      if (thinkingReq <= previousThinkingReq) {
+        issues.push({ file: 'economy', path: `lecture.audience_tiers.${index}.thinking_req`, message: '讲课思维要求必须严格递增' });
+      }
+      if (thinkingReq > tier.threshold || thinkingReq < tier.threshold - 8) {
+        issues.push({
+          file: 'economy',
+          path: `lecture.audience_tiers.${index}.thinking_req`,
+          message: `讲课思维要求须落在 [门槛−8, 门槛] = [${tier.threshold - 8}, ${tier.threshold}]，实得 ${thinkingReq}`,
+        });
+      }
+      previousThinkingReq = thinkingReq;
+    });
+    if (completeLecture.reputation_pay_curve.max_mult < completeLecture.reputation_pay_curve.min_mult) {
+      issues.push({ file: 'economy', path: 'lecture.reputation_pay_curve', message: '讲课声誉乘区上限不能低于下限' });
+    }
+    const growth = completeLecture.growth;
+    if (growth !== undefined && growth.secondary_share > 1) {
+      issues.push({ file: 'economy', path: 'lecture.growth.secondary_share', message: '讲课附带成长份额不能超过主成长（≤1）' });
+    }
+  }
+}
+
+/**
+ * 开局包语义校验（注册/回填的前置条件，缺失即坏配置快速失败）：
+ * 分区必填、结构合法（zod）、发放道具 id 必须在 items.yaml 存在且不重复。
+ */
+function checkOnboarding(economy: EconomyConfig, items: ItemDef[], issues: SemanticIssue[]): void {
+  if (economy.onboarding === undefined) {
+    issues.push({
+      file: 'economy',
+      path: 'onboarding',
+      message: '新用户开局包缺失：economy.onboarding 为必填（money/reputation/students/items）',
+    });
+    return;
+  }
+  const parsed = onboardingConfigSchema.safeParse(economy.onboarding);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    issues.push({
+      file: 'economy',
+      path: `onboarding${first && first.path.length > 0 ? `.${first.path.join('.')}` : ''}`,
+      message: `开局包结构非法：${first?.message ?? 'unknown'}`,
+    });
+    return;
+  }
+  const itemIds = new Set(items.map((item) => item.id));
+  const seen = new Set<string>();
+  parsed.data.items.forEach((entry, index) => {
+    if (seen.has(entry.id)) {
+      issues.push({ file: 'economy', path: `onboarding.items.${index}.id`, message: `开局包道具重复：${entry.id}` });
+    }
+    seen.add(entry.id);
+    if (!itemIds.has(entry.id)) {
+      issues.push({ file: 'economy', path: `onboarding.items.${index}.id`, message: `开局包道具不存在：${entry.id}` });
+    }
+  });
+}
+
+function checkSimulation(
+  economy: EconomyConfig,
+  items: ItemDef[],
+  stages: StagesConfig | undefined,
+  issues: SemanticIssue[],
+): void {
+  const simulation = economy.simulation;
+  if (simulation === undefined) return;
+  const seenIds = new Set<string>();
+  const lecture = economy.lecture !== undefined ? lectureConfigSchema.safeParse(economy.lecture) : undefined;
+  const lectureIds = new Set(lecture?.success ? lecture.data.audience_tiers.map((tier) => tier.id) : []);
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const stageKeys = new Set(stages?.stages.map((stage) => `${stage.chapter}:${stage.stage_index}`));
+  const adventure = economy.adventure;
+  const moneyRanges = adventure !== null && typeof adventure === 'object'
+    ? (adventure as Record<string, unknown>).money_ranges_by_rarity
+    : undefined;
+  const moneyRangeIds = new Set(
+    moneyRanges !== null && typeof moneyRanges === 'object' ? Object.keys(moneyRanges) : [],
+  );
+
+  simulation.profiles.forEach((profile) => {
+    const base = `simulation.profiles.${profile.id}`;
+    if (seenIds.has(profile.id)) {
+      issues.push({ file: 'economy', path: `${base}.id`, message: `模拟画像 id 重复：${profile.id}` });
+    }
+    seenIds.add(profile.id);
+
+    if (lecture === undefined || !lecture.success) {
+      issues.push({ file: 'economy', path: `${base}.lectures.tier`, message: '讲课档位配置缺失或不完整，无法验证 tier 引用' });
+    } else if (!lectureIds.has(profile.lectures.tier)) {
+      issues.push({ file: 'economy', path: `${base}.lectures.tier`, message: `讲课 tier 引用不存在：${profile.lectures.tier}` });
+    }
+    const book = itemById.get(profile.training.directed_book_item_id);
+    if (book === undefined || book.category !== 'book' || book.price === null) {
+      issues.push({ file: 'economy', path: `${base}.training.directed_book_item_id`, message: `定向训练书籍不存在、不是书籍或无价格：${profile.training.directed_book_item_id}` });
+    }
+    if (stages !== undefined && !stageKeys.has(profile.story.stage_key)) {
+      issues.push({ file: 'economy', path: `${base}.story.stage_key`, message: `剧情关卡 key 不存在：${profile.story.stage_key}` });
+    }
+    const weights = Object.values(profile.adventures.rarity_mix);
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    if (weights.some((weight) => !Number.isFinite(weight)) || !Number.isFinite(total) || total <= 0) {
+      issues.push({ file: 'economy', path: `${base}.adventures.rarity_mix`, message: '历练稀有度权重必须为有限数且总和大于 0' });
+    }
+    for (const rarity of Object.keys(profile.adventures.rarity_mix)) {
+      if (!moneyRangeIds.has(rarity)) {
+        issues.push({
+          file: 'economy',
+          path: `${base}.adventures.rarity_mix.${rarity}`,
+          message: `历练稀有度没有金额区间配置：${rarity}`,
+        });
+      }
+    }
+  });
+}

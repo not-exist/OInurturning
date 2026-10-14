@@ -1,0 +1,78 @@
+name: oinur
+
+services:
+  mysql:
+    image: mysql:26.7
+    container_name: oinur-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-oinur}
+      MYSQL_USER: ${MYSQL_USER:-oinur}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set in .env}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  # 一次性迁移：镜像构建完成后、API 启动前，对 healthy 的 MySQL 执行 prisma migrate deploy。
+  # 与 api 共用 oinur-api 镜像（只构建一次），并以 MIGRATE_ONLY=1 复用镜像 entrypoint.sh 的
+  # 迁移逻辑（单一实现，含 prisma CLI 探测与 DATABASE_URL 缺失时 fail-loud）。失败则 api 不会起来。
+  migrate:
+    image: oinur-api
+    build: { context: .., dockerfile: deploy/api.Dockerfile }
+    container_name: oinur-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+      MIGRATE_ONLY: "1"
+    depends_on:
+      mysql: { condition: service_healthy }
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  api:
+    image: oinur-api
+    build: { context: .., dockerfile: deploy/api.Dockerfile }
+    container_name: oinur-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # nginx 是 API 前唯一的可信反代；保留外层 HTTPS 协议供 refresh Cookie 判定。
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CONFIG_DIR: /app/config
+      # 限流参数透传（T5.4）：.env 未设时即基线，与 apps/api/src/config/env.ts 默认值一致
+      RATE_LIMIT_GLOBAL_MAX: ${RATE_LIMIT_GLOBAL_MAX:-300}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-10}
+      RATE_LIMIT_AUTH_WINDOW_MS: ${RATE_LIMIT_AUTH_WINDOW_MS:-900000}
+    depends_on:
+      mysql: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    expose: ["3000"]
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
+  nginx:
+    build: { context: .., dockerfile: deploy/web.Dockerfile }   # 多阶段：vite build → nginx 托管产物
+    container_name: oinur-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [api]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+volumes:
+  dbdata:

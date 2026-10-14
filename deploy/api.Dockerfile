@@ -1,0 +1,38 @@
+# ---- stage 1: 构建 ----
+FROM node:26-alpine AS build
+WORKDIR /app
+# node:26 镜像不再自带 corepack，需自行安装；pnpm 版本由 package.json 的 packageManager 决定
+RUN npm i -g corepack && corepack enable
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/api/package.json apps/api/
+RUN pnpm install --frozen-lockfile
+COPY tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY apps/api apps/api
+COPY docs/data docs/data
+# 构建期：生成 Prisma Client（不连库）。migrate deploy 必须有 MySQL，
+# 由运行镜像 entrypoint 在 compose 起栈、mysql healthy 后自动执行。
+RUN pnpm -C apps/api generate && pnpm -C apps/api build
+
+# ---- stage 2: 运行 ----
+FROM node:26-alpine
+WORKDIR /app
+ENV NODE_ENV=production CONFIG_DIR=/app/config
+# 镜像 pnpm workspace 布局：tsup 默认外置 dependencies，运行时需要
+# apps/api/node_modules（相对符号链接 → 根 node_modules/.pnpm）解析链完整
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/packages ./packages
+COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+# Prisma 7 起 datasource.url 不再写在 schema.prisma 里，改由 prisma.config.ts 提供
+# （apps/api/src/lib/prisma.ts 注释同此约定）；缺此文件 entrypoint 的
+# `prisma migrate deploy` 会以 "datasource.url is required" 失败，容器无法启动。
+COPY --from=build /app/apps/api/prisma.config.ts ./apps/api/prisma.config.ts
+COPY --from=build /app/docs/data ./config
+COPY deploy/entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
+EXPOSE 3000
+CMD ["./entrypoint.sh"]

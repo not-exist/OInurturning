@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.local
+coverage/
+apps/api/prisma/migrations/dev/
+test-results/
+playwright-report/
+playwright/.cache/
+tests/e2e/.auth/

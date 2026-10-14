@@ -1,0 +1,32 @@
+# 测试 fixtures：最小合法 talents 配置（结构对齐 docs/data/talents.yaml）
+version: 1
+
+talents:
+  - id: focus-yellow
+    name: 专注
+    rarity: yellow
+    kind: positive
+    family: focus
+    effects:
+      - {stat: focus_gain, mode: percent, value: 8}
+    description: 测试用天赋·黄。
+    upgrade_to: focus-green
+  - id: focus-green
+    name: 专注·进阶
+    rarity: green
+    kind: positive
+    family: focus
+    effects:
+      - {stat: focus_gain, mode: percent, value: 12}
+      - {stat: math, mode: percent, value: 3}
+    description: 测试用天赋·绿。
+    upgrade_to: null
+  - id: slump-gray
+    name: 拖延症
+    rarity: gray
+    kind: negative
+    family: null
+    effects:
+      - {stat: thinking, mode: percent, value: -5}
+    description: 测试用负面天赋。
+    upgrade_to: null
