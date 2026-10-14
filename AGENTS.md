@@ -23,8 +23,9 @@
 
 ## 当前上下文速览
 
-- 主工作分支 `refactor`（未 push，全部完成后统一 push）。重构 R0–R6 已完成（2026-10-07），
-  方案文档 `docs/refactor-plan.md` 与会话日志 `history.txt` 已删除（2026-10-14）。
+- 主工作分支 `main`（2026-10-14 已按重构方案 §1 完成孤儿化：历史 = 1 个 baseline + 47 个原子重构提交，
+  纯线性；旧完整历史仅存本地 ref `backup/pre-orphan-20261014`）。重构 R0–R6 已完成并入库，
+  方案文档与会话日志已删除。
 - 测试库：容器 `oinur-dev-mysql`（mysql:26.7）绑 127.0.0.1:3307（root 密码 oinur-dev-root，业务号 oinur/oinur）。
   集成/e2e 必须显式传 `DATABASE_URL=mysql://oinur:oinur@127.0.0.1:3307/oinur_test`
   （e2e 另加 `E2E_DATABASE_URL=mysql://oinur:oinur@127.0.0.1:3307/oinur_e2e`）；unit 不连库，无需配置。
