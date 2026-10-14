@@ -37,6 +37,7 @@ jobs:
       DATABASE_URL: mysql://oinur:oinur@127.0.0.1:3306/oinur_test
       JWT_SECRET: ci-jwt-secret-0123456789abcdef-test-only
     steps:
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/ci-setup
       - name: Grant test user privileges
         run: mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'oinur'@'%'; FLUSH PRIVILEGES;"

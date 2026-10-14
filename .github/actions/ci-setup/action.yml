@@ -1,5 +1,5 @@
 name: 'CI setup'
-description: 'Checkout, install the pinned toolchain, and install + generate Prisma. Shared by test.yml and e2e.yml so the setup never drifts between them.'
+description: 'Install the pinned toolchain and install + generate Prisma. Shared by test.yml and e2e.yml so the setup never drifts between them. Requires the caller to run actions/checkout first (local actions cannot be resolved before checkout).'
 inputs:
   # 预留：若某条 workflow 需要不同的 node 版本可覆盖；缺省用根 packageManager 与 node 26。
   node-version:
@@ -9,7 +9,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - uses: actions/checkout@v7
     # 不传 version：由根 package.json 的 packageManager 决定，避免两处真源漂移
     - uses: pnpm/action-setup@v6
     - uses: actions/setup-node@v7
